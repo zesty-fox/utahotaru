@@ -364,6 +364,9 @@ class EditorInterface(QWidget):
         self._key_map = self._key_map_edit
         # 应用默认速度
         default_speed = settings.get("audio.default_speed", 1.0)
+        # 同步到音频引擎，避免 UI 与引擎速度分道扬镳
+        if self._timing_service:
+            self._timing_service.set_speed(default_speed)
         speed_pct = int(default_speed * 100)
         self.transport.edit_speed.blockSignals(True)
         self.transport.edit_speed.setText(f"{max(50, min(200, speed_pct))}%")

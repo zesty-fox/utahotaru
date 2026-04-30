@@ -182,6 +182,8 @@ class SoundDeviceEngine(IAudioEngine):
             return
 
         # 启动流 + producer
+        # 先强制对齐 active 速度，避免 producer 启动后仍在喂旧速度数据
+        self._maybe_swap_active_speed()
         self._start_streaming()
         self._state = PlaybackState.PLAYING
 
@@ -209,9 +211,22 @@ class SoundDeviceEngine(IAudioEngine):
 
         with self._state_lock:
             self._read_pos_samples = 0
-            if self._original_data is not None and abs(self._speed - 1.0) < 1e-9:
-                self._active_pcm = self._original_data
-                self._active_speed = 1.0
+            if self._original_data is not None:
+                # 始终让 active 与当前速度保持一致，避免 stop→play 时状态分歧。
+                # 若缓存未就绪则回退到 1.0x 并同步速度属性，防止播放“错位速度”。
+                if abs(self._speed - 1.0) < 1e-9:
+                    self._active_pcm = self._original_data
+                    self._active_speed = 1.0
+                else:
+                    cached = self._cache.get(self._speed)
+                    if cached is not None:
+                        self._active_pcm = cached
+                        self._active_speed = self._speed
+                    else:
+                        self._active_pcm = self._original_data
+                        self._active_speed = 1.0
+                        self._speed = 1.0
+                        self._pending_speed = 1.0
 
     # ==================== 位置 ====================
 
