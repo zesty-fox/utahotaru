@@ -303,9 +303,12 @@ class SoundDeviceEngine(IAudioEngine):
         if self._original_data is not None:
             q = _quantize(self._speed)
             cb = self._render_progress_cb
+            # 优先渲染当前播放位置附近的音频
+            priority_center = self._read_pos_samples if self._active_pcm is not None else None
             result = self._cache.ensure(
                 self._speed,
                 progress_cb=cb,
+                priority_center=priority_center,
             )
             # 命中缓存 / 1.0x 直通：立刻通知 UI "已就绪"
             if result is not None and cb is not None:

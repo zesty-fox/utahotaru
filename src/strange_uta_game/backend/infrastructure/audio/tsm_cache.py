@@ -102,11 +102,15 @@ class TSMRenderCache:
         speed: float,
         progress_cb: Optional[ProgressCallback] = None,
         done_cb: Optional[DoneCallback] = None,
+        priority_center: Optional[int] = None,
     ) -> Optional[np.ndarray]:
         """确保 ``speed`` 对应的 PCM 就绪。
 
         - 若已缓存：立即返回 ndarray。
         - 否则：后台开始渲染，返回 ``None``；完成时调 ``done_cb(speed)``。
+
+        Args:
+            priority_center: 优先渲染的位置（采样索引），用于先渲染播放位置附近
 
         新的 ensure 调用会取消正在进行的旧渲染（如果不同 speed）。
         """
@@ -134,8 +138,8 @@ class TSMRenderCache:
 
         def _target() -> None:
             try:
-                print(f"[TSM] Worker started for speed {q}x")
-                rendered = self._render_full(q, progress_cb)
+                print(f"[TSM] Worker started for speed {q}x, priority={priority_center}")
+                rendered = self._render_full(q, progress_cb, priority_center)
                 if rendered is None:
                     print(f"[TSM] Render cancelled for speed {q}x")
                     return  # 被取消
@@ -172,6 +176,7 @@ class TSMRenderCache:
         self,
         speed: float,
         progress_cb: Optional[ProgressCallback],
+        priority_center: Optional[int] = None,
     ) -> Optional[np.ndarray]:
         """整文件 TSM 渲染；返回 ``(n_samples, channels)`` float32。
 
@@ -179,6 +184,7 @@ class TSMRenderCache:
         音质极佳，支持高质量模式和瞬态保护。
 
         为避免长时间阻塞无进度反馈，将音频分段处理。
+        如果指定了 priority_center，优先渲染该位置附近的音频。
         """
         assert self._original is not None
         n_in = self._original.shape[0]
@@ -189,17 +195,29 @@ class TSMRenderCache:
         # speed > 1 表示加快播放，所以 stretch_factor = 1/speed
         stretch_factor = 1.0 / speed
 
-        # 分段处理：每段约 5 秒（更小的段，更频繁的进度更新）
+        # 分段处理：每段约 5 秒
         segment_samples = int(self._sample_rate * 5)
-        segments = []
-        pos = 0
         total_segments = max(1, (n_in + segment_samples - 1) // segment_samples)
-        print(f"[TSM] Rendering {n_in} samples at {speed}x, {total_segments} segments")
 
-        for seg_idx in range(total_segments):
+        # 计算段的顺序：优先渲染 priority_center 附近的段
+        if priority_center is not None and 0 <= priority_center < n_in:
+            priority_seg = priority_center // segment_samples
+            # 按距离排序：先渲染 priority_center 附近的段
+            segment_order = sorted(range(total_segments), key=lambda i: abs(i - priority_seg))
+        else:
+            segment_order = list(range(total_segments))
+
+        print(f"[TSM] Rendering {n_in} samples at {speed}x, {total_segments} segments, priority={priority_center}")
+
+        # 预分配输出数组
+        out_segments = [None] * total_segments
+        rendered_count = 0
+
+        for seg_idx in segment_order:
             if self._worker_cancel.is_set():
                 return None
 
+            pos = seg_idx * segment_samples
             end = min(pos + segment_samples, n_in)
             segment = self._original[pos:end]
 
@@ -208,20 +226,19 @@ class TSMRenderCache:
             stretched = time_stretch(
                 pcm_segment, float(self._sample_rate), stretch_factor=stretch_factor
             )
-            segments.append(stretched)
+            out_segments[seg_idx] = stretched
+            rendered_count += 1
 
             # 更新进度
-            progress = (seg_idx + 1) / total_segments
+            progress = rendered_count / total_segments
             if progress_cb is not None:
                 try:
                     progress_cb(speed, min(progress * 0.99, 0.99))
                 except Exception:
                     pass
 
-            pos = end
-
-        # 拼接所有段
-        out = np.concatenate(segments, axis=0).astype(np.float32)
+        # 按顺序拼接所有段
+        out = np.concatenate([s for s in out_segments if s is not None], axis=0).astype(np.float32)
 
         if progress_cb is not None:
             try:
