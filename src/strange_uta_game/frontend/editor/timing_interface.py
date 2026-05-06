@@ -2493,6 +2493,7 @@ class EditorInterface(QWidget):
                 auto_check_flags=auto_check_flags, user_dictionary=user_dict
             )
             auto_check.apply_to_project(self._project, only_noruby=only_noruby)
+            auto_check.update_checkpoints_for_project(self._project)
             self.refresh_lyric_display()
             if hasattr(self, "_store") and self._store:
                 self._store.notify("rubies")
