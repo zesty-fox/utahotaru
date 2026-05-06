@@ -1813,7 +1813,7 @@ class EditorInterface(QWidget):
         self._update_status()
 
     def _on_seek_to_char(self, line_idx: int, char_idx: int):
-        """双击字符 → 跳转到该字符的渲染时间戳前指定毫秒数"""
+        """双击字符 → 跳转到该字符的时间戳前指定毫秒数"""
         if not self._project or line_idx >= len(self._project.sentences):
             return
         sentence = self._project.sentences[line_idx]
@@ -1825,8 +1825,8 @@ class EditorInterface(QWidget):
         if not char:
             return
 
-        # 使用渲染时间戳（包含偏移）而不是原始时间戳
-        tags = char.all_global_timestamps
+        # 使用原始时间戳（不带偏移），与 _on_seek_to_checkpoint 保持一致
+        tags = char.all_timestamps
         if tags:
             target_ms = max(0, tags[0] - jump_before)
             self._on_seek(target_ms)

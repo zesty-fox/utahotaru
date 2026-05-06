@@ -293,10 +293,11 @@ class SoundDeviceEngine(IAudioEngine):
     def _seek_to_orig_samples(self, orig_samples: int) -> None:
         """把播放头移到原始时间轴 ``orig_samples`` 处。"""
         with self._state_lock:
-            if self._active_pcm is None:
+            if self._active_pcm is None or self._active_speed <= 0:
                 return
-            # pedalboard 输出的 PCM 已经是变速后的，直接使用 orig_samples
-            new_pos = int(orig_samples)
+            # 原始时间轴偏移 → 变速后 PCM 偏移
+            # read_pos = orig_samples / active_speed
+            new_pos = int(orig_samples / self._active_speed)
             new_pos = max(0, min(new_pos, len(self._active_pcm)))
             self._read_pos_samples = new_pos
         # 丢弃 ring 里的旧样本
