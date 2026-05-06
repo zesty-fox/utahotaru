@@ -66,7 +66,7 @@ class KaraokePreview(QWidget):
         self._current_char_idx = 0
         self._current_checkpoint_idx: Optional[int] = None
         self._current_time_ms = 0
-        self._render_offset_ms = 0
+        self._global_offset_ms = 0
         self._duration_ms = 0  # 音频总时长（用于行尾非句尾时的wipe右边界）
         self._visible_lines = 7  # 视口内可见行数（决定行高）
         self._scroll_center_line: float = 0.0  # 视口中央对应的行索引
@@ -99,7 +99,7 @@ class KaraokePreview(QWidget):
         self._font_current = QFont("Microsoft YaHei", 22, QFont.Weight.Bold)
         self._font_context = QFont("Microsoft YaHei", 18)
         self._font_ruby = QFont("Microsoft YaHei", 10)
-        self._font_checkpoint = QFont("Microsoft YaHei", 10)
+        self._font_checkpoint = QFont("Microsoft YaHei", 8)
         self._font_line_number = QFont("Microsoft YaHei", 10)
         self._fm_current = QFontMetrics(self._font_current)
         self._fm_context = QFontMetrics(self._font_context)
@@ -255,10 +255,10 @@ class KaraokePreview(QWidget):
             if offset > 0 and not any_valid:
                 return
 
-    def set_render_offset(self, offset_ms: int):
-        """设置渲染偏移量（毫秒），与导出偏移联动，更新所有字符的渲染时间戳"""
-        self._render_offset_ms = offset_ms
-        # 偏移变更时，渲染时间戳已在字符上更新，清除缓存使 wipe 区间重新计算
+    def set_global_offset(self, offset_ms: int):
+        """设置全局偏移量（毫秒），更新所有字符的时间戳"""
+        self._global_offset_ms = offset_ms
+        # 偏移变更时，清除缓存使 wipe 区间重新计算
         self._sentence_cache.clear()
         self._line_versions.clear()
         self._global_version += 1
@@ -345,7 +345,8 @@ class KaraokePreview(QWidget):
                 self._focus_char_idx = char_idx
                 self._focus_char_range_end = char_idx
                 self._focus_dragging = True
-                self.char_selected.emit(line_idx, char_idx)
+                # 不立即触发 char_selected，避免居中导致双击失败
+                # char_selected 会在单击超时后触发
 
                 # 记录待处理的单击位置，等待双击判断
                 self._pending_cp_click = False
@@ -537,7 +538,7 @@ class KaraokePreview(QWidget):
         """查找下一行的第一个checkpoint时间戳，用于行尾非句尾时的wipe右边界。
 
         Returns:
-            下一行第一个字符的 render_timestamps[0]，如果不存在返回 None
+            下一行第一个字符的 global_timestamps[0]，如果不存在返回 None
         """
         if not self._project or not self._project.sentences:
             return None
@@ -546,8 +547,8 @@ class KaraokePreview(QWidget):
             return None
         next_sentence = self._project.sentences[next_line_idx]
         for ch in next_sentence.characters:
-            if ch.render_timestamps:
-                return int(ch.render_timestamps[0])
+            if ch.global_timestamps:
+                return int(ch.global_timestamps[0])
         return None
 
     def _get_sentence_render_data(
@@ -557,8 +558,8 @@ class KaraokePreview(QWidget):
 
         渲染模型：
           - wipe 时间线的单位 = 一整行（sentence），与打轴的连词组解耦
-          - 行内所有带 render_timestamps 的字符 + 行尾（is_sentence_end +
-            render_sentence_end_ts）构成"锚点"
+          - 行内所有带 global_timestamps 的字符 + 行尾（is_sentence_end +
+            global_sentence_end_ts）构成"锚点"
           - 相邻锚点之间的所有字符（含无时间戳的）按字符像素宽度加权线性插值
             分配 wipe 区间——解决等字符数分配导致的宽度/节奏不匹配跳变
           - 首锚之前 / 末锚之后的字符贴首/末锚（wipe 恒 0 或 1）
@@ -577,16 +578,11 @@ class KaraokePreview(QWidget):
         characters = sentence.characters
         n_chars = len(chars)
 
-        # 字符像素宽度（取字符和ruby中较宽者，避免ruby重叠）
+        # 字符像素宽度（初始为字符本身的宽度）
         fm_ruby = self._fm_ruby
         char_widths = []
         for ci, ch in enumerate(chars):
             char_w = main_fm.horizontalAdvance(ch)
-            # 检查是否有ruby且ruby更宽
-            ruby = characters[ci].ruby
-            if ruby:
-                ruby_w = fm_ruby.horizontalAdvance(ruby.text)
-                char_w = max(char_w, ruby_w)
             char_widths.append(char_w)
 
         # ---------- 连词组（仅用于视觉层，与 wipe 计算无关） ----------
@@ -610,7 +606,7 @@ class KaraokePreview(QWidget):
                 for _ci in group[1:]:
                     linked_non_leader.add(_ci)
 
-        # 连词组：确保组的总宽度 >= 合并后ruby的宽度
+        # 连词组：将合并后的 ruby 宽度平均分配到组内每个字符
         for leader_ci, group in linked_leader_groups.items():
             merged_ruby_text = ""
             for _gci in group:
@@ -619,23 +615,31 @@ class KaraokePreview(QWidget):
                     merged_ruby_text += _r.text
             if merged_ruby_text:
                 merged_ruby_w = fm_ruby.horizontalAdvance(merged_ruby_text)
-                group_total_w = sum(char_widths[g] for g in group)
-                if merged_ruby_w > group_total_w:
-                    # 将多余宽度平均分配到组内每个字符
-                    extra = (merged_ruby_w - group_total_w) / len(group)
-                    for g in group:
-                        char_widths[g] += extra
+                group_total_char_w = sum(char_widths[g] for g in group)
+                # 确保组的总宽度 >= 合并后ruby的宽度
+                target_total_w = max(group_total_char_w, merged_ruby_w)
+                # 将宽度平均分配到组内每个字符
+                per_char_w = target_total_w / len(group)
+                for g in group:
+                    char_widths[g] = max(char_widths[g], per_char_w)
+
+        # 单字符：确保宽度 >= ruby宽度
+        for ci, ch in enumerate(chars):
+            ruby = characters[ci].ruby
+            if ruby and ci not in linked_non_leader:
+                ruby_w = fm_ruby.horizontalAdvance(ruby.text)
+                char_widths[ci] = max(char_widths[ci], ruby_w)
 
         # ---------- wipe 时间线（离散字符开始时间模型） ----------
-        # 每个字符的 wipe 开始时间 = 该字符第一个 cp 的时间戳（render_timestamps[0]）。
+        # 每个字符的 wipe 开始时间 = 该字符第一个 cp 的时间戳（global_timestamps[0]）。
         # 字符 wipe 结束时间 = 同句子内下一个有 start_ts 的字符的开始时间；
-        # 若后面无 start_ts，则使用句尾时间戳（render_sentence_end_ts）。
+        # 若后面无 start_ts，则使用句尾时间戳（global_sentence_end_ts）。
         # 中间无 timestamp 的字符与上一个有 timestamp 的字符连读，共享同一段 wipe。
         # 一行可能含多个句子（多个 is_sentence_end），各句子独立计算段。
         start_times: dict[int, int] = {}
         for ci, ch in enumerate(characters):
-            if ch.render_timestamps:
-                start_times[ci] = int(ch.render_timestamps[0])
+            if ch.global_timestamps:
+                start_times[ci] = int(ch.global_timestamps[0])
 
         # 按 is_sentence_end 拆分为句子范围 [(sent_start, sent_end)]，含边界
         sent_ranges: list[tuple[int, int]] = []
@@ -677,8 +681,8 @@ class KaraokePreview(QWidget):
                     # 句子最后一段：找 sentence_end_ts
                     end_ts = None
                     for ci in range(leader, sent_end + 1):
-                        if characters[ci].is_sentence_end and characters[ci].render_sentence_end_ts is not None:
-                            end_ts = int(characters[ci].render_sentence_end_ts)
+                        if characters[ci].is_sentence_end and characters[ci].global_sentence_end_ts is not None:
+                            end_ts = int(characters[ci].global_sentence_end_ts)
                             break
                     if end_ts is None:
                         # 使用预处理的 fallback（行尾非句尾时从下一行借的时间戳）
@@ -754,7 +758,8 @@ class KaraokePreview(QWidget):
                 self._pending_cp_line, self._pending_cp_char, self._pending_cp_idx
             )
         elif self._pending_click_line >= 0:
-            # 单击字符：触发 line_clicked 跳转到该行
+            # 单击字符：触发 char_selected（居中）和 line_clicked
+            self.char_selected.emit(self._pending_click_line, self._pending_click_char)
             self.line_clicked.emit(self._pending_click_line)
 
         self._pending_click_pos = None
@@ -773,7 +778,7 @@ class KaraokePreview(QWidget):
         self._checkpoint_hitboxes = []
         self._char_hitboxes = []
 
-        # 渲染时间：偏移已在 render_timestamps 中预计算，直接使用当前播放时间
+        # 渲染时间：偏移已在 global_timestamps 中预计算，直接使用当前播放时间
         current_time = self._current_time_ms
 
         if not self._project or not self._project.sentences:
@@ -1126,9 +1131,9 @@ class KaraokePreview(QWidget):
                         # 同源——使用 render_* 时间戳字段。否则当存在 render
                         # offset 时句尾标记会与走字进度不同步。
                         has_timed = (
-                            ch_obj.render_sentence_end_ts is not None
+                            ch_obj.global_sentence_end_ts is not None
                             if is_sentence_end_marker
-                            else cp_idx < len(ch_obj.render_timestamps)
+                            else cp_idx < len(ch_obj.global_timestamps)
                         )
 
                         if is_sentence_end_marker:
