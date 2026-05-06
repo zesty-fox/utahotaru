@@ -1183,7 +1183,7 @@ class KaraokePreview(QWidget):
                             ch_obj.selected_checkpoint_idx == cp_idx
                         )
                         if not has_timed:
-                            color = QColor("black")
+                            color = theme.text_disabled
                         elif is_selected:
                             color = _char_complement_colors.get(
                                 char_pos, _char_singer_colors.get(char_pos, highlight_color)
