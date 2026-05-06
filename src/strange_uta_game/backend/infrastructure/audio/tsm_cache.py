@@ -78,7 +78,7 @@ class TSMRenderCache:
     # ---------- 查询 ----------
 
     def get(self, speed: float) -> Optional[np.ndarray]:
-        """非阻塞查询。命中则触碰 LRU；未命中返回 None。"""
+        """查询缓存，未命中则实时渲染返回。"""
         if self._original is None:
             return None
         q = _quantize(speed)
@@ -89,7 +89,17 @@ class TSMRenderCache:
             pcm = self._cache.get(key)
             if pcm is not None:
                 self._cache.move_to_end(key)
-            return pcm
+                return pcm
+
+        # 未命中缓存，实时渲染
+        rendered = self._render_full(q, None)
+        if rendered is not None:
+            with self._lock:
+                self._cache[key] = rendered
+                self._cache.move_to_end(key)
+                while len(self._cache) > _LRU_MAX:
+                    self._cache.popitem(last=False)
+        return rendered
 
     def has(self, speed: float) -> bool:
         return self.get(speed) is not None
