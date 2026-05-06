@@ -50,7 +50,7 @@ class KaraokePreview(QWidget):
         int, int, int, str
     )  # line_idx, start_char, end_char, singer_id
     delete_chars_requested = pyqtSignal(int, int, int)
-    delete_timestamp_requested = pyqtSignal(int, int, int)
+    delete_timestamp_requested = pyqtSignal(int, int)
     insert_space_after_requested = pyqtSignal(int, int)
     merge_line_up_requested = pyqtSignal(int)
     delete_line_requested = pyqtSignal(int)
@@ -438,6 +438,20 @@ class KaraokePreview(QWidget):
         delete_end = sel_end + 1 if in_selection else target_char_idx + 1
 
         menu = RoundMenu(parent=self)
+        # 确保菜单背景不透明
+        bg_color = theme.bg_secondary.name()
+        border_color = theme.border_primary.name()
+        menu.setStyleSheet(f"""
+            RoundMenu {{
+                background-color: {bg_color};
+                border: 1px solid {border_color};
+            }}
+            MenuActionListWidget {{
+                background-color: {bg_color};
+                border: 1px solid {border_color};
+                border-radius: 9px;
+            }}
+        """)
 
         delete_action = Action("删除字符", menu)
         delete_action.triggered.connect(
