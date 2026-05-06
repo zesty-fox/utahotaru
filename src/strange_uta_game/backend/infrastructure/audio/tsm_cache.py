@@ -198,9 +198,15 @@ class TSMRenderCache:
 
     def _cancel_worker_and_wait(self) -> None:
         """取消正在进行的渲染任务。"""
+        # 设置取消标志
         self._worker_cancel.set()
-        # 不等待 worker 完成，让它自己检查取消标志并停止
-        # 这样可以避免阻塞调用线程
+        # 等待之前的 worker 完成
+        worker = self._worker
+        if worker is not None and worker.is_alive():
+            print(f"[TSM] Waiting for previous worker to finish...")
+            worker.join(timeout=5.0)  # 等待 worker 检测到取消信号并完成
+            if worker.is_alive():
+                print(f"[TSM] Warning: Previous worker still alive after timeout")
         self._worker = None
         self._worker_speed = None
 
