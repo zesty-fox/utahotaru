@@ -62,6 +62,8 @@ class FileLoader:
 
     def prompt_load_project(self):
         """弹出文件选择框加载项目"""
+        if not self.check_unsaved_changes():
+            return
         path, _ = QFileDialog.getOpenFileName(
             self._editor, "打开项目", "",
             "StrangeUtaGame 项目 (*.sug);;所有文件 (*.*)",
@@ -97,8 +99,44 @@ class FileLoader:
 
     # ── 实际加载逻辑 ──
 
+    def check_unsaved_changes(self) -> bool:
+        """检查当前项目是否有未保存内容，提示用户保存。
+
+        Returns:
+            True: 可以继续加载新项目
+            False: 用户取消了操作
+        """
+        if not self._project:
+            return True
+
+        store = self._store
+        has_save_path = store and store.save_path
+
+        if not has_save_path:
+            # 临时项目：提示保存
+            reply = QMessageBox.question(
+                self._editor,
+                "保存当前项目",
+                "当前项目尚未保存，是否保存？",
+                QMessageBox.StandardButton.Save
+                | QMessageBox.StandardButton.Discard
+                | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Save,
+            )
+            if reply == QMessageBox.StandardButton.Save:
+                self._editor._on_save()
+                return True
+            elif reply == QMessageBox.StandardButton.Discard:
+                return True
+            else:  # Cancel
+                return False
+
+        return True
+
     def load_project(self, file_path: str):
         """加载 .sug 项目文件"""
+        if not self.check_unsaved_changes():
+            return
         try:
             from strange_uta_game.backend.infrastructure.persistence.sug_io import (
                 SugProjectParser,
