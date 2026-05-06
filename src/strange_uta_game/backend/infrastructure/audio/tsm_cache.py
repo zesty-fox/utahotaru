@@ -78,7 +78,7 @@ class TSMRenderCache:
     # ---------- 查询 ----------
 
     def get(self, speed: float) -> Optional[np.ndarray]:
-        """查询缓存，未命中则实时渲染返回。"""
+        """非阻塞查询。命中则触碰 LRU；未命中返回 None。"""
         if self._original is None:
             return None
         q = _quantize(speed)
@@ -90,16 +90,7 @@ class TSMRenderCache:
             if pcm is not None:
                 self._cache.move_to_end(key)
                 return pcm
-
-        # 未命中缓存，实时渲染
-        rendered = self._render_full(q, None)
-        if rendered is not None:
-            with self._lock:
-                self._cache[key] = rendered
-                self._cache.move_to_end(key)
-                while len(self._cache) > _LRU_MAX:
-                    self._cache.popitem(last=False)
-        return rendered
+        return None
 
     def has(self, speed: float) -> bool:
         return self.get(speed) is not None
@@ -126,36 +117,41 @@ class TSMRenderCache:
             return self._original
         cached = self.get(q)
         if cached is not None:
+            print(f"[TSM] Cache hit for speed {q}x")
             return cached
 
         # 需要渲染
         with self._lock:
             if self._worker is not None and self._worker_speed == q and self._worker.is_alive():
-                # 已经在渲同一速度，合并
+                print(f"[TSM] Already rendering speed {q}x, skipping")
                 return None
 
         self._cancel_worker_and_wait()
 
         self._worker_cancel.clear()
         self._worker_speed = q
+        print(f"[TSM] Starting render for speed {q}x")
 
         def _target() -> None:
             try:
+                print(f"[TSM] Worker started for speed {q}x")
                 rendered = self._render_full(q, progress_cb)
                 if rendered is None:
+                    print(f"[TSM] Render cancelled for speed {q}x")
                     return  # 被取消
                 with self._lock:
                     self._cache[(self._path or "", q)] = rendered
                     self._cache.move_to_end((self._path or "", q))
                     while len(self._cache) > _LRU_MAX:
                         self._cache.popitem(last=False)
+                print(f"[TSM] Render complete for speed {q}x, shape={rendered.shape}")
                 if done_cb is not None:
                     try:
                         done_cb(q)
                     except Exception as e:
-                        print(f"[TSMRenderCache] done_cb error: {e}")
+                        print(f"[TSM] done_cb error: {e}")
             except Exception as e:
-                print(f"[TSMRenderCache] render error: {e}")
+                print(f"[TSM] Render error for speed {q}x: {e}")
 
         t = threading.Thread(target=_target, daemon=True, name=f"TSMRender-{q}")
         self._worker = t
@@ -193,11 +189,12 @@ class TSMRenderCache:
         # speed > 1 表示加快播放，所以 stretch_factor = 1/speed
         stretch_factor = 1.0 / speed
 
-        # 分段处理：每段约 10 秒（避免长时间无进度反馈）
-        segment_samples = int(self._sample_rate * 10)  # 10秒
+        # 分段处理：每段约 5 秒（更小的段，更频繁的进度更新）
+        segment_samples = int(self._sample_rate * 5)
         segments = []
         pos = 0
         total_segments = max(1, (n_in + segment_samples - 1) // segment_samples)
+        print(f"[TSM] Rendering {n_in} samples at {speed}x, {total_segments} segments")
 
         for seg_idx in range(total_segments):
             if self._worker_cancel.is_set():
