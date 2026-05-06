@@ -164,7 +164,7 @@ class MainWindow(MSFluentWindow):
 
     def _init_navigation(self):
         """初始化侧边栏导航"""
-        self.addSubInterface(self.homeInterface, FIF.HOME, "主页")
+        self.addSubInterface(self.homeInterface, FIF.HOME, "主页（待移除）")
         self.addSubInterface(self.editorInterface, FIF.PLAY, "打轴")
         self.addSubInterface(self.editViewInterface, FIF.EDIT, "行编辑")
         self.addSubInterface(self.exportInterface, FIF.SHARE, "导出")
@@ -180,8 +180,8 @@ class MainWindow(MSFluentWindow):
             position=NavigationItemPosition.BOTTOM,
         )
 
-        # 默认主页
-        self.switchTo(self.homeInterface)
+        # 默认打轴页面
+        self.switchTo(self.editorInterface)
 
     # ==================== 标签页切换 ====================
 
