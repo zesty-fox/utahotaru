@@ -521,23 +521,36 @@ class EditorInterface(QWidget):
         a0.acceptProposedAction()
 
     def _load_lyrics_from_path(self, path: str):
-        """从文件路径加载歌词（拖拽或按钮均可调用）。"""
-        if not self._project:
-            InfoBar.warning(
-                title="无法加载",
-                content="请先创建或打开一个项目",
-                orient=Qt.Orientation.Horizontal,
-                isClosable=True,
-                position=InfoBarPosition.TOP,
-                duration=3000,
-                parent=self,
-            )
-            return
+        """从文件路径加载歌词（拖拽或按钮均可调用）。
+
+        如果当前没有项目，会自动创建一个新项目。
+        """
         try:
             from strange_uta_game.backend.application import (
                 ProjectImportService,
                 ProjectImportError,
             )
+            from strange_uta_game.backend.domain import Singer
+
+            # 如果没有项目，自动创建一个新项目
+            if not self._project:
+                if self._store:
+                    from strange_uta_game.backend.application import ProjectService
+                    project_service = ProjectService()
+                    project = project_service.create_project()
+                    self._store._project = project
+                    self._store.notify("project")
+                else:
+                    InfoBar.warning(
+                        title="无法加载",
+                        content="请先创建或打开一个项目",
+                        orient=Qt.Orientation.Horizontal,
+                        isClosable=True,
+                        position=InfoBarPosition.TOP,
+                        duration=3000,
+                        parent=self,
+                    )
+                    return
 
             default_singer = self._project.get_default_singer()
             try:
