@@ -24,6 +24,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QKeyEvent
 from PyQt6.QtWidgets import (
     QDialog,
+    QFileDialog,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -136,6 +137,8 @@ class EditorInterface(QWidget):
         # 1) 工具栏
         self.toolbar = EditorToolBar(self)
         self.toolbar.save_clicked.connect(self._on_save)
+        self.toolbar.save_as_clicked.connect(self._on_save_as)
+        self.toolbar.new_project_clicked.connect(self._on_new_project)
         self.toolbar.load_project_clicked.connect(self._on_load_project)
         self.toolbar.load_audio_clicked.connect(self._on_load_audio)
         self.toolbar.load_lyrics_clicked.connect(self._on_load_lyrics)
@@ -560,6 +563,106 @@ class EditorInterface(QWidget):
                     SugProjectParser,
                 )
 
+                SugProjectParser.save(self._project, path)
+                success = True
+
+            if success:
+                InfoBar.success(
+                    title="保存成功",
+                    content=path,
+                    orient=Qt.Orientation.Horizontal,
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=3000,
+                    parent=self,
+                )
+                self.project_saved.emit()
+            else:
+                InfoBar.error(
+                    title="保存失败",
+                    content="无法保存到 " + path,
+                    orient=Qt.Orientation.Horizontal,
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=3000,
+                    parent=self,
+                )
+        except Exception as e:
+            InfoBar.error(
+                title="保存失败",
+                content=str(e),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=5000,
+                parent=self,
+            )
+
+    def _on_new_project(self):
+        """新建项目（检查当前项目是否需要保存）"""
+        if self._project:
+            # 检查是否有未保存的更改
+            store = getattr(self, "_store", None)
+            has_save_path = store and store.save_path
+
+            if not has_save_path:
+                # 临时项目：提示保存
+                reply = QMessageBox.question(
+                    self,
+                    "保存当前项目",
+                    "当前项目尚未保存，是否保存？",
+                    QMessageBox.StandardButton.Save
+                    | QMessageBox.StandardButton.Discard
+                    | QMessageBox.StandardButton.Cancel,
+                    QMessageBox.StandardButton.Save,
+                )
+                if reply == QMessageBox.StandardButton.Save:
+                    self._on_save()
+                elif reply == QMessageBox.StandardButton.Cancel:
+                    return
+
+        # 创建新项目
+        from strange_uta_game.backend.application import ProjectService
+
+        project_service = ProjectService()
+        project = project_service.create_project()
+        if self._store:
+            self._store._project = project
+            self._store._save_path = None
+            self._store.notify("project")
+        else:
+            self.set_project(project)
+
+    def _on_save_as(self):
+        """项目另存为"""
+        if not self._project:
+            InfoBar.warning(
+                title="无项目",
+                content="请先创建或打开项目",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+            return
+
+        path, _ = QFileDialog.getSaveFileName(
+            self, "另存为", "", "StrangeUtaGame 项目 (*.sug);;所有文件 (*.*)"
+        )
+        if not path:
+            return
+        if not path.endswith(".sug"):
+            path += ".sug"
+
+        try:
+            store = getattr(self, "_store", None)
+            if store:
+                success = store.save(path)
+            else:
+                from strange_uta_game.backend.infrastructure.persistence.sug_io import (
+                    SugProjectParser,
+                )
                 SugProjectParser.save(self._project, path)
                 success = True
 

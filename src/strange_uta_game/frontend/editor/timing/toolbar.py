@@ -25,6 +25,8 @@ class EditorToolBar(QFrame):
     """编辑器工具栏 - 保存/加载/批量变更/修改字符/插入导唱符/偏移调整"""
 
     save_clicked = pyqtSignal()
+    save_as_clicked = pyqtSignal()
+    new_project_clicked = pyqtSignal()
     load_project_clicked = pyqtSignal()
     load_audio_clicked = pyqtSignal()
     load_lyrics_clicked = pyqtSignal()
@@ -45,18 +47,16 @@ class EditorToolBar(QFrame):
         layout.setContentsMargins(10, 4, 10, 4)
         layout.setSpacing(6)
 
-        self.btn_save = PushButton("保存项目", self)
-        self.btn_save.setIcon(FIF.SAVE)
-        self.btn_save.setFixedHeight(32)
-        self.btn_save.clicked.connect(self.save_clicked.emit)
-        layout.addWidget(self.btn_save)
-
-        # 加载下拉菜单（加载项目 / 加载音频 / 加载歌词）
-        self.btn_load = DropDownPushButton("加载", self)
+        # 文件管理下拉菜单
+        self.btn_load = DropDownPushButton("文件管理", self)
         self.btn_load.setIcon(FIF.FOLDER)
         self.btn_load.setFixedHeight(32)
         load_menu = RoundMenu(parent=self.btn_load)
+        load_menu.addAction(Action(FIF.ADD, "新建项目", self, triggered=self.new_project_clicked.emit))
+        load_menu.addAction(Action(FIF.SAVE, "保存项目", self, triggered=self.save_clicked.emit))
+        load_menu.addSeparator()
         load_menu.addAction(Action(FIF.FOLDER, "加载项目", self, triggered=self.load_project_clicked.emit))
+        load_menu.addAction(Action(FIF.SAVE_AS, "项目另存为", self, triggered=self.save_as_clicked.emit))
         load_menu.addAction(Action(FIF.MUSIC, "加载音频", self, triggered=self.load_audio_clicked.emit))
         load_menu.addAction(Action(FIF.DOCUMENT, "加载歌词", self, triggered=self.load_lyrics_clicked.emit))
         self.btn_load.setMenu(load_menu)
