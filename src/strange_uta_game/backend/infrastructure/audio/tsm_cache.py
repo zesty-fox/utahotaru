@@ -195,9 +195,9 @@ class TSMRenderCache:
         if n_in == 0:
             return np.zeros((0, self._channels), dtype=np.float32)
 
-        # stretch_factor: >1 拉伸（变慢），<1 压缩（变快）
-        # speed > 1 表示加快播放，所以 stretch_factor = 1/speed
-        stretch_factor = 1.0 / speed
+        # stretch_factor: >1 压缩（变快），<1 拉伸（变慢）
+        # speed > 1 表示加快播放，所以 stretch_factor = speed
+        stretch_factor = speed
 
         # 分段处理：每段约 5 秒
         segment_samples = int(self._sample_rate * 5)
