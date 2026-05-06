@@ -234,9 +234,8 @@ class SoundDeviceEngine(IAudioEngine):
         with self._state_lock:
             if self._active_pcm is None or self._sample_rate == 0:
                 return 0
-            # active 上的偏移 → 原始时间轴：active 上 N 个样本 = 原始上
-            # N * speed 个样本（因为 active 是变速后的 PCM，速度 s 表示
-            # active 比原始快 s 倍，亦即每 1 秒 active = 1*s 秒原始）
+            # pedalboard 输出的 PCM 已经是变速后的，active_speed 始终为 1.0
+            # 位置计算：直接使用 read_pos_samples
             read_pos = self._read_pos_samples
 
             # 减去 RingBuffer 中尚未播放的样本数，得到实际播放位置
@@ -246,8 +245,8 @@ class SoundDeviceEngine(IAudioEngine):
                 # 在 active PCM 上，这些帧对应的位置
                 read_pos = max(0, read_pos - buffered_frames)
 
-            orig_samples = read_pos * self._active_speed
-            ms = int(orig_samples / self._sample_rate * 1000)
+            # 直接转换为毫秒（active_speed 始终为 1.0）
+            ms = int(read_pos / self._sample_rate * 1000)
             return min(max(ms, 0), self._duration_ms)
 
     def set_position_ms(self, position_ms: int) -> None:
@@ -262,8 +261,8 @@ class SoundDeviceEngine(IAudioEngine):
         with self._state_lock:
             if self._active_pcm is None:
                 return
-            # active 上的偏移 = orig_samples / active_speed
-            new_pos = int(orig_samples / max(self._active_speed, 1e-6))
+            # pedalboard 输出的 PCM 已经是变速后的，直接使用 orig_samples
+            new_pos = int(orig_samples)
             new_pos = max(0, min(new_pos, len(self._active_pcm)))
             self._read_pos_samples = new_pos
         # 丢弃 ring 里的旧样本
@@ -511,13 +510,15 @@ class SoundDeviceEngine(IAudioEngine):
         # 计算"当前原始时间轴位置" → 在新 PCM 上的偏移
         if cur_pcm is None or self._sample_rate == 0:
             return
-        orig_samples = cur_pos * cur_speed
-        new_pos = int(orig_samples / max(pending, 1e-6))
+        # pedalboard 输出的 PCM 已经是变速后的，active_speed 始终为 1.0
+        # 位置计算：orig_samples = read_pos * 1.0
+        orig_samples = cur_pos  # 因为 active_speed 始终为 1.0
+        new_pos = int(orig_samples)
         new_pos = max(0, min(new_pos, len(new_pcm)))
 
         with self._state_lock:
             self._active_pcm = new_pcm
-            self._active_speed = float(pending)
+            self._active_speed = 1.0  # pedalboard 输出已是变速后的 PCM
             self._read_pos_samples = new_pos
 
         # 丢弃 ring 里的旧速度样本，避免跨速度拼接听感跳变
