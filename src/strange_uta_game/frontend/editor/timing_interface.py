@@ -523,12 +523,115 @@ class EditorInterface(QWidget):
     def _load_lyrics_from_path(self, path: str):
         """从文件路径加载歌词（拖拽或按钮均可调用）。
 
+        自动检测歌词格式（LRC/SRT/ASS/Nicokara/内联格式等）并解析。
         如果当前没有项目，会自动创建一个新项目。
         """
+        from .lyric_loader import read_lyric_file, parse_lyric_content
+
+        content = read_lyric_file(path)
+        if content is None:
+            InfoBar.error(
+                title="读取失败",
+                content="无法读取歌词文件",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=5000,
+                parent=self,
+            )
+            return
+
         try:
-            from strange_uta_game.backend.application import (
-                ProjectImportService,
-                ProjectImportError,
+            from strange_uta_game.backend.application import ProjectService
+            from strange_uta_game.backend.domain import Singer
+
+            # 如果没有项目，自动创建一个新项目
+            if not self._project:
+                if self._store:
+                    project_service = ProjectService()
+                    project = project_service.create_project()
+                    self._store._project = project
+                    self._store.notify("project")
+                else:
+                    InfoBar.warning(
+                        title="无法加载",
+                        content="请先创建或打开一个项目",
+                        orient=Qt.Orientation.Horizontal,
+                        isClosable=True,
+                        position=InfoBarPosition.TOP,
+                        duration=3000,
+                        parent=self,
+                    )
+                    return
+
+            default_singer = self._project.get_default_singer()
+
+            # 解析歌词
+            sentences, is_nicokara, new_singers = parse_lyric_content(
+                content, default_singer.id, self._project.singers
+            )
+
+            # 添加 Nicokara 格式中的新演唱者
+            for singer in new_singers:
+                self._project.add_singer(singer)
+
+            if not sentences:
+                InfoBar.warning(
+                    title="解析结果为空",
+                    content="歌词文件未解析出有效内容",
+                    orient=Qt.Orientation.Horizontal,
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=3000,
+                    parent=self,
+                )
+                return
+
+            # 替换项目歌词
+            self._project.sentences.clear()
+            for s in sentences:
+                self._project.sentences.append(s)
+
+            # 重建引擎状态
+            if self._timing_service:
+                self._timing_service.set_project(self._project)
+            if self._store:
+                self._store.notify("lyrics")
+
+            self.refresh_lyric_display()
+
+            InfoBar.success(
+                title="歌词已加载",
+                content=f"已加载 {len(sentences)} 行歌词",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+
+            # 如果是 Nicokara 格式，提示用户是否需要重新注音
+            if is_nicokara:
+                reply = QMessageBox.question(
+                    self,
+                    "Nicokara 格式检测",
+                    "检测到 Nicokara 格式歌词（已包含注音）。\n\n是否需要重新自动注音？\n"
+                    "选择「是」将清除现有注音并重新分析；\n选择「否」保留原有注音。",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No,
+                )
+                if reply == QMessageBox.StandardButton.Yes:
+                    self._auto_analyze_all_rubies()
+
+        except Exception as e:
+            InfoBar.error(
+                title="加载失败",
+                content=str(e),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=5000,
+                parent=self,
             )
             from strange_uta_game.backend.domain import Singer
 
@@ -2482,3 +2585,45 @@ class EditorInterface(QWidget):
 
     def refresh_lyric_display(self):
         self.preview._update_display()
+
+    def _auto_analyze_all_rubies(self):
+        """自动分析全部注音（用于歌词导入后重新注音）"""
+        if not self._project:
+            return
+
+        try:
+            from strange_uta_game.backend.application import AutoCheckService
+            from strange_uta_game.frontend.settings.settings_interface import AppSettings
+
+            app_settings = AppSettings()
+            auto_check_flags = app_settings.get_all().get("auto_check", {})
+            user_dict = app_settings.load_dictionary()
+            auto_check = AutoCheckService(
+                auto_check_flags=auto_check_flags, user_dictionary=user_dict
+            )
+            # 全部重新分析（覆盖已有注音）
+            auto_check.apply_to_project(self._project, only_noruby=False)
+            self.refresh_lyric_display()
+            if hasattr(self, "_store") and self._store:
+                self._store.notify("rubies")
+                self._store.notify("checkpoints")
+
+            InfoBar.success(
+                title="注音分析完成",
+                content="已重新分析全部注音",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+        except Exception as e:
+            InfoBar.warning(
+                title="注音分析失败",
+                content=str(e),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
