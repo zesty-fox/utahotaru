@@ -37,7 +37,7 @@ def _get_config_dir() -> Path:
 
 # 配置目录（与 AppSettings 一致）
 _CONFIG_DIR = _get_config_dir()
-_UNTITLED_TEMP = _CONFIG_DIR / "untitled.sug.temp"
+_UNTITLED_TEMP = _CONFIG_DIR / ".untitled.sug.temp"
 
 
 class ProjectStore(QObject):
@@ -226,19 +226,35 @@ class ProjectStore(QObject):
             pass  # 定时保存静默失败
 
     def get_temp_path(self) -> Path:
-        """返回当前项目的临时保存路径。"""
+        """返回当前项目的临时保存路径（隐藏文件）。"""
         if self._save_path:
-            return Path(self._save_path + ".temp")
+            p = Path(self._save_path)
+            return p.parent / ("." + p.name + ".temp")
         return _UNTITLED_TEMP
 
     def cleanup_temp_files(self) -> None:
-        """删除当前项目关联的临时文件（含 .temp 与 .autosave，兼容旧 .autosave.sug）。"""
+        """删除当前项目关联的临时文件（含 .temp 与 .autosave，兼容旧命名）。"""
         temp = self.get_temp_path()
         try:
             if temp.exists():
                 temp.unlink()
         except Exception:
             pass
+
+        # 删除 autosave 文件（仅已保存项目才有）；兼容旧命名
+        if self._save_path:
+            p = Path(self._save_path)
+            for name in (
+                str(p.parent / ("." + p.name + ".autosave")),
+                self._save_path + ".autosave",
+                self._save_path + ".autosave.sug",
+            ):
+                try:
+                    fp = Path(name)
+                    if fp.exists():
+                        fp.unlink()
+                except Exception:
+                    pass
 
         # 删除 autosave 文件（仅已保存项目才有）；兼容旧命名
         if self._save_path:
