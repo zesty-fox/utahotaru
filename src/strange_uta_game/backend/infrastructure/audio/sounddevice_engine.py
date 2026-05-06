@@ -237,7 +237,16 @@ class SoundDeviceEngine(IAudioEngine):
             # active 上的偏移 → 原始时间轴：active 上 N 个样本 = 原始上
             # N * speed 个样本（因为 active 是变速后的 PCM，速度 s 表示
             # active 比原始快 s 倍，亦即每 1 秒 active = 1*s 秒原始）
-            orig_samples = self._read_pos_samples * self._active_speed
+            read_pos = self._read_pos_samples
+
+            # 减去 RingBuffer 中尚未播放的样本数，得到实际播放位置
+            if self._ring is not None and self._state == PlaybackState.PLAYING:
+                # RingBuffer 中待播放的帧数
+                buffered_frames = self._ring.available_read()
+                # 在 active PCM 上，这些帧对应的位置
+                read_pos = max(0, read_pos - buffered_frames)
+
+            orig_samples = read_pos * self._active_speed
             ms = int(orig_samples / self._sample_rate * 1000)
             return min(max(ms, 0), self._duration_ms)
 

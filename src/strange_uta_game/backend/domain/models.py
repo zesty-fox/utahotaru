@@ -178,15 +178,12 @@ class Character:
     # 不参与 .sug 序列化——选中态是 UI 状态，不跨会话持久化。
     selected_checkpoint_idx: Optional[int] = field(default=None, compare=False)
 
-    # 渲染/导出偏移量（内部管理，不参与构造和序列化）
-    _render_offset_ms: int = field(default=0, init=False, repr=False)
-    _export_offset_ms: int = field(default=0, init=False, repr=False)
+    # 全局偏移量（内部管理，不参与构造和序列化）
+    _global_offset_ms: int = field(default=0, init=False, repr=False)
 
     # 派生偏移时间戳（自动维护，不参与构造和序列化）
-    render_timestamps: List[int] = field(default_factory=list, init=False, repr=False)
-    render_sentence_end_ts: Optional[int] = field(default=None, init=False, repr=False)
-    export_timestamps: List[int] = field(default_factory=list, init=False, repr=False)
-    export_sentence_end_ts: Optional[int] = field(default=None, init=False, repr=False)
+    global_timestamps: List[int] = field(default_factory=list, init=False, repr=False)
+    global_sentence_end_ts: Optional[int] = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
         if not self.char:
@@ -433,55 +430,35 @@ class Character:
 
     # ── 偏移时间戳管理 ──
 
-    def set_offsets(self, render_offset_ms: int, export_offset_ms: int) -> None:
-        """设置渲染/导出偏移量并重新计算派生时间戳
+    def set_offset(self, offset_ms: int) -> None:
+        """设置全局偏移量并重新计算派生时间戳
 
         Args:
-            render_offset_ms: 渲染偏移量（毫秒），负值=提前渲染
-            export_offset_ms: 导出偏移量（毫秒），负值=提前导出
+            offset_ms: 偏移量（毫秒），负值=提前
         """
-        self._render_offset_ms = render_offset_ms
-        self._export_offset_ms = export_offset_ms
+        self._global_offset_ms = offset_ms
         self._update_offset_timestamps()
 
     def _update_offset_timestamps(self) -> None:
-        """根据基础时间戳和偏移量重新计算渲染/导出时间戳"""
-        self.render_timestamps = [
-            max(0, ts + self._render_offset_ms) for ts in self.timestamps
+        """根据基础时间戳和偏移量重新计算全局时间戳"""
+        self.global_timestamps = [
+            max(0, ts + self._global_offset_ms) for ts in self.timestamps
         ]
-        self.export_timestamps = [
-            max(0, ts + self._export_offset_ms) for ts in self.timestamps
-        ]
-        self.render_sentence_end_ts = (
-            max(0, self.sentence_end_ts + self._render_offset_ms)
-            if self.sentence_end_ts is not None
-            else None
-        )
-        self.export_sentence_end_ts = (
-            max(0, self.sentence_end_ts + self._export_offset_ms)
+        self.global_sentence_end_ts = (
+            max(0, self.sentence_end_ts + self._global_offset_ms)
             if self.sentence_end_ts is not None
             else None
         )
 
     @property
-    def all_render_timestamps(self) -> List[int]:
-        """按打轴顺序返回所有渲染时间戳"""
+    def all_global_timestamps(self) -> List[int]:
+        """按打轴顺序返回所有全局时间戳（带偏移）"""
         sentence_end = (
-            [self.render_sentence_end_ts]
-            if self.is_sentence_end and self.render_sentence_end_ts is not None
+            [self.global_sentence_end_ts]
+            if self.is_sentence_end and self.global_sentence_end_ts is not None
             else []
         )
-        return list(self.render_timestamps) + sentence_end
-
-    @property
-    def all_export_timestamps(self) -> List[int]:
-        """按打轴顺序返回所有导出时间戳"""
-        sentence_end = (
-            [self.export_sentence_end_ts]
-            if self.is_sentence_end and self.export_sentence_end_ts is not None
-            else []
-        )
-        return list(self.export_timestamps) + sentence_end
+        return list(self.global_timestamps) + sentence_end
 
 
 # ──────────────────────────────────────────────

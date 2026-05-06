@@ -82,7 +82,7 @@ class LRCExporter(BaseExporter):
         # 收集所有 (timestamp_ms, char_idx, checkpoint_idx) 并排序
         all_tags: List[tuple[int, int, int]] = []
         for i, ch in enumerate(sentence.characters):
-            for cp_idx, ts in enumerate(ch.export_timestamps):
+            for cp_idx, ts in enumerate(ch.global_timestamps):
                 all_tags.append((ts, i, cp_idx))
 
         if not all_tags:
@@ -141,7 +141,7 @@ class LRCLineExporter(LRCExporter):
         # 找到最早的时间标签作为行时间
         first_ts = None
         for ch in sentence.characters:
-            for ts in ch.export_timestamps:
+            for ts in ch.global_timestamps:
                 if first_ts is None or ts < first_ts:
                     first_ts = ts
 
@@ -175,7 +175,7 @@ class LRCWordExporter(LRCExporter):
         # 收集所有 (timestamp_ms, char_idx, checkpoint_idx) 并排序
         all_tags: List[tuple[int, int, int]] = []
         for i, ch in enumerate(sentence.characters):
-            for cp_idx, ts in enumerate(ch.export_timestamps):
+            for cp_idx, ts in enumerate(ch.global_timestamps):
                 all_tags.append((ts, i, cp_idx))
 
         if not all_tags:

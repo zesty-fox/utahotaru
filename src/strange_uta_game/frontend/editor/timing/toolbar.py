@@ -70,7 +70,7 @@ class EditorToolBar(QFrame):
 
         layout.addSpacing(10)
 
-        self.btn_bulk_change = PushButton("批量变更 (Ctrl+H)", self)
+        self.btn_bulk_change = PushButton("批量变更", self)
         self.btn_bulk_change.setIcon(FIF.EDIT)
         self.btn_bulk_change.setFixedHeight(32)
         self.btn_bulk_change.clicked.connect(self.bulk_change_clicked.emit)
@@ -107,7 +107,7 @@ class EditorToolBar(QFrame):
         text = self.edit_offset.text().strip()
         try:
             val = int(text)
-            val = max(-2000, min(2000, val))
+            val = max(-5000, min(5000, val))
         except ValueError:
             val = 0
         self.edit_offset.setText(str(val))

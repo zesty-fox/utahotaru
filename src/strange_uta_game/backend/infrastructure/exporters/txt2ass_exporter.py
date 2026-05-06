@@ -197,7 +197,7 @@ class ASSDirectExporter(BaseExporter):
         # 收集所有 (timestamp_ms, char) 并按时间排序（使用导出时间戳）
         all_tags: List[tuple[int, str]] = []
         for ch in sentence.characters:
-            for ts in ch.export_timestamps:
+            for ts in ch.global_timestamps:
                 all_tags.append((ts, ch.char))
 
         if not all_tags:

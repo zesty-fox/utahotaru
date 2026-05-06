@@ -380,15 +380,15 @@ class Sentence:
         return max(all_ts) if all_ts else None
 
     @property
-    def export_timing_start_ms(self) -> Optional[int]:
-        """句子最早导出时间戳（含偏移），如果无时间标签返回 None"""
-        all_ts = [ts for c in self.characters for ts in c.all_export_timestamps]
+    def global_timing_start_ms(self) -> Optional[int]:
+        """句子最早全局时间戳（含偏移），如果无时间标签返回 None"""
+        all_ts = [ts for c in self.characters for ts in c.all_global_timestamps]
         return min(all_ts) if all_ts else None
 
     @property
-    def export_timing_end_ms(self) -> Optional[int]:
-        """句子最晚导出时间戳（含偏移），如果无时间标签返回 None"""
-        all_ts = [ts for c in self.characters for ts in c.all_export_timestamps]
+    def global_timing_end_ms(self) -> Optional[int]:
+        """句子最晚全局时间戳（含偏移），如果无时间标签返回 None"""
+        all_ts = [ts for c in self.characters for ts in c.all_global_timestamps]
         return max(all_ts) if all_ts else None
 
     @property

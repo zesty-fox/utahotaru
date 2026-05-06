@@ -64,7 +64,7 @@ class BulkChangeDialog(QDialog):
         # 执行后的失败项汇总：(sentence_index, abs_char_idx, char, reason)
         self._linked_failures: List[Tuple[int, int, str, str]] = []
 
-        self.setWindowTitle("批量变更 (Ctrl+H)")
+        self.setWindowTitle("批量变更")
         self.resize(520, 480)
         self.setFont(QFont("Microsoft YaHei", 10))
 

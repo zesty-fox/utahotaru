@@ -208,35 +208,35 @@ class NicokaraExporter(BaseExporter):
                 prev_singer_id = effective_singer
 
             # 字符起始时间戳（第一个 checkpoint，使用导出时间戳含偏移）
-            if ch.export_timestamps:
-                parts.append(_format_nicokara_ts(ch.export_timestamps[0]))
+            if ch.global_timestamps:
+                parts.append(_format_nicokara_ts(ch.global_timestamps[0]))
             parts.append(ch.char)
 
             # 非行尾句尾字符的释放时间戳（句中句尾需要输出一前一后两个时间戳）
             if (
                 i < len(sentence.characters) - 1
                 and ch.is_sentence_end
-                and ch.export_sentence_end_ts is not None
+                and ch.global_sentence_end_ts is not None
             ):
                 eff = self._normalize_singer_id(
                     ch.singer_id or sentence.singer_id, default_singer_id
                 )
                 if singer_ids is None or eff in singer_ids:
-                    parts.append(_format_nicokara_ts(ch.export_sentence_end_ts))
+                    parts.append(_format_nicokara_ts(ch.global_sentence_end_ts))
 
         # 行末结束时间戳（最后一个字符的 sentence-end checkpoint）
         if sentence.characters:
             last_char = sentence.characters[-1]
             if (
                 last_char.is_sentence_end
-                and last_char.export_sentence_end_ts is not None
+                and last_char.global_sentence_end_ts is not None
             ):
                 # 演唱者过滤：只有该字符属于选定演唱者时才输出
                 eff = self._normalize_singer_id(
                     last_char.singer_id or sentence.singer_id, default_singer_id
                 )
                 if singer_ids is None or eff in singer_ids:
-                    parts.append(_format_nicokara_ts(last_char.export_sentence_end_ts))
+                    parts.append(_format_nicokara_ts(last_char.global_sentence_end_ts))
 
         return "".join(parts), prev_singer_id
 
@@ -416,8 +416,8 @@ class NicokaraWithRubyExporter(NicokaraExporter):
                     first_char_ts: Optional[int] = None
                     if start_idx < len(sentence.characters):
                         ch = sentence.characters[start_idx]
-                        if ch.export_timestamps:
-                            first_char_ts = ch.export_timestamps[0]
+                        if ch.global_timestamps:
+                            first_char_ts = ch.global_timestamps[0]
 
                     if key not in ruby_groups:
                         ruby_groups[key] = []
@@ -542,9 +542,9 @@ class NicokaraWithRubyExporter(NicokaraExporter):
             if start_idx < len(sentence.characters)
             else None
         )
-        if not first_char or not first_char.export_timestamps:
+        if not first_char or not first_char.global_timestamps:
             return reading
-        group_start_ms = first_char.export_timestamps[0]
+        group_start_ms = first_char.global_timestamps[0]
 
         # 拼装读音字符 + 相对时间戳
         result: List[str] = []
@@ -556,8 +556,8 @@ class NicokaraWithRubyExporter(NicokaraExporter):
 
             if char_idx >= 0 and cp_idx >= 0:
                 ch = sentence.characters[char_idx]
-                if cp_idx < len(ch.export_timestamps):
-                    relative_ms = ch.export_timestamps[cp_idx] - group_start_ms
+                if cp_idx < len(ch.global_timestamps):
+                    relative_ms = ch.global_timestamps[cp_idx] - group_start_ms
                     result.append(_format_nicokara_ts(relative_ms))
 
             result.append(group_text)

@@ -373,7 +373,7 @@ class EditorInterface(QWidget):
         self.transport.edit_speed.blockSignals(False)
         # 应用渲染偏移（与导出偏移联动）
         render_offset = settings.get("export.offset_ms", -100)
-        self.preview.set_render_offset(render_offset)
+        self.preview.set_global_offset(render_offset)
         # 同步工具栏偏移控件
         self.toolbar.edit_offset.blockSignals(True)
         self.toolbar.edit_offset.setText(str(render_offset))
@@ -382,7 +382,7 @@ class EditorInterface(QWidget):
         if self._project:
             for sentence in self._project.sentences:
                 for ch in sentence.characters:
-                    ch.set_offsets(render_offset, render_offset)
+                    ch.set_offset(render_offset)
         # 应用歌词对齐方式
         lyrics_alignment = settings.get("ui.lyrics_alignment", "center")
         self.preview.set_alignment(lyrics_alignment)
@@ -449,18 +449,18 @@ class EditorInterface(QWidget):
         if self._project:
             for sentence in self._project.sentences:
                 for ch in sentence.characters:
-                    ch.set_offsets(offset_ms, offset_ms)
+                    ch.set_offset(offset_ms)
         # 更新渲染
-        self.preview.set_render_offset(offset_ms)
+        self.preview.set_global_offset(offset_ms)
 
     def set_project(self, project: Project):
         self._project = project
         self.preview.set_project(project)
         # 应用当前渲染/导出偏移到新加载项目的所有字符
-        offset = self.preview._render_offset_ms
+        offset = self.preview._global_offset_ms
         for sentence in project.sentences:
             for ch in sentence.characters:
-                ch.set_offsets(offset, offset)
+                ch.set_offset(offset)
         self._apply_checkpoint_position(
             self._timing_service.get_current_position()
             if self._timing_service
@@ -1822,7 +1822,7 @@ class EditorInterface(QWidget):
             return
 
         # 使用渲染时间戳（包含偏移）而不是原始时间戳
-        tags = char.all_render_timestamps
+        tags = char.all_global_timestamps
         if tags:
             target_ms = max(0, tags[0] - jump_before)
             self._on_seek(target_ms)
@@ -2456,7 +2456,7 @@ class EditorInterface(QWidget):
         if not self._project:
             return
         # 使用渲染时间戳（带偏移），与波形显示对齐
-        self.timeline.set_time_tags(self._project.collect_all_render_timestamp_ms())
+        self.timeline.set_time_tags(self._project.collect_all_global_timestamp_ms())
 
     def _update_status(self):
         if not self._project:
