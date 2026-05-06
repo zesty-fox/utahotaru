@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import os
 import threading
+import time
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable, Optional, Tuple
@@ -33,6 +34,23 @@ SegmentReadyCallback = Callable[[float, np.ndarray], None]  # (speed, segment_pc
 
 _SPEED_QUANT = 2  # round(speed, 2)，0.01 精度
 _LRU_MAX = 3
+
+# 共享线程池：限制总线程数为 CPU 核心数的 70%
+_SHARED_EXECUTOR: Optional[ThreadPoolExecutor] = None
+_SHARED_EXECUTOR_LOCK = threading.Lock()
+
+
+def _get_shared_executor() -> ThreadPoolExecutor:
+    """获取共享线程池（单例）"""
+    global _SHARED_EXECUTOR
+    if _SHARED_EXECUTOR is None:
+        with _SHARED_EXECUTOR_LOCK:
+            if _SHARED_EXECUTOR is None:
+                cpu_count = os.cpu_count() or 1
+                max_workers = max(1, int(cpu_count * 0.7))
+                _SHARED_EXECUTOR = ThreadPoolExecutor(max_workers=max_workers)
+                print(f"[TSM] Shared executor created with {max_workers} workers")
+    return _SHARED_EXECUTOR
 
 
 def _quantize(speed: float) -> float:
@@ -248,10 +266,9 @@ class TSMRenderCache:
         else:
             segment_order = list(range(total_segments))
 
-        # 使用线程池并行处理（使用 50%-70% CPU 核心，避免占用过多资源）
-        cpu_count = os.cpu_count() or 1
-        max_workers = max(1, int(cpu_count * 0.6))
-        print(f"[TSM] Rendering {n_in} samples at {speed}x, {total_segments} segments, {max_workers} workers")
+        # 使用共享线程池（限制总线程数为 CPU 核心数的 70%）
+        executor = _get_shared_executor()
+        print(f"[TSM] Rendering {n_in} samples at {speed}x, {total_segments} segments")
 
         # 预分配输出数组
         out_segments = [None] * total_segments
@@ -275,49 +292,50 @@ class TSMRenderCache:
             stretched = time_stretch(
                 pcm_segment, float(self._sample_rate), stretch_factor=stretch_factor
             )
+            # 释放资源，避免阻塞其他进程
+            time.sleep(0)
             return (seg_idx, stretched)
 
-        # 使用线程池并行处理
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # 提交所有任务（按优先级顺序）
-            futures = {}
-            for seg_idx in segment_order:
-                if is_cancelled():
-                    break
-                future = executor.submit(process_segment, seg_idx)
-                futures[future] = seg_idx
+        # 使用共享线程池并行处理
+        # 提交所有任务（按优先级顺序）
+        futures = {}
+        for seg_idx in segment_order:
+            if is_cancelled():
+                break
+            future = executor.submit(process_segment, seg_idx)
+            futures[future] = seg_idx
 
-            # 收集结果
-            for future in as_completed(futures):
-                if is_cancelled():
-                    # 取消所有未完成的任务
-                    for f in futures:
-                        f.cancel()
-                    return None
+        # 收集结果
+        for future in as_completed(futures):
+            if is_cancelled():
+                # 取消所有未完成的任务
+                for f in futures:
+                    f.cancel()
+                return None
 
-                result = future.result()
-                if result is not None:
-                    seg_idx, stretched = result
-                    out_segments[seg_idx] = stretched
+            result = future.result()
+            if result is not None:
+                seg_idx, stretched = result
+                out_segments[seg_idx] = stretched
 
-                    with rendered_lock:
-                        rendered_count += 1
-                        current_count = rendered_count
+                with rendered_lock:
+                    rendered_count += 1
+                    current_count = rendered_count
 
-                    # 回调通知：当前段已渲染完成
-                    if segment_ready_cb is not None:
-                        try:
-                            segment_ready_cb(speed, stretched)
-                        except Exception as e:
-                            print(f"[TSM] segment_ready_cb error: {e}")
+                # 回调通知：当前段已渲染完成
+                if segment_ready_cb is not None:
+                    try:
+                        segment_ready_cb(speed, stretched)
+                    except Exception as e:
+                        print(f"[TSM] segment_ready_cb error: {e}")
 
-                    # 更新进度
-                    progress = current_count / total_segments
-                    if progress_cb is not None:
-                        try:
-                            progress_cb(speed, min(progress * 0.99, 0.99))
-                        except Exception:
-                            pass
+                # 更新进度
+                progress = current_count / total_segments
+                if progress_cb is not None:
+                    try:
+                        progress_cb(speed, min(progress * 0.99, 0.99))
+                    except Exception:
+                        pass
 
         # 按顺序拼接所有段
         out = np.concatenate([s for s in out_segments if s is not None], axis=0).astype(np.float32)
