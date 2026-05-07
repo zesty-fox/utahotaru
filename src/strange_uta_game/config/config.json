@@ -40,7 +40,12 @@
   "ui": {
     "theme": "auto",
     "language": "zh_CN",
-    "font_size": 24
+    "font_size": 18,
+    "current_line_font_size": 22,
+    "ruby_size": 10,
+    "cp_size": 8,
+    "line_height_factor": 1.20,
+    "lyrics_alignment": "center"
   },
   "export": {
     "default_format": "LRC (增强型)",

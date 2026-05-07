@@ -234,28 +234,43 @@ class AppSettings:
                 print(f"复制内嵌配置失败: {e}")
 
     def _load_settings(self) -> Dict[str, Any]:
+        # 从内嵌 config.json 加载默认值
+        defaults = self._load_packaged_defaults()
+
         if self._config_path.exists():
             try:
                 with open(self._config_path, "r", encoding="utf-8") as f:
                     loaded = json.load(f)
-                    settings = self._deep_copy_defaults()
-                    self._deep_merge(settings, loaded)
-                    return settings
+                    # 以默认值为基础，用户配置覆盖
+                    self._deep_merge(defaults, loaded)
             except Exception as e:
                 print(f"加载设置失败: {e}")
+        else:
+            # 用户配置不存在，使用内嵌默认配置
+            packaged = self._get_packaged_config_path("config.json")
+            if packaged:
+                try:
+                    with open(packaged, "r", encoding="utf-8") as f:
+                        loaded = json.load(f)
+                        self._deep_merge(defaults, loaded)
+                except Exception:
+                    pass
 
-        # 回退到内嵌默认配置
+        # 强制主题为 auto（跟随系统）
+        if "ui" in defaults:
+            defaults["ui"]["theme"] = "auto"
+
+        return defaults
+
+    def _load_packaged_defaults(self) -> Dict[str, Any]:
+        """从内嵌 config.json 加载默认配置"""
         packaged = self._get_packaged_config_path("config.json")
         if packaged:
             try:
                 with open(packaged, "r", encoding="utf-8") as f:
-                    loaded = json.load(f)
-                    settings = self._deep_copy_defaults()
-                    self._deep_merge(settings, loaded)
-                    return settings
+                    return json.load(f)
             except Exception:
                 pass
-
         return self._deep_copy_defaults()
 
     def _deep_copy_defaults(self) -> Dict[str, Any]:
