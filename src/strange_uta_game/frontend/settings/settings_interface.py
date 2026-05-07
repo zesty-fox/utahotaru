@@ -347,11 +347,18 @@ class SettingsInterface(ScrollArea):
             suffix=" ms",
             parent=self.timing_group,
         )
+        self.card_disable_click_jump = SwitchSettingCard(
+            FIF.CLOSE,
+            "禁用单击跳转",
+            "关闭单击字符/节奏点延迟后跳转到目标行的功能（双击跳转不受影响）",
+            parent=self.timing_group,
+        )
 
         self.timing_group.addSettingCard(self.card_offset)
         self.timing_group.addSettingCard(self.card_speed_correction)
         self.timing_group.addSettingCard(self.card_export_offset)
         self.timing_group.addSettingCard(self.card_timing_step)
+        self.timing_group.addSettingCard(self.card_disable_click_jump)
         self.expandLayout.addWidget(self.timing_group)
 
     def _init_calibration_group(self):
@@ -565,6 +572,12 @@ class SettingsInterface(ScrollArea):
             "为 ()【】[]{}「」!?、， 等标点符号自动添加节奏点（不参与注音）",
             parent=self.auto_check_group,
         )
+        self.card_check_english_word_end = SwitchSettingCard(
+            FIF.ACCEPT,
+            "英文单词结尾句尾",
+            "英文单词结尾自动设置为句尾（is_sentence_end）",
+            parent=self.auto_check_group,
+        )
 
         self.auto_check_group.addSettingCard(self.card_auto_on_load)
         self.auto_check_group.addSettingCard(self.card_check_n)
@@ -579,6 +592,7 @@ class SettingsInterface(ScrollArea):
         self.auto_check_group.addSettingCard(self.card_space_after_symbol)
         self.auto_check_group.addSettingCard(self.card_space_as_line_end)
         self.auto_check_group.addSettingCard(self.card_checkpoint_on_punctuation)
+        self.auto_check_group.addSettingCard(self.card_check_english_word_end)
 
     # ── 读音词典 ──
 
@@ -673,6 +687,16 @@ class SettingsInterface(ScrollArea):
             suffix=" x",
             parent=self.ui_group,
         )
+        self.card_alignment_margin = SpinSettingCard(
+            FIF.FONT_SIZE,
+            "左/右对齐时页边距",
+            "左对齐或右对齐时歌词与窗口边缘的间距",
+            min_val=0,
+            max_val=500,
+            step=4,
+            suffix=" px",
+            parent=self.ui_group,
+        )
         self.card_lyrics_alignment = ComboSettingCard(
             FIF.ALIGNMENT,
             "歌词对齐方式",
@@ -687,6 +711,7 @@ class SettingsInterface(ScrollArea):
         self.ui_group.addSettingCard(self.card_ruby_size)
         self.ui_group.addSettingCard(self.card_cp_size)
         self.ui_group.addSettingCard(self.card_line_height_factor)
+        self.ui_group.addSettingCard(self.card_alignment_margin)
         self.ui_group.addSettingCard(self.card_lyrics_alignment)
         self.expandLayout.addWidget(self.ui_group)
 
@@ -1101,6 +1126,9 @@ class SettingsInterface(ScrollArea):
         self.card_timing_step.setValue(
             self._settings.get("timing.timing_adjust_step_ms", 10)
         )
+        self.card_disable_click_jump.setChecked(
+            self._settings.get("timing.disable_click_jump", False)
+        )
 
         # Auto Check
         self.card_check_hiragana.setChecked(
@@ -1155,6 +1183,9 @@ class SettingsInterface(ScrollArea):
         self.card_checkpoint_on_punctuation.setChecked(
             self._settings.get("auto_check.checkpoint_on_punctuation", False)
         )
+        self.card_check_english_word_end.setChecked(
+            self._settings.get("auto_check.check_english_word_end", True)
+        )
 
         # 界面设定（主题已写死为跟随系统，无需加载）
         self.card_font_size.setValue(self._settings.get("ui.font_size", 18))
@@ -1162,6 +1193,7 @@ class SettingsInterface(ScrollArea):
         self.card_ruby_size.setValue(self._settings.get("ui.ruby_size", 10))
         self.card_cp_size.setValue(self._settings.get("ui.cp_size", 8))
         self.card_line_height_factor.setValue(self._settings.get("ui.line_height_factor", 1.20))
+        self.card_alignment_margin.setValue(self._settings.get("ui.alignment_margin", 168))
         alignment = self._settings.get("ui.lyrics_alignment", "center")
         alignment_idx = {"left": 0, "center": 1, "right": 2}.get(alignment, 1)
         self.card_lyrics_alignment.setCurrentIndex(alignment_idx)
@@ -1235,6 +1267,9 @@ class SettingsInterface(ScrollArea):
         self._settings.set(
             "timing.timing_adjust_step_ms", self.card_timing_step.value()
         )
+        self._settings.set(
+            "timing.disable_click_jump", self.card_disable_click_jump.isChecked()
+        )
 
         # Auto Check
         self._settings.set("auto_check.hiragana", self.card_check_hiragana.isChecked())
@@ -1282,6 +1317,10 @@ class SettingsInterface(ScrollArea):
             "auto_check.checkpoint_on_punctuation",
             self.card_checkpoint_on_punctuation.isChecked(),
         )
+        self._settings.set(
+            "auto_check.check_english_word_end",
+            self.card_check_english_word_end.isChecked(),
+        )
 
         # 界面设定（主题强制为 auto）
         self._settings.set("ui.theme", "auto")
@@ -1290,6 +1329,7 @@ class SettingsInterface(ScrollArea):
         self._settings.set("ui.ruby_size", self.card_ruby_size.value())
         self._settings.set("ui.cp_size", self.card_cp_size.value())
         self._settings.set("ui.line_height_factor", self.card_line_height_factor.value())
+        self._settings.set("ui.alignment_margin", self.card_alignment_margin.value())
         alignment_map = {0: "left", 1: "center", 2: "right"}
         self._settings.set(
             "ui.lyrics_alignment",

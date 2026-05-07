@@ -32,7 +32,7 @@ class AppSettings:
             "rewind_ms": 5000,
             "jump_before_ms": 3000,
             "timing_adjust_step_ms": 10,
-            "disable_click_jump": False,
+            "disable_click_jump": True,
         },
         "auto_check": {
             "hiragana": True,
@@ -55,12 +55,14 @@ class AppSettings:
             "small_kana": False,
             "check_space_as_line_end": True,
             "checkpoint_on_punctuation": False,
+            "check_english_word_end": True,
         },
         "ui": {
             "theme": "auto",
             "language": "zh_CN",
             "font_size": 24,
             "lyrics_alignment": "left",
+            "alignment_margin": 168,
         },
         "export": {
             "default_format": "Nicokara (带注音)",
