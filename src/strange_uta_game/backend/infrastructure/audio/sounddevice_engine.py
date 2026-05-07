@@ -47,7 +47,7 @@ from .base import (
     PlaybackState,
 )
 from .ring_buffer import RingBuffer
-from .tsm_cache import TSMRenderCache, _quantize
+from .tsm_cache import TSMRenderCache, LoadProgressCallback, _quantize
 
 
 # ---- 常量 ----
@@ -71,8 +71,9 @@ class SoundDeviceEngine(IAudioEngine):
 
     def __init__(self) -> None:
         # ---- 音频元数据 ----
-        self._original_data: Optional[np.ndarray] = None  # (n, channels) float32
-        self._sample_rate: int = 44100
+        self._original_data: Optional[np.ndarray] = None  # (n, channels) float32（原始文件，仅用于波形显示）
+        self._original_sample_rate: int = 44100  # 原始文件采样率（用于时长/位置计算）
+        self._sample_rate: int = 44100  # 播放采样率（MP3 采样率，用于 stream/ring）
         self._channels: int = 2
         self._file_path: Optional[str] = None
         self._duration_ms: int = 0
@@ -122,44 +123,44 @@ class SoundDeviceEngine(IAudioEngine):
 
     # ==================== 加载 / 资源 ====================
 
-    def load(self, file_path: str) -> None:
+    def load(self, file_path: str, progress_cb: Optional[LoadProgressCallback] = None) -> None:
         try:
+            if progress_cb:
+                progress_cb("读取音频文件...", 0.0)
             data, sr = sf.read(file_path, dtype="float32")
             if data.ndim == 1:
                 data = data.reshape(-1, 1)
 
-            # 如果采样率高于 32000Hz，压缩到 32000Hz 立体声
-            target_sr = 32000
-            if int(sr) > target_sr:
-                print(f"[SoundDeviceEngine] Downsampling from {int(sr)}Hz to {target_sr}Hz")
-                # 使用 pedalboard 重采样
-                from pedalboard import Resample
-                resampler = Resample(target_sr)
-                data = resampler(data, int(sr)).astype(np.float32)
-                sr = target_sr
-
-            self._sample_rate = int(sr)
+            self._original_sample_rate = int(sr)
             self._channels = int(data.shape[1])
             self._file_path = file_path
             self._original_data = np.ascontiguousarray(data, dtype=np.float32)
-            self._duration_ms = int(len(data) / self._sample_rate * 1000)
 
             # 获取歌曲名称（不含扩展名）用于缓存文件命名
             song_name = Path(file_path).stem
-            self._cache.set_source(song_name, self._original_data, self._sample_rate)
+            self._cache.set_source(song_name, self._original_data, self._original_sample_rate, progress_cb)
 
-            # 重建 ring（容量随采样率 / 声道）
+            # 从缓存获取 MP3 后的 PCM
+            cached_pcm = self._cache.get(1.0)
+            if cached_pcm is not None:
+                self._sample_rate = self._cache._sample_rate
+                self._channels = self._cache._channels
+            else:
+                self._sample_rate = self._original_sample_rate
+                cached_pcm = self._original_data
+
+            # 时长基于 MP3 实际数据（确保位置计算一致）
+            self._duration_ms = int(len(cached_pcm) / self._sample_rate * 1000)
+
+            # 重建 ring
             cap = max(_BLOCK_FRAMES * 4, int(_RING_SECONDS * self._sample_rate))
             self._ring = RingBuffer(cap, self._channels)
 
             with self._state_lock:
-                # 初始 active = 原始 PCM @ 1.0x
-                self._active_pcm = self._original_data
+                self._active_pcm = cached_pcm
                 self._active_speed = 1.0
-                # 加载新音频时强制恢复速度为 1.0，避免旧速度残留
                 self._speed = 1.0
                 self._pending_speed = 1.0
-                # 把当前位置（原始时间轴）映射到 active PCM
                 self._read_pos_samples = 0
 
             self._state = PlaybackState.STOPPED
@@ -177,11 +178,18 @@ class SoundDeviceEngine(IAudioEngine):
         if self._original_data is None:
             return
 
-        # 预渲染速度列表
-        common_speeds = [0.75, 0.5, 0.9, 0.8, 0.7, 0.6]
-        print(f"[SoundDeviceEngine] Prewarming common speeds: {common_speeds}")
-        for speed in common_speeds:
-            self._cache.ensure(speed)
+        # 预渲染速度列表（按优先级排序，优先级越小越优先）
+        common_speeds = [
+            (0.75, 0),  # 最高优先级
+            (0.5, 1),   # 第二优先级
+            (0.9, 2),
+            (0.8, 3),
+            (0.7, 4),
+            (0.6, 5),
+        ]
+        print(f"[SoundDeviceEngine] Prewarming common speeds: {[s for s, _ in common_speeds]}")
+        for speed, priority in common_speeds:
+            self._cache.ensure(speed, priority=priority)
 
     def release(self) -> None:
         self.stop()
@@ -238,10 +246,9 @@ class SoundDeviceEngine(IAudioEngine):
         with self._state_lock:
             self._read_pos_samples = 0
             if self._original_data is not None:
-                # 始终让 active 与当前速度保持一致，避免 stop→play 时状态分歧。
-                # 若缓存未就绪则回退到 1.0x 并同步速度属性，防止播放“错位速度”。
+                # 始终让 active 与当前速度保持一致
                 if abs(self._speed - 1.0) < 1e-9:
-                    self._active_pcm = self._original_data
+                    self._active_pcm = self._cache.get(1.0)
                     self._active_speed = 1.0
                 else:
                     cached = self._cache.get(self._speed)
@@ -249,7 +256,7 @@ class SoundDeviceEngine(IAudioEngine):
                         self._active_pcm = cached
                         self._active_speed = self._speed
                     else:
-                        self._active_pcm = self._original_data
+                        self._active_pcm = self._cache.get(1.0)
                         self._active_speed = 1.0
                         self._speed = 1.0
                         self._pending_speed = 1.0
@@ -329,12 +336,9 @@ class SoundDeviceEngine(IAudioEngine):
         if self._original_data is not None:
             q = _quantize(self._speed)
             cb = self._render_progress_cb
-            # 优先渲染当前播放位置附近的音频
-            priority_center = self._read_pos_samples if self._active_pcm is not None else None
             result = self._cache.ensure(
                 self._speed,
                 progress_cb=cb,
-                priority_center=priority_center,
             )
             # 命中缓存 / 1.0x 直通：立刻通知 UI "已就绪"
             if result is not None and cb is not None:
@@ -392,13 +396,13 @@ class SoundDeviceEngine(IAudioEngine):
         )
 
     def get_original_samples(self) -> Optional[np.ndarray]:
-        """获取原始音频采样数据（用于波形可视化）
+        """获取音频采样数据（用于波形可视化）
 
         Returns:
-            原始 PCM 数据，形状为 (n_samples, channels) 的 float32 数组，
-            如果没有加载音频则返回 None
+            MP3 后的 PCM 数据，形状为 (n_samples, channels) 的 float32 数组，
+            采样率与播放采样率一致。如果没有加载音频则返回 None
         """
-        return self._original_data
+        return self._cache.get(1.0)
 
     # ==================== 内部：流 / Producer / 回调 ====================
 
@@ -530,12 +534,10 @@ class SoundDeviceEngine(IAudioEngine):
             cur_pos = self._read_pos_samples
             cur_speed = self._active_speed
 
-        # 检查是否已渲染足够的数据（当前播放位置 + 缓冲区）
-        # 至少需要渲染当前播放位置之后的数据
-        min_samples_needed = cur_pos + int(self._sample_rate * 2)  # 当前位置 + 2秒
-        new_pcm = self._cache.get_partial(pending, min_samples=min_samples_needed)
+        # 检查缓存是否已就绪
+        new_pcm = self._cache.get(pending)
         if new_pcm is None:
-            return  # 还没渲染好足够数据，下次再试
+            return  # 还没渲染好，下次再试
 
         # 计算"当前原始时间轴位置" → 在新 PCM 上的偏移
         if cur_pcm is None or self._sample_rate == 0:

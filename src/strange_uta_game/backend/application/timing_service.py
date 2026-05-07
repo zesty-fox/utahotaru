@@ -155,13 +155,13 @@ class TimingService:
         """设置打轴偏移量（补偿反应延迟）"""
         self._timing_offset_ms = offset_ms
 
-    def load_audio(self, file_path: str) -> None:
+    def load_audio(self, file_path: str, progress_cb=None) -> None:
         """Load audio file. Raises AudioLoadError on failure."""
         try:
             self._audio_engine.stop()
         except Exception:
             pass
-        self._audio_engine.load(file_path)
+        self._audio_engine.load(file_path, progress_cb=progress_cb)
 
     def get_audio_info(self):
         return self._audio_engine.get_audio_info()

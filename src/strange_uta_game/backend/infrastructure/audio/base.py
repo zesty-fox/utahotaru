@@ -60,11 +60,12 @@ class IAudioEngine(ABC):
     """
 
     @abstractmethod
-    def load(self, file_path: str) -> None:
+    def load(self, file_path: str, progress_cb=None) -> None:
         """加载音频文件
 
         Args:
             file_path: 音频文件路径
+            progress_cb: 可选的进度回调 (stage, progress)
 
         Raises:
             AudioLoadError: 加载失败（文件不存在、格式不支持等）
