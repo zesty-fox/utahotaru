@@ -65,7 +65,7 @@ class AppSettings:
             "default_format": "Nicokara (带注音)",
             "auto_add_extension": True,
             "last_export_dir": "",
-            "offset_ms": -100,
+            "offset_ms": -230,
         },
         "ruby_dictionary": {
             "enabled": True,
