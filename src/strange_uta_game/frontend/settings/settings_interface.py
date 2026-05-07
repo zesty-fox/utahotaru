@@ -629,12 +629,13 @@ class SettingsInterface(ScrollArea):
     def _init_ui_group(self):
         self.ui_group = SettingCardGroup("界面设定", self.scrollWidget)
 
-        # 主题说明（写死为跟随系统）
-        self.card_theme_info = SettingCard(
+        # 主题选择（支持手动切换，Win10 兼容方案）
+        self.card_theme = ComboSettingCard(
             FIF.BRUSH,
             "主题",
-            "主题已设为跟随系统自动切换，无需手动设置",
-            self.ui_group,
+            "选择界面主题，或设为自动跟随系统切换",
+            items=["自动", "浅色", "深色"],
+            parent=self.ui_group,
         )
         self.card_font_size = SpinSettingCard(
             FIF.FONT_SIZE,
@@ -705,7 +706,7 @@ class SettingsInterface(ScrollArea):
             parent=self.ui_group,
         )
 
-        self.ui_group.addSettingCard(self.card_theme_info)
+        self.ui_group.addSettingCard(self.card_theme)
         self.ui_group.addSettingCard(self.card_font_size)
         self.ui_group.addSettingCard(self.card_current_line_font_size)
         self.ui_group.addSettingCard(self.card_ruby_size)
@@ -1187,7 +1188,10 @@ class SettingsInterface(ScrollArea):
             self._settings.get("auto_check.check_english_word_end", True)
         )
 
-        # 界面设定（主题已写死为跟随系统，无需加载）
+        # 界面设定
+        theme_value = self._settings.get("ui.theme", "auto")
+        theme_idx = {"auto": 0, "light": 1, "dark": 2}.get(theme_value, 0)
+        self.card_theme.setCurrentIndex(theme_idx)
         self.card_font_size.setValue(self._settings.get("ui.font_size", 18))
         self.card_current_line_font_size.setValue(self._settings.get("ui.current_line_font_size", 22))
         self.card_ruby_size.setValue(self._settings.get("ui.ruby_size", 10))
@@ -1322,8 +1326,9 @@ class SettingsInterface(ScrollArea):
             self.card_check_english_word_end.isChecked(),
         )
 
-        # 界面设定（主题强制为 auto）
-        self._settings.set("ui.theme", "auto")
+        # 界面设定
+        theme_map = {0: "auto", 1: "light", 2: "dark"}
+        self._settings.set("ui.theme", theme_map.get(self.card_theme.currentIndex(), "auto"))
         self._settings.set("ui.font_size", self.card_font_size.value())
         self._settings.set("ui.current_line_font_size", self.card_current_line_font_size.value())
         self._settings.set("ui.ruby_size", self.card_ruby_size.value())

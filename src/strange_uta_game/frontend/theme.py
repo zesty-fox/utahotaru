@@ -20,7 +20,7 @@ import sys
 from enum import Enum, auto
 from typing import Callable, List, Optional
 
-from PyQt6.QtCore import Qt, pyqtSignal, QObject
+from PyQt6.QtCore import Qt, pyqtSignal, QObject, QTimer
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QApplication, QWidget
 
@@ -281,12 +281,37 @@ class Theme(QObject):
         self._colors: Optional[ThemeColors] = None
         self._system_is_dark: bool = False
         self._listeners: List[Callable] = []
+        self._poll_timer: Optional[QTimer] = None
+        self._is_win10: bool = self._detect_windows_version()
 
         # 检测初始系统主题
         self._detect_system_theme()
 
         # 监听系统主题变化
         self._setup_system_theme_listener()
+
+    @staticmethod
+    def _detect_windows_version() -> bool:
+        """检测是否为 Windows 10。
+
+        Returns:
+            True 表示 Win10，False 表示 Win11 或非 Windows 系统。
+        """
+        if sys.platform != "win32":
+            return False
+        try:
+            import winreg
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+            )
+            build_str, _ = winreg.QueryValueEx(key, "CurrentBuildNumber")
+            winreg.CloseKey(key)
+            build = int(build_str)
+            # Win10: 10240-22000, Win11: >= 22000
+            return build < 22000
+        except Exception:
+            return False
 
     def _detect_system_theme(self) -> None:
         """检测系统主题"""
@@ -314,16 +339,43 @@ class Theme(QObject):
     def _setup_system_theme_listener(self) -> None:
         """设置系统主题变化监听器"""
         app = QApplication.instance()
-        if app:
-            # Qt 6.5+ 支持 colorSchemeChanged 信号
-            try:
-                app.styleHints().colorSchemeChanged.connect(self._on_system_theme_changed)
-            except AttributeError:
-                # 旧版本 Qt 不支持，使用定时器轮询
-                pass
+        if not app:
+            return
+
+        # Qt 6.5+ 支持 colorSchemeChanged 信号（Win11 上有效）
+        connected = False
+        try:
+            app.styleHints().colorSchemeChanged.connect(self._on_system_theme_changed)
+            connected = True
+        except AttributeError:
+            pass
+
+        # Win10 上 colorSchemeChanged 不触发，使用定时器轮询
+        if self._is_win10 or not connected:
+            self._start_polling()
+
+    def _start_polling(self) -> None:
+        """启动定时器轮询系统主题（Win10 兼容方案）"""
+        if self._poll_timer is not None:
+            return
+        self._poll_timer = QTimer(self)
+        self._poll_timer.setInterval(2000)  # 每 2 秒检查一次
+        self._poll_timer.timeout.connect(self._poll_system_theme)
+        self._poll_timer.start()
+
+    def _poll_system_theme(self) -> None:
+        """轮询检测系统主题变化"""
+        if self._mode != ThemeMode.AUTO:
+            return
+
+        old_dark = self._system_is_dark
+        self._detect_system_theme()
+
+        if old_dark != self._system_is_dark:
+            self._apply_theme_change()
 
     def _on_system_theme_changed(self, scheme: Qt.ColorScheme) -> None:
-        """系统主题变化回调
+        """系统主题变化回调（Win11 colorSchemeChanged 信号）
 
         只有在 AUTO 模式下才响应系统主题变化，
         手动设置 LIGHT/DARK 时忽略系统变化。
@@ -335,10 +387,14 @@ class Theme(QObject):
         self._system_is_dark = (scheme == Qt.ColorScheme.Dark)
 
         if old_dark != self._system_is_dark:
-            self._invalidate()
-            self._apply_qfluentwidgets_theme()
-            self._refresh_all_widgets()
-            self.changed.emit()
+            self._apply_theme_change()
+
+    def _apply_theme_change(self) -> None:
+        """应用主题变更（统一入口）"""
+        self._invalidate()
+        self._apply_qfluentwidgets_theme()
+        self._refresh_all_widgets()
+        self.changed.emit()
 
     @property
     def mode(self) -> ThemeMode:
@@ -349,10 +405,7 @@ class Theme(QObject):
         if self._mode == value:
             return
         self._mode = value
-        self._invalidate()
-        self._apply_qfluentwidgets_theme()
-        self._refresh_all_widgets()
-        self.changed.emit()
+        self._apply_theme_change()
 
     @property
     def is_dark(self) -> bool:
@@ -373,13 +426,20 @@ class Theme(QObject):
         self._colors = None
 
     def _apply_qfluentwidgets_theme(self) -> None:
-        """同步应用 qfluentwidgets 主题"""
+        """同步应用 qfluentwidgets 主题
+
+        Win10 上需要多次调用以确保所有控件正确更新。
+        """
         try:
             from qfluentwidgets import setTheme, Theme as QfwTheme
-            if self.is_dark:
-                setTheme(QfwTheme.DARK, lazy=True)
-            else:
-                setTheme(QfwTheme.LIGHT, lazy=True)
+            target = QfwTheme.DARK if self.is_dark else QfwTheme.LIGHT
+            setTheme(target, lazy=True)
+            # Win10 兼容：某些控件需要额外的强制刷新
+            if self._is_win10:
+                app = QApplication.instance()
+                if app:
+                    app.processEvents()
+                    setTheme(target, lazy=True)
         except Exception:
             pass
 
@@ -421,10 +481,7 @@ class Theme(QObject):
     def refresh(self) -> None:
         """刷新主题（重新检测系统主题）"""
         self._detect_system_theme()
-        self._invalidate()
-        self._apply_qfluentwidgets_theme()
-        self._refresh_all_widgets()
-        self.changed.emit()
+        self._apply_theme_change()
 
     def __getattr__(self, name: str):
         """代理 ThemeColors 的属性访问"""
@@ -432,7 +489,9 @@ class Theme(QObject):
                                               'on_change', 'off_change', 'refresh',
                                               '_invalidate', '_apply_qfluentwidgets_theme',
                                               '_detect_system_theme', '_setup_system_theme_listener',
-                                              '_on_system_theme_changed'):
+                                              '_on_system_theme_changed', '_apply_theme_change',
+                                              '_start_polling', '_poll_system_theme',
+                                              '_detect_windows_version'):
             raise AttributeError(name)
         return getattr(self.colors, name)
 

@@ -259,10 +259,6 @@ class AppSettings:
                 except Exception:
                     pass
 
-        # 强制主题为 auto（跟随系统）
-        if "ui" in defaults:
-            defaults["ui"]["theme"] = "auto"
-
         return defaults
 
     def _load_packaged_defaults(self) -> Dict[str, Any]:
