@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import threading
 import time
+from pathlib import Path
 from typing import Callable, Optional
 
 import numpy as np
@@ -127,14 +128,25 @@ class SoundDeviceEngine(IAudioEngine):
             if data.ndim == 1:
                 data = data.reshape(-1, 1)
 
+            # 如果采样率高于 32000Hz，压缩到 32000Hz 立体声
+            target_sr = 32000
+            if int(sr) > target_sr:
+                print(f"[SoundDeviceEngine] Downsampling from {int(sr)}Hz to {target_sr}Hz")
+                # 使用 pedalboard 重采样
+                from pedalboard import Resample
+                resampler = Resample(target_sr)
+                data = resampler(data, int(sr)).astype(np.float32)
+                sr = target_sr
+
             self._sample_rate = int(sr)
             self._channels = int(data.shape[1])
             self._file_path = file_path
             self._original_data = np.ascontiguousarray(data, dtype=np.float32)
             self._duration_ms = int(len(data) / self._sample_rate * 1000)
 
-            # 重置缓存与状态（set_source 会清空旧缓存）
-            self._cache.set_source(file_path, self._original_data, self._sample_rate)
+            # 获取歌曲名称（不含扩展名）用于缓存文件命名
+            song_name = Path(file_path).stem
+            self._cache.set_source(song_name, self._original_data, self._sample_rate)
 
             # 重建 ring（容量随采样率 / 声道）
             cap = max(_BLOCK_FRAMES * 4, int(_RING_SECONDS * self._sample_rate))
@@ -161,34 +173,14 @@ class SoundDeviceEngine(IAudioEngine):
             raise AudioLoadError(f"加载音频失败: {e}")
 
     def _prewarm_common_speeds(self) -> None:
-        """预渲染常用速度（后台进行，不阻塞加载）
-
-        如果预渲染总内存超过 1GB，只预渲染前两个速度。
-        """
+        """预渲染常用速度到磁盘缓存（后台进行，不阻塞加载）"""
         if self._original_data is None:
             return
 
-        # 估算原始 PCM 内存占用
-        original_bytes = self._original_data.nbytes
         # 预渲染速度列表
-        all_speeds = [0.75, 0.5, 0.9, 0.8, 0.7, 0.6]
-
-        # 计算预渲染总内存
-        total_extra_bytes = 0
-        speeds_to_prewarm = []
-        for speed in all_speeds:
-            # 变速后长度 = 原始长度 / speed
-            stretched_bytes = int(original_bytes / speed)
-            total_extra_bytes += stretched_bytes
-            speeds_to_prewarm.append(speed)
-            # 如果超过 1GB，只预渲染前两个
-            if total_extra_bytes > 1024 * 1024 * 1024:
-                speeds_to_prewarm = [0.75, 0.5]
-                print(f"[SoundDeviceEngine] Prewarming limited to {speeds_to_prewarm} (memory limit)")
-                break
-
-        print(f"[SoundDeviceEngine] Prewarming common speeds: {speeds_to_prewarm}")
-        for speed in speeds_to_prewarm:
+        common_speeds = [0.75, 0.5, 0.9, 0.8, 0.7, 0.6]
+        print(f"[SoundDeviceEngine] Prewarming common speeds: {common_speeds}")
+        for speed in common_speeds:
             self._cache.ensure(speed)
 
     def release(self) -> None:

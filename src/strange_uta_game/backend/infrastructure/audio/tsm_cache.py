@@ -1,18 +1,13 @@
-"""离线预渲染 TSM 缓存。
+"""磁盘缓存 TSM 渲染缓存。
 
 设计：
-- 切换播放速度（≠ 1.0x）时，后台 worker 用 Pedalboard 的 time_stretch 把整段
-  原始 PCM 渲染成该速度下的 PCM，作为一块连续的 ``np.ndarray`` 缓存在内存里。
-- 回调线程播放时只需从对应缓存里按 sample 偏移拷贝到 ring buffer，
-  **完全不在实时路径上跑 Python TSM**。
-- 同一个 ``(audio_path, speed)`` 渲染完即长驻；最多保留 LRU 3 份。
+- 切换播放速度（≠ 1.0x）时，后台 worker 用 Pedalboard 的 time_stretch 渲染，
+  结果保存到磁盘缓存文件，不占用大量内存。
+- 播放时从磁盘缓存读取到内存（只读取当前需要的部分）。
+- 缓存文件位于用户目录下的 .cache 文件夹，更换歌曲或退出时自动清理。
 - 1.0x 特殊路径：直接返回原始 PCM 引用，零渲染开销。
 
-线程模型：
-- 任意线程（通常 UI 线程）调 :meth:`ensure`：若目标速度的 PCM 已就绪，同步返回；
-  否则安排后台渲染，立即返回 ``None``，完成后通过 ``progress_cb`` / ``done_cb`` 通知。
-- 任意时刻只有一个渲染 worker 在跑；新的请求会取消前一个。
-- :meth:`get` 非阻塞，查不到返回 ``None``。
+缓存文件命名：{歌曲名}_{speed}x.cache
 """
 
 from __future__ import annotations
@@ -20,131 +15,121 @@ from __future__ import annotations
 import os
 import threading
 import time
-from collections import OrderedDict
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Callable, Optional, Tuple
+from pathlib import Path
+from typing import Callable, Optional
 
 import numpy as np
+import soundfile as sf
 from pedalboard import time_stretch
 
 
 ProgressCallback = Callable[[float, float], None]  # (speed, 0.0~1.0)
 DoneCallback = Callable[[float], None]              # (speed,)
-SegmentReadyCallback = Callable[[float, np.ndarray], None]  # (speed, segment_pcm)
 
 _SPEED_QUANT = 2  # round(speed, 2)，0.01 精度
-_LRU_MAX = 3
-
-# 共享线程池：限制总线程数为 CPU 核心数的 70%
-_SHARED_EXECUTOR: Optional[ThreadPoolExecutor] = None
-_SHARED_EXECUTOR_LOCK = threading.Lock()
-
-
-def _get_shared_executor() -> ThreadPoolExecutor:
-    """获取共享线程池（单例）"""
-    global _SHARED_EXECUTOR
-    if _SHARED_EXECUTOR is None:
-        with _SHARED_EXECUTOR_LOCK:
-            if _SHARED_EXECUTOR is None:
-                cpu_count = os.cpu_count() or 1
-                max_workers = max(1, int(cpu_count * 0.7))
-                _SHARED_EXECUTOR = ThreadPoolExecutor(max_workers=max_workers)
-                print(f"[TSM] Shared executor created with {max_workers} workers")
-    return _SHARED_EXECUTOR
+_CACHE_DIR_NAME = ".cache"
 
 
 def _quantize(speed: float) -> float:
     return round(float(speed), _SPEED_QUANT)
 
 
+def _get_cache_dir() -> Path:
+    """获取缓存目录（软件工作目录下的 .cache 文件夹）"""
+    cache_dir = Path.cwd() / _CACHE_DIR_NAME
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir
+
+
+def _get_cache_path(song_name: str, speed: float) -> Path:
+    """获取缓存文件路径"""
+    cache_dir = _get_cache_dir()
+    q = _quantize(speed)
+    filename = f"{song_name}_{q}x.cache"
+    return cache_dir / filename
+
+
+def clear_cache() -> None:
+    """清空所有缓存文件"""
+    cache_dir = _get_cache_dir()
+    for f in cache_dir.glob("*.cache"):
+        try:
+            f.unlink()
+        except Exception:
+            pass
+    print(f"[TSM] Cache cleared: {cache_dir}")
+
+
+def clear_cache_for_song(song_name: str) -> None:
+    """清空指定歌曲的所有缓存文件"""
+    cache_dir = _get_cache_dir()
+    for f in cache_dir.glob(f"{song_name}_*.cache"):
+        try:
+            f.unlink()
+        except Exception:
+            pass
+    print(f"[TSM] Cache cleared for song: {song_name}")
+
+
 class TSMRenderCache:
-    """(audio_path, speed) -> rendered PCM (n_samples, channels) float32。"""
+    """磁盘缓存 TSM 渲染缓存。"""
 
     def __init__(self) -> None:
         self._original: Optional[np.ndarray] = None  # (n, channels)
         self._sample_rate: int = 0
         self._channels: int = 0
-        self._path: Optional[str] = None
-
-        # key: (path, quantized_speed) -> ndarray (n, channels)
-        self._cache: OrderedDict[Tuple[str, float], np.ndarray] = OrderedDict()
+        self._song_name: str = ""  # 歌曲名称（用于缓存文件命名）
 
         self._worker: Optional[threading.Thread] = None
         self._worker_cancel = threading.Event()
         self._worker_speed: Optional[float] = None
-        self._render_version: int = 0  # 用于控制取消
+        self._render_version: int = 0
         self._lock = threading.Lock()
 
     # ---------- 加载 ----------
 
     def set_source(
         self,
-        path: str,
+        song_name: str,
         original_pcm: np.ndarray,
         sample_rate: int,
     ) -> None:
-        """切换原始音频。清空缓存。``original_pcm`` 形状 ``(n, channels)``。"""
+        """切换原始音频。清空旧缓存。"""
         self._cancel_worker_and_wait()
         with self._lock:
-            self._path = path
+            self._song_name = song_name
             self._original = original_pcm
             self._sample_rate = int(sample_rate)
-            self._channels = int(original_pcm.shape[1])
-            self._cache.clear()
+            self._channels = int(original_pcm.shape[1]) if original_pcm.ndim > 1 else 1
+            # 清空旧缓存
+            clear_cache_for_song(song_name)
 
     def clear(self) -> None:
         self._cancel_worker_and_wait()
         with self._lock:
-            self._cache.clear()
+            if self._song_name:
+                clear_cache_for_song(self._song_name)
 
     # ---------- 查询 ----------
 
     def get(self, speed: float) -> Optional[np.ndarray]:
-        """非阻塞查询。命中则触碰 LRU；未命中返回 None。"""
+        """从磁盘缓存读取。命中返回 ndarray；未命中返回 None。"""
         if self._original is None:
             return None
         q = _quantize(speed)
         if abs(q - 1.0) < 1e-9:
             return self._original  # 1.0x 直通
-        key = (self._path or "", q)
-        with self._lock:
-            pcm = self._cache.get(key)
-            if pcm is not None:
-                self._cache.move_to_end(key)
-                return pcm
+
+        cache_path = _get_cache_path(self._song_name, q)
+        if cache_path.exists():
+            try:
+                data, sr = sf.read(str(cache_path), dtype="float32")
+                if data.ndim == 1:
+                    data = data.reshape(-1, 1)
+                return data
+            except Exception as e:
+                print(f"[TSM] Failed to read cache: {e}")
         return None
-
-    def get_partial(self, speed: float, min_samples: int = 0) -> Optional[np.ndarray]:
-        """查询缓存，返回已渲染的部分（即使未完全渲染完）。
-
-        如果已渲染的样本数 >= min_samples，返回已渲染的部分。
-        否则返回 None。
-        """
-        if self._original is None:
-            return None
-        q = _quantize(speed)
-        if abs(q - 1.0) < 1e-9:
-            return self._original
-        key = (self._path or "", q)
-        with self._lock:
-            pcm = self._cache.get(key)
-            if pcm is not None:
-                self._cache.move_to_end(key)
-                if len(pcm) >= min_samples:
-                    return pcm
-        return None
-
-    def get_rendered_length(self, speed: float) -> int:
-        """返回已渲染的样本数（用于检查是否可以开始播放）。"""
-        if self._original is None:
-            return 0
-        q = _quantize(speed)
-        if abs(q - 1.0) < 1e-9:
-            return len(self._original)
-        key = (self._path or "", q)
-        with self._lock:
-            pcm = self._cache.get(key)
-            return len(pcm) if pcm is not None else 0
 
     # ---------- 渲染 ----------
 
@@ -153,25 +138,19 @@ class TSMRenderCache:
         speed: float,
         progress_cb: Optional[ProgressCallback] = None,
         done_cb: Optional[DoneCallback] = None,
-        segment_ready_cb: Optional[SegmentReadyCallback] = None,
-        priority_center: Optional[int] = None,
     ) -> Optional[np.ndarray]:
         """确保 ``speed`` 对应的 PCM 就绪。
 
         - 若已缓存：立即返回 ndarray。
         - 否则：后台开始渲染，返回 ``None``；完成时调 ``done_cb(speed)``。
-
-        Args:
-            priority_center: 优先渲染的位置（采样索引），用于先渲染播放位置附近
-            segment_ready_cb: 每段渲染完成时回调，用于边渲染边播放
-
-        新的 ensure 调用会取消正在进行的旧渲染（如果不同 speed）。
         """
         if self._original is None:
             return None
         q = _quantize(speed)
         if abs(q - 1.0) < 1e-9:
             return self._original
+
+        # 检查磁盘缓存
         cached = self.get(q)
         if cached is not None:
             print(f"[TSM] Cache hit for speed {q}x")
@@ -185,7 +164,7 @@ class TSMRenderCache:
 
         self._cancel_worker_and_wait()
 
-        # 使用版本号控制取消，避免竞态条件
+        # 使用版本号控制取消
         self._render_version += 1
         current_version = self._render_version
         self._worker_speed = q
@@ -194,16 +173,16 @@ class TSMRenderCache:
         def _target() -> None:
             try:
                 print(f"[TSM] Worker started for speed {q}x, version={current_version}")
-                rendered = self._render_full(q, progress_cb, priority_center, segment_ready_cb, current_version)
+                rendered = self._render_full(q, progress_cb, current_version)
                 if rendered is None:
                     print(f"[TSM] Render cancelled for speed {q}x, version={current_version}")
-                    return  # 被取消
-                with self._lock:
-                    self._cache[(self._path or "", q)] = rendered
-                    self._cache.move_to_end((self._path or "", q))
-                    while len(self._cache) > _LRU_MAX:
-                        self._cache.popitem(last=False)
-                print(f"[TSM] Render complete for speed {q}x, shape={rendered.shape}, version={current_version}")
+                    return
+
+                # 保存到磁盘缓存
+                cache_path = _get_cache_path(self._song_name, q)
+                sf.write(str(cache_path), rendered, self._sample_rate)
+                print(f"[TSM] Render complete for speed {q}x, saved to {cache_path}")
+
                 if done_cb is not None:
                     try:
                         done_cb(q)
@@ -221,7 +200,6 @@ class TSMRenderCache:
 
     def _cancel_worker_and_wait(self) -> None:
         """取消正在进行的渲染任务。"""
-        # 设置取消标志，让 worker 自己检测并停止
         self._worker_cancel.set()
         self._worker = None
         self._worker_speed = None
@@ -230,18 +208,9 @@ class TSMRenderCache:
         self,
         speed: float,
         progress_cb: Optional[ProgressCallback],
-        priority_center: Optional[int] = None,
-        segment_ready_cb: Optional[SegmentReadyCallback] = None,
         render_version: int = 0,
     ) -> Optional[np.ndarray]:
-        """整文件 TSM 渲染；返回 ``(n_samples, channels)`` float32。
-
-        使用 Spotify Pedalboard 的 time_stretch，基于 Rubber Band 引擎，
-        音质极佳，支持高质量模式和瞬态保护。
-
-        使用多线程并行处理不同段，充分利用多核 CPU。
-        如果指定了 priority_center，优先渲染该位置附近的音频。
-        """
+        """整文件 TSM 渲染；返回 ``(n_samples, channels)`` float32。"""
         assert self._original is not None
         n_in = self._original.shape[0]
         if n_in == 0:
@@ -249,100 +218,28 @@ class TSMRenderCache:
 
         # 检查是否被取消
         if self._render_version != render_version:
-            print(f"[TSM] Render cancelled (version mismatch: {render_version} vs {self._render_version})")
             return None
+
+        if progress_cb is not None:
+            try:
+                progress_cb(speed, 0.01)
+            except Exception:
+                pass
 
         # stretch_factor: >1 压缩（变快），<1 拉伸（变慢）
         stretch_factor = speed
 
-        # 分段处理：每段约 5 秒
-        segment_samples = int(self._sample_rate * 5)
-        total_segments = max(1, (n_in + segment_samples - 1) // segment_samples)
+        # 整文件处理
+        pcm = np.ascontiguousarray(self._original, dtype=np.float32)
+        out = time_stretch(pcm, float(self._sample_rate), stretch_factor=stretch_factor)
 
-        # 计算段的顺序：优先渲染 priority_center 附近的段
-        if priority_center is not None and 0 <= priority_center < n_in:
-            priority_seg = priority_center // segment_samples
-            segment_order = sorted(range(total_segments), key=lambda i: abs(i - priority_seg))
-        else:
-            segment_order = list(range(total_segments))
-
-        # 使用共享线程池（限制总线程数为 CPU 核心数的 70%）
-        executor = _get_shared_executor()
-        print(f"[TSM] Rendering {n_in} samples at {speed}x, {total_segments} segments")
-
-        # 预分配输出数组
-        out_segments = [None] * total_segments
-        rendered_count = 0
-        rendered_lock = threading.Lock()
-
-        def is_cancelled() -> bool:
-            """检查是否被取消（使用版本号）"""
-            return self._render_version != render_version
-
-        def process_segment(seg_idx: int) -> Optional[Tuple[int, np.ndarray]]:
-            """处理单个段"""
-            if is_cancelled():
-                return None
-
-            pos = seg_idx * segment_samples
-            end = min(pos + segment_samples, n_in)
-            segment = self._original[pos:end]
-
-            pcm_segment = np.ascontiguousarray(segment, dtype=np.float32)
-            stretched = time_stretch(
-                pcm_segment, float(self._sample_rate), stretch_factor=stretch_factor
-            )
-            # 释放资源，避免阻塞其他进程
-            time.sleep(0)
-            return (seg_idx, stretched)
-
-        # 使用共享线程池并行处理
-        # 提交所有任务（按优先级顺序）
-        futures = {}
-        for seg_idx in segment_order:
-            if is_cancelled():
-                break
-            future = executor.submit(process_segment, seg_idx)
-            futures[future] = seg_idx
-
-        # 收集结果
-        for future in as_completed(futures):
-            if is_cancelled():
-                # 取消所有未完成的任务
-                for f in futures:
-                    f.cancel()
-                return None
-
-            result = future.result()
-            if result is not None:
-                seg_idx, stretched = result
-                out_segments[seg_idx] = stretched
-
-                with rendered_lock:
-                    rendered_count += 1
-                    current_count = rendered_count
-
-                # 回调通知：当前段已渲染完成
-                if segment_ready_cb is not None:
-                    try:
-                        segment_ready_cb(speed, stretched)
-                    except Exception as e:
-                        print(f"[TSM] segment_ready_cb error: {e}")
-
-                # 更新进度
-                progress = current_count / total_segments
-                if progress_cb is not None:
-                    try:
-                        progress_cb(speed, min(progress * 0.99, 0.99))
-                    except Exception:
-                        pass
-
-        # 按顺序拼接所有段
-        out = np.concatenate([s for s in out_segments if s is not None], axis=0).astype(np.float32)
+        if self._render_version != render_version:
+            return None
 
         if progress_cb is not None:
             try:
                 progress_cb(speed, 1.0)
             except Exception:
                 pass
-        return out
+
+        return out.astype(np.float32)
