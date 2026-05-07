@@ -7,7 +7,7 @@ name = "strange-uta-game"
 version = "0.1.0"
 description = "一款由 RhythmicaLyrics 启发的歌词打轴软件"
 readme = "README.md"
-license = {text = "MIT"}
+license = {text = "GPL-3.0"}
 requires-python = ">=3.9"
 authors = [
     {name = "StrangeUtaGame Team"}
@@ -16,7 +16,7 @@ keywords = ["karaoke", "lyrics", "timing", "rhythmica", "subtitle"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: End Users/Desktop",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
