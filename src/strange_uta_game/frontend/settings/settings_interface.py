@@ -625,10 +625,20 @@ class SettingsInterface(ScrollArea):
         )
         self.card_font_size = SpinSettingCard(
             FIF.FONT_SIZE,
-            "歌词字体大小",
-            "歌词预览区域的字体像素大小",
+            "基础字体大小",
+            "非当前行的歌词字体像素大小",
             min_val=12,
             max_val=48,
+            step=2,
+            suffix=" px",
+            parent=self.ui_group,
+        )
+        self.card_current_line_font_size = SpinSettingCard(
+            FIF.FONT_SIZE,
+            "当前行字体大小",
+            "当前高亮行的字体像素大小（放大效果）",
+            min_val=12,
+            max_val=64,
             step=2,
             suffix=" px",
             parent=self.ui_group,
@@ -663,6 +673,7 @@ class SettingsInterface(ScrollArea):
 
         self.ui_group.addSettingCard(self.card_theme)
         self.ui_group.addSettingCard(self.card_font_size)
+        self.ui_group.addSettingCard(self.card_current_line_font_size)
         self.ui_group.addSettingCard(self.card_ruby_size)
         self.ui_group.addSettingCard(self.card_cp_size)
         self.ui_group.addSettingCard(self.card_lyrics_alignment)
@@ -1138,7 +1149,8 @@ class SettingsInterface(ScrollArea):
         theme = self._settings.get("ui.theme", "auto")
         theme_idx = {"light": 0, "dark": 1, "auto": 2}.get(theme, 2)
         self.card_theme.setCurrentIndex(theme_idx)
-        self.card_font_size.setValue(self._settings.get("ui.font_size", 24))
+        self.card_font_size.setValue(self._settings.get("ui.font_size", 18))
+        self.card_current_line_font_size.setValue(self._settings.get("ui.current_line_font_size", 22))
         self.card_ruby_size.setValue(self._settings.get("ui.ruby_size", 10))
         self.card_cp_size.setValue(self._settings.get("ui.cp_size", 8))
         alignment = self._settings.get("ui.lyrics_alignment", "center")
@@ -1268,6 +1280,7 @@ class SettingsInterface(ScrollArea):
             "ui.theme", theme_map.get(self.card_theme.currentIndex(), "light")
         )
         self._settings.set("ui.font_size", self.card_font_size.value())
+        self._settings.set("ui.current_line_font_size", self.card_current_line_font_size.value())
         self._settings.set("ui.ruby_size", self.card_ruby_size.value())
         self._settings.set("ui.cp_size", self.card_cp_size.value())
         alignment_map = {0: "left", 1: "center", 2: "right"}

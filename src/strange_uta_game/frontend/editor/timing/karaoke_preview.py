@@ -276,16 +276,17 @@ class KaraokePreview(QWidget):
             self._alignment = alignment
             self.update()
 
-    def set_font_sizes(self, main_size: int, ruby_size: int = 10, cp_size: int = 8):
+    def set_font_sizes(self, base_size: int, current_line_size: int = 0, ruby_size: int = 10, cp_size: int = 8):
         """设置字体大小并自动适配预览行数。
 
         Args:
-            main_size: 主字体大小（当前行），非当前行自动减4
+            base_size: 基础字体大小（非当前行）
+            current_line_size: 当前行放大字体大小，0 表示自动比基础大4
             ruby_size: 注音字体大小
             cp_size: 节奏点标记字体大小
         """
-        current_size = max(12, main_size)
-        context_size = max(12, current_size - 4)
+        context_size = max(12, base_size)
+        current_size = max(12, current_line_size if current_line_size > 0 else base_size + 4)
         ruby_size = max(6, ruby_size)
         cp_size = max(6, cp_size)
 
@@ -298,9 +299,9 @@ class KaraokePreview(QWidget):
         self._fm_ruby = QFontMetrics(self._font_ruby)
         self._fm_checkpoint = QFontMetrics(self._font_checkpoint)
 
-        # 根据字体大小自动计算可见行数（行高需容纳主文字 + ruby + cp）
+        # 行高以当前行（放大后）字体大小为准，需容纳 ruby + cp
         total_height = self._fm_current.height() + self._fm_ruby.height() + self._fm_checkpoint.height()
-        line_h = total_height * 0.85
+        line_h = total_height * 1.65
         h = self.height() if self.height() > 0 else 600
         self._visible_lines = max(3, min(15, int(h / line_h)))
 

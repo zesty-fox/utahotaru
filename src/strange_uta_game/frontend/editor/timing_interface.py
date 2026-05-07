@@ -401,10 +401,11 @@ class EditorInterface(QWidget):
         lyrics_alignment = settings.get("ui.lyrics_alignment", "center")
         self.preview.set_alignment(lyrics_alignment)
         # 应用字体大小设置
-        font_size = settings.get("ui.font_size", 22)
+        base_font_size = settings.get("ui.font_size", 18)
+        current_line_size = settings.get("ui.current_line_font_size", 22)
         ruby_size = settings.get("ui.ruby_size", 10)
         cp_size = settings.get("ui.cp_size", 8)
-        self.preview.set_font_sizes(font_size, ruby_size, cp_size)
+        self.preview.set_font_sizes(base_font_size, current_line_size, ruby_size, cp_size)
         # 更新快捷键提示（#6：只保留 9 项核心）
         self._update_shortcut_hint(timing_actions, edit_actions)
         # #7：打轴按钮文字联动 shortcuts.timing_mode.tag_now
