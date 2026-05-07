@@ -369,6 +369,13 @@ class EditorInterface(QWidget):
             self._key_map_edit.pop(key_name, None)
         # 兼容旧字段名：当前活动 map（按播放状态切换；初始为编辑模式）
         self._key_map = self._key_map_edit
+        # 应用默认音量
+        default_volume = int(settings.get("audio.default_volume", 80))
+        if self._timing_service:
+            self._timing_service.set_volume(default_volume)
+        self.transport.slider_volume.blockSignals(True)
+        self.transport.slider_volume.setValue(default_volume)
+        self.transport.slider_volume.blockSignals(False)
         # 应用默认速度
         default_speed = settings.get("audio.default_speed", 1.0)
         # 同步到音频引擎，避免 UI 与引擎速度分道扬镳
@@ -393,6 +400,11 @@ class EditorInterface(QWidget):
         # 应用歌词对齐方式
         lyrics_alignment = settings.get("ui.lyrics_alignment", "center")
         self.preview.set_alignment(lyrics_alignment)
+        # 应用字体大小设置
+        font_size = settings.get("ui.font_size", 22)
+        ruby_size = settings.get("ui.ruby_size", 10)
+        cp_size = settings.get("ui.cp_size", 8)
+        self.preview.set_font_sizes(font_size, ruby_size, cp_size)
         # 更新快捷键提示（#6：只保留 9 项核心）
         self._update_shortcut_hint(timing_actions, edit_actions)
         # #7：打轴按钮文字联动 shortcuts.timing_mode.tag_now
@@ -1054,12 +1066,25 @@ class EditorInterface(QWidget):
             self._audio_file_path = file_path
             self.toolbar.lbl_audio.setText(Path(file_path).name)
 
-            # 同步音频引擎当前速度到 UI（加载后引擎已重置为 1.0x）
+            # 应用设置中的默认音量和速度
             if self._timing_service:
-                current_speed = self._timing_service.get_speed()
-                self.transport.edit_speed.blockSignals(True)
-                self.transport.edit_speed.setText(f"{int(current_speed * 100)}%")
-                self.transport.edit_speed.blockSignals(False)
+                main_window = self.window()
+                setting_iface = getattr(main_window, "settingInterface", None)
+                if setting_iface is not None:
+                    settings = setting_iface.get_settings()
+                    # 默认音量
+                    default_volume = int(settings.get("audio.default_volume", 80))
+                    self._timing_service.set_volume(default_volume)
+                    self.transport.slider_volume.blockSignals(True)
+                    self.transport.slider_volume.setValue(default_volume)
+                    self.transport.slider_volume.blockSignals(False)
+                    # 默认速度
+                    default_speed = settings.get("audio.default_speed", 1.0)
+                    self._timing_service.set_speed(default_speed)
+                    speed_pct = int(default_speed * 100)
+                    self.transport.edit_speed.blockSignals(True)
+                    self.transport.edit_speed.setText(f"{max(50, min(200, speed_pct))}%")
+                    self.transport.edit_speed.blockSignals(False)
 
             # 与 Home 页加载音频的动作对称：广播 audio 变更，使导出页等订阅者同步
             if hasattr(self, "_store") and self._store:

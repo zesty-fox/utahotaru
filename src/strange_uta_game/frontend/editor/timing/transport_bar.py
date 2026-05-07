@@ -121,10 +121,10 @@ class TransportBar(QFrame):
 
     def set_position(self, ms: int):
         self._current_ms = ms
-        # 用户拖动滑块时不覆盖位置，避免"回弹"BUG
+        # 用户拖动滑块时不覆盖位置和时间标签，避免拖动失效
         if self._duration_ms > 0 and not self.slider_progress.isSliderDown():
             self.slider_progress.setValue(int((ms / self._duration_ms) * 10000))
-        self._update_label()
+            self._update_label()
 
     def set_playing(self, playing: bool):
         self._is_playing = playing

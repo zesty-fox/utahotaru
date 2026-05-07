@@ -202,11 +202,14 @@ class CalibrationDialog(QDialog):
             (_time.monotonic() - start_time) / cycle_duration + index / num_blocks
         ) % 1.0
 
-    def _generate_click(self, sr=44100, duration_ms=30, freq=1000):
+    def _generate_click(self, sr=44100, duration_ms=30, freq=660):
         n = int(sr * duration_ms / 1000)
         t = np.arange(n) / sr
-        click = 0.5 * np.sin(2 * np.pi * freq * t)
-        fade = np.linspace(1.0, 0.0, n)
+        click = 0.4 * np.sin(2 * np.pi * freq * t)
+        # 添加二次谐波使音色更温暖
+        click += 0.15 * np.sin(2 * np.pi * freq * 2 * t)
+        # 柔和的指数衰减包络
+        fade = np.exp(-8.0 * t / (duration_ms / 1000))
         click *= fade
         return click.astype(np.float32)
 

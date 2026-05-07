@@ -276,6 +276,40 @@ class KaraokePreview(QWidget):
             self._alignment = alignment
             self.update()
 
+    def set_font_sizes(self, main_size: int, ruby_size: int = 10, cp_size: int = 8):
+        """设置字体大小并自动适配预览行数。
+
+        Args:
+            main_size: 主字体大小（当前行），非当前行自动减4
+            ruby_size: 注音字体大小
+            cp_size: 节奏点标记字体大小
+        """
+        current_size = max(12, main_size)
+        context_size = max(12, current_size - 4)
+        ruby_size = max(6, ruby_size)
+        cp_size = max(6, cp_size)
+
+        self._font_current = QFont("Microsoft YaHei", current_size, QFont.Weight.Bold)
+        self._font_context = QFont("Microsoft YaHei", context_size)
+        self._font_ruby = QFont("Microsoft YaHei", ruby_size)
+        self._font_checkpoint = QFont("Microsoft YaHei", cp_size)
+        self._fm_current = QFontMetrics(self._font_current)
+        self._fm_context = QFontMetrics(self._font_context)
+        self._fm_ruby = QFontMetrics(self._font_ruby)
+        self._fm_checkpoint = QFontMetrics(self._font_checkpoint)
+
+        # 根据字体大小自动计算可见行数（行高需容纳主文字 + ruby + cp）
+        total_height = self._fm_current.height() + self._fm_ruby.height() + self._fm_checkpoint.height()
+        line_h = total_height * 0.85
+        h = self.height() if self.height() > 0 else 600
+        self._visible_lines = max(3, min(15, int(h / line_h)))
+
+        # 清除缓存并重绘
+        self._sentence_cache.clear()
+        self._line_versions.clear()
+        self._global_version += 1
+        self.update()
+
     def _update_display(self):
         self._global_version += 1
         self.update()

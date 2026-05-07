@@ -327,16 +327,6 @@ class SettingsInterface(ScrollArea):
             suffix=" %",
             parent=self.timing_group,
         )
-        self.card_preview_lines = SpinSettingCard(
-            FIF.VIEW,
-            "预览行数",
-            "歌词预览区域显示的行数",
-            min_val=3,
-            max_val=15,
-            step=1,
-            suffix=" 行",
-            parent=self.timing_group,
-        )
         self.card_export_offset = SpinSettingCard(
             FIF.HISTORY,
             "全局偏移",
@@ -360,7 +350,6 @@ class SettingsInterface(ScrollArea):
 
         self.timing_group.addSettingCard(self.card_offset)
         self.timing_group.addSettingCard(self.card_speed_correction)
-        self.timing_group.addSettingCard(self.card_preview_lines)
         self.timing_group.addSettingCard(self.card_export_offset)
         self.timing_group.addSettingCard(self.card_timing_step)
         self.expandLayout.addWidget(self.timing_group)
@@ -644,6 +633,26 @@ class SettingsInterface(ScrollArea):
             suffix=" px",
             parent=self.ui_group,
         )
+        self.card_ruby_size = SpinSettingCard(
+            FIF.FONT_SIZE,
+            "注音字体大小",
+            "Ruby注音的字体像素大小",
+            min_val=6,
+            max_val=24,
+            step=1,
+            suffix=" px",
+            parent=self.ui_group,
+        )
+        self.card_cp_size = SpinSettingCard(
+            FIF.FONT_SIZE,
+            "节奏点标记大小",
+            "Checkpoint节奏点标记的字体像素大小",
+            min_val=6,
+            max_val=20,
+            step=1,
+            suffix=" px",
+            parent=self.ui_group,
+        )
         self.card_lyrics_alignment = ComboSettingCard(
             FIF.ALIGNMENT,
             "歌词对齐方式",
@@ -654,6 +663,8 @@ class SettingsInterface(ScrollArea):
 
         self.ui_group.addSettingCard(self.card_theme)
         self.ui_group.addSettingCard(self.card_font_size)
+        self.ui_group.addSettingCard(self.card_ruby_size)
+        self.ui_group.addSettingCard(self.card_cp_size)
         self.ui_group.addSettingCard(self.card_lyrics_alignment)
         self.expandLayout.addWidget(self.ui_group)
 
@@ -1065,9 +1076,6 @@ class SettingsInterface(ScrollArea):
         self.card_speed_correction.setValue(
             self._settings.get("timing.speed_correction", 80)
         )
-        self.card_preview_lines.setValue(
-            self._settings.get("timing.show_preview_lines", 5)
-        )
         self.card_timing_step.setValue(
             self._settings.get("timing.timing_adjust_step_ms", 10)
         )
@@ -1131,6 +1139,8 @@ class SettingsInterface(ScrollArea):
         theme_idx = {"light": 0, "dark": 1, "auto": 2}.get(theme, 2)
         self.card_theme.setCurrentIndex(theme_idx)
         self.card_font_size.setValue(self._settings.get("ui.font_size", 24))
+        self.card_ruby_size.setValue(self._settings.get("ui.ruby_size", 10))
+        self.card_cp_size.setValue(self._settings.get("ui.cp_size", 8))
         alignment = self._settings.get("ui.lyrics_alignment", "center")
         alignment_idx = {"left": 0, "center": 1, "right": 2}.get(alignment, 1)
         self.card_lyrics_alignment.setCurrentIndex(alignment_idx)
@@ -1201,7 +1211,6 @@ class SettingsInterface(ScrollArea):
         self._settings.set(
             "timing.speed_correction", self.card_speed_correction.value()
         )
-        self._settings.set("timing.show_preview_lines", self.card_preview_lines.value())
         self._settings.set(
             "timing.timing_adjust_step_ms", self.card_timing_step.value()
         )
@@ -1259,6 +1268,8 @@ class SettingsInterface(ScrollArea):
             "ui.theme", theme_map.get(self.card_theme.currentIndex(), "light")
         )
         self._settings.set("ui.font_size", self.card_font_size.value())
+        self._settings.set("ui.ruby_size", self.card_ruby_size.value())
+        self._settings.set("ui.cp_size", self.card_cp_size.value())
         alignment_map = {0: "left", 1: "center", 2: "right"}
         self._settings.set(
             "ui.lyrics_alignment",
