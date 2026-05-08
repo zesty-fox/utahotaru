@@ -92,6 +92,8 @@ class TimingCallbacks(Protocol):
 class TimingServiceQt(QObject):
     # 通知Karaoke渲染位置更新信号
     _focus_moved_signal = pyqtSignal(int, int) # line_idx , char_idx
+    # 通知Karaoke将当前行居中滚动信号
+    _center_current_line_signal = pyqtSignal()
     def __init__(self):
         super().__init__()
 
@@ -219,6 +221,8 @@ class TimingService:
                 self._global_checkpoint_idx = prev_idx
                 self._current_position = self._global_checkpoints[prev_idx]
                 self._notify_checkpoint_moved()
+                # 通知前端将当前行居中滚动
+                self._global_qt._center_current_line_signal.emit()
         return result
 
     def redo(self) -> Optional[str]:
@@ -464,6 +468,8 @@ class TimingService:
         self.move_to_next_checkpoint()
         # 打轴键也会更新焦点
         self._notify_focus_moved()
+        # 通知前端将当前行居中滚动
+        self._global_qt._center_current_line_signal.emit()
 
     def on_timing_key_pressed(self, key: str) -> None:
         """打轴按键按下处理（Space 或 F1-F9）
