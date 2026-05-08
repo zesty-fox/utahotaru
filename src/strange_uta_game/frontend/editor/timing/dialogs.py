@@ -1,22 +1,27 @@
 """打轴编辑对话框集合。
 
-包含三个字符级编辑对话框：
+包含以下编辑对话框：
 - ``ModifyCharacterDialog`` : 批量修改字符/注音
 - ``InsertGuideSymbolDialog`` : 插入制导符号
 - ``CharEditDialog`` : 单字符编辑
+- ``SetSingerByLineDialog`` : 按行设置演唱者
 """
 
 from __future__ import annotations
 
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QFormLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QScrollArea,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -27,6 +32,7 @@ from strange_uta_game.backend.domain import (
     Ruby,
     RubyPart,
     Sentence,
+    Singer,
 )
 
 
@@ -553,5 +559,193 @@ class CharEditDialog(QDialog):
 
 
 # ──────────────────────────────────────────────
-# 时间轴
+# 按行设置演唱者对话框
 # ──────────────────────────────────────────────
+
+
+class SetSingerByLineDialog(QDialog):
+    """按行设置演唱者对话框 — 批量为多行设置演唱者。
+
+    显示所有行（只读），用户可通过复选框选择多行，
+    然后从下拉列表中选择演唱者来批量设置。
+    点击"应用"按钮后不关闭对话框，方便继续设置其他行。
+    """
+
+    apply_requested = pyqtSignal(dict)  # {line_idx: singer_id}
+
+    def __init__(self, sentences: list[Sentence], singers: list[Singer], parent=None):
+        super().__init__(parent)
+        self._sentences = sentences
+        self._singers = singers
+        self._modified = False
+
+        # 构建 singer_id -> Singer 映射
+        self._singer_map = {s.id: s for s in singers}
+
+        self.setWindowTitle("按行设置演唱者")
+        self.resize(900, 500)
+        self.setFont(QFont("Microsoft YaHei", 10))
+
+        layout = QVBoxLayout(self)
+
+        # 提示标签
+        hint = CaptionLabel("选择要设置演唱者的行，然后从下方选择演唱者，点击「应用」执行：")
+        layout.addWidget(hint)
+
+        # 行列表表格
+        self.table = QTableWidget(len(sentences), 4, self)
+        self.table.setHorizontalHeaderLabels(["选择", "行号", "歌词内容", "当前演唱者"])
+        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.setColumnWidth(0, 50)
+        self.table.setColumnWidth(1, 60)
+        self.table.setColumnWidth(2, 500)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+
+        for idx, sentence in enumerate(sentences):
+            # 复选框
+            chk = QCheckBox()
+            chk_widget = QWidget()
+            chk_layout = QHBoxLayout(chk_widget)
+            chk_layout.addWidget(chk)
+            chk_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            chk_layout.setContentsMargins(0, 0, 0, 0)
+            self.table.setCellWidget(idx, 0, chk_widget)
+
+            # 行号
+            line_num_item = QTableWidgetItem(str(idx + 1))
+            line_num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table.setItem(idx, 1, line_num_item)
+
+            # 歌词内容（只读）
+            text = sentence.text if sentence.characters else "(空行)"
+            text_item = QTableWidgetItem(text)
+            self.table.setItem(idx, 2, text_item)
+
+            # 当前演唱者（只读）- 显示行内所有不同的演唱者
+            singer_names = self._get_singer_names_for_sentence(sentence)
+            singer_item = QTableWidgetItem(singer_names)
+            singer_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table.setItem(idx, 3, singer_item)
+
+        layout.addWidget(self.table, stretch=1)
+
+        # 全选/全不选按钮
+        select_layout = QHBoxLayout()
+        btn_select_all = PushButton("全选", self)
+        btn_select_all.clicked.connect(self._select_all)
+        btn_deselect_all = PushButton("全不选", self)
+        btn_deselect_all.clicked.connect(self._deselect_all)
+        select_layout.addWidget(btn_select_all)
+        select_layout.addWidget(btn_deselect_all)
+        select_layout.addStretch()
+        layout.addLayout(select_layout)
+
+        # 演唱者选择
+        singer_layout = QHBoxLayout()
+        singer_layout.addWidget(QLabel("设置演唱者为:"))
+        self.combo_singer = QComboBox(self)
+        for singer in singers:
+            self.combo_singer.addItem(singer.name)
+            self.combo_singer.setItemData(self.combo_singer.count() - 1, QColor(singer.color), Qt.ItemDataRole.BackgroundRole)
+            self.combo_singer.setItemData(self.combo_singer.count() - 1, singer.id, Qt.ItemDataRole.UserRole)
+        singer_layout.addWidget(self.combo_singer, stretch=1)
+        layout.addLayout(singer_layout)
+
+        # 按钮
+        btn_layout = QHBoxLayout()
+        btn_apply = PrimaryPushButton("应用", self)
+        btn_apply.clicked.connect(self._on_apply)
+        btn_close = PushButton("关闭", self)
+        btn_close.clicked.connect(self.reject)
+        btn_layout.addStretch()
+        btn_layout.addWidget(btn_apply)
+        btn_layout.addWidget(btn_close)
+        layout.addLayout(btn_layout)
+
+    def _get_singer_names_for_sentence(self, sentence: Sentence) -> str:
+        """获取句子内所有不同的演唱者名称，用逗号分隔"""
+        if not sentence.characters:
+            return ""
+        singer_ids = set()
+        for ch in sentence.characters:
+            if ch.singer_id:
+                singer_ids.add(ch.singer_id)
+        if not singer_ids:
+            return ""
+        names = []
+        for sid in singer_ids:
+            singer = self._singer_map.get(sid)
+            names.append(singer.name if singer else "未知")
+        return ", ".join(names)
+
+    def _select_all(self):
+        """全选所有行"""
+        for idx in range(self.table.rowCount()):
+            widget = self.table.cellWidget(idx, 0)
+            if widget:
+                chk = widget.findChild(QCheckBox)
+                if chk:
+                    chk.setChecked(True)
+
+    def _deselect_all(self):
+        """全不选"""
+        for idx in range(self.table.rowCount()):
+            widget = self.table.cellWidget(idx, 0)
+            if widget:
+                chk = widget.findChild(QCheckBox)
+                if chk:
+                    chk.setChecked(False)
+
+    def _on_apply(self):
+        """应用按钮点击处理 - 不关闭对话框"""
+        # 获取选中的演唱者ID
+        singer_idx = self.combo_singer.currentIndex()
+        if singer_idx < 0:
+            return
+        singer_id = self.combo_singer.itemData(singer_idx, Qt.ItemDataRole.UserRole)
+        if not singer_id:
+            return
+
+        # 收集选中的行
+        selected_lines = []
+        for idx in range(self.table.rowCount()):
+            widget = self.table.cellWidget(idx, 0)
+            if widget:
+                chk = widget.findChild(QCheckBox)
+                if chk and chk.isChecked():
+                    selected_lines.append(idx)
+
+        if not selected_lines:
+            return
+
+        # 构建结果映射并发出信号
+        result_map = {line_idx: singer_id for line_idx in selected_lines}
+        self._modified = True
+        self.apply_requested.emit(result_map)
+
+        # 更新表格中已应用行的当前演唱者显示
+        singer = self._singer_map.get(singer_id)
+        singer_name = singer.name if singer else "未知"
+        for line_idx in selected_lines:
+            item = self.table.item(line_idx, 3)
+            if item:
+                item.setText(singer_name)
+                if singer:
+                    item.setForeground(QColor(singer.color))
+
+        # 取消已应用行的复选框选中状态
+        for idx in selected_lines:
+            widget = self.table.cellWidget(idx, 0)
+            if widget:
+                chk = widget.findChild(QCheckBox)
+                if chk:
+                    chk.setChecked(False)
+
+    def was_modified(self) -> bool:
+        return self._modified
+
+    def result_map(self) -> dict[int, str]:
+        """返回 {line_idx: singer_id} 映射"""
+        return self._result_map

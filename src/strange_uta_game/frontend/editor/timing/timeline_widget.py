@@ -339,14 +339,18 @@ class TimelineWidget(QWidget):
         self.zoom_label.setFixedWidth(40)
         bottom_layout.addWidget(self.zoom_label)
 
-        bottom_layout.addStretch()
-
         # 横向滚动条
         self.scroll_bar = QScrollBar(Qt.Orientation.Horizontal, self)
         self.scroll_bar.setRange(0, 1000)
         self.scroll_bar.setValue(0)
         self.scroll_bar.valueChanged.connect(self._on_scroll_bar_changed)
         bottom_layout.addWidget(self.scroll_bar, stretch=1)
+
+        # 音频名称标签
+        self.lbl_audio_name = CaptionLabel("未加载音频", self)
+        self.lbl_audio_name.setFixedWidth(400)
+        self.lbl_audio_name.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        bottom_layout.addWidget(self.lbl_audio_name)
 
         layout.addLayout(bottom_layout)
 
@@ -362,6 +366,10 @@ class TimelineWidget(QWidget):
 
     def set_audio_data(self, samples: np.ndarray, sample_rate: int, channels: int):
         self.waveform_display.set_audio_data(samples, sample_rate, channels)
+
+    def set_audio_name(self, name: str):
+        """设置音频文件名称显示"""
+        self.lbl_audio_name.setText(name)
 
     def _on_zoom_changed(self, zoom: float):
         self.zoom_slider.blockSignals(True)

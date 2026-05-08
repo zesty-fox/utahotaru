@@ -31,10 +31,12 @@ class EditorToolBar(QFrame):
     load_audio_clicked = pyqtSignal()
     load_lyrics_clicked = pyqtSignal()
     bulk_change_clicked = pyqtSignal()
+    modify_line_clicked = pyqtSignal()
     analyze_rubies_clicked = pyqtSignal()
     modify_char_clicked = pyqtSignal()
     insert_guide_clicked = pyqtSignal()
     delete_rubies_by_type_clicked = pyqtSignal()
+    set_singer_by_line_clicked = pyqtSignal()
     offset_changed = pyqtSignal(int)  # 偏移量变化（毫秒）
 
     def __init__(self, parent=None):
@@ -84,6 +86,12 @@ class EditorToolBar(QFrame):
         self.btn_bulk_change.clicked.connect(self.bulk_change_clicked.emit)
         layout.addWidget(self.btn_bulk_change)
 
+        self.btn_modify_line = PushButton("修改选中行", self)
+        self.btn_modify_line.setIcon(FIF.EDIT)
+        self.btn_modify_line.setFixedHeight(32)
+        self.btn_modify_line.clicked.connect(self.modify_line_clicked.emit)
+        layout.addWidget(self.btn_modify_line)
+
         self.btn_analyze_rubies = PushButton("注音分析", self)
         self.btn_analyze_rubies.setIcon(FIF.SYNC)
         self.btn_analyze_rubies.setFixedHeight(32)
@@ -95,6 +103,12 @@ class EditorToolBar(QFrame):
         self.btn_delete_rubies_by_type.setFixedHeight(32)
         self.btn_delete_rubies_by_type.clicked.connect(self.delete_rubies_by_type_clicked.emit)
         layout.addWidget(self.btn_delete_rubies_by_type)
+
+        self.btn_set_singer_by_line = PushButton("按行设置演唱者", self)
+        self.btn_set_singer_by_line.setIcon(FIF.PEOPLE)
+        self.btn_set_singer_by_line.setFixedHeight(32)
+        self.btn_set_singer_by_line.clicked.connect(self.set_singer_by_line_clicked.emit)
+        layout.addWidget(self.btn_set_singer_by_line)
 
         layout.addSpacing(10)
 
@@ -111,10 +125,6 @@ class EditorToolBar(QFrame):
         layout.addWidget(self.edit_offset)
 
         layout.addStretch()
-
-        # 状态标签
-        self.lbl_audio = CaptionLabel("未加载音频")
-        layout.addWidget(self.lbl_audio)
 
     def _on_offset_editing_finished(self):
         """偏移输入框编辑完成 — 解析并发射信号"""

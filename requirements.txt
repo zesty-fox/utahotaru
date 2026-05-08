@@ -9,6 +9,7 @@ pedalboard>=0.9.0
 pykakasi>=2.2.1
 sudachipy>=0.6.0
 sudachidict_core
+av>=12.0.0
 
 # 测试依赖
 pytest>=7.4.0

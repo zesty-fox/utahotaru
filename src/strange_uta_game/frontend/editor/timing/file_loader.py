@@ -6,13 +6,20 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QFileDialog, QMessageBox
-from qfluentwidgets import InfoBar, InfoBarPosition
+from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox
+from qfluentwidgets import InfoBar, InfoBarPosition, StateToolTip
 
+from strange_uta_game.backend.infrastructure.audio.video_converter import (
+    VIDEO_EXTENSIONS,
+    extract_audio,
+    is_ffmpeg_available,
+    is_video_file,
+)
 from strange_uta_game.frontend.settings.app_settings import AppSettings
 
 from .lyric_loader import parse_lyric_content, read_lyric_file
@@ -24,7 +31,7 @@ if TYPE_CHECKING:
 class FileLoader:
     """文件加载管理器 — 处理项目/音频/歌词的加载"""
 
-    _AUDIO_EXTENSIONS = {".mp3", ".wav", ".flac", ".aac", ".ogg", ".m4a"}
+    _AUDIO_EXTENSIONS = {".mp3", ".wav", ".flac", ".ogg"}
     _LYRIC_EXTENSIONS = {".lrc", ".txt", ".kra"}
     _PROJECT_EXTENSIONS = {".sug"}
 
@@ -48,7 +55,7 @@ class FileLoader:
     def can_accept_drop(self, file_path: str) -> bool:
         """判断文件是否可接受拖拽"""
         ext = Path(file_path).suffix.lower()
-        return ext in (self._AUDIO_EXTENSIONS | self._LYRIC_EXTENSIONS | self._PROJECT_EXTENSIONS)
+        return ext in (self._AUDIO_EXTENSIONS | VIDEO_EXTENSIONS | self._LYRIC_EXTENSIONS | self._PROJECT_EXTENSIONS)
 
     def handle_drop(self, file_path: str):
         """处理拖拽文件"""
@@ -56,6 +63,8 @@ class FileLoader:
         if ext in self._AUDIO_EXTENSIONS:
             self._editor.load_audio(file_path)
             self._save_last_dir(file_path)
+        elif ext in VIDEO_EXTENSIONS:
+            self._load_video_as_audio(file_path)
         elif ext in self._LYRIC_EXTENSIONS:
             self.load_lyrics(file_path)
             self._save_last_dir(file_path)
@@ -83,14 +92,17 @@ class FileLoader:
             self.load_project(path)
 
     def prompt_load_audio(self):
-        """弹出文件选择框加载音频"""
+        """弹出文件选择框加载音频或视频"""
         path, _ = QFileDialog.getOpenFileName(
-            self._editor, "选择音频文件", "",
-            "音频文件 (*.mp3 *.wav *.flac *.aac *.ogg *.m4a);;所有文件 (*.*)",
+            self._editor, "选择音频或视频文件", "",
+            "音频/视频文件 (*.mp3 *.wav *.flac *.ogg *.mp4 *.mkv *.m4a *.avi *.mov *.wmv *.flv *.webm *.m4v *.mpg *.mpeg *.ts *.3gp *.vob *.mts *.m2ts *.rm *.rmvb *.asf *.f4v *.ogv *.m4b *.aac *.wma *.opus *.ape *.ac3 *.dts);;所有文件 (*.*)",
         )
         if path:
-            self._editor.load_audio(path)
-            self._save_last_dir(path)
+            if is_video_file(path):
+                self._load_video_as_audio(path)
+            else:
+                self._editor.load_audio(path)
+                self._save_last_dir(path)
 
     def prompt_load_lyrics(self):
         """弹出文件选择框加载歌词"""
@@ -109,6 +121,76 @@ class FileLoader:
         if path:
             self.load_lyrics(path)
             self._save_last_dir(path)
+
+    def _load_video_as_audio(self, file_path: str):
+        """加载视频文件，提取音频并加载"""
+        from strange_uta_game.frontend.theme import theme
+
+        # 检查 FFmpeg 是否可用
+        if not is_ffmpeg_available():
+            InfoBar.error(
+                title="无法读取视频文件",
+                content="当前环境未检测到 FFmpeg，请安装 FFmpeg 并将其添加到系统环境变量后重试。",
+                orient=Qt.Orientation.Horizontal, isClosable=True,
+                position=InfoBarPosition.TOP, duration=5000,
+                parent=self._editor,
+            )
+            return
+
+        # 创建状态提示
+        state_tooltip = StateToolTip("正在处理视频", "正在检查 FFmpeg 环境...", self._editor)
+        green = theme.status_complete.name()
+        state_tooltip.setStyleSheet(f"""
+            StateToolTip {{
+                background-color: {green};
+                border: 1px solid {green};
+                border-radius: 8px;
+            }}
+            StateToolTip QLabel {{
+                color: white;
+            }}
+        """)
+        state_tooltip.move(state_tooltip.getSuitablePos())
+        state_tooltip.show()
+
+        def on_progress(stage: str, value: float):
+            state_tooltip.setContent(stage)
+            QApplication.processEvents()
+
+        temp_path = None
+        try:
+            # 提取音频
+            temp_path = extract_audio(file_path, progress_cb=on_progress)
+
+            # 更新状态提示
+            state_tooltip.setContent("正在加载音频...")
+            QApplication.processEvents()
+
+            # 使用现有流程加载提取出的音频
+            self._editor.load_audio(temp_path)
+            self._save_last_dir(file_path)
+
+            # 完成
+            state_tooltip.setState(True)
+            state_tooltip.setContent("加载完成")
+            state_tooltip.close()
+
+        except Exception as e:
+            state_tooltip.close()
+            InfoBar.error(
+                title="视频处理失败",
+                content=str(e),
+                orient=Qt.Orientation.Horizontal, isClosable=True,
+                position=InfoBarPosition.TOP, duration=5000,
+                parent=self._editor,
+            )
+        finally:
+            # 清理临时文件
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
 
     # ── 实际加载逻辑 ──
 

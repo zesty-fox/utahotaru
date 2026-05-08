@@ -14,7 +14,7 @@
     "rewind_ms": 5000,
     "jump_before_ms": 3000,
     "timing_adjust_step_ms": 10,
-    "disable_click_jump": true
+    "disable_click_jump": false
   },
   "auto_check": {
     "hiragana": true,

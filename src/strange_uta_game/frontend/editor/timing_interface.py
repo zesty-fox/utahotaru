@@ -52,9 +52,8 @@ from strange_uta_game.backend.infrastructure.parsers.text_splitter import (
 )
 from strange_uta_game.frontend.theme import theme
 
+from .line_interface import LineDetailDialog
 from .timing import (
-    _SentenceSnapshotCommand,
-    SentenceSnapshotCommand,
     CharEditDialog,
     EditorToolBar,
     FileLoader,
@@ -63,6 +62,8 @@ from .timing import (
     ModifyCharacterDialog,
     TimelineWidget,
     TransportBar,
+    _SentenceSnapshotCommand,
+    SentenceSnapshotCommand,
 )
 
 __all__ = [
@@ -146,8 +147,10 @@ class EditorInterface(QWidget):
         self.toolbar.modify_char_clicked.connect(self._on_modify_char)
         self.toolbar.insert_guide_clicked.connect(self._on_insert_guide)
         self.toolbar.bulk_change_clicked.connect(self._on_bulk_change)
+        self.toolbar.modify_line_clicked.connect(self._on_modify_line)
         self.toolbar.analyze_rubies_clicked.connect(self._on_analyze_rubies)
         self.toolbar.delete_rubies_by_type_clicked.connect(self._on_delete_rubies_by_type)
+        self.toolbar.set_singer_by_line_clicked.connect(self._on_set_singer_by_line)
         self.toolbar.offset_changed.connect(self._on_offset_changed)
         layout.addWidget(self.toolbar)
 
@@ -902,6 +905,45 @@ class EditorInterface(QWidget):
                     + more,
                 )
 
+    def _on_modify_line(self):
+        """打开修改选中行对话框（复用行编辑界面的 LineDetailDialog）"""
+        if not self._project:
+            return
+
+        line_idx = self.preview._current_line_idx
+        if line_idx < 0 or line_idx >= len(self._project.sentences):
+            return
+
+        sentence = self._project.sentences[line_idx]
+        before_sentences = deepcopy(self._project.sentences)
+
+        dialog = LineDetailDialog(sentence, project=self._project, parent=self)
+        dialog.exec()
+
+        if dialog.was_modified():
+            command_manager = None
+            if self._timing_service:
+                command_manager = self._timing_service.command_manager
+            if command_manager is not None:
+                after_sentences = deepcopy(self._project.sentences)
+                cmd = SentenceSnapshotCommand(
+                    self._project,
+                    before_sentences,
+                    after_sentences,
+                    f"修改选中行（第 {line_idx + 1} 句）",
+                )
+                command_manager.execute(cmd)
+
+            if self._timing_service:
+                self._timing_service.rebuild_global_checkpoints()
+            self.refresh_lyric_display()
+            self._update_time_tags_display()
+            self._update_status()
+            if hasattr(self, "_store") and self._store:
+                self._store.notify("rubies")
+                self._store.notify("checkpoints")
+                self._store.notify("lyrics")
+
     def _on_delete_rubies_by_type(self):
         """工具栏「按类型删除注音」入口。
 
@@ -983,6 +1025,83 @@ class EditorInterface(QWidget):
         InfoBar.success(
             title="删除完成",
             content=f"已删除 {removed_box[0]} 个注音（类型: {labels}）",
+            orient=Qt.Orientation.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=4000,
+            parent=self,
+        )
+
+    def _on_set_singer_by_line(self):
+        """工具栏「按行设置演唱者」入口。
+
+        弹出对话框显示所有行（只读），用户可多选行后批量设置演唱者。
+        点击"应用"按钮后不关闭对话框，方便继续设置其他行。
+        通过 _execute_structural_edit 包装，支持撤销/重做。
+        """
+        if not self._project:
+            return
+        if not self._project.singers:
+            InfoBar.warning(
+                title="无演唱者",
+                content="项目中没有演唱者，请先添加演唱者",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2500,
+                parent=self,
+            )
+            return
+
+        from .timing.dialogs import SetSingerByLineDialog
+
+        dlg = SetSingerByLineDialog(
+            self._project.sentences,
+            self._project.singers,
+            self,
+        )
+        dlg.apply_requested.connect(self._on_apply_singer_by_line)
+        dlg.exec()
+
+    def _on_apply_singer_by_line(self, result_map: dict):
+        """处理按行设置演唱者的应用请求"""
+        if not self._project or not result_map:
+            return
+
+        def _mutate() -> Optional[tuple[int, int, Optional[int], str]]:
+            assert self._project is not None
+            changed = 0
+            for line_idx, singer_id in result_map.items():
+                if 0 <= line_idx < len(self._project.sentences):
+                    sentence = self._project.sentences[line_idx]
+                    if sentence.singer_id != singer_id:
+                        sentence.singer_id = singer_id
+                        # 同步更新所有字符的 singer_id
+                        for ch in sentence.characters:
+                            ch.singer_id = singer_id
+                            if ch.ruby:
+                                ch.push_to_ruby()
+                        changed += 1
+            if changed == 0:
+                return None
+            return (self._current_line_idx, self.preview._current_char_idx, None, "singers")
+
+        ok = self._execute_structural_edit("按行设置演唱者", _mutate)
+        if not ok:
+            InfoBar.info(
+                title="无变化",
+                content="所选行的演唱者未发生变化",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2500,
+                parent=self,
+            )
+            return
+
+        InfoBar.success(
+            title="设置完成",
+            content=f"已为 {len(result_map)} 行设置演唱者",
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -1103,7 +1222,7 @@ class EditorInterface(QWidget):
                     )
 
             self._audio_file_path = file_path
-            self.toolbar.lbl_audio.setText(Path(file_path).name)
+            self.timeline.set_audio_name(Path(file_path).name)
 
             # 应用设置中的默认音量和速度
             if self._timing_service:

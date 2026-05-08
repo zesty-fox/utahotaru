@@ -258,7 +258,12 @@ class RubyInterface(QWidget):
         # 标题
         title = QLabel("全文本编辑")
         title.setStyleSheet("font-size: 24px; font-weight: bold;")
-        layout.addWidget(title)
+        title_tip = CaptionLabel("（本页面预定删除，直接编辑本页面会导致字符改变的行，时间戳丢失需要重新打轴）")
+        title_layout = QHBoxLayout()
+        title_layout.addWidget(title)
+        title_layout.addWidget(title_tip)
+        title_layout.addStretch()
+        layout.addLayout(title_layout)
 
         # 说明
         desc = CaptionLabel(
