@@ -135,6 +135,22 @@ class CommandManager:
         """获取重做栈大小"""
         return len(self._redo_stack)
 
+    def get_last_undone_command(self) -> Optional[Command]:
+        """获取最近一次撤销的命令（位于重做栈顶）
+
+        Returns:
+            最近撤销的命令，如果没有则返回 None
+        """
+        return self._redo_stack[-1] if self._redo_stack else None
+
+    def get_last_redone_command(self) -> Optional[Command]:
+        """获取最近一次重做的命令（位于撤销栈顶）
+
+        Returns:
+            最近重做的命令，如果没有则返回 None
+        """
+        return self._undo_stack[-1] if self._undo_stack else None
+
     def get_undo_stack_descriptions(self, count: int = 10) -> List[str]:
         """获取撤销栈中最近命令的描述列表
 

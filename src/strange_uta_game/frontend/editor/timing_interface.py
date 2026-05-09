@@ -958,12 +958,21 @@ class EditorInterface(QWidget):
             return
         # 复用 fulltext_interface 的对话框（CharType 复选 + 默认勾选平假名/片假名）
         from .fulltext_interface import DeleteRubyByTypeDialog
+        from strange_uta_game.frontend.settings.settings_interface import AppSettings
 
-        dlg = DeleteRubyByTypeDialog(self)
+        app_settings = AppSettings()
+        saved_types = app_settings.get("auto_check.delete_ruby_types", [])
+
+        dlg = DeleteRubyByTypeDialog(self, initial_types=saved_types)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
         selected = dlg.selected_types()
+
+        # 保存用户选择到配置（无论是否有变化）
+        app_settings.set("auto_check.delete_ruby_types", dlg.selected_type_names())
+        app_settings.save()
+
         if not selected:
             return
 
@@ -2772,6 +2781,9 @@ class EditorInterface(QWidget):
             return
         try:
             from strange_uta_game.backend.application import AutoCheckService
+            from strange_uta_game.backend.application.auto_check_service import (
+                delete_rubies_by_type_names,
+            )
             from strange_uta_game.frontend.settings.settings_interface import AppSettings
 
             app_settings = AppSettings()
@@ -2782,20 +2794,40 @@ class EditorInterface(QWidget):
             )
             auto_check.apply_to_project(self._project, only_noruby=only_noruby)
             auto_check.update_checkpoints_for_project(self._project)
+
+            # 自动删除指定类型的注音
+            delete_types = auto_check_flags.get("delete_ruby_types", [])
+            deleted_count = 0
+            if delete_types:
+                deleted_count = delete_rubies_by_type_names(
+                    self._project, delete_types
+                )
+
             self.refresh_lyric_display()
             if hasattr(self, "_store") and self._store:
                 self._store.notify("rubies")
                 self._store.notify("checkpoints")
 
-            InfoBar.success(
-                title="注音分析完成",
-                content="已重新分析注音",
-                orient=Qt.Orientation.Horizontal,
-                isClosable=True,
-                position=InfoBarPosition.TOP,
-                duration=3000,
-                parent=self,
-            )
+            if deleted_count > 0:
+                InfoBar.success(
+                    title="注音分析完成",
+                    content=f"已重新分析注音，并自动删除了 {deleted_count} 个注音",
+                    orient=Qt.Orientation.Horizontal,
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=3000,
+                    parent=self,
+                )
+            else:
+                InfoBar.success(
+                    title="注音分析完成",
+                    content="已重新分析注音",
+                    orient=Qt.Orientation.Horizontal,
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=3000,
+                    parent=self,
+                )
         except Exception as e:
             InfoBar.warning(
                 title="注音分析失败",

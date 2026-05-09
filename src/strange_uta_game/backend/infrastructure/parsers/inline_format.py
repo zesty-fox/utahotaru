@@ -35,10 +35,10 @@ from strange_uta_game.backend.domain.entities import Sentence
 
 def format_timestamp(ms: int) -> str:
     """毫秒 → MM:SS:cc"""
-    total_s = ms // 1000
-    centis = (ms % 1000) // 10
-    minutes = total_s // 60
-    seconds = total_s % 60
+    total_cs = round(ms / 10)
+    minutes = total_cs // 6000
+    seconds = (total_cs % 6000) // 100
+    centis = total_cs % 100
     return f"{minutes:02d}:{seconds:02d}:{centis:02d}"
 
 
@@ -258,6 +258,12 @@ def _single_char_to_normal_node(char: Character) -> str:
 
     # 无 CP 的字符（如空格）直接输出
     if char.check_count == 0:
+        # 检查是否有句尾标记
+        if char.is_sentence_end:
+            if char.sentence_end_ts is not None:
+                return f"{display_char}[10|{format_timestamp(char.sentence_end_ts)}]"
+            else:
+                return f"{display_char}[10]"
         return display_char
 
     char_parts: List[str] = []
@@ -334,41 +340,41 @@ def _single_char_to_ruby_node(char: Character) -> str:
 def _linked_group_to_normal_node(group: List[Character]) -> str:
     """将无注音的连词字符组转换为 Normal Node。
 
-    合并所有字符的文本，使用第一个字符的时间戳。
+    每个字符独立输出时间戳和字符。
+
     格式:
     - 无 CP (check_count=0): 直接输出文本
-    - 有 CP 有时间戳: [1|ts]text
-    - 有 CP 无时间戳: [1]text
-    - 有句尾 CP 有时间戳: text[10|ts]
-    - 有句尾 CP 无时间戳: text[10]
+    - 有 CP 有时间戳: [1|ts]char[1|ts]char...
+    - 有 CP 无时间戳: [1]char[1]char...
+    - 句尾字符后面加 [10|ts] 或 [10]
     """
-    display = "".join(REST_CHAR if c.is_rest else c.char for c in group)
-    first_char = group[0]
-
     # 无 CP 的字符组直接输出
-    if first_char.check_count == 0:
-        return display
+    if all(c.check_count == 0 for c in group):
+        return "".join(REST_CHAR if c.is_rest else c.char for c in group)
 
-    char_parts: List[str] = []
+    parts: List[str] = []
+    for i, c in enumerate(group):
+        display_char = REST_CHAR if c.is_rest else c.char
 
-    # 主时间戳
-    if first_char.timestamps:
-        ts = first_char.timestamps[0]
-        char_parts.append(f"[1|{format_timestamp(ts)}]")
-    else:
-        char_parts.append("[1]")
-
-    # 字符本身
-    char_parts.append(display)
-
-    # 句尾标记
-    if first_char.is_sentence_end:
-        if first_char.sentence_end_ts is not None:
-            char_parts.append(f"[10|{format_timestamp(first_char.sentence_end_ts)}]")
+        if c.check_count > 0:
+            # 有 CP 的字符
+            if c.timestamps:
+                ts = c.timestamps[0]
+                parts.append(f"[1|{format_timestamp(ts)}]{display_char}")
+            else:
+                parts.append(f"[1]{display_char}")
         else:
-            char_parts.append("[10]")
+            # 无 CP 的字符
+            parts.append(display_char)
 
-    return "".join(char_parts)
+        # 句尾标记（无论是否有 CP）
+        if c.is_sentence_end:
+            if c.sentence_end_ts is not None:
+                parts.append(f"[10|{format_timestamp(c.sentence_end_ts)}]")
+            else:
+                parts.append("[10]")
+
+    return "".join(parts)
 
 
 def _linked_group_to_ruby_node(group: List[Character]) -> str:
@@ -404,6 +410,9 @@ def _linked_group_to_ruby_node(group: List[Character]) -> str:
                         portion_parts.append(f"[{count}|{format_timestamp(ts)}]")
                     else:
                         portion_parts.append(f"[{format_timestamp(ts)}]")
+                elif cp_idx == 0:
+                    # 没有时间戳但有注音，输出 [count]
+                    portion_parts.append(f"[{count}]")
 
                 if cp_idx < len(ruby_segments):
                     portion_parts.append(ruby_segments[cp_idx])
@@ -667,7 +676,7 @@ def _parse_ruby_group(
             character = Character(
                 char=char_text,
                 ruby=ruby_obj,
-                check_count=0 if not ruby_text else 1,
+                check_count=0 if not ruby_text else len(split_into_moras(ruby_text)),
                 singer_id=singer_id,
             )
             if ruby_obj:
@@ -749,10 +758,13 @@ def _parse_plain_segment(
             ts_ms = parse_timestamp(m.group(2))
             pos = m.end()
 
-            # 查看紧跟的文本字符
+            # 查看紧跟的文本（可能是多个字符，直到下一个 [ 或 {）
             if pos < len(content) and content[pos] not in "[{":
-                ch = content[pos]
-                pos += 1
+                # 读取所有非 [ 和 { 的字符
+                text_start = pos
+                while pos < len(content) and content[pos] not in "[{":
+                    pos += 1
+                text = content[text_start:pos]
 
                 if n_str is not None:
                     # 新字符起始
@@ -769,11 +781,13 @@ def _parse_plain_segment(
                             pos = m2.end()
                             # 吃掉可能的文本 (不应该有，但安全处理)
                             if pos < len(content) and content[pos] not in "[{":
-                                pos += 1
+                                text_start2 = pos
+                                while pos < len(content) and content[pos] not in "[{":
+                                    pos += 1
                         else:
                             break
 
-                    is_rest = ch == REST_CHAR
+                    is_rest = text == REST_CHAR
                     first_n = pending_tags[0][0]
                     if first_n is not None:
                         check_count, is_line_end, is_sentence_end = decode_check_n(
@@ -790,17 +804,30 @@ def _parse_plain_segment(
                     if is_sentence_end and len(all_timestamps) > check_count:
                         sentence_end_ts = all_timestamps[check_count]
 
-                    character = Character(
-                        char=ch,
-                        check_count=check_count,
-                        timestamps=timestamps,
-                        sentence_end_ts=sentence_end_ts,
-                        is_line_end=is_line_end,
-                        is_sentence_end=is_sentence_end,
-                        is_rest=is_rest,
-                        singer_id=singer_id,
-                    )
-                    characters.append(character)
+                    # 为每个字符创建 Character
+                    for ch_idx, ch in enumerate(text):
+                        if ch_idx == 0:
+                            # 第一个字符：有 CP 和时间戳
+                            character = Character(
+                                char=ch,
+                                check_count=check_count,
+                                timestamps=timestamps,
+                                sentence_end_ts=sentence_end_ts if len(text) == 1 else None,
+                                is_line_end=is_line_end if len(text) == 1 else False,
+                                is_sentence_end=is_sentence_end if len(text) == 1 else False,
+                                is_rest=is_rest,
+                                singer_id=singer_id,
+                            )
+                        else:
+                            # 后续字符：无 CP
+                            character = Character(
+                                char=ch,
+                                check_count=0,
+                                is_sentence_end=is_sentence_end if ch_idx == len(text) - 1 else False,
+                                sentence_end_ts=sentence_end_ts if ch_idx == len(text) - 1 else None,
+                                singer_id=singer_id,
+                            )
+                        characters.append(character)
                     pending_tags = []
                 else:
                     # 后续 checkpoint（归属前一个字符）

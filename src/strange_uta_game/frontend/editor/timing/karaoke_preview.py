@@ -106,6 +106,7 @@ class KaraokePreview(QWidget):
         self._fm_checkpoint = QFontMetrics(self._font_checkpoint)
         self._fm_line_number = QFontMetrics(self._font_line_number)
         self._line_number_margin = 45  # 行号左侧区域宽度
+        self._ruby_spacing = 4  # Ruby与主文字的垂直间距
 
         # 歌词对齐方式："left" / "center" / "right"
         self._alignment: str = "center"
@@ -287,7 +288,7 @@ class KaraokePreview(QWidget):
             self._alignment_margin = margin
             self.update()
 
-    def set_font_sizes(self, base_size: int, current_line_size: int = 0, ruby_size: int = 10, cp_size: int = 8, line_height_factor: float = 1.20):
+    def set_font_sizes(self, base_size: int, current_line_size: int = 0, ruby_size: int = 10, cp_size: int = 8, line_height_factor: float = 1.20, ruby_spacing: int = 4):
         """设置字体大小并自动适配预览行数。
 
         Args:
@@ -296,12 +297,14 @@ class KaraokePreview(QWidget):
             ruby_size: 注音字体大小
             cp_size: 节奏点标记字体大小
             line_height_factor: 行高系数（默认1.20）
+            ruby_spacing: Ruby与主文字的垂直间距（默认4px）
         """
         context_size = max(12, base_size)
         current_size = max(12, current_line_size if current_line_size > 0 else base_size + 4)
         ruby_size = max(6, ruby_size)
         cp_size = max(6, cp_size)
         line_height_factor = max(0.5, min(5.0, line_height_factor))
+        ruby_spacing = max(0, min(20, ruby_spacing))
 
         self._font_current = QFont("Microsoft YaHei", current_size, QFont.Weight.Bold)
         self._font_context = QFont("Microsoft YaHei", context_size)
@@ -311,9 +314,10 @@ class KaraokePreview(QWidget):
         self._fm_context = QFontMetrics(self._font_context)
         self._fm_ruby = QFontMetrics(self._font_ruby)
         self._fm_checkpoint = QFontMetrics(self._font_checkpoint)
+        self._ruby_spacing = ruby_spacing
 
-        # 行高以当前行（放大后）字体大小为准，需容纳 ruby + cp
-        total_height = self._fm_current.height() + self._fm_ruby.height() + self._fm_checkpoint.height()
+        # 行高以当前行（放大后）字体大小为准，需容纳 ruby + ruby_spacing + cp
+        total_height = self._fm_current.height() + self._fm_ruby.height() + ruby_spacing + self._fm_checkpoint.height()
         line_h = total_height * line_height_factor
         h = self.height() if self.height() > 0 else 600
         self._visible_lines = max(3, min(15, int(h / line_h)))
@@ -474,13 +478,28 @@ class KaraokePreview(QWidget):
             self._click_snapshot = click
             self._click_timer.start()
         else:
+            # _pending_click 被拖拽检测清掉了，但 focus 已在 mousePressEvent
+            # 里更新。用 focus 位置作为单击坐标，确保 current 域同步。
+            if (
+                not self._disable_click_jump
+                and self._focus_line_idx >= 0
+                and self._focus_char_idx >= 0
+            ):
+                self.char_selected.emit(self._focus_line_idx, self._focus_char_idx)
+                self.line_clicked.emit(self._focus_line_idx)
             self._pending_click = None
             self._press_pos = None
 
     def _clear_click_snapshot(self):
-        """清除单击快照和相关定时器"""
+        """清除单击快照和相关定时器。
+
+        300ms 超时 → 确认是单击而非双击，兜底同步 current 域到 focus 位置，
+        防止期间有状态漂移。
+        """
         self._click_snapshot = None
         self._click_timer.stop()
+        if self._focus_line_idx >= 0 and self._focus_char_idx >= 0:
+            self.set_current_position(self._focus_line_idx, self._focus_char_idx)
 
     def _show_context_menu(self, global_pos, click_x: int, click_y: int):
         """显示字符上下文菜单。"""
@@ -1058,7 +1077,7 @@ class KaraokePreview(QWidget):
                         _grp_w = sum(char_widths[g] for g in _grp)
                         ruby_text_w = fm_ruby.horizontalAdvance(_merged)
                         ruby_x = curr_x + (_grp_w - ruby_text_w) // 2
-                        ruby_y = int(y_center - main_fm.ascent() - 4)
+                        ruby_y = int(y_center - main_fm.ascent() - self._ruby_spacing)
                         painter.setFont(font_ruby)
                         painter.setPen(base_color)
                         painter.drawText(int(ruby_x), ruby_y, _merged)
@@ -1117,7 +1136,7 @@ class KaraokePreview(QWidget):
                         _ruby_disp = ruby.text
                         ruby_text_w = fm_ruby.horizontalAdvance(_ruby_disp)
                         ruby_x = curr_x + (char_w - ruby_text_w) // 2
-                        ruby_y = int(y_center - main_fm.ascent() - 4)
+                        ruby_y = int(y_center - main_fm.ascent() - self._ruby_spacing)
                         painter.setFont(font_ruby)
                         painter.setPen(base_color)
                         painter.drawText(int(ruby_x), ruby_y, _ruby_disp)

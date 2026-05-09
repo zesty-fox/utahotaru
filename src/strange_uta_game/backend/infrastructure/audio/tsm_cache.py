@@ -11,7 +11,7 @@
 分块并行渲染架构：
 - 最多同时渲染 2 个不同速度（MAX_SPEEDS）
 - 每个速度内部，音频分成多个块（30秒/块），由多个 worker 并行处理
-- 块之间有 10% 重叠，使用交叉恒定增益淡化拼接
+- 块之间有 10% 渲染重叠保证质量，拼接时提取 core 区域直接硬切
 
 缓存文件命名：{歌曲名}_{speed}x.mp3
 """
@@ -23,6 +23,7 @@ import os
 import sys
 import threading
 import time
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -45,7 +46,7 @@ _MP3_QUALITY = 128  # MP3 比特率 (kbps)
 # 分块渲染参数
 _MAX_SPEEDS = 2         # 最多同时渲染的速度数
 _CHUNK_SECONDS = 30     # 每块秒数
-_OVERLAP_RATIO = 0.1    # 重叠比例 10%
+_OVERLAP_RATIO = 0.1    # 渲染重叠比例 10%，保证 TSM 渲染质量
 _CPU_USAGE_RATIO = 0.7  # CPU 使用比例上限
 
 
@@ -121,14 +122,14 @@ class ChunkInfo:
 
 
 def _split_chunks(total_samples: int, sample_rate: int) -> List[ChunkInfo]:
-    """将音频分成多个块，每块向两侧扩展 overlap 用于交叉淡化。
+    """将音频分成多个块，每块向两侧扩展 overlap 用于 TSM 渲染质量。
 
-    例如 60 秒音频，30 秒/块，3 秒 overlap：
+    例如 60 秒音频，30 秒/块，渲染 overlap 3秒：
     块0: core=[0, 30s),      src=[0, 33s)      右侧扩展3秒
     块1: core=[30s, 60s),    src=[27s, 60s)    左侧扩展3秒
 
-    重叠区域：27~33秒（6秒），两个块都有数据。
-    淡化过程：27~33秒，块0淡出(1→0)，块1淡入(0→1)
+    重叠区域：27~33秒（6秒），渲染时两个块都覆盖该区域保证 TSM 质量。
+    拼接时只提取 core 区域直接硬切，不做淡化。
 
     Returns:
         ChunkInfo 列表
@@ -158,46 +159,6 @@ def _split_chunks(total_samples: int, sample_rate: int) -> List[ChunkInfo]:
         idx += 1
 
     return chunks
-
-
-def _crossfade_constant_power(a: np.ndarray, b: np.ndarray, overlap_len: int) -> np.ndarray:
-    """交叉恒定功率淡化拼接。
-
-    使用 sin/cos 曲线，满足 a² + b² = 1，总功率始终为 1。
-
-    Args:
-        a: 前段数据 (n, ch)
-        b: 后段数据 (n, ch)
-        overlap_len: 重叠长度
-
-    Returns:
-        拼接后的数据
-    """
-    if overlap_len <= 0 or len(a) == 0 or len(b) == 0:
-        return np.concatenate([a, b], axis=0)
-
-    actual_overlap = min(overlap_len, len(a), len(b))
-    if actual_overlap <= 0:
-        return np.concatenate([a, b], axis=0)
-
-    # 恒定功率淡化曲线：cos/sin，满足 a² + b² = 1
-    t = np.linspace(0, np.pi / 2, actual_overlap, dtype=np.float32)
-    fade_out = np.cos(t)  # 从 1 到 0
-    fade_in = np.sin(t)   # 从 0 到 1
-
-    # 扩展维度以匹配声道
-    if a.ndim == 2:
-        fade_out = fade_out[:, np.newaxis]
-        fade_in = fade_in[:, np.newaxis]
-
-    # 混合重叠区域
-    a_tail = a[-actual_overlap:] * fade_out
-    b_head = b[:actual_overlap] * fade_in
-    mixed = a_tail + b_head
-
-    # 拼接：a 非重叠部分 + 混合部分 + b 非重叠部分
-    result = np.concatenate([a[:-actual_overlap], mixed, b[actual_overlap:]], axis=0)
-    return result
 
 
 @dataclass
@@ -265,6 +226,11 @@ class TSMRenderCache:
         self._scheduler_thread: Optional[threading.Thread] = None
         self._scheduler_stop = threading.Event()
 
+        # 内存级别的 PCM 缓存，避免重复读盘解码
+        self._memory_cache: OrderedDict[float, np.ndarray] = OrderedDict()
+        self._mem_cache_lock = threading.Lock()
+        self._MAX_MEM_CACHE = 3
+
     # ---------- 加载 ----------
 
     def set_source(
@@ -280,6 +246,8 @@ class TSMRenderCache:
             if progress_cb:
                 progress_cb("清理旧缓存...", 0.0)
             clear_cache()
+            with self._mem_cache_lock:
+                self._memory_cache.clear()
 
             self._song_name = song_name
             channels = int(original_pcm.shape[1]) if original_pcm.ndim > 1 else 1
@@ -346,31 +314,57 @@ class TSMRenderCache:
             if self._song_name:
                 clear_cache_for_song(self._song_name)
             self._source_mp3_path = None
+        with self._mem_cache_lock:
+            self._memory_cache.clear()
 
     # ---------- 查询 ----------
 
     def get(self, speed: float) -> Optional[np.ndarray]:
-        """从磁盘缓存读取。命中返回 ndarray；未命中返回 None。"""
+        """从缓存读取。优先查内存缓存，未命中再查磁盘。"""
         if self._source_mp3_path is None:
             return None
         q = _quantize(speed)
         if abs(q - 1.0) < 1e-9:
             return self._load_source_pcm()
 
+        # 先查内存缓存
+        with self._mem_cache_lock:
+            if q in self._memory_cache:
+                self._memory_cache.move_to_end(q)
+                return self._memory_cache[q]
+
+        # 内存没有，查磁盘缓存
         cache_path = _get_cache_path(self._song_name, q)
         if cache_path.exists():
             try:
                 data = self._load_from_mp3(cache_path)
+                # 存入内存缓存
+                with self._mem_cache_lock:
+                    self._memory_cache[q] = data
+                    if len(self._memory_cache) > self._MAX_MEM_CACHE:
+                        self._memory_cache.popitem(last=False)
                 return data
             except Exception as e:
                 print(f"[TSM] Failed to read cache: {e}")
         return None
 
     def _load_source_pcm(self) -> Optional[np.ndarray]:
-        """从源 MP3 加载 PCM 数据。"""
+        """从源 MP3 加载 PCM 数据（带内存缓存）。"""
+        # 1.0x 对应的量化键
+        q = 1.0
+        with self._mem_cache_lock:
+            if q in self._memory_cache:
+                self._memory_cache.move_to_end(q)
+                return self._memory_cache[q]
+
         if self._source_mp3_path is None or not self._source_mp3_path.exists():
             return None
-        return self._load_from_mp3(self._source_mp3_path)
+        data = self._load_from_mp3(self._source_mp3_path)
+        with self._mem_cache_lock:
+            self._memory_cache[q] = data
+            if len(self._memory_cache) > self._MAX_MEM_CACHE:
+                self._memory_cache.popitem(last=False)
+        return data
 
     def _load_from_mp3(self, path: Path) -> np.ndarray:
         """从 MP3 文件加载 PCM 数据。返回 (samples, channels) float32。"""
@@ -606,50 +600,38 @@ class TSMRenderCache:
                 self._active_tasks.pop(task.speed, None)
 
     def _merge_chunks(self, task: SpeedTask) -> np.ndarray:
-        """使用交叉恒定功率淡化拼接所有块。
+        """拼接所有块（测试：无交叉淡化，直接硬切）。
 
-        淡化发生在 overlap 区域（6秒）：
-        - 块0的尾部(27~33s)淡出
-        - 块1的头部(0~6s，对应原始27~33s)淡入
-
-        例如 60 秒音频，30 秒/块，3 秒 overlap：
-        - 块0: src=[0, 33s)，提取 0~33s
-        - 块1: src=[27s, 60s)，提取 0~33s（从src开头取33s）
-        - 混合后：0~27s + 混合(27~33s) + 33~60s = 60s
+        渲染时每个块向两侧扩展 10% overlap 保证 TSM 质量，
+        此处仅提取 core 区域直接拼接，不做任何淡化，测试听感。
         """
-        overlap_samples = int(_CHUNK_SECONDS * self._sample_rate * _OVERLAP_RATIO)
-
-        # 按 index 排序
         sorted_chunks = sorted(task.chunks, key=lambda c: c.index)
 
-        # 提取每个块的完整 src 区域
-        segments = []
+        core_segments = []
         for chunk in sorted_chunks:
             rendered = task.results[chunk.index]
             if rendered is None:
                 raise ValueError(f"Chunk {chunk.index} is None")
 
-            # 提取整个 src 区域
-            segment = rendered  # 已经是整个 src 的渲染结果
-            segments.append(segment)
+            # 从渲染结果中提取 core 区域（去掉两侧 overlap）
+            src_len = chunk.src_end - chunk.src_start
+            core_start_ratio = (chunk.core_start - chunk.src_start) / src_len
+            core_end_ratio = (chunk.core_end - chunk.src_start) / src_len
 
-        if not segments:
+            rendered_core_start = int(len(rendered) * core_start_ratio)
+            rendered_core_end = int(len(rendered) * core_end_ratio)
+
+            core_segments.append(rendered[rendered_core_start:rendered_core_end])
+
+        if not core_segments:
             return np.zeros((0, self._channels), dtype=np.float32)
 
-        # 计算变速后的 overlap 长度（6秒）
-        overlap_rendered = int(overlap_samples * 2 / task.speed) if len(segments) > 1 else 0
+        result = np.concatenate(core_segments, axis=0)
 
-        # 逐段交叉淡化拼接
-        result = segments[0]
-        for i in range(1, len(segments)):
-            result = _crossfade_constant_power(result, segments[i], overlap_rendered)
-
-        # 裁剪到正确长度（core 区域总长度）
+        # 裁剪到正确长度
         total_core_samples = sum(c.core_end - c.core_start for c in sorted_chunks)
         total_rendered = int(total_core_samples / task.speed)
         result = result[:total_rendered]
-
-        return result
 
         return result
 

@@ -4,17 +4,13 @@
 采用 Fluent Design 风格，集成到 MSFluentWindow 侧边栏导航中。
 """
 
-import os
-
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
-    QLabel,
     QFileDialog,
-    QApplication,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent
 from qfluentwidgets import (
     PushButton,
@@ -29,7 +25,6 @@ from qfluentwidgets import (
     LargeTitleLabel,
     SubtitleLabel,
     TitleLabel,
-    BodyLabel,
     CaptionLabel,
 )
 
@@ -38,10 +33,8 @@ from pathlib import Path
 
 from strange_uta_game.backend.domain import Project, Sentence, Singer
 from strange_uta_game.backend.application import ProjectService, AutoCheckService
-from strange_uta_game.backend.infrastructure import SugProjectParser
 from strange_uta_game.backend.infrastructure.audio.video_converter import (
     VIDEO_EXTENSIONS,
-    extract_audio,
     is_ffmpeg_available,
     is_video_file,
 )
@@ -79,6 +72,10 @@ class HomeInterface(QWidget):
         self._lyric_lines: List[Sentence] = []
         self._nicokara_singers: List[Singer] = []
         self._nicokara_singer_key_to_id: dict = {}
+        # 异步加载相关
+        self._loading_thread: Optional[QThread] = None
+        self._loading_worker = None
+        self._state_tooltip = None
 
         self.setAcceptDrops(True)
         self._init_ui()
@@ -456,6 +453,15 @@ class HomeInterface(QWidget):
                         auto_check_flags=auto_check_flags, user_dictionary=user_dict
                     )
                     auto_check.apply_to_project(project, only_noruby=True)
+
+                    # 自动删除指定类型的注音
+                    delete_types = auto_check_flags.get("delete_ruby_types", [])
+                    if delete_types:
+                        from strange_uta_game.backend.application.auto_check_service import (
+                            delete_rubies_by_type_names,
+                        )
+
+                        delete_rubies_by_type_names(project, delete_types)
             except Exception:
                 pass  # 注音分析失败不阻止项目创建
 
@@ -755,7 +761,7 @@ class HomeInterface(QWidget):
             self._store.set_audio_path(file_path)
 
     def _load_video_as_audio(self, file_path: str) -> None:
-        """加载视频文件，提取音频并设置路径"""
+        """异步加载视频文件，提取音频并设置路径"""
         from strange_uta_game.frontend.theme import theme
 
         # 检查 FFmpeg 是否可用
@@ -770,9 +776,9 @@ class HomeInterface(QWidget):
             return
 
         # 创建状态提示
-        state_tooltip = StateToolTip("正在处理视频", "正在检查 FFmpeg 环境...", self)
+        self._state_tooltip = StateToolTip("正在处理视频", "正在检查 FFmpeg 环境...", self)
         green = theme.status_complete.name()
-        state_tooltip.setStyleSheet(f"""
+        self._state_tooltip.setStyleSheet(f"""
             StateToolTip {{
                 background-color: {green};
                 border: 1px solid {green};
@@ -782,50 +788,64 @@ class HomeInterface(QWidget):
                 color: white;
             }}
         """)
-        state_tooltip.move(state_tooltip.getSuitablePos())
-        state_tooltip.show()
+        self._state_tooltip.move(self._state_tooltip.getSuitablePos())
+        self._state_tooltip.show()
 
-        def on_progress(stage: str, value: float):
-            state_tooltip.setContent(stage)
-            QApplication.processEvents()
+        # 创建后台线程
+        from strange_uta_game.frontend.workers import VideoExtractOnlyWorker
 
-        temp_path = None
-        try:
-            # 提取音频
-            temp_path = extract_audio(file_path, progress_cb=on_progress)
+        self._loading_thread = QThread(self)
+        self._loading_worker = VideoExtractOnlyWorker(file_path)
+        self._loading_worker.moveToThread(self._loading_thread)
 
-            # 更新状态提示
-            state_tooltip.setContent("正在加载音频...")
-            QApplication.processEvents()
+        # 连接信号
+        self._loading_thread.started.connect(self._loading_worker.run)
+        self._loading_worker.progress.connect(self._on_video_progress)
+        self._loading_worker.finished.connect(lambda path: self._on_video_extracted(path, file_path))
+        self._loading_worker.error.connect(self._on_video_error)
+        self._loading_worker.finished.connect(self._cleanup_loading_thread)
+        self._loading_worker.error.connect(self._cleanup_loading_thread)
 
-            # 设置音频路径（使用提取出的临时 MP3 文件）
-            self._set_audio_path(temp_path)
+        # 启动线程
+        self._loading_thread.start()
 
-            # 保存原始视频文件路径到临时变量，以便后续清理
-            self._temp_audio_path = temp_path
+    def _on_video_progress(self, stage: str, value: float) -> None:
+        """更新视频处理进度"""
+        if self._state_tooltip:
+            self._state_tooltip.setContent(stage)
 
-            # 完成
-            state_tooltip.setState(True)
-            state_tooltip.setContent("加载完成")
-            state_tooltip.close()
+    def _on_video_extracted(self, temp_path: str, original_path: str) -> None:
+        """视频提取完成回调"""
+        if self._state_tooltip:
+            self._state_tooltip.setState(True)
+            self._state_tooltip.setContent("加载完成")
+            self._state_tooltip.close()
+            self._state_tooltip = None
 
-            InfoBar.success(
-                title="音频提取成功",
-                content=f"已从视频中提取音频: {Path(file_path).name}",
-                orient=Qt.Orientation.Horizontal, isClosable=True,
-                position=InfoBarPosition.TOP, duration=3000,
-                parent=self,
-            )
+        self._set_audio_path(temp_path)
+        self._temp_audio_path = temp_path
 
-        except Exception as e:
-            state_tooltip.close()
-            InfoBar.error(
-                title="视频处理失败",
-                content=str(e),
-                orient=Qt.Orientation.Horizontal, isClosable=True,
-                position=InfoBarPosition.TOP, duration=5000,
-                parent=self,
-            )
+        InfoBar.success(
+            title="音频提取成功",
+            content=f"已从视频中提取音频: {Path(original_path).name}",
+            orient=Qt.Orientation.Horizontal, isClosable=True,
+            position=InfoBarPosition.TOP, duration=3000,
+            parent=self,
+        )
+
+    def _on_video_error(self, error_msg: str) -> None:
+        """视频处理失败回调"""
+        if self._state_tooltip:
+            self._state_tooltip.close()
+            self._state_tooltip = None
+
+        InfoBar.error(
+            title="视频处理失败",
+            content=error_msg,
+            orient=Qt.Orientation.Horizontal, isClosable=True,
+            position=InfoBarPosition.TOP, duration=5000,
+            parent=self,
+        )
 
     def _reset_form(self) -> None:
         self.text_lyrics.clear()
@@ -836,19 +856,74 @@ class HomeInterface(QWidget):
         self._nicokara_singer_key_to_id = {}
 
     def _open_project_file(self, file_path: str) -> None:
-        try:
-            project = SugProjectParser.load(file_path)
+        """异步加载 .sug 项目文件"""
+        from strange_uta_game.frontend.theme import theme
 
-            # 发送信号（含文件路径，用于 ProjectStore 记录 save_path）
-            self.project_opened.emit(project, file_path)
+        # 创建状态提示
+        self._state_tooltip = StateToolTip("正在加载项目", "正在解析项目数据...", self)
+        green = theme.status_complete.name()
+        self._state_tooltip.setStyleSheet(f"""
+            StateToolTip {{
+                background-color: {green};
+                border: 1px solid {green};
+                border-radius: 8px;
+            }}
+            StateToolTip QLabel {{
+                color: white;
+            }}
+        """)
+        self._state_tooltip.move(self._state_tooltip.getSuitablePos())
+        self._state_tooltip.show()
 
-        except Exception as e:
-            InfoBar.error(
-                title="打开失败",
-                content=str(e),
-                orient=Qt.Orientation.Horizontal,
-                isClosable=True,
-                position=InfoBarPosition.TOP,
-                duration=5000,
-                parent=self,
-            )
+        # 创建后台线程
+        from strange_uta_game.frontend.workers import ProjectLoadWorker
+
+        self._loading_thread = QThread(self)
+        self._loading_worker = ProjectLoadWorker(file_path)
+        self._loading_worker.moveToThread(self._loading_thread)
+
+        # 连接信号
+        self._loading_thread.started.connect(self._loading_worker.run)
+        self._loading_worker.finished.connect(self._on_project_load_success)
+        self._loading_worker.error.connect(self._on_project_load_error)
+        self._loading_worker.finished.connect(self._cleanup_loading_thread)
+        self._loading_worker.error.connect(self._cleanup_loading_thread)
+
+        # 启动线程
+        self._loading_thread.start()
+
+    def _on_project_load_success(self, project: Project, file_path: str) -> None:
+        """项目加载成功回调"""
+        if self._state_tooltip:
+            self._state_tooltip.setState(True)
+            self._state_tooltip.setContent("加载完成")
+            self._state_tooltip.close()
+            self._state_tooltip = None
+
+        self.project_opened.emit(project, file_path)
+
+    def _on_project_load_error(self, error_msg: str) -> None:
+        """项目加载失败回调"""
+        if self._state_tooltip:
+            self._state_tooltip.close()
+            self._state_tooltip = None
+
+        InfoBar.error(
+            title="打开失败",
+            content=error_msg,
+            orient=Qt.Orientation.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=5000,
+            parent=self,
+        )
+
+    def _cleanup_loading_thread(self) -> None:
+        """清理加载线程"""
+        if self._loading_thread:
+            self._loading_thread.quit()
+            self._loading_thread.wait()
+            self._loading_thread = None
+        if self._loading_worker:
+            self._loading_worker.deleteLater()
+            self._loading_worker = None

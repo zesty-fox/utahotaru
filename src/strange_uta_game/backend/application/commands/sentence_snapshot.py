@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import List
+from typing import List, Optional, Tuple
 
 from strange_uta_game.backend.application.commands.base import Command
 from strange_uta_game.backend.domain import Project, Sentence
@@ -31,6 +31,10 @@ class SentenceSnapshotCommand(Command):
         self._before_sentences = before_sentences
         self._after_sentences = after_sentences
         self._description = description
+        self.undo_position: Optional[Tuple[int, int]] = None
+        """撤销后应恢复的光标位置 ``(line_idx, char_idx)``。"""
+        self.redo_position: Optional[Tuple[int, int]] = None
+        """重做后应恢复的光标位置 ``(line_idx, char_idx)``。"""
 
     def execute(self) -> None:
         self._project.sentences = deepcopy(self._after_sentences)

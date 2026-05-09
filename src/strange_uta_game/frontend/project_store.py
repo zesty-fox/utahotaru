@@ -35,9 +35,21 @@ def _get_config_dir() -> Path:
     return program_dir
 
 
+def _get_cache_dir() -> Path:
+    """获取缓存目录（程序所在目录下的 .cache 文件夹）。
+    
+    与 video_converter.py 中的缓存目录保持一致。
+    """
+    program_dir = Path(sys.argv[0]).resolve().parent
+    cache_dir = program_dir / ".cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir
+
+
 # 配置目录（与 AppSettings 一致）
 _CONFIG_DIR = _get_config_dir()
-_UNTITLED_TEMP = _CONFIG_DIR / ".untitled.sug.temp"
+_CACHE_DIR = _get_cache_dir()
+_UNTITLED_TEMP = _CACHE_DIR / ".untitled.sug.temp"
 
 
 class ProjectStore(QObject):
@@ -114,6 +126,10 @@ class ProjectStore(QObject):
 
         所有 UI 模块应在收到 ``data_changed("project")`` 后全量刷新。
         """
+        # 清理旧项目的临时文件
+        if self._project:
+            self.cleanup_temp_files()
+        
         self._project = project
         self._save_path = save_path
         if audio_path is not None:
@@ -124,6 +140,7 @@ class ProjectStore(QObject):
 
     def close_project(self) -> None:
         """关闭当前项目。"""
+        self.cleanup_temp_files()
         self._auto_save_timer.stop()
         self._periodic_save_timer.stop()
         self._project = None
@@ -214,24 +231,27 @@ class ProjectStore(QObject):
     def _do_periodic_save(self) -> None:
         """执行定时保存到 .sug.temp 文件。
 
-        有 save_path → ``<save_path>.temp``
-        无 save_path → ``~/.strange_uta_game/untitled.sug.temp``
+        所有临时文件统一存放在程序目录的 .cache 文件夹下：
+        - 已保存项目 → ``.cache/.项目名.sug.temp``
+        - 未保存项目 → ``.cache/.untitled.sug.temp``
         """
         if not self._project:
             return
 
         temp_path = self.get_temp_path()
         try:
-            _CONFIG_DIR.mkdir(exist_ok=True)
+            _CACHE_DIR.mkdir(exist_ok=True)
             SugProjectParser.save(self._project, str(temp_path))
         except Exception:
             pass  # 定时保存静默失败
 
     def get_temp_path(self) -> Path:
-        """返回当前项目的临时保存路径（隐藏文件）。"""
+        """返回当前项目的临时保存路径（存放在 .cache 目录下）。"""
         if self._save_path:
             p = Path(self._save_path)
-            return p.parent / ("." + p.name + ".temp")
+            # 使用项目文件名作为临时文件名，存放在 .cache 目录
+            temp_filename = "." + p.name + ".temp"
+            return _CACHE_DIR / temp_filename
         return _UNTITLED_TEMP
 
     def cleanup_temp_files(self) -> None:
@@ -258,39 +278,41 @@ class ProjectStore(QObject):
                 except Exception:
                     pass
 
-        # 删除 autosave 文件（仅已保存项目才有）；兼容旧命名
-        if self._save_path:
-            for name in (
-                self._save_path + ".autosave",
-                self._save_path + ".autosave.sug",
-            ):
-                try:
-                    p = Path(name)
-                    if p.exists():
-                        p.unlink()
-                except Exception:
-                    pass
-
     @staticmethod
     def has_crash_recovery() -> bool:
-        """检查是否有未命名项目的闪退恢复文件。"""
-        return _UNTITLED_TEMP.exists()
+        """检查是否有闪退恢复文件（检查 .cache 目录下的所有 .sug.temp 文件）。"""
+        return _UNTITLED_TEMP.exists() or any(_CACHE_DIR.glob(".*.sug.temp"))
 
     @staticmethod
     def load_crash_recovery() -> Optional[Project]:
-        """加载闪退恢复文件。"""
-        if not _UNTITLED_TEMP.exists():
-            return None
-        try:
-            return SugProjectParser.load(str(_UNTITLED_TEMP))
-        except Exception:
-            return None
+        """加载闪退恢复文件（优先加载未命名项目的恢复文件）。"""
+        # 优先检查未命名项目的恢复文件
+        if _UNTITLED_TEMP.exists():
+            try:
+                return SugProjectParser.load(str(_UNTITLED_TEMP))
+            except Exception:
+                pass
+        
+        # 检查其他项目的恢复文件
+        for temp_file in _CACHE_DIR.glob(".*.sug.temp"):
+            try:
+                return SugProjectParser.load(str(temp_file))
+            except Exception:
+                continue
+        return None
 
     @staticmethod
     def delete_crash_recovery() -> None:
-        """删除闪退恢复文件。"""
+        """删除闪退恢复文件（删除 .cache 目录下的所有 .sug.temp 文件）。"""
         try:
             if _UNTITLED_TEMP.exists():
                 _UNTITLED_TEMP.unlink()
         except Exception:
             pass
+        
+        # 删除其他项目的恢复文件
+        for temp_file in _CACHE_DIR.glob(".*.sug.temp"):
+            try:
+                temp_file.unlink()
+            except Exception:
+                pass

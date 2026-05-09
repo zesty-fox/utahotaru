@@ -111,6 +111,10 @@ class SoundDeviceEngine(IAudioEngine):
 
         self._stream: Optional[sd.OutputStream] = None
 
+        # ---- 热重载标志位 ----
+        # 当音频回调检测到底层设备异常时置位，由 producer 线程执行恢复
+        self._needs_recovery = threading.Event()
+
         # ---- 位置回调 ----
         self._position_callback: Optional[Callable[[int], None]] = None
         self._callback_thread: Optional[threading.Thread] = None
@@ -124,6 +128,9 @@ class SoundDeviceEngine(IAudioEngine):
     # ==================== 加载 / 资源 ====================
 
     def load(self, file_path: str, progress_cb: Optional[LoadProgressCallback] = None) -> None:
+        # 加载新音频前，彻底停止并销毁旧的流和线程，防止"幽灵流"叠加导致倍速播放
+        self.stop()
+
         try:
             if progress_cb:
                 progress_cb("读取音频文件...", 0.0)
@@ -411,6 +418,9 @@ class SoundDeviceEngine(IAudioEngine):
         if self._ring is None or self._original_data is None:
             return
 
+        # 防御性清理：绝对不允许同一个实例开启两个 stream
+        self._stop_streaming()
+
         # 启动 producer
         self._producer_stop.clear()
         self._producer_thread = threading.Thread(
@@ -455,8 +465,15 @@ class SoundDeviceEngine(IAudioEngine):
     def _audio_callback(self, outdata, frames, time_info, status) -> None:  # noqa: D401
         """**实时回调**：极简、零分配、零锁、零 Python 重活。"""
         if status:
-            # underflow/output_underflow 等只打日志
-            print(f"[SoundDeviceEngine] callback status: {status}")
+            if status.output_underflow:
+                # underflow 只是说明 Python 喂数据慢了，属于正常性能抖动，不用管
+                pass
+            else:
+                # 遇到了设备断开、采样率突变等致命状态
+                print(f"[SoundDeviceEngine] 底层设备状态异常，请求热重载: {status}")
+                self._needs_recovery.set()
+                outdata.fill(0)
+                return
 
         if self._state != PlaybackState.PLAYING:
             outdata.fill(0)
@@ -484,6 +501,12 @@ class SoundDeviceEngine(IAudioEngine):
         target_low = _BLOCK_FRAMES * 2
 
         while not self._producer_stop.is_set():
+            # 0) 看门狗：检测是否需要热重载 (设备切换、流崩溃或抛出异常)
+            if self._state == PlaybackState.PLAYING and self._stream is not None:
+                if self._needs_recovery.is_set() or not self._stream.active:
+                    self._perform_hot_recovery()
+                    continue
+
             # 1) 检查待切换的速度
             self._maybe_swap_active_speed()
 
@@ -568,6 +591,55 @@ class SoundDeviceEngine(IAudioEngine):
                     return
                 time.sleep(_PRODUCER_TICK)
         self._state = PlaybackState.STOPPED
+
+    def _perform_hot_recovery(self) -> None:
+        """执行音频流热重载（断线重连）
+
+        当检测到底层设备异常（如采样率突变、设备拔插）时，
+        静默销毁旧流 -> 等待设备稳定 -> 创建新流 -> 恢复播放进度。
+        整个过程对用户来说只是短暂卡顿，然后自动恢复正常。
+        """
+        print("[SoundDeviceEngine] 正在执行音频流热重载...")
+        self._needs_recovery.clear()
+
+        # 1. 记住当前的播放位置（毫秒）
+        current_ms = self.get_position_ms()
+
+        # 2. 强行销毁旧的异常流
+        if self._stream is not None:
+            try:
+                self._stream.stop()
+                self._stream.close()
+            except Exception:
+                pass
+            self._stream = None
+
+        # 3. 稍微等待，给操作系统和 PortAudio 留出切换默认音频端点的时间
+        # (比如蓝牙切换协议通常需要几百毫秒)
+        time.sleep(0.5)
+
+        # 4. 尝试重新开启流并恢复进度
+        if self._producer_stop.is_set():
+            return
+
+        try:
+            self._stream = sd.OutputStream(
+                samplerate=self._sample_rate,
+                channels=self._channels,
+                dtype="float32",
+                blocksize=_BLOCK_FRAMES,
+                callback=self._audio_callback,
+            )
+            self._stream.start()
+
+            # 恢复播放头位置，内部会调用 self._ring.reset() 并清空旧的废弃缓冲
+            self.set_position_ms(current_ms)
+
+            print("[SoundDeviceEngine] 热重载成功！已恢复播放。")
+        except Exception as e:
+            print(f"[SoundDeviceEngine] 热重载失败: {e}")
+            # 如果实在救不回来，暂停播放，让用户后续手动点击播放重试
+            self._state = PlaybackState.PAUSED
 
     def _callback_loop(self) -> None:
         """位置回调线程（独立于音频回调，~60fps）。"""

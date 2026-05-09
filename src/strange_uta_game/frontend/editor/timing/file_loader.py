@@ -6,17 +6,15 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox
+from PyQt6.QtCore import Qt, QThread
+from PyQt6.QtWidgets import QFileDialog, QMessageBox
 from qfluentwidgets import InfoBar, InfoBarPosition, StateToolTip
 
 from strange_uta_game.backend.infrastructure.audio.video_converter import (
     VIDEO_EXTENSIONS,
-    extract_audio,
     is_ffmpeg_available,
     is_video_file,
 )
@@ -37,6 +35,10 @@ class FileLoader:
 
     def __init__(self, editor: EditorInterface):
         self._editor = editor
+        # 异步加载相关
+        self._loading_thread: QThread | None = None
+        self._loading_worker = None
+        self._state_tooltip = None
 
     @property
     def _project(self):
@@ -123,7 +125,7 @@ class FileLoader:
             self._save_last_dir(path)
 
     def _load_video_as_audio(self, file_path: str):
-        """加载视频文件，提取音频并加载"""
+        """加载视频文件，提取音频并加载（异步）"""
         from strange_uta_game.frontend.theme import theme
 
         # 检查 FFmpeg 是否可用
@@ -138,9 +140,9 @@ class FileLoader:
             return
 
         # 创建状态提示
-        state_tooltip = StateToolTip("正在处理视频", "正在检查 FFmpeg 环境...", self._editor)
+        self._state_tooltip = StateToolTip("正在处理视频", "正在检查 FFmpeg 环境...", self._editor)
         green = theme.status_complete.name()
-        state_tooltip.setStyleSheet(f"""
+        self._state_tooltip.setStyleSheet(f"""
             StateToolTip {{
                 background-color: {green};
                 border: 1px solid {green};
@@ -150,47 +152,104 @@ class FileLoader:
                 color: white;
             }}
         """)
-        state_tooltip.move(state_tooltip.getSuitablePos())
-        state_tooltip.show()
+        self._state_tooltip.move(self._state_tooltip.getSuitablePos())
+        self._state_tooltip.show()
 
-        def on_progress(stage: str, value: float):
-            state_tooltip.setContent(stage)
-            QApplication.processEvents()
+        # 创建后台线程
+        from strange_uta_game.frontend.workers import VideoExtractWorker
 
-        temp_path = None
-        try:
-            # 提取音频
-            temp_path = extract_audio(file_path, progress_cb=on_progress)
+        engine = self._timing_service._audio_engine if self._timing_service else None
+        self._loading_thread = QThread(self._editor)
+        self._loading_worker = VideoExtractWorker(engine, file_path)
+        self._loading_worker.moveToThread(self._loading_thread)
 
-            # 更新状态提示
-            state_tooltip.setContent("正在加载音频...")
-            QApplication.processEvents()
+        # 连接信号
+        self._loading_thread.started.connect(self._loading_worker.run)
+        self._loading_worker.progress.connect(self._on_video_progress)
+        self._loading_worker.finished.connect(lambda temp: self._on_video_loaded(temp, file_path))
+        self._loading_worker.error.connect(self._on_video_error)
+        self._loading_worker.finished.connect(self._cleanup_video_thread)
+        self._loading_worker.error.connect(self._cleanup_video_thread)
 
-            # 使用现有流程加载提取出的音频
-            self._editor.load_audio(temp_path)
-            self._save_last_dir(file_path)
+        # 启动线程
+        self._loading_thread.start()
 
-            # 完成
-            state_tooltip.setState(True)
-            state_tooltip.setContent("加载完成")
-            state_tooltip.close()
+    def _on_video_progress(self, stage: str, value: float) -> None:
+        """更新视频处理进度"""
+        if self._state_tooltip:
+            self._state_tooltip.setContent(stage)
 
-        except Exception as e:
-            state_tooltip.close()
-            InfoBar.error(
-                title="视频处理失败",
-                content=str(e),
-                orient=Qt.Orientation.Horizontal, isClosable=True,
-                position=InfoBarPosition.TOP, duration=5000,
-                parent=self._editor,
-            )
-        finally:
-            # 清理临时文件
-            if temp_path and os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except OSError:
-                    pass
+    def _on_video_loaded(self, temp_path: str, original_path: str) -> None:
+        """视频提取+加载完成的回调"""
+        if self._state_tooltip:
+            self._state_tooltip.setState(True)
+            self._state_tooltip.setContent("加载完成")
+            self._state_tooltip.close()
+            self._state_tooltip = None
+
+        # 设置音频文件路径（用于波形显示等）
+        self._editor._audio_file_path = temp_path
+        self._editor.timeline.set_audio_name(Path(original_path).name)
+
+        # 更新 UI（音频已在后台线程加载到引擎）
+        if self._timing_service:
+            info = self._timing_service.get_audio_info()
+            if info:
+                self._editor.transport.set_duration(info.duration_ms)
+                self._editor.timeline.set_duration(info.duration_ms)
+                self._editor.preview.set_duration(info.duration_ms)
+                self._editor.transport.set_position(0)
+                self._editor.timeline.set_position(0)
+
+                samples = self._timing_service.get_original_samples()
+                if samples is not None:
+                    self._editor.timeline.set_audio_data(
+                        samples, info.sample_rate, info.channels
+                    )
+
+        # 通知 store
+        if self._store:
+            self._store.set_audio_path(temp_path)
+
+        self._save_last_dir(original_path)
+
+        InfoBar.success(
+            title="音频已加载",
+            content=Path(original_path).name,
+            orient=Qt.Orientation.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=3000,
+            parent=self._editor,
+        )
+
+        # 记录临时文件路径以便后续清理
+        self._temp_audio_path = temp_path
+
+    def _on_video_error(self, error_msg: str) -> None:
+        """视频处理失败的回调"""
+        if self._state_tooltip:
+            self._state_tooltip.close()
+            self._state_tooltip = None
+
+        InfoBar.error(
+            title="视频处理失败",
+            content=error_msg,
+            orient=Qt.Orientation.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP, duration=5000,
+            parent=self._editor,
+        )
+
+    def _cleanup_video_thread(self) -> None:
+        """清理视频处理线程"""
+        if self._loading_thread:
+            self._loading_thread.quit()
+            self._loading_thread.wait()
+            self._loading_thread = None
+        if self._loading_worker:
+            self._loading_worker.deleteLater()
+            self._loading_worker = None
 
     # ── 实际加载逻辑 ──
 
@@ -227,28 +286,82 @@ class FileLoader:
         return True
 
     def load_project(self, file_path: str):
-        """加载 .sug 项目文件"""
+        """加载 .sug 项目文件（异步）"""
         if not self.check_unsaved_changes():
             return
-        try:
-            from strange_uta_game.backend.infrastructure.persistence.sug_io import (
-                SugProjectParser,
-            )
 
-            project = SugProjectParser.load(file_path)
-            if self._store:
-                self._store._project = project
-                self._store._save_path = file_path
-                self._store.notify("project")
-            else:
-                self._editor.set_project(project)
-        except Exception as e:
-            InfoBar.error(
-                title="打开失败", content=str(e),
-                orient=Qt.Orientation.Horizontal, isClosable=True,
-                position=InfoBarPosition.TOP, duration=5000,
-                parent=self._editor,
-            )
+        from strange_uta_game.frontend.theme import theme
+
+        # 创建状态提示
+        self._state_tooltip = StateToolTip("正在加载项目", "正在解析项目数据...", self._editor)
+        green = theme.status_complete.name()
+        self._state_tooltip.setStyleSheet(f"""
+            StateToolTip {{
+                background-color: {green};
+                border: 1px solid {green};
+                border-radius: 8px;
+            }}
+            StateToolTip QLabel {{
+                color: white;
+            }}
+        """)
+        self._state_tooltip.move(self._state_tooltip.getSuitablePos())
+        self._state_tooltip.show()
+
+        # 创建后台线程
+        from strange_uta_game.frontend.workers import ProjectLoadWorker
+
+        self._loading_thread = QThread(self._editor)
+        self._loading_worker = ProjectLoadWorker(file_path)
+        self._loading_worker.moveToThread(self._loading_thread)
+
+        # 连接信号
+        self._loading_thread.started.connect(self._loading_worker.run)
+        self._loading_worker.finished.connect(self._on_project_loaded)
+        self._loading_worker.error.connect(self._on_project_load_error)
+        self._loading_worker.finished.connect(self._cleanup_loading_thread)
+        self._loading_worker.error.connect(self._cleanup_loading_thread)
+
+        # 启动线程
+        self._loading_thread.start()
+
+    def _on_project_loaded(self, project, file_path: str) -> None:
+        """项目加载完成的回调"""
+        if self._state_tooltip:
+            self._state_tooltip.setState(True)
+            self._state_tooltip.setContent("加载完成")
+            self._state_tooltip.close()
+            self._state_tooltip = None
+
+        if self._store:
+            self._store._project = project
+            self._store._save_path = file_path
+            self._store.notify("project")
+        else:
+            self._editor.set_project(project)
+
+    def _on_project_load_error(self, error_msg: str) -> None:
+        """项目加载失败的回调"""
+        if self._state_tooltip:
+            self._state_tooltip.close()
+            self._state_tooltip = None
+
+        InfoBar.error(
+            title="打开失败", content=error_msg,
+            orient=Qt.Orientation.Horizontal, isClosable=True,
+            position=InfoBarPosition.TOP, duration=5000,
+            parent=self._editor,
+        )
+
+    def _cleanup_loading_thread(self) -> None:
+        """清理加载线程"""
+        if self._loading_thread:
+            self._loading_thread.quit()
+            self._loading_thread.wait()
+            self._loading_thread = None
+        if self._loading_worker:
+            self._loading_worker.deleteLater()
+            self._loading_worker = None
 
     def can_load_from_clipboard(self) -> bool:
         """判断是否可以从剪贴板加载歌词。
@@ -444,3 +557,25 @@ class FileLoader:
             self._editor._auto_analyze_rubies(only_noruby=False)
         elif clicked is btn_only_noruby:
             self._editor._auto_analyze_rubies(only_noruby=True)
+        elif clicked is btn_keep:
+            self._recalc_checkpoints_from_rubies()
+
+    def _recalc_checkpoints_from_rubies(self):
+        """根据已有注音重算节奏点（不重新分析注音）"""
+        if not self._project:
+            return
+        try:
+            from strange_uta_game.backend.application import AutoCheckService
+
+            app_settings = AppSettings()
+            auto_check_flags = app_settings.get_all().get("auto_check", {})
+            user_dict = app_settings.load_dictionary()
+            auto_check = AutoCheckService(
+                auto_check_flags=auto_check_flags, user_dictionary=user_dict
+            )
+            auto_check.update_checkpoints_for_project(self._project)
+            self._editor.refresh_lyric_display()
+            if hasattr(self._editor, "_store") and self._editor._store:
+                self._editor._store.notify("checkpoints")
+        except Exception:
+            pass

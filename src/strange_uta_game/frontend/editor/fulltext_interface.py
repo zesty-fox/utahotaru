@@ -196,7 +196,27 @@ class DeleteRubyByTypeDialog(QDialog):
         (CharType.SPACE, "空格"),
     ]
 
-    def __init__(self, parent=None):
+    _TYPE_NAME_MAP = {
+        CharType.HIRAGANA: "hiragana",
+        CharType.KATAKANA: "katakana",
+        CharType.KANJI: "kanji",
+        CharType.ALPHABET: "alphabet",
+        CharType.NUMBER: "number",
+        CharType.SYMBOL: "symbol",
+        CharType.LONG_VOWEL: "long_vowel",
+        CharType.SOKUON: "sokuon",
+        CharType.OTHER: "other",
+        CharType.SPACE: "space",
+    }
+
+    _NAME_TYPE_MAP = {v: k for k, v in _TYPE_NAME_MAP.items()}
+
+    def __init__(self, parent=None, initial_types: list[str] | None = None):
+        """
+        Args:
+            parent: 父组件
+            initial_types: 初始选中的类型名称列表（config 格式），如 ["hiragana", "katakana"]
+        """
         super().__init__(parent)
         self.setWindowTitle("按类型删除注音")
         self.resize(320, 370)
@@ -209,11 +229,16 @@ class DeleteRubyByTypeDialog(QDialog):
         lbl.setStyleSheet("font-weight: bold;")
         layout.addWidget(lbl)
 
+        # 确定默认选中项
+        if initial_types is not None:
+            default_set = {self._NAME_TYPE_MAP[n] for n in initial_types if n in self._NAME_TYPE_MAP}
+        else:
+            default_set = {CharType.HIRAGANA, CharType.KATAKANA}
+
         self._checkboxes: list[tuple[CharType, QCheckBox]] = []
         for char_type, label in self._TYPE_LABELS:
             cb = QCheckBox(label, self)
-            if char_type in (CharType.HIRAGANA, CharType.KATAKANA):
-                cb.setChecked(True)
+            cb.setChecked(char_type in default_set)
             layout.addWidget(cb)
             self._checkboxes.append((char_type, cb))
 
@@ -232,6 +257,10 @@ class DeleteRubyByTypeDialog(QDialog):
     def selected_types(self) -> list[CharType]:
         """返回用户选中的字符类型列表。"""
         return [ct for ct, cb in self._checkboxes if cb.isChecked()]
+
+    def selected_type_names(self) -> list[str]:
+        """返回用户选中的类型名称列表（config 格式）。"""
+        return [self._TYPE_NAME_MAP[ct] for ct, cb in self._checkboxes if cb.isChecked()]
 
 
 class RubyInterface(QWidget):
@@ -557,11 +586,21 @@ class RubyInterface(QWidget):
         if not self._project:
             return
 
-        dlg = DeleteRubyByTypeDialog(self)
+        from strange_uta_game.frontend.settings.settings_interface import AppSettings
+
+        app_settings = AppSettings()
+        saved_types = app_settings.get("auto_check.delete_ruby_types", [])
+
+        dlg = DeleteRubyByTypeDialog(self, initial_types=saved_types)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
         selected = dlg.selected_types()
+
+        # 保存用户选择到配置（无论是否有变化）
+        app_settings.set("auto_check.delete_ruby_types", dlg.selected_type_names())
+        app_settings.save()
+
         if not selected:
             return
 

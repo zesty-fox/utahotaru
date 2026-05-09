@@ -471,13 +471,14 @@ class TimingService:
         # 通知前端将当前行居中滚动
         self._global_qt._center_current_line_signal.emit()
 
-    def on_timing_key_pressed(self, key: str) -> None:
+    def on_timing_key_pressed(self, key: str, queue_delay_ms: int = 0) -> None:
         """打轴按键按下处理（Space 或 F1-F9）
 
         薄 shim：自动启播 + 计算时间戳 + 转发 on_key_changed('pressed')
 
         Args:
             key: 按键名称（"SPACE", "F1", "F2", ...）
+            queue_delay_ms: 事件在 Qt 队列中的等待时间（毫秒）
         """
         if not self._project:
             self._notify_error("NO_PROJECT", "未加载项目")
@@ -486,21 +487,24 @@ class TimingService:
         if not self._audio_engine.is_playing():
             self._audio_engine.play()
 
-        timestamp_ms = max(0, self._audio_engine.get_position_ms() + self._timing_offset_ms)
+        raw_time = self._audio_engine.get_position_ms()
+        timestamp_ms = max(0, raw_time - queue_delay_ms + self._timing_offset_ms)
         self.on_key_changed(timestamp_ms, "pressed")
 
-    def on_timing_key_released(self, key: str) -> None:
+    def on_timing_key_released(self, key: str, queue_delay_ms: int = 0) -> None:
         """打轴按键抬起处理
 
         薄 shim：计算时间戳 + 转发 on_key_changed('released')
 
         Args:
             key: 按键名称（"SPACE", "F1", "F2", ...）
+            queue_delay_ms: 事件在 Qt 队列中的等待时间（毫秒）
         """
         if not self._project:
             return
 
-        timestamp_ms = max(0, self._audio_engine.get_position_ms() + self._timing_offset_ms)
+        raw_time = self._audio_engine.get_position_ms()
+        timestamp_ms = max(0, raw_time - queue_delay_ms + self._timing_offset_ms)
         self.on_key_changed(timestamp_ms, "released")
 
     def _add_timetag_at_current_checkpoint(self, timestamp_ms: int) -> None:
