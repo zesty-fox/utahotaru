@@ -49,6 +49,8 @@ from .cards import (
     BrowseSettingCard,
     ComboSettingCard,
     DoubleSpinSettingCard,
+    MultiBoolSettingCard,
+    MultiCheckSettingCard,
     ShortcutSettingCard,
     SpinSettingCard,
     SwitchSettingCard,
@@ -170,50 +172,73 @@ class SettingsInterface(ScrollArea):
         theme.mode = mode_map.get(theme_value, ThemeMode.AUTO)
 
     def _on_shortcut_changed(self, changed_card: ShortcutSettingCard, new_value: str):
-        """快捷键卡片变更事件。处理冲突判断并保存。"""
+        """快捷键卡片变更事件。处理冲突判断并保存。
+
+        冲突规则：同模式 + 同按键 + 同触发类型 → 冲突；
+        同按键不同触发类型 → 允许。
+        特殊：tag_now（打轴键）使用 press/release 语义，同时占用短按和长按。
+        """
         if self._loading_settings:
             return
 
-        # 1. 查找哪个键被改变了（相对于 AppSettings 里的值）
-        # 先收集当前所有 UI 中的快捷键，判断是否有冲突
-        all_cards = self._get_all_shortcut_cards()
-        
-        # 为了满足 #2，我们需要检测 changed_card 刚刚设置的键是否与其他卡片冲突
-        new_keys = [k.strip().upper() for k in new_value.split(",") if k.strip()]
-        
+        # 解析新值中的 (key, trigger) 对
+        new_pairs: list[tuple[str, str]] = []
+        for k in new_value.split(","):
+            k = k.strip()
+            if not k:
+                continue
+            if ":" in k:
+                key_part, trigger_part = k.rsplit(":", 1)
+                new_pairs.append((key_part.strip().upper(), trigger_part.strip().lower()))
+            else:
+                new_pairs.append((k.upper(), "short"))
+
         for mode_key, mode_label in self._SHORTCUT_MODES:
             # 只检查 changed_card 参与的模式
             mode_actions = self._shortcut_cards[mode_key]
             if not any(card is changed_card for card in mode_actions.values()):
                 continue
-            
+
             # 在此模式内检查冲突
             for action_key, card in mode_actions.items():
                 if card is changed_card:
                     continue
-                
-                for key in new_keys:
-                    if key in card.all_keys():
-                        # 冲突！
-                        # #2 恢复原按键
-                        for btn in [changed_card.btn_key1, changed_card.btn_key2]:
-                            if btn.get_key().strip().upper() == key:
-                                btn.restore_original_key()
-                        
-                        # 弹出提示
-                        action_titles = {a[0]: a[2] for a in self._SHORTCUT_ACTIONS}
-                        InfoBar.warning(
-                            title="快捷键冲突",
-                            content=f"[{mode_label}]「{action_titles[action_key]}」已占用按键 {key}",
-                            orient=Qt.Orientation.Horizontal,
-                            isClosable=True,
-                            position=InfoBarPosition.TOP,
-                            duration=4000,
-                            parent=self,
-                        )
-                        return # 冲突已处理，不保存
 
-        # 2. 无冲突，直接保存
+                other_pairs = card.all_keys_with_trigger()
+                # tag_now 使用 press/release 语义，同时占用短按和长按
+                if action_key == "tag_now":
+                    expanded: list[tuple[str, str]] = []
+                    for k, _ in other_pairs:
+                        expanded.append((k, "short"))
+                        expanded.append((k, "long"))
+                    other_pairs = expanded
+
+                for new_key, new_trigger in new_pairs:
+                    if not new_key:
+                        continue
+                    for other_key, other_trigger in other_pairs:
+                        if new_key == other_key and new_trigger == other_trigger:
+                            # 冲突！同键+同触发类型
+                            # #2 恢复原按键
+                            for btn in [changed_card.btn_key1, changed_card.btn_key2]:
+                                if btn.get_key().strip().upper() == new_key and btn.get_trigger_type() == new_trigger:
+                                    btn.restore_original_key()
+
+                            # 弹出提示
+                            action_titles = {a[0]: a[2] for a in self._SHORTCUT_ACTIONS}
+                            trigger_label = "长按" if new_trigger == "long" else "短按"
+                            InfoBar.warning(
+                                title="快捷键冲突",
+                                content=f"[{mode_label}]「{action_titles[action_key]}」已占用{trigger_label}按键 {new_key}",
+                                orient=Qt.Orientation.Horizontal,
+                                isClosable=True,
+                                position=InfoBarPosition.TOP,
+                                duration=4000,
+                                parent=self,
+                            )
+                            return  # 冲突已处理，不保存
+
+        # 无冲突，直接保存
         self._schedule_auto_save()
 
     def _init_ui(self):
@@ -225,7 +250,6 @@ class SettingsInterface(ScrollArea):
         self._init_calibration_group()
         self._init_auto_save_group()
         self._init_auto_check_group()
-        self._init_check_behavior_group()
         self._init_dictionary_group()
         self._init_ui_group()
         self._init_export_group()
@@ -441,158 +465,94 @@ class SettingsInterface(ScrollArea):
     def _init_auto_check_group(self):
         self.auto_check_group = SettingCardGroup("Auto Check", self.scrollWidget)
 
-        self.card_check_hiragana = SwitchSettingCard(
-            FIF.ACCEPT,
-            "平假名",
-            "自动为平假名字符生成节奏点",
+        # 节奏点字符类型
+        self.card_checkpoint_chars = MultiBoolSettingCard(
+            FIF.MUSIC,
+            "节奏点字符类型",
+            "选择哪些字符类型自动生成节奏点",
+            items=[
+                ("hiragana", "ひらがな（平假名）"),
+                ("katakana", "カタカナ（片假名）"),
+                ("kanji", "漢字（汉字）"),
+                ("alphabet", "アルファベット（英文字母）"),
+                ("digit", "数字"),
+                ("symbol", "記号（符号）"),
+                ("space", "空格"),
+            ],
             parent=self.auto_check_group,
         )
-        self.card_check_katakana = SwitchSettingCard(
-            FIF.ACCEPT,
-            "片假名",
-            "自动为片假名字符生成节奏点",
-            parent=self.auto_check_group,
-        )
-        self.card_check_kanji = SwitchSettingCard(
-            FIF.ACCEPT,
-            "汉字",
-            "自动为汉字字符生成节奏点",
-            parent=self.auto_check_group,
-        )
-        self.card_check_alphabet = SwitchSettingCard(
-            FIF.ACCEPT,
-            "アルファベット",
-            "自动为英文字母生成节奏点",
-            parent=self.auto_check_group,
-        )
-        self.card_check_digit = SwitchSettingCard(
-            FIF.ACCEPT,
-            "数字",
-            "自动为数字字符生成节奏点",
-            parent=self.auto_check_group,
-        )
-        self.card_check_symbol = SwitchSettingCard(
-            FIF.REMOVE,
-            "記号",
-            "自动为符号字符生成节奏点",
-            parent=self.auto_check_group,
-        )
-        self.card_check_space = SwitchSettingCard(
-            FIF.REMOVE,
-            "空格",
-            "自动为空格字符生成节奏点",
-            parent=self.auto_check_group,
+        self.card_checkpoint_chars.selection_changed.connect(
+            lambda vals: self._on_multi_bool_changed("auto_check", vals)
         )
 
-        self.auto_check_group.addSettingCard(self.card_check_hiragana)
-        self.auto_check_group.addSettingCard(self.card_check_katakana)
-        self.auto_check_group.addSettingCard(self.card_check_kanji)
-        self.auto_check_group.addSettingCard(self.card_check_alphabet)
-        self.auto_check_group.addSettingCard(self.card_check_digit)
-        self.auto_check_group.addSettingCard(self.card_check_symbol)
-        self.auto_check_group.addSettingCard(self.card_check_space)
-        self.expandLayout.addWidget(self.auto_check_group)
+        # check 规则
+        self.card_check_rules = MultiBoolSettingCard(
+            FIF.SETTING,
+            "check 规则",
+            "选择启用哪些自动节奏点规则",
+            items=[
+                ("check_n", "「ん」check"),
+                ("check_sokuon", "促音check"),
+                ("small_kana", "小写假名check"),
+                ("check_parentheses", "括号内文字check"),
+                ("checkpoint_on_punctuation", "标点参与节奏点"),
+                ("check_empty_lines", "空行check"),
+                ("check_line_start", "行首check"),
+                ("check_line_end", "行尾check"),
+                ("space_after_japanese", "日语后空格check"),
+                ("space_after_alphabet", "字母后空格check"),
+                ("space_after_symbol", "符号数字后空格check"),
+                ("space_as_line_end", "空格视为句尾"),
+                ("check_english_word_end", "英文单词结尾句尾"),
+            ],
+            parent=self.auto_check_group,
+        )
+        self.card_check_rules.selection_changed.connect(
+            lambda vals: self._on_multi_bool_changed("auto_check", vals)
+        )
 
-    def _init_check_behavior_group(self):
+        # 自动行为
         self.card_auto_on_load = SwitchSettingCard(
             FIF.ACCEPT,
             "读取时自动check",
             "导入文本后自动执行check分析",
             parent=self.auto_check_group,
         )
-        self.card_check_n = SwitchSettingCard(
-            FIF.ACCEPT,
-            "「ん」check",
-            "对ん字符设置节奏点",
+
+        # 自动删除注音
+        self.card_delete_ruby_types = MultiCheckSettingCard(
+            FIF.DELETE,
+            "自动删除注音",
+            "自动注音完成后，自动删除指定类型的注音",
+            options=[
+                ("hiragana", "ひらがな（平假名）"),
+                ("katakana", "カタカナ（片假名）"),
+                ("kanji", "漢字（汉字）"),
+                ("alphabet", "アルファベット（英文字母）"),
+                ("number", "数字"),
+                ("symbol", "記号（符号）"),
+                ("long_vowel", "長音符号（ー、～等）"),
+                ("sokuon", "促音（っ/ッ）"),
+                ("other", "その他（♪等特殊符号）"),
+                ("space", "空格"),
+            ],
             parent=self.auto_check_group,
         )
-        self.card_check_sokuon = SwitchSettingCard(
-            FIF.ACCEPT,
-            "促音check",
-            "对っ/ッ促音设置节奏点",
-            parent=self.auto_check_group,
-        )
-        self.card_check_parentheses = SwitchSettingCard(
-            FIF.ACCEPT,
-            "括号内文字check",
-            "对括号()内的文字设置节奏点",
-            parent=self.auto_check_group,
-        )
-        self.card_check_empty_lines = SwitchSettingCard(
-            FIF.ACCEPT,
-            "空行check",
-            "对空行设置节奏点",
-            parent=self.auto_check_group,
-        )
-        self.card_check_line_start = SwitchSettingCard(
-            FIF.ACCEPT,
-            "行首check",
-            "在每行开头增加一个节奏点",
-            parent=self.auto_check_group,
-        )
-        self.card_check_line_end = SwitchSettingCard(
-            FIF.ACCEPT,
-            "行尾check",
-            "在每行末尾增加一个节奏点（用于记录行结束时间）",
-            parent=self.auto_check_group,
-        )
-        self.card_space_after_jp = SwitchSettingCard(
-            FIF.ACCEPT,
-            "日语后空格check",
-            "日语字符后的空格设置check点",
-            parent=self.auto_check_group,
-        )
-        self.card_space_after_alpha = SwitchSettingCard(
-            FIF.ACCEPT,
-            "字母后空格check",
-            "英文字母后的空格设置check点",
-            parent=self.auto_check_group,
-        )
-        self.card_space_after_symbol = SwitchSettingCard(
-            FIF.ACCEPT,
-            "符号数字后空格check",
-            "符号或数字后的空格设置check点",
-            parent=self.auto_check_group,
-        )
-        self.card_small_kana = SwitchSettingCard(
-            FIF.ACCEPT,
-            "小写假名check",
-            "对小写假名（ぁ、ぃ、ゃ、ゅ、ょ等）设置节奏点",
-            parent=self.auto_check_group,
-        )
-        self.card_space_as_line_end = SwitchSettingCard(
-            FIF.ACCEPT,
-            "空格视为句尾",
-            "字符后跟空格时视为句尾，额外增加一个节奏点",
-            parent=self.auto_check_group,
-        )
-        self.card_checkpoint_on_punctuation = SwitchSettingCard(
-            FIF.ACCEPT,
-            "标点参与节奏点",
-            "为 ()【】[]{}「」!?、， 等标点符号自动添加节奏点（不参与注音）",
-            parent=self.auto_check_group,
-        )
-        self.card_check_english_word_end = SwitchSettingCard(
-            FIF.ACCEPT,
-            "英文单词结尾句尾",
-            "英文单词结尾自动设置为句尾（is_sentence_end）",
-            parent=self.auto_check_group,
+        self.card_delete_ruby_types.selection_changed.connect(
+            lambda types: self._on_multi_bool_changed("auto_check", {"delete_ruby_types": types})
         )
 
+        self.auto_check_group.addSettingCard(self.card_checkpoint_chars)
+        self.auto_check_group.addSettingCard(self.card_check_rules)
         self.auto_check_group.addSettingCard(self.card_auto_on_load)
-        self.auto_check_group.addSettingCard(self.card_check_n)
-        self.auto_check_group.addSettingCard(self.card_check_sokuon)
-        self.auto_check_group.addSettingCard(self.card_small_kana)
-        self.auto_check_group.addSettingCard(self.card_check_parentheses)
-        self.auto_check_group.addSettingCard(self.card_check_empty_lines)
-        self.auto_check_group.addSettingCard(self.card_check_line_start)
-        self.auto_check_group.addSettingCard(self.card_check_line_end)
-        self.auto_check_group.addSettingCard(self.card_space_after_jp)
-        self.auto_check_group.addSettingCard(self.card_space_after_alpha)
-        self.auto_check_group.addSettingCard(self.card_space_after_symbol)
-        self.auto_check_group.addSettingCard(self.card_space_as_line_end)
-        self.auto_check_group.addSettingCard(self.card_checkpoint_on_punctuation)
-        self.auto_check_group.addSettingCard(self.card_check_english_word_end)
+        self.auto_check_group.addSettingCard(self.card_delete_ruby_types)
+        self.expandLayout.addWidget(self.auto_check_group)
+
+    def _on_multi_bool_changed(self, prefix: str, vals: dict):
+        """MultiBoolSettingCard 选择变更回调，批量写入 config 并保存。"""
+        for key, val in vals.items():
+            self._settings.set(f"{prefix}.{key}", val)
+        self._settings.save()
 
     # ── 读音词典 ──
 
@@ -667,6 +627,16 @@ class SettingsInterface(ScrollArea):
             suffix=" px",
             parent=self.ui_group,
         )
+        self.card_ruby_spacing = SpinSettingCard(
+            FIF.FONT_SIZE,
+            "注音与主文字间距",
+            "Ruby注音与主文字之间的垂直间距",
+            min_val=0,
+            max_val=20,
+            step=1,
+            suffix=" px",
+            parent=self.ui_group,
+        )
         self.card_cp_size = SpinSettingCard(
             FIF.FONT_SIZE,
             "节奏点标记大小",
@@ -680,7 +650,7 @@ class SettingsInterface(ScrollArea):
         self.card_line_height_factor = DoubleSpinSettingCard(
             FIF.FONT_SIZE,
             "行间距系数",
-            "行高 = (当前行字体 + 注音 + 节奏点)高度 × 系数",
+            "行高 = (当前行字体 + 注音 + 注音间距 + 节奏点)高度 × 系数",
             min_val=0.50,
             max_val=5.00,
             step=0.05,
@@ -710,6 +680,7 @@ class SettingsInterface(ScrollArea):
         self.ui_group.addSettingCard(self.card_font_size)
         self.ui_group.addSettingCard(self.card_current_line_font_size)
         self.ui_group.addSettingCard(self.card_ruby_size)
+        self.ui_group.addSettingCard(self.card_ruby_spacing)
         self.ui_group.addSettingCard(self.card_cp_size)
         self.ui_group.addSettingCard(self.card_line_height_factor)
         self.ui_group.addSettingCard(self.card_alignment_margin)
@@ -761,33 +732,42 @@ class SettingsInterface(ScrollArea):
     _SHORTCUT_ACTIONS: list[tuple[str, object, str, str, str, str, str, str, str]] = [
         # (key, icon, title, content, default_timing, default_edit, scope, timing_content, edit_content)
         # — 两模式通用 —
-        ("play_pause", FIF.PLAY, "播放/暂停", "切换播放和暂停", "D", "D", "both", None, None),
-        ("stop", FIF.PAUSE, "停止", "停止播放", "S", "S", "both", None, None),
-        ("speed_down", FIF.SPEED_OFF, "减速", "降低播放速度", "Q", "Q", "both", None, None),
-        ("speed_up", FIF.SPEED_HIGH, "加速", "提高播放速度", "W", "W", "both", None, None),
+        ("play_pause", FIF.PLAY, "播放/暂停", "切换播放和暂停", "D:short", "D:short", "both", None, None),
+        ("stop", FIF.PAUSE, "停止", "停止播放", "S:short", "S:short", "both", None, None),
+        ("speed_down", FIF.SPEED_OFF, "减速", "降低播放速度", "Q:short", "Q:short", "both", None, None),
+        ("speed_up", FIF.SPEED_HIGH, "加速", "提高播放速度", "W:short", "W:short", "both", None, None),
         ("volume_up", FIF.VOLUME, "音量增大", "增大播放音量", "", "", "both", None, None),
         ("volume_down", FIF.MUTE, "音量减小", "减小播放音量", "", "", "both", None, None),
-        ("nav_prev_line", FIF.UP, "上一行", "移动到上一歌词行", "UP", "UP", "both", None, None),
-        ("nav_next_line", FIF.DOWN, "下一行", "移动到下一歌词行", "DOWN", "DOWN", "both", None, None),
-        ("nav_prev_char", FIF.LEFT_ARROW, "上一字符", "在当前行内移动到上一个字符；若已在首字符则跳到上一行末字符", "LEFT", "LEFT", "both", None, None),
-        ("nav_next_char", FIF.RIGHT_ARROW, "下一字符", "在当前行内移动到下一个字符；若已在末字符则跳到下一行首字符", "RIGHT", "RIGHT", "both", None, None),
-        ("cycle_checkpoint_prev", FIF.SYNC, "切换字内节奏点（反向）", "在当前字符的多个节奏点之间反向循环切换（Alt+←）", "ALT+LEFT", "ALT+LEFT", "both", None, None),
-        ("timestamp_up", FIF.UP, "时间戳+步长", "增加选中节奏点时间戳", "ALT+UP", "ALT+UP", "both", None, None),
-        ("timestamp_down", FIF.DOWN, "时间戳-步长", "减少选中节奏点时间戳", "ALT+DOWN", "ALT+DOWN", "both", None, None),
-        ("cycle_checkpoint", FIF.SYNC, "切换字内节奏点", "在当前字符的多个节奏点之间循环切换（Alt+→）", "ALT+RIGHT", "ALT+RIGHT", "both", None, None),
-        ("edit_ruby", FIF.EDIT, "注音编辑", "编辑当前字符注音", "F2", "F2", "both", None, None),
-        ("toggle_word_join", FIF.LINK, "连词", "连词/取消连词", "F3", "F3", "both", None, None),
+        ("nav_prev_line", FIF.UP, "上一行", "移动到上一歌词行", "UP:short", "UP:short", "both", None, None),
+        ("nav_next_line", FIF.DOWN, "下一行", "移动到下一歌词行", "DOWN:short", "DOWN:short", "both", None, None),
+        ("nav_prev_char", FIF.LEFT_ARROW, "上一字符", "在当前行内移动到上一个字符；若已在首字符则跳到上一行末字符", "LEFT:short", "LEFT:short", "both", None, None),
+        ("nav_next_char", FIF.RIGHT_ARROW, "下一字符", "在当前行内移动到下一个字符；若已在末字符则跳到下一行首字符", "RIGHT:short", "RIGHT:short", "both", None, None),
+        ("cycle_checkpoint_prev", FIF.SYNC, "切换字内节奏点（反向）", "在当前字符的多个节奏点之间反向循环切换（Alt+←）", "ALT+LEFT:short", "ALT+LEFT:short", "both", None, None),
+        ("timestamp_up", FIF.UP, "时间戳+步长", "增加选中节奏点时间戳", "ALT+UP:short", "ALT+UP:short", "both", None, None),
+        ("timestamp_down", FIF.DOWN, "时间戳-步长", "减少选中节奏点时间戳", "ALT+DOWN:short", "ALT+DOWN:short", "both", None, None),
+        ("cycle_checkpoint", FIF.SYNC, "切换字内节奏点", "在当前字符的多个节奏点之间循环切换（Alt+→）", "ALT+RIGHT:short", "ALT+RIGHT:short", "both", None, None),
+        ("edit_ruby", FIF.EDIT, "注音编辑", "编辑当前字符注音", "F2:short", "F2:short", "both", None, None),
+        ("toggle_word_join", FIF.LINK, "连词", "连词/取消连词", "F3:short", "F3:short", "both", None, None),
         # — 仅打轴模式 —
-        ("tag_now", FIF.PLAY, "打轴键", "打轴操作的按键【仅打轴模式】", "Space", "", "timing_only", None, None),
-        ("seek_back", FIF.LEFT_ARROW, "后退", "后退跳转【仅打轴模式】", "Z", "", "timing_only", None, None),
-        ("seek_forward", FIF.CHEVRON_RIGHT, "前进", "前进跳转【仅打轴模式】", "X", "", "timing_only", None, None),
-        ("delete_timestamp", FIF.DELETE, "删除当前时间戳并回滚", "删除跳转【仅打轴模式】", "Backspace", "", "timing_only", None, None),
+        ("tag_now", FIF.PLAY, "打轴键", "打轴操作的按键【仅打轴模式】", "Space:short", "", "timing_only", None, None),
+        ("seek_back", FIF.LEFT_ARROW, "后退", "后退跳转【仅打轴模式】", "Z:short", "", "timing_only", None, None),
+        ("seek_forward", FIF.CHEVRON_RIGHT, "前进", "前进跳转【仅打轴模式】", "X:short", "", "timing_only", None, None),
+        ("delete_timestamp", FIF.DELETE, "删除当前时间戳并回滚", "删除跳转【仅打轴模式】", "Backspace:short", "", "timing_only", None, None),
         # — 两模式下按键不同 —
-        ("add_checkpoint", FIF.PIN, "增加节奏点", "增加当前字符的节奏点数量", "F5", "Space", "split", "增加当前字符的节奏点数量（默认 F5）", "增加当前字符的节奏点数量（默认 Space）"),
-        ("remove_checkpoint", FIF.REMOVE, "删除节奏点", "减少当前字符的节奏点数量", "F6", "Backspace", "split", "减少当前字符的节奏点数量（默认 F6）", "减少当前字符的节奏点数量（默认 Backspace）"),
-        ("toggle_line_end", FIF.TAG, "切换句尾", "切换当前字符的句尾标记", "F4", ".", "split", "切换当前字符的句尾标记（默认 F4）", "切换当前字符的句尾标记（默认 句号）"),
-        ("break_line_here", FIF.RETURN, "在此处换行", "在当前字符后插入换行", "Return", "Return", "both", None, None),
-        ("delete_char", FIF.DELETE, "删除字符", "删除选中字符或当前字符（删行尾时行合并）", "Delete", "Delete", "both", None, None),
+        ("add_checkpoint", FIF.PIN, "增加节奏点", "增加当前字符的节奏点数量", "F5:short", "Space:short", "split", "增加当前字符的节奏点数量（默认 F5）", "增加当前字符的节奏点数量（默认 Space）"),
+        ("remove_checkpoint", FIF.REMOVE, "删除节奏点", "减少当前字符的节奏点数量", "F6:short", "Backspace:short", "split", "减少当前字符的节奏点数量（默认 F6）", "减少当前字符的节奏点数量（默认 Backspace）"),
+        ("toggle_line_end", FIF.TAG, "切换句尾", "切换当前字符的句尾标记", "F4:short", ".:short", "split", "切换当前字符的句尾标记（默认 F4）", "切换当前字符的句尾标记（默认 句号）"),
+        ("break_line_here", FIF.RETURN, "在此处换行", "在当前字符后插入换行", "Return:short", "Return:short", "both", None, None),
+        ("delete_char", FIF.DELETE, "删除字符", "删除选中字符或当前字符（删行尾时行合并）", "Delete:short", "Delete:short", "both", None, None),
+        # — 通用工具栏功能 —
+        ("bulk_change", FIF.EDIT, "批量变更", "打开批量变更对话框", "CTRL+H:short", "CTRL+H:short", "both", None, None),
+        ("modify_char", FIF.EDIT, "修改所选字符", "打开修改所选字符对话框", "", "", "both", None, None),
+        ("insert_guide", FIF.ADD, "插入导唱符", "打开插入导唱符对话框", "", "", "both", None, None),
+        ("modify_line", FIF.EDIT, "修改选中行", "打开修改选中行对话框", "", "", "both", None, None),
+        ("analyze_rubies", FIF.SYNC, "注音分析", "自动分析全部注音", "", "", "both", None, None),
+        ("delete_rubies_by_type", FIF.DELETE, "按类型删除注音", "按类型删除注音对话框", "", "", "both", None, None),
+        ("set_singer_by_line", FIF.PEOPLE, "按行设置演唱者", "按行批量设置演唱者", "", "", "both", None, None),
+        ("clear_timestamp", FIF.DELETE, "清除当前行时间戳", "清除当前行所有时间戳", "", "", "both", None, None),
     ]
 
     # 两种模式的中文标签，供 UI 标题与冲突提示使用
@@ -897,49 +877,50 @@ class SettingsInterface(ScrollArea):
         """检测并解决快捷键冲突。
 
         - 冲突检测 **仅在同一模式内** 进行（#13：打轴/编辑两套独立）。
+        - 同按键 + 同触发类型 → 冲突；同按键不同触发类型 → 允许。
+        - tag_now（打轴键）使用 press/release 语义，同时占用短按和长按。
         - 冲突提示需包含另一个占用该按键的功能名称（#12）。
-        - #2: 如果检测到冲突，恢复本次修改前的按键。
         - scope=both 的卡片在两个模式下是同一对象，用 id() 去重避免自冲突。
         """
         conflicts: list[str] = []
-        cards = self._get_all_shortcut_cards()
+        action_titles = {a[0]: a[2] for a in self._SHORTCUT_ACTIONS}
         # 以模式为粒度独立检测冲突
         for mode_key, mode_label in self._SHORTCUT_MODES:
             seen_ids: set[int] = set()
-            mode_cards: list[tuple[str, ShortcutSettingCard]] = []
-            for m, _, name, card in cards:
-                if m != mode_key:
-                    continue
+            # (action_key, name, card)
+            mode_entries: list[tuple[str, str, ShortcutSettingCard]] = []
+            for action_key, card in self._shortcut_cards[mode_key].items():
                 if id(card) in seen_ids:
                     continue
                 seen_ids.add(id(card))
-                mode_cards.append((name, card))
+                name = action_titles.get(action_key, action_key)
+                mode_entries.append((action_key, name, card))
 
-            # 冲突检测：同一按键不能被两个不同的功能占用
-            key_owners: dict[str, tuple[str, ShortcutSettingCard]] = {}
-            for name, card in mode_cards:
-                for key in card.all_keys():
+            # 冲突检测：同按键 + 同触发类型不能被两个不同的功能占用
+            key_owners: dict[tuple[str, str], tuple[str, ShortcutSettingCard]] = {}
+            for action_key, name, card in mode_entries:
+                pairs = card.all_keys_with_trigger()
+                # tag_now 使用 press/release 语义，同时占用短按和长按
+                if action_key == "tag_now":
+                    expanded: list[tuple[str, str]] = []
+                    for k, _ in pairs:
+                        expanded.append((k, "short"))
+                        expanded.append((k, "long"))
+                    pairs = expanded
+
+                for key, trigger in pairs:
                     if not key:
                         continue
-                    if key in key_owners:
-                        old_name, old_card = key_owners[key]
-                        # #2 / #3 期望：如果当前正在编辑的卡片引起了冲突，则恢复它，而不是清除别人的
-                        # 但 _resolve_shortcut_conflicts 是在保存时运行的，它不知道谁是"新"的。
-                        # 不过，在 _do_auto_save 中调用时，我们希望它是实时的。
-                        
-                        # 改进逻辑：如果是在 _do_auto_save 实时触发，我们希望能恢复当前冲突的按键
-                        # 这里统一处理：如果发现冲突，清除旧的（保持原有逻辑作为安全网），
-                        # 但在 ShortcutSettingCard._on_key_changed 中我们可以做得更精细。
-                        
-                        # 为了满足 #2 "冲突时恢复原按键"，我们需要知道哪个是刚刚修改的。
-                        # 我们在 ShortcutSettingCard 中通过 restore_key 恢复。
-                        
+                    pair = (key, trigger)
+                    if pair in key_owners:
+                        old_name, old_card = key_owners[pair]
                         old_card.clear_key_by_name(key)
+                        trigger_label = "长按" if trigger == "long" else "短按"
                         conflicts.append(
-                            f"[{mode_label}]「{name}」与「{old_name}」的按键 {key} 冲突，"
+                            f"[{mode_label}]「{name}」与「{old_name}」的{trigger_label}按键 {key} 冲突，"
                             f"已清除「{old_name}」上的该按键"
                         )
-                    key_owners[key] = (name, card)
+                    key_owners[pair] = (name, card)
         return conflicts
 
     # ── 操作按钮 ──
@@ -972,7 +953,7 @@ class SettingsInterface(ScrollArea):
         about_card = SettingCard(
             FIF.INFO,
             "StrangeUtaGame - 歌词打轴软件",
-            "版本 0.2.6 | 由 RhythmicaLyrics 启发",
+            "版本 0.2.7 | 由 RhythmicaLyrics 启发",
             self.about_group,
         )
         self.about_group.addSettingCard(about_card)
@@ -1132,60 +1113,35 @@ class SettingsInterface(ScrollArea):
         )
 
         # Auto Check
-        self.card_check_hiragana.setChecked(
-            self._settings.get("auto_check.hiragana", True)
-        )
-        self.card_check_katakana.setChecked(
-            self._settings.get("auto_check.katakana", True)
-        )
-        self.card_check_kanji.setChecked(self._settings.get("auto_check.kanji", True))
-        self.card_check_alphabet.setChecked(
-            self._settings.get("auto_check.alphabet", False)
-        )
-        self.card_check_digit.setChecked(self._settings.get("auto_check.digit", False))
-        self.card_check_symbol.setChecked(
-            self._settings.get("auto_check.symbol", False)
-        )
-        self.card_check_space.setChecked(self._settings.get("auto_check.space", False))
+        self.card_checkpoint_chars.setValues({
+            "hiragana": self._settings.get("auto_check.hiragana", True),
+            "katakana": self._settings.get("auto_check.katakana", True),
+            "kanji": self._settings.get("auto_check.kanji", True),
+            "alphabet": self._settings.get("auto_check.alphabet", False),
+            "digit": self._settings.get("auto_check.digit", False),
+            "symbol": self._settings.get("auto_check.symbol", False),
+            "space": self._settings.get("auto_check.space", False),
+        })
+        self.card_check_rules.setValues({
+            "check_n": self._settings.get("auto_check.check_n", False),
+            "check_sokuon": self._settings.get("auto_check.check_sokuon", False),
+            "small_kana": self._settings.get("auto_check.small_kana", False),
+            "check_parentheses": self._settings.get("auto_check.check_parentheses", True),
+            "checkpoint_on_punctuation": self._settings.get("auto_check.checkpoint_on_punctuation", False),
+            "check_empty_lines": self._settings.get("auto_check.check_empty_lines", False),
+            "check_line_start": self._settings.get("auto_check.check_line_start", False),
+            "check_line_end": self._settings.get("auto_check.check_line_end", True),
+            "space_after_japanese": self._settings.get("auto_check.space_after_japanese", True),
+            "space_after_alphabet": self._settings.get("auto_check.space_after_alphabet", True),
+            "space_after_symbol": self._settings.get("auto_check.space_after_symbol", True),
+            "space_as_line_end": self._settings.get("auto_check.check_space_as_line_end", True),
+            "check_english_word_end": self._settings.get("auto_check.check_english_word_end", True),
+        })
         self.card_auto_on_load.setChecked(
             self._settings.get("auto_check.auto_on_load", True)
         )
-        self.card_check_n.setChecked(self._settings.get("auto_check.check_n", False))
-        self.card_check_sokuon.setChecked(
-            self._settings.get("auto_check.check_sokuon", False)
-        )
-        self.card_check_parentheses.setChecked(
-            self._settings.get("auto_check.check_parentheses", True)
-        )
-        self.card_check_empty_lines.setChecked(
-            self._settings.get("auto_check.check_empty_lines", False)
-        )
-        self.card_check_line_start.setChecked(
-            self._settings.get("auto_check.check_line_start", False)
-        )
-        self.card_check_line_end.setChecked(
-            self._settings.get("auto_check.check_line_end", True)
-        )
-        self.card_space_after_jp.setChecked(
-            self._settings.get("auto_check.space_after_japanese", True)
-        )
-        self.card_space_after_alpha.setChecked(
-            self._settings.get("auto_check.space_after_alphabet", True)
-        )
-        self.card_space_after_symbol.setChecked(
-            self._settings.get("auto_check.space_after_symbol", True)
-        )
-        self.card_small_kana.setChecked(
-            self._settings.get("auto_check.small_kana", False)
-        )
-        self.card_space_as_line_end.setChecked(
-            self._settings.get("auto_check.check_space_as_line_end", True)
-        )
-        self.card_checkpoint_on_punctuation.setChecked(
-            self._settings.get("auto_check.checkpoint_on_punctuation", False)
-        )
-        self.card_check_english_word_end.setChecked(
-            self._settings.get("auto_check.check_english_word_end", True)
+        self.card_delete_ruby_types.setSelectedValues(
+            self._settings.get("auto_check.delete_ruby_types", [])
         )
 
         # 界面设定
@@ -1195,6 +1151,7 @@ class SettingsInterface(ScrollArea):
         self.card_font_size.setValue(self._settings.get("ui.font_size", 18))
         self.card_current_line_font_size.setValue(self._settings.get("ui.current_line_font_size", 22))
         self.card_ruby_size.setValue(self._settings.get("ui.ruby_size", 10))
+        self.card_ruby_spacing.setValue(self._settings.get("ui.ruby_spacing", 4))
         self.card_cp_size.setValue(self._settings.get("ui.cp_size", 8))
         self.card_line_height_factor.setValue(self._settings.get("ui.line_height_factor", 1.20))
         self.card_alignment_margin.setValue(self._settings.get("ui.alignment_margin", 168))
@@ -1276,54 +1233,16 @@ class SettingsInterface(ScrollArea):
         )
 
         # Auto Check
-        self._settings.set("auto_check.hiragana", self.card_check_hiragana.isChecked())
-        self._settings.set("auto_check.katakana", self.card_check_katakana.isChecked())
-        self._settings.set("auto_check.kanji", self.card_check_kanji.isChecked())
-        self._settings.set("auto_check.alphabet", self.card_check_alphabet.isChecked())
-        self._settings.set("auto_check.digit", self.card_check_digit.isChecked())
-        self._settings.set("auto_check.symbol", self.card_check_symbol.isChecked())
-        self._settings.set("auto_check.space", self.card_check_space.isChecked())
+        for key, val in self.card_checkpoint_chars.values().items():
+            self._settings.set(f"auto_check.{key}", val)
+        for key, val in self.card_check_rules.values().items():
+            self._settings.set(f"auto_check.{key}", val)
         self._settings.set(
             "auto_check.auto_on_load", self.card_auto_on_load.isChecked()
         )
-        self._settings.set("auto_check.check_n", self.card_check_n.isChecked())
         self._settings.set(
-            "auto_check.check_sokuon", self.card_check_sokuon.isChecked()
-        )
-        self._settings.set(
-            "auto_check.check_parentheses", self.card_check_parentheses.isChecked()
-        )
-        self._settings.set(
-            "auto_check.check_empty_lines", self.card_check_empty_lines.isChecked()
-        )
-        self._settings.set(
-            "auto_check.check_line_start", self.card_check_line_start.isChecked()
-        )
-        self._settings.set(
-            "auto_check.check_line_end", self.card_check_line_end.isChecked()
-        )
-        self._settings.set(
-            "auto_check.space_after_japanese", self.card_space_after_jp.isChecked()
-        )
-        self._settings.set(
-            "auto_check.space_after_alphabet",
-            self.card_space_after_alpha.isChecked(),
-        )
-        self._settings.set(
-            "auto_check.space_after_symbol", self.card_space_after_symbol.isChecked()
-        )
-        self._settings.set("auto_check.small_kana", self.card_small_kana.isChecked())
-        self._settings.set(
-            "auto_check.check_space_as_line_end",
-            self.card_space_as_line_end.isChecked(),
-        )
-        self._settings.set(
-            "auto_check.checkpoint_on_punctuation",
-            self.card_checkpoint_on_punctuation.isChecked(),
-        )
-        self._settings.set(
-            "auto_check.check_english_word_end",
-            self.card_check_english_word_end.isChecked(),
+            "auto_check.delete_ruby_types",
+            self.card_delete_ruby_types.selectedValues(),
         )
 
         # 界面设定
@@ -1332,6 +1251,7 @@ class SettingsInterface(ScrollArea):
         self._settings.set("ui.font_size", self.card_font_size.value())
         self._settings.set("ui.current_line_font_size", self.card_current_line_font_size.value())
         self._settings.set("ui.ruby_size", self.card_ruby_size.value())
+        self._settings.set("ui.ruby_spacing", self.card_ruby_spacing.value())
         self._settings.set("ui.cp_size", self.card_cp_size.value())
         self._settings.set("ui.line_height_factor", self.card_line_height_factor.value())
         self._settings.set("ui.alignment_margin", self.card_alignment_margin.value())

@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont, QKeyEvent
-from PyQt6.QtWidgets import QFileDialog, QLabel
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QFont, QKeyEvent, QWheelEvent
+from PyQt6.QtWidgets import QCheckBox, QDialog, QDialogButtonBox, QFileDialog, QLabel, QVBoxLayout, QWidget
 from qfluentwidgets import (
     ComboBox,
     DoubleSpinBox,
@@ -19,6 +19,20 @@ from qfluentwidgets import (
     SpinBox,
     SwitchButton,
 )
+
+
+class NoWheelSpinBox(SpinBox):
+    """禁用滚轮的 SpinBox"""
+
+    def wheelEvent(self, event: QWheelEvent | None) -> None:
+        event.ignore() if event else None
+
+
+class NoWheelDoubleSpinBox(DoubleSpinBox):
+    """禁用滚轮的 DoubleSpinBox"""
+
+    def wheelEvent(self, event: QWheelEvent | None) -> None:
+        event.ignore() if event else None
 
 
 class SpinSettingCard(SettingCard):
@@ -38,7 +52,7 @@ class SpinSettingCard(SettingCard):
         parent=None,
     ):
         super().__init__(icon, title, content, parent)
-        self.spin = SpinBox(self)
+        self.spin = NoWheelSpinBox(self)
         self.spin.setRange(min_val, max_val)
         self.spin.setSingleStep(step)
         if suffix:
@@ -73,7 +87,7 @@ class DoubleSpinSettingCard(SettingCard):
         parent=None,
     ):
         super().__init__(icon, title, content, parent)
-        self.spin = DoubleSpinBox(self)
+        self.spin = NoWheelDoubleSpinBox(self)
         self.spin.setRange(min_val, max_val)
         self.spin.setSingleStep(step)
         self.spin.setDecimals(decimals)
@@ -170,23 +184,38 @@ class BrowseSettingCard(SettingCard):
 
 
 class _KeyCaptureButton(PushButton):
-    """按键捕获按钮 — 点击后进入监听模式，捕获下一次按键组合。"""
+    """按键捕获按钮 — 点击后进入监听模式，捕获下一次按键组合。
 
-    key_captured = pyqtSignal(str)  # 捕获到的按键名称
+    短按录入 → trigger_type = "short"
+    长按录入（≥300ms） → trigger_type = "long"
+    """
+
+    key_captured = pyqtSignal(str)  # 捕获到的按键名称（含触发类型，如 "F5:short"）
     key_restored = pyqtSignal()     # 因冲突或其他原因恢复原值时触发
+
+    HOLD_THRESHOLD_MS = 300  # 长按判定阈值
 
     def _postInit(self):
         super()._postInit()
         self._captured_key = ""
+        self._trigger_type = "short"
         self._original_key = ""
+        self._original_trigger = "short"
         self._listening = False
-        self.setFixedWidth(120)
+        self._pending_key = None  # 等待释放的按键名
+        self._hold_timer = QTimer(self)
+        self._hold_timer.setSingleShot(True)
+        self._hold_timer.setInterval(self.HOLD_THRESHOLD_MS)
+        self._hold_timer.timeout.connect(self._on_hold_timeout)
+        self.setFixedWidth(140)
         self.setFont(QFont("Microsoft YaHei", 9))
         self.clicked.connect(self._start_listening)
 
     def _start_listening(self):
         self._listening = True
         self._original_key = self._captured_key
+        self._original_trigger = self._trigger_type
+        self._pending_key = None
         self.setText("按下按键...")
         self.setStyleSheet("border: 2px solid #0078D4; border-radius: 4px;")
         self.setFocus()
@@ -194,6 +223,7 @@ class _KeyCaptureButton(PushButton):
     def restore_original_key(self):
         """恢复修改前的按键（用于冲突处理）。"""
         self._captured_key = self._original_key
+        self._trigger_type = self._original_trigger
         self._update_display()
         self.key_restored.emit()
 
@@ -214,42 +244,110 @@ class _KeyCaptureButton(PushButton):
         # ESC 取消捕获，不设置按键
         if key == Qt.Key.Key_Escape:
             self._listening = False
+            self._hold_timer.stop()
+            self._pending_key = None
             self._update_display()
             self.setStyleSheet("")
             self.clearFocus()
             a0.accept()
             return
+        if a0.isAutoRepeat():
+            a0.accept()
+            return
         modifiers = a0.modifiers()
         key_name = _KeyCaptureButton._build_key_name(key, modifiers)
         if key_name:
-            self._captured_key = key_name
+            self._pending_key = key_name
+            self._hold_timer.start(self.HOLD_THRESHOLD_MS)
+        a0.accept()
+
+    def keyReleaseEvent(self, a0: QKeyEvent | None):
+        if a0 is None or not self._listening:
+            super().keyReleaseEvent(a0)
+            return
+        key = a0.key()
+        if key in (
+            Qt.Key.Key_Control,
+            Qt.Key.Key_Shift,
+            Qt.Key.Key_Alt,
+            Qt.Key.Key_Meta,
+        ):
+            a0.accept()
+            return
+        if a0.isAutoRepeat():
+            a0.accept()
+            return
+        if self._pending_key:
+            self._hold_timer.stop()
+            # 短按录入
+            self._captured_key = self._pending_key
+            self._trigger_type = "short"
             self._listening = False
+            self._pending_key = None
             self._update_display()
             self.setStyleSheet("")
-            self.key_captured.emit(key_name)
+            self.key_captured.emit(f"{self._captured_key}:{self._trigger_type}")
             self.clearFocus()
         a0.accept()
+
+    def _on_hold_timeout(self):
+        """长按定时器到期 — 记录为长按触发。"""
+        if self._pending_key:
+            self._captured_key = self._pending_key
+            self._trigger_type = "long"
+            self._listening = False
+            self._pending_key = None
+            self._update_display()
+            self.setStyleSheet("")
+            self.key_captured.emit(f"{self._captured_key}:{self._trigger_type}")
+            self.clearFocus()
 
     def focusOutEvent(self, a0):
         if self._listening:
             self._listening = False
+            self._hold_timer.stop()
+            self._pending_key = None
             self._update_display()
             self.setStyleSheet("")
         super().focusOutEvent(a0)
 
     def _update_display(self):
-        self.setText(self._captured_key if self._captured_key else "未设置")
+        if self._captured_key:
+            suffix = " (长)" if self._trigger_type == "long" else ""
+            self.setText(f"{self._captured_key}{suffix}")
+        else:
+            self.setText("未设置")
 
-    def set_key(self, key_name: str):
-        self._captured_key = key_name
-        self._original_key = key_name
+    def set_key(self, key_with_trigger: str):
+        """设置按键值，支持 "F5:short" / "F5:long" / "F5" 格式。"""
+        if ":" in key_with_trigger:
+            key_part, trigger_part = key_with_trigger.rsplit(":", 1)
+            self._captured_key = key_part.strip()
+            self._trigger_type = trigger_part.strip().lower() or "short"
+        else:
+            self._captured_key = key_with_trigger
+            self._trigger_type = "short"
+        self._original_key = self._captured_key
+        self._original_trigger = self._trigger_type
         self._update_display()
 
     def get_key(self) -> str:
+        """返回原始按键名（不含触发类型）。"""
         return self._captured_key
+
+    def get_trigger_type(self) -> str:
+        """返回触发类型 ("short" / "long")。"""
+        return self._trigger_type
+
+    def get_key_with_trigger(self) -> str:
+        """返回 "key:trigger" 格式字符串。"""
+        if self._captured_key:
+            return f"{self._captured_key}:{self._trigger_type}"
+        return ""
 
     def clear_key(self):
         self._captured_key = ""
+        self._trigger_type = "short"
         self._update_display()
 
     @staticmethod
@@ -361,21 +459,21 @@ class ShortcutSettingCard(SettingCard):
             self.btn_key2.restore_original_key()
 
     def setValue(self, value: str):
-        """设置快捷键值，支持 'Space' 或 'Space,A' 格式。"""
+        """设置快捷键值，支持 'F5:short' / 'F5:long' / 'F5' / 'F5:short,A:long' 格式。"""
         keys = [k.strip() for k in value.split(",") if k.strip()] if value else []
         self.btn_key1.set_key(keys[0] if len(keys) >= 1 else "")
         self.btn_key2.set_key(keys[1] if len(keys) >= 2 else "")
 
     def value(self) -> str:
-        """返回快捷键值，格式为 'Space' 或 'Space,A'。"""
-        k1 = self.btn_key1.get_key().strip()
-        k2 = self.btn_key2.get_key().strip()
+        """返回快捷键值，格式为 'F5:short' 或 'F5:short,A:long'。"""
+        k1 = self.btn_key1.get_key_with_trigger()
+        k2 = self.btn_key2.get_key_with_trigger()
         if k1 and k2:
             return f"{k1},{k2}"
         return k1 or k2
 
     def all_keys(self) -> list[str]:
-        """返回所有已设置的快捷键列表。"""
+        """返回所有已设置的快捷键列表（不含触发类型，兼容旧接口）。"""
         keys = []
         k1 = self.btn_key1.get_key().strip()
         k2 = self.btn_key2.get_key().strip()
@@ -385,9 +483,177 @@ class ShortcutSettingCard(SettingCard):
             keys.append(k2.upper())
         return keys
 
+    def all_keys_with_trigger(self) -> list[tuple[str, str]]:
+        """返回所有已设置的快捷键列表，每项为 (key_upper, trigger_type)。"""
+        keys: list[tuple[str, str]] = []
+        k1 = self.btn_key1.get_key().strip()
+        t1 = self.btn_key1.get_trigger_type()
+        if k1:
+            keys.append((k1.upper(), t1))
+        k2 = self.btn_key2.get_key().strip()
+        t2 = self.btn_key2.get_trigger_type()
+        if k2:
+            keys.append((k2.upper(), t2))
+        return keys
+
     def clear_key_by_name(self, key_name: str):
         """清除指定的快捷键（用于冲突解决）。"""
         if self.btn_key1.get_key().strip().upper() == key_name.upper():
             self.btn_key1.clear_key()
         if self.btn_key2.get_key().strip().upper() == key_name.upper():
             self.btn_key2.clear_key()
+
+
+class MultiCheckSettingCard(SettingCard):
+    """多选设定卡片 — 点击按钮弹出对话框进行多选。"""
+
+    selection_changed = pyqtSignal(list)
+
+    def __init__(
+        self,
+        icon,
+        title: str,
+        content: str,
+        options: list[tuple[str, str]],
+        parent=None,
+    ):
+        """
+        Args:
+            icon: 图标
+            title: 标题
+            content: 描述
+            options: 选项列表，每项为 (value, label) 元组
+            parent: 父组件
+        """
+        super().__init__(icon, title, content, parent)
+        self._title_text = title
+        self._content_text = content
+        self._options = options
+        self._selected: list[str] = []
+
+        self.btn = PushButton("编辑", self)
+        self.btn.setFixedWidth(120)
+        self.btn.clicked.connect(self._on_click)
+        self.hBoxLayout.addWidget(self.btn, 0, Qt.AlignmentFlag.AlignRight)
+        self.hBoxLayout.addSpacing(16)
+
+        self._update_button_text()
+
+    def _on_click(self):
+        """点击按钮弹出多选对话框。"""
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self._title_text)
+        dlg.setMinimumWidth(300)
+        dlg.setFont(self.font())
+
+        layout = QVBoxLayout(dlg)
+        layout.setSpacing(8)
+
+        checkboxes: list[tuple[str, QCheckBox]] = []
+        for value, label in self._options:
+            cb = QCheckBox(label, dlg)
+            cb.setChecked(value in self._selected)
+            layout.addWidget(cb)
+            checkboxes.append((value, cb))
+
+        btn_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        btn_box.accepted.connect(dlg.accept)
+        btn_box.rejected.connect(dlg.reject)
+        layout.addWidget(btn_box)
+
+        if dlg.exec():
+            new_selected = [value for value, cb in checkboxes if cb.isChecked()]
+            self._selected = new_selected
+            self._update_button_text()
+            self.selection_changed.emit(self._selected)
+
+    def _update_button_text(self):
+        """更新按钮显示文本。"""
+        self.btn.setText("编辑")
+
+    def setSelectedValues(self, values: list[str]):
+        """设置选中的值列表。"""
+        self._selected = list(values)
+        self._update_button_text()
+
+    def selectedValues(self) -> list[str]:
+        """返回选中的值列表。"""
+        return list(self._selected)
+
+
+class MultiBoolSettingCard(SettingCard):
+    """多布尔值设定卡片 — 将多个布尔配置项整合为一个多选对话框。
+
+    每个复选框对应一个独立的 config 键（bool 值），点击按钮弹出对话框进行多选。
+    """
+
+    selection_changed = pyqtSignal(dict)
+
+    def __init__(
+        self,
+        icon,
+        title: str,
+        content: str,
+        items: list[tuple[str, str]],
+        parent=None,
+    ):
+        """
+        Args:
+            icon: 图标
+            title: 标题
+            content: 描述
+            items: 配置项列表，每项为 (config_key_suffix, label) 元组
+                   config_key_suffix 是相对于父级的键名，如 "hiragana"
+            parent: 父组件
+        """
+        super().__init__(icon, title, content, parent)
+        self._title_text = title
+        self._items = items
+        self._values: dict[str, bool] = {key: False for key, _ in items}
+
+        self.btn = PushButton("编辑", self)
+        self.btn.setFixedWidth(120)
+        self.btn.clicked.connect(self._on_click)
+        self.hBoxLayout.addWidget(self.btn, 0, Qt.AlignmentFlag.AlignRight)
+        self.hBoxLayout.addSpacing(16)
+
+    def _on_click(self):
+        """点击按钮弹出多选对话框。"""
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self._title_text)
+        dlg.setMinimumWidth(300)
+        dlg.setFont(self.font())
+
+        layout = QVBoxLayout(dlg)
+        layout.setSpacing(8)
+
+        checkboxes: list[tuple[str, QCheckBox]] = []
+        for key, label in self._items:
+            cb = QCheckBox(label, dlg)
+            cb.setChecked(self._values.get(key, False))
+            layout.addWidget(cb)
+            checkboxes.append((key, cb))
+
+        from PyQt6.QtWidgets import QDialogButtonBox
+
+        btn_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        btn_box.accepted.connect(dlg.accept)
+        btn_box.rejected.connect(dlg.reject)
+        layout.addWidget(btn_box)
+
+        if dlg.exec():
+            new_values = {key: cb.isChecked() for key, cb in checkboxes}
+            self._values = new_values
+            self.selection_changed.emit(self._values)
+
+    def setValues(self, values: dict[str, bool]):
+        """设置各配置项的值。"""
+        self._values = dict(values)
+
+    def values(self) -> dict[str, bool]:
+        """返回各配置项的值。"""
+        return dict(self._values)
