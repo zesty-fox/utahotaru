@@ -108,6 +108,21 @@ class BulkChangeDialog(QDialog):
         self.chk_register = QCheckBox("将此词注册到读音词典")
         layout.addWidget(self.chk_register)
 
+        # 注音分段方式选择
+        from strange_uta_game.frontend.editor.timing.dialogs import _create_ruby_split_group, _save_ruby_split_mode, parse_ruby_text
+        self._radio_direct, self._radio_by_char, self._radio_by_mora, ruby_split_group = _create_ruby_split_group(self)
+        layout.addWidget(ruby_split_group)
+
+        # 预览区域
+        self.preview_label = CaptionLabel("预览: ")
+        self.preview_label.setWordWrap(True)
+        layout.addWidget(self.preview_label)
+
+        # 连接信号更新预览
+        self._radio_direct.toggled.connect(self._update_preview)
+        self._radio_by_char.toggled.connect(self._update_preview)
+        self._radio_by_mora.toggled.connect(self._update_preview)
+
         # 按钮
         btn_row = QHBoxLayout()
         btn_row.addStretch()
@@ -197,6 +212,56 @@ class BulkChangeDialog(QDialog):
                 self._append_char_row(ch, r_val, c_val, l_val)
         finally:
             self._suppress_row_signals = False
+        # 更新预览
+        self._update_preview()
+
+    def _update_preview(self):
+        """更新预览区域"""
+        from strange_uta_game.frontend.editor.timing.dialogs import parse_ruby_text
+        preview_items = []
+        for _, edit_ruby, edit_check, _ in self._char_rows:
+            ruby_text = edit_ruby.text().strip()
+            try:
+                check_count = max(1, int(edit_check.text().strip()))
+            except ValueError:
+                check_count = 1
+
+            if ruby_text:
+                # 获取当前选择的分段方式
+                if self._radio_direct.isChecked():
+                    mode = "direct"
+                elif self._radio_by_char.isChecked():
+                    mode = "char"
+                else:
+                    mode = "mora"
+
+                # 根据分段方式解析注音
+                if mode == "direct":
+                    # 直接应用：用逗号手动分段，无逗号则不分段
+                    parts = [p.strip() for p in ruby_text.split(",") if p.strip()]
+                elif mode == "char":
+                    # 按字符均分（始终按字符拆分，忽略逗号）
+                    clean_text = ruby_text.replace(",", "")
+                    chars = [ch for ch in clean_text]
+                    if len(chars) >= check_count:
+                        head = chars[:check_count - 1]
+                        tail = "".join(chars[check_count - 1:])
+                        parts = head + [tail]
+                    else:
+                        parts = chars + [""] * (check_count - len(chars))
+                else:
+                    # 按 mora 均分（始终按 mora 拆分，忽略逗号）
+                    from strange_uta_game.backend.infrastructure.parsers.inline_format import (
+                        split_ruby_for_checkpoints,
+                    )
+                    clean_text = ruby_text.replace(",", "")
+                    parts = split_ruby_for_checkpoints(clean_text, check_count)
+
+                preview_items.append(f"[{','.join(parts)}]")
+            else:
+                preview_items.append("[]")
+
+        self.preview_label.setText(f"预览: {' '.join(preview_items)}")
 
     # ---------- 信号处理 ----------
 
@@ -204,6 +269,8 @@ class BulkChangeDialog(QDialog):
         if self._suppress_row_signals:
             return
         self._rows_user_edited = True
+        # 更新预览
+        self._update_preview()
 
     def _on_row_checkbox_edited(self, _state: int):
         if self._suppress_row_signals:
@@ -296,14 +363,10 @@ class BulkChangeDialog(QDialog):
 
     # ---------- 解析 ----------
 
-    def _parse_ruby(self, raw: str) -> Optional[Ruby]:
-        text = raw.strip()
-        if not text:
-            return None
-        parts = [p.strip() for p in text.split(",") if p.strip()]
-        if not parts:
-            return None
-        return Ruby(parts=[RubyPart(text=p) for p in parts])
+    def _parse_ruby(self, raw: str, check_count: int = 1) -> Optional[Ruby]:
+        """解析 ruby 文本，根据 check_count 自动分段"""
+        from strange_uta_game.frontend.editor.timing.dialogs import parse_ruby_text
+        return parse_ruby_text(raw, check_count)
 
     def _collect_per_char(
         self, new_text: str
@@ -318,11 +381,12 @@ class BulkChangeDialog(QDialog):
                 per_char_linked.append(False)
                 continue
             _, edit_ruby, edit_check, chk_linked = self._char_rows[i]
-            per_char_ruby.append(self._parse_ruby(edit_ruby.text()))
             try:
-                per_char_check.append(max(0, int(edit_check.text().strip())))
+                check_count = max(0, int(edit_check.text().strip()))
             except ValueError:
-                per_char_check.append(1)
+                check_count = 1
+            per_char_check.append(check_count)
+            per_char_ruby.append(self._parse_ruby(edit_ruby.text(), check_count))
             per_char_linked.append(bool(chk_linked.isChecked()))
         return per_char_ruby, per_char_check, per_char_linked
 
@@ -478,6 +542,9 @@ class BulkChangeDialog(QDialog):
         # 注册到词典
         if self.chk_register.isChecked():
             self._register_to_dictionary(new_text, per_char_ruby)
+
+        # 保存注音分段方式配置
+        _save_ruby_split_mode(self._radio_direct, self._radio_by_char, self._radio_by_mora)
 
         # 将本次批量变更登记为一次 CommandManager 快照命令（支持撤销/重做）
         self._register_snapshot_command(before_sentences, changed)

@@ -16,14 +16,17 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QRadioButton,
     QScrollArea,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
+    QButtonGroup,
 )
 from qfluentwidgets import PrimaryPushButton, PushButton, CaptionLabel
 
@@ -34,6 +37,124 @@ from strange_uta_game.backend.domain import (
     Sentence,
     Singer,
 )
+
+
+def _get_ruby_split_mode() -> str:
+    """获取注音分段方式配置值"""
+    try:
+        from strange_uta_game.frontend.settings.app_settings import AppSettings
+        settings = AppSettings()
+        return settings.get("ruby_split_mode", "mora")
+    except Exception:
+        return "mora"
+
+
+def _set_ruby_split_mode(mode: str) -> None:
+    """设置注音分段方式配置值"""
+    try:
+        from strange_uta_game.frontend.settings.app_settings import AppSettings
+        settings = AppSettings()
+        settings.set("ruby_split_mode", mode)
+        settings.save()
+    except Exception:
+        pass
+
+
+def _create_ruby_split_group(parent: QWidget) -> tuple[QRadioButton, QRadioButton, QRadioButton, QGroupBox]:
+    """创建注音分段方式选择组
+
+    Returns:
+        (radio_direct, radio_by_char, radio_by_mora, group_box)
+    """
+    group_box = QGroupBox("注音分段方式")
+    group_layout = QVBoxLayout(group_box)
+
+    radio_direct = QRadioButton("直接应用（用逗号手动分段，无逗号则不分段）")
+    radio_by_char = QRadioButton("按字符均分")
+    radio_by_mora = QRadioButton("按 mora 均分（推荐）")
+
+    # 读取配置值
+    mode = _get_ruby_split_mode()
+    if mode == "direct":
+        radio_direct.setChecked(True)
+    elif mode == "char":
+        radio_by_char.setChecked(True)
+    else:
+        radio_by_mora.setChecked(True)
+
+    group_layout.addWidget(radio_direct)
+    group_layout.addWidget(radio_by_char)
+    group_layout.addWidget(radio_by_mora)
+
+    return radio_direct, radio_by_char, radio_by_mora, group_box
+
+
+def _save_ruby_split_mode(radio_direct: QRadioButton, radio_by_char: QRadioButton, radio_by_mora: QRadioButton) -> None:
+    """保存注音分段方式配置值"""
+    if radio_direct.isChecked():
+        _set_ruby_split_mode("direct")
+    elif radio_by_char.isChecked():
+        _set_ruby_split_mode("char")
+    else:
+        _set_ruby_split_mode("mora")
+
+
+def parse_ruby_text(raw: str, check_count: int = 1) -> Optional[Ruby]:
+    """解析 ruby 文本，根据 check_count 自动分段
+
+    规则：
+    1. 直接应用：用逗号手动分段，无逗号则不分段
+    2. 按字符均分：始终按字符拆分，忽略逗号
+    3. 按 mora 均分：始终按 mora 拆分，忽略逗号
+    4. 当分段数 > check_count 时，多余部分合到末段
+
+    Args:
+        raw: 用户输入的注音文本
+        check_count: 节奏点数量
+
+    Returns:
+        Ruby 对象，或 None（无注音时）
+    """
+    text = raw.strip()
+    if not text:
+        return None
+
+    # 获取用户选择的分段方式
+    mode = _get_ruby_split_mode()
+
+    if mode == "direct":
+        # 直接应用：用逗号手动分段，无逗号则不分段
+        parts = [p.strip() for p in text.split(",") if p.strip()]
+        if not parts:
+            return None
+        return Ruby(parts=[RubyPart(text=p) for p in parts if p])
+    elif mode == "char":
+        # 按字符均分（始终按字符拆分，忽略逗号）
+        clean_text = text.replace(",", "")
+        if not clean_text:
+            return None
+        if check_count <= 1:
+            return Ruby(parts=[RubyPart(text=clean_text)])
+        chars = [ch for ch in clean_text]
+        if len(chars) >= check_count:
+            head = chars[:check_count - 1]
+            tail = "".join(chars[check_count - 1:])
+            parts = head + [tail]
+        else:
+            parts = chars + [""] * (check_count - len(chars))
+        return Ruby(parts=[RubyPart(text=p) for p in parts if p])
+    else:
+        # 按 mora 均分（始终按 mora 拆分，忽略逗号）
+        from strange_uta_game.backend.infrastructure.parsers.inline_format import (
+            split_ruby_for_checkpoints,
+        )
+        clean_text = text.replace(",", "")
+        if not clean_text:
+            return None
+        if check_count <= 1:
+            return Ruby(parts=[RubyPart(text=clean_text)])
+        parts = split_ruby_for_checkpoints(clean_text, check_count)
+        return Ruby(parts=[RubyPart(text=p) for p in parts if p])
 
 
 class ModifyCharacterDialog(QDialog):
@@ -107,6 +228,24 @@ class ModifyCharacterDialog(QDialog):
         self.chk_register = QCheckBox("将此词注册到读音词典")
         layout.addWidget(self.chk_register)
 
+        # 注音分段方式选择
+        self._radio_direct, self._radio_by_char, self._radio_by_mora, ruby_split_group = _create_ruby_split_group(self)
+        layout.addWidget(ruby_split_group)
+
+        # 预览区域
+        self.preview_label = CaptionLabel("预览: ")
+        self.preview_label.setWordWrap(True)
+        layout.addWidget(self.preview_label)
+
+        # 连接信号更新预览
+        self.edit_new_chars.textChanged.connect(self._update_preview)
+        self._radio_direct.toggled.connect(self._update_preview)
+        self._radio_by_char.toggled.connect(self._update_preview)
+        self._radio_by_mora.toggled.connect(self._update_preview)
+
+        # 初始预览
+        self._update_preview()
+
         # Buttons
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
@@ -138,6 +277,9 @@ class ModifyCharacterDialog(QDialog):
         chk_linked.setToolTip(
             "连接到下一字符（末字/句尾/行尾不可连词，提交时将跳过并提示）"
         )
+        # 监控用户手动编辑
+        edit_ruby.textEdited.connect(self._on_row_user_edited)
+        edit_check.textEdited.connect(self._on_row_user_edited)
         row_layout.addWidget(lbl)
         row_layout.addWidget(edit_ruby, stretch=1)
         row_layout.addWidget(edit_check)
@@ -164,17 +306,63 @@ class ModifyCharacterDialog(QDialog):
             else:
                 r_val, c_val, l_val = "", "1", False
             self._append_char_row(ch, r_val, c_val, l_val)
+        # 更新预览
+        self._update_preview()
 
-    def _parse_ruby(self, raw: str):
-        from strange_uta_game.backend.domain.models import Ruby, RubyPart
+    def _on_row_user_edited(self, _text: str):
+        """用户手动编辑行时更新预览"""
+        self._update_preview()
 
-        text = raw.strip()
-        if not text:
-            return None
-        parts = [p.strip() for p in text.split(",") if p.strip()]
-        if not parts:
-            return None
-        return Ruby(parts=[RubyPart(text=p) for p in parts])
+    def _update_preview(self):
+        """更新预览区域"""
+        preview_items = []
+        for _, edit_ruby, edit_check, _ in self._char_rows:
+            ruby_text = edit_ruby.text().strip()
+            try:
+                check_count = max(1, int(edit_check.text().strip()))
+            except ValueError:
+                check_count = 1
+
+            if ruby_text:
+                # 获取当前选择的分段方式
+                if self._radio_direct.isChecked():
+                    mode = "direct"
+                elif self._radio_by_char.isChecked():
+                    mode = "char"
+                else:
+                    mode = "mora"
+
+                # 根据分段方式解析注音
+                if mode == "direct":
+                    # 直接应用：用逗号手动分段，无逗号则不分段
+                    parts = [p.strip() for p in ruby_text.split(",") if p.strip()]
+                elif mode == "char":
+                    # 按字符均分（始终按字符拆分，忽略逗号）
+                    clean_text = ruby_text.replace(",", "")
+                    chars = [ch for ch in clean_text]
+                    if len(chars) >= check_count:
+                        head = chars[:check_count - 1]
+                        tail = "".join(chars[check_count - 1:])
+                        parts = head + [tail]
+                    else:
+                        parts = chars + [""] * (check_count - len(chars))
+                else:
+                    # 按 mora 均分（始终按 mora 拆分，忽略逗号）
+                    from strange_uta_game.backend.infrastructure.parsers.inline_format import (
+                        split_ruby_for_checkpoints,
+                    )
+                    clean_text = ruby_text.replace(",", "")
+                    parts = split_ruby_for_checkpoints(clean_text, check_count)
+
+                preview_items.append(f"[{','.join(parts)}]")
+            else:
+                preview_items.append("[]")
+
+        self.preview_label.setText(f"预览: {' '.join(preview_items)}")
+
+    def _parse_ruby(self, raw: str, check_count: int = 1):
+        """解析 ruby 文本，根据 check_count 自动分段"""
+        return parse_ruby_text(raw, check_count)
 
     def _on_execute(self):
         from strange_uta_game.backend.domain.models import Character
@@ -194,11 +382,12 @@ class ModifyCharacterDialog(QDialog):
                 per_char_linked_req.append(False)
                 continue
             _, edit_ruby, edit_check, chk_linked = self._char_rows[i]
-            per_char_ruby.append(self._parse_ruby(edit_ruby.text()))
             try:
-                per_char_check.append(max(0, int(edit_check.text().strip())))
+                check_count = max(0, int(edit_check.text().strip()))
             except ValueError:
-                per_char_check.append(1)
+                check_count = 1
+            per_char_check.append(check_count)
+            per_char_ruby.append(self._parse_ruby(edit_ruby.text(), check_count))
             per_char_linked_req.append(bool(chk_linked.isChecked()))
 
         old_chars = self._sentence.characters[self._start_idx : self._end_idx + 1]
@@ -288,6 +477,9 @@ class ModifyCharacterDialog(QDialog):
                 else:
                     readings.append("")
             self._register_to_dictionary(new_text, readings)
+
+        # 保存注音分段方式配置
+        _save_ruby_split_mode(self._radio_direct, self._radio_by_char, self._radio_by_mora)
 
         self._modified = True
         self.accept()
@@ -447,15 +639,19 @@ class InsertGuideSymbolDialog(QDialog):
 
 
 class CharEditDialog(QDialog):
-    """注音编辑对话框 — 支持连词（Ruby 合并/拆分）
+    """注音编辑对话框 — 支持连词（Ruby 合并/拆分）和 CheckCount 编辑
 
-    连词功能：用 + 号将相邻字符合并显示。
-    在 per-char Ruby 模型中，每个字符独立拥有自己的 Ruby 对象。
-    连词由 Character.linked_to_next 标记控制。
+    与 ModifyCharacterDialog 类似，但用于 F2 快捷键触发：
+    - 直接获取对应字符的整个连词情况
+    - 支持全文件替换功能
 
     UI 布局：
     - 当前字符显示（只读）
-    - 注音文本编辑
+    - 新字符输入
+    - 每字符一行：[字符] [注音] [节奏点] [是否连词]
+    - 处理方式选择（直接应用/按字符均分/按 mora 均分）
+    - 预览区域
+    - 全文件替换选项
     - 确定/取消按钮
     """
 
@@ -464,52 +660,84 @@ class CharEditDialog(QDialog):
         self._sentence = sentence
         self._char_idx = char_idx
         self._modified = False
+        self._char_rows: list[tuple[QLabel, QLineEdit, QLineEdit, QCheckBox]] = []
 
-        self.setWindowTitle("编辑注音")
-        self.resize(360, 220)
+        self.setWindowTitle("编辑字符")
+        self.resize(520, 550)
         self.setFont(QFont("Microsoft YaHei", 10))
 
-        form = QFormLayout(self)
+        layout = QVBoxLayout(self)
 
         # 当前字符（只读）— 显示连词组内所有字符
         ch = sentence.characters[char_idx]
         # 查找连词组范围
         word_start, word_end = sentence.get_word_char_range(char_idx)
-        if word_end - word_start > 1:
+        word_len = word_end - word_start
+
+        if word_len > 1:
             display = " + ".join(
                 sentence.characters[i].char for i in range(word_start, word_end)
             )
         else:
             display = ch.char
 
-        lbl_char = QLabel(display)
-        lbl_char.setStyleSheet("font-size: 16px; font-weight: bold;")
-        form.addRow("字符:", lbl_char)
+        top_form = QFormLayout()
+        lbl_current = QLabel(display)
+        lbl_current.setStyleSheet("font-size: 16px; font-weight: bold;")
+        top_form.addRow("当前字符:", lbl_current)
+        # 新字符输入框只包含字符本身，不包含 " + "
+        self.edit_new_chars = QLineEdit("".join(
+            sentence.characters[i].char for i in range(word_start, word_end)
+        ))
+        self.edit_new_chars.setPlaceholderText("输入新字符")
+        top_form.addRow("新字符:", self.edit_new_chars)
+        layout.addLayout(top_form)
 
-        # 注音编辑 — 如果是连词组，显示逗号分隔的各字符 ruby
-        if word_end - word_start > 1:
-            parts = []
-            for i in range(word_start, word_end):
-                r = sentence.characters[i].ruby
-                parts.append(r.text if r else "")
-            initial_ruby = ",".join(parts) if any(parts) else ""
-        else:
-            initial_ruby = ch.ruby.text if ch.ruby else ""
+        # 字符级编辑区标题
+        hint = CaptionLabel("按字符编辑（注音用半角逗号分隔 RubyPart；节奏点为非负整数）:")
+        layout.addWidget(hint)
 
-        self.edit_ruby = QLineEdit(initial_ruby)
-        self.edit_ruby.setPlaceholderText("输入注音（留空则删除注音）")
-        form.addRow("注音:", self.edit_ruby)
+        # Scroll area with per-char rows
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        self._rows_container = QWidget()
+        self._rows_layout = QVBoxLayout(self._rows_container)
+        self._rows_layout.setContentsMargins(4, 4, 4, 4)
+        self._rows_layout.setSpacing(4)
+        scroll.setWidget(self._rows_container)
+        layout.addWidget(scroll, stretch=1)
 
-        # 连词范围提示
-        if word_end - word_start > 1:
-            range_text = " + ".join(
-                sentence.characters[i].char for i in range(word_start, word_end)
+        # 初始按当前字符填充
+        for i in range(word_start, word_end):
+            c = sentence.characters[i]
+            ruby_str = (
+                ",".join(p.text for p in c.ruby.parts) if c.ruby and c.ruby.parts else ""
             )
-            lbl_range = CaptionLabel(f"当前连词范围: {range_text}（逗号分隔各字符注音）")
-            form.addRow("", lbl_range)
+            self._append_char_row(c.char, ruby_str, str(c.check_count), c.linked_to_next)
+
+        # 文本变更 → 重建行，保留已输入值
+        self.edit_new_chars.textChanged.connect(self._rebuild_rows_on_text_change)
+
+        # 注音分段方式选择
+        self._radio_direct, self._radio_by_char, self._radio_by_mora, ruby_split_group = _create_ruby_split_group(self)
+        layout.addWidget(ruby_split_group)
+
+        # 预览区域
+        self.preview_label = CaptionLabel("预览: ")
+        self.preview_label.setWordWrap(True)
+        layout.addWidget(self.preview_label)
+
+        # 连接信号更新预览
+        self.edit_new_chars.textChanged.connect(self._update_preview)
+        self._radio_direct.toggled.connect(self._update_preview)
+        self._radio_by_char.toggled.connect(self._update_preview)
+        self._radio_by_mora.toggled.connect(self._update_preview)
 
         self._word_start = word_start
         self._word_end = word_end
+
+        # 初始预览
+        self._update_preview()
 
         # 按钮
         btn_layout = QHBoxLayout()
@@ -520,52 +748,171 @@ class CharEditDialog(QDialog):
         btn_layout.addStretch()
         btn_layout.addWidget(btn_ok)
         btn_layout.addWidget(btn_cancel)
-        form.addRow(btn_layout)
+        layout.addLayout(btn_layout)
+
+    def _append_char_row(
+        self, char_str: str, ruby_str: str, check_str: str, linked: bool = False
+    ):
+        row_widget = QWidget()
+        row_layout = QHBoxLayout(row_widget)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(6)
+        lbl = QLabel(char_str)
+        lbl.setFixedWidth(32)
+        lbl.setStyleSheet("font-size: 14px; font-weight: bold;")
+        edit_ruby = QLineEdit(ruby_str)
+        edit_ruby.setPlaceholderText("注音（逗号分隔多 RubyPart）")
+        edit_check = QLineEdit(check_str)
+        edit_check.setPlaceholderText("节奏点")
+        edit_check.setFixedWidth(64)
+        chk_linked = QCheckBox("是否连词")
+        chk_linked.setChecked(bool(linked))
+        chk_linked.setToolTip(
+            "连接到下一字符（末字/句尾/行尾不可连词，提交时将跳过并提示）"
+        )
+        # 监控用户手动编辑
+        edit_ruby.textEdited.connect(self._on_row_user_edited)
+        edit_check.textEdited.connect(self._on_row_user_edited)
+        row_layout.addWidget(lbl)
+        row_layout.addWidget(edit_ruby, stretch=1)
+        row_layout.addWidget(edit_check)
+        row_layout.addWidget(chk_linked)
+        self._rows_layout.addWidget(row_widget)
+        self._char_rows.append((lbl, edit_ruby, edit_check, chk_linked))
+
+    def _rebuild_rows_on_text_change(self, new_text: str):
+        # 保留旧输入值按索引对齐
+        old_vals = [
+            (e_r.text(), e_c.text(), chk.isChecked())
+            for _, e_r, e_c, chk in self._char_rows
+        ]
+        # 清空现有行
+        while self._rows_layout.count():
+            item = self._rows_layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+        self._char_rows.clear()
+        for i, ch in enumerate(new_text):
+            if i < len(old_vals):
+                r_val, c_val, l_val = old_vals[i]
+            else:
+                r_val, c_val, l_val = "", "1", False
+            self._append_char_row(ch, r_val, c_val, l_val)
+        # 更新预览
+        self._update_preview()
+
+    def _on_row_user_edited(self, _text: str):
+        """用户手动编辑行时更新预览"""
+        self._update_preview()
+
+    def _update_preview(self):
+        """更新预览区域"""
+        preview_items = []
+        for _, edit_ruby, edit_check, _ in self._char_rows:
+            ruby_text = edit_ruby.text().strip()
+            try:
+                check_count = max(1, int(edit_check.text().strip()))
+            except ValueError:
+                check_count = 1
+
+            if ruby_text:
+                # 获取当前选择的分段方式
+                if self._radio_direct.isChecked():
+                    mode = "direct"
+                elif self._radio_by_char.isChecked():
+                    mode = "char"
+                else:
+                    mode = "mora"
+
+                # 根据分段方式解析注音
+                if mode == "direct":
+                    # 直接应用：用逗号手动分段，无逗号则不分段
+                    parts = [p.strip() for p in ruby_text.split(",") if p.strip()]
+                elif mode == "char":
+                    # 按字符均分（始终按字符拆分，忽略逗号）
+                    clean_text = ruby_text.replace(",", "")
+                    chars = [ch for ch in clean_text]
+                    if len(chars) >= check_count:
+                        head = chars[:check_count - 1]
+                        tail = "".join(chars[check_count - 1:])
+                        parts = head + [tail]
+                    else:
+                        parts = chars + [""] * (check_count - len(chars))
+                else:
+                    # 按 mora 均分（始终按 mora 拆分，忽略逗号）
+                    from strange_uta_game.backend.infrastructure.parsers.inline_format import (
+                        split_ruby_for_checkpoints,
+                    )
+                    clean_text = ruby_text.replace(",", "")
+                    parts = split_ruby_for_checkpoints(clean_text, check_count)
+
+                preview_items.append(f"[{','.join(parts)}]")
+            else:
+                preview_items.append("[]")
+
+        self.preview_label.setText(f"预览: {' '.join(preview_items)}")
 
     def _on_accept(self):
-        new_ruby_text = self.edit_ruby.text().strip()
+        new_text = self.edit_new_chars.text().strip()
         word_len = self._word_end - self._word_start
 
-        if not new_ruby_text:
-            # 清空连词组内所有字符的 ruby
-            for i in range(self._word_start, self._word_end):
-                if self._sentence.characters[i].ruby:
-                    self._sentence.characters[i].set_ruby(None)
-                    self._modified = True
+        if not new_text:
             self.accept()
             return
 
-        if word_len > 1 and "," in new_ruby_text:
-            # 连词组：按逗号分隔赋给各字符
-            parts = [p.strip() for p in new_ruby_text.split(",")]
-            # 如果 parts 数量不足，用空字符串补齐
-            while len(parts) < word_len:
-                parts.append("")
-            for i, part in enumerate(parts[:word_len]):
-                ci = self._word_start + i
-                if part:
-                    self._sentence.characters[ci].set_ruby(Ruby(parts=[RubyPart(text=part)]))
-                else:
-                    self._sentence.characters[ci].set_ruby(None)
-                self._modified = True
-        elif word_len > 1:
-            # 连词组但无逗号：按 mora 均分
-            from strange_uta_game.backend.infrastructure.parsers.inline_format import (
-                split_ruby_for_checkpoints,
-            )
+        # 收集每行值：ruby / check_count / linked_to_next
+        per_char_ruby = []
+        per_char_check = []
+        per_char_linked_req = []
+        for i in range(len(new_text)):
+            if i >= len(self._char_rows):
+                per_char_ruby.append(None)
+                per_char_check.append(1)
+                per_char_linked_req.append(False)
+                continue
+            _, edit_ruby, edit_check, chk_linked = self._char_rows[i]
+            try:
+                check_count = max(0, int(edit_check.text().strip()))
+            except ValueError:
+                check_count = 1
+            per_char_check.append(check_count)
+            per_char_ruby.append(parse_ruby_text(edit_ruby.text(), check_count))
+            per_char_linked_req.append(bool(chk_linked.isChecked()))
 
-            split_parts = split_ruby_for_checkpoints(new_ruby_text, word_len)
-            for i, part in enumerate(split_parts):
-                ci = self._word_start + i
-                if part:
-                    self._sentence.characters[ci].set_ruby(Ruby(parts=[RubyPart(text=part)]))
-                else:
-                    self._sentence.characters[ci].set_ruby(None)
-                self._modified = True
+        # 应用到当前连词组
+        old_chars = [self._sentence.characters[i] for i in range(self._word_start, self._word_end)]
+
+        if len(new_text) == len(old_chars):
+            # 字符数不变 → 原地修改
+            for i, ch_str in enumerate(new_text):
+                tgt = old_chars[i]
+                tgt.char = ch_str
+                tgt.set_ruby(per_char_ruby[i])
+                tgt.set_check_count(per_char_check[i], force=True)
+                tgt.push_to_ruby()
+                tgt.linked_to_next = per_char_linked_req[i]
         else:
-            # 单字符
-            self._sentence.characters[self._char_idx].set_ruby(Ruby(parts=[RubyPart(text=new_ruby_text)]))
-            self._modified = True
+            # 字符数变化 → 替换 slice
+            singer_id = old_chars[0].singer_id if old_chars else ""
+            new_chars = []
+            for i, ch_str in enumerate(new_text):
+                new_ch = Character(
+                    char=ch_str,
+                    ruby=per_char_ruby[i],
+                    check_count=per_char_check[i],
+                    singer_id=singer_id,
+                    linked_to_next=False,
+                    is_line_end=False,
+                    is_sentence_end=False,
+                )
+                new_chars.append(new_ch)
+            self._sentence.characters[self._word_start:self._word_end] = new_chars
+
+        self._modified = True
+
+        # 保存注音分段方式配置
+        _save_ruby_split_mode(self._radio_direct, self._radio_by_char, self._radio_by_mora)
 
         self.accept()
 
