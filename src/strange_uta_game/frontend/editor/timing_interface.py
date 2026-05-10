@@ -20,7 +20,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Callable, Optional, Tuple
 
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QEvent, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QKeyEvent
 from PyQt6.QtWidgets import (
     QApplication,
@@ -136,6 +136,18 @@ class EditorInterface(QWidget):
         self._position_poll_timer.setInterval(16)  # ~60fps
         self._position_poll_timer.timeout.connect(self._poll_audio_position)
 
+        # 自动滚动状态机：用户交互挂起 → 播放到达新行 + 3s 无交互后恢复
+        self._auto_scroll_suspended: bool = False
+        self._auto_scroll_new_line_reached: bool = False
+        self._auto_scroll_cooldown_timer = QTimer(self)
+        self._auto_scroll_cooldown_timer.setSingleShot(True)
+        self._auto_scroll_cooldown_timer.setInterval(3000)
+        self._auto_scroll_cooldown_timer.timeout.connect(
+            self._on_auto_scroll_cooldown_timeout
+        )
+        # eventFilter 中鼠标拖拽检测
+        self._auto_scroll_mouse_press_pos = None
+
     def _bind_callback_signals(self):
         self._position_changed_signal.connect(self._handle_position_changed)
         self._checkpoint_moved_signal.connect(self._handle_checkpoint_moved)
@@ -213,6 +225,13 @@ class EditorInterface(QWidget):
         self.preview.toggle_sentence_end_requested.connect(
             self._on_toggle_sentence_end_requested
         )
+        self.preview.auto_scroll_line_changed.connect(
+            self._on_auto_scroll_line_changed
+        )
+        self.preview.user_interaction_during_auto_scroll.connect(
+            self._on_user_interaction_during_auto_scroll
+        )
+        self.preview.installEventFilter(self)
         layout.addWidget(self.preview, stretch=1)
 
         # 5) 底部打轴操作栏
@@ -341,6 +360,13 @@ class EditorInterface(QWidget):
             "cycle_checkpoint",
             "cycle_checkpoint_prev",
             "delete_timestamp",
+            "bulk_change",
+            "modify_char",
+            "insert_guide",
+            "modify_line",
+            "analyze_rubies",
+            "delete_rubies_by_type",
+            "set_singer_by_line",
         ]
         # 默认值兜底（当设置未写入新 schema 时使用）
         defaults = {
@@ -367,6 +393,13 @@ class EditorInterface(QWidget):
             "cycle_checkpoint": "ALT+RIGHT",
             "cycle_checkpoint_prev": "ALT+LEFT",
             "delete_timestamp": "Backspace",
+            "bulk_change": "CTRL+H:short",
+            "modify_char": "",
+            "insert_guide": "",
+            "modify_line": "",
+            "analyze_rubies": "",
+            "delete_rubies_by_type": "",
+            "set_singer_by_line": "",
         }
 
         def _normalize_trigger(raw: str) -> str:
@@ -425,9 +458,6 @@ class EditorInterface(QWidget):
         if self._settings_migrated:
             settings.save()
             self._settings_migrated = False
-        for key_name in ("SPACE", "Z", "X"):
-            edit_short.pop(key_name, None)
-            edit_long.pop(key_name, None)
         self._key_map_timing_short = timing_short
         self._key_map_timing_long = timing_long
         self._key_map_edit_short = edit_short
@@ -1217,10 +1247,30 @@ class EditorInterface(QWidget):
         if char_idx < 0 or char_idx >= len(sentence.characters):
             return
 
+        # 快照 before：InsertGuideSymbolDialog 会原地修改 project.sentences
+        before_sentences = deepcopy(self._project.sentences)
+
         dialog = InsertGuideSymbolDialog(sentence, char_idx, self)
         dialog.exec()
 
         if dialog.was_modified():
+            # 将本次修改登记为一次 SentenceSnapshotCommand（支持撤销/重做）
+            command_manager = None
+            if self._timing_service:
+                command_manager = self._timing_service.command_manager
+            if command_manager is not None:
+                after_sentences = deepcopy(self._project.sentences)
+                cmd = SentenceSnapshotCommand(
+                    self._project,
+                    before_sentences,
+                    after_sentences,
+                    f"插入导唱符（第 {line_idx + 1} 句 第 {char_idx + 1} 字前）",
+                )
+                cursor_pos = (self._current_line_idx, self.preview._current_char_idx)
+                cmd.undo_position = cursor_pos
+                cmd.redo_position = cursor_pos
+                command_manager.execute(cmd)
+
             # Rebuild global checkpoints
             if self._timing_service:
                 self._timing_service.rebuild_global_checkpoints()
@@ -1422,6 +1472,11 @@ class EditorInterface(QWidget):
                 self.preview.set_playing(self._timing_service.is_playing())
                 self.lbl_status.setText("播放中")
                 self._update_mode_indicator()
+                # 恢复自动滚动（用户主动回到被动听模式）
+                self._auto_scroll_suspended = False
+                self._auto_scroll_new_line_reached = False
+                self._auto_scroll_cooldown_timer.stop()
+                self.preview.resume_auto_scroll()
                 # 启动位置主动拉取定时器
                 self._position_poll_timer.start()
             except Exception as e:
@@ -1434,6 +1489,10 @@ class EditorInterface(QWidget):
             self.preview.set_playing(False)
             self.lbl_status.setText("已暂停")
             self._update_mode_indicator()
+            # 重置自动滚动状态
+            self._auto_scroll_suspended = False
+            self._auto_scroll_new_line_reached = False
+            self._auto_scroll_cooldown_timer.stop()
             # 停止位置拉取定时器
             self._position_poll_timer.stop()
             # 切换到编辑模式时校验所有行时间戳
@@ -1448,12 +1507,17 @@ class EditorInterface(QWidget):
             self.timeline.set_position(0)
             self.lbl_status.setText("已停止")
             self._update_mode_indicator()
+            # 重置自动滚动状态
+            self._auto_scroll_suspended = False
+            self._auto_scroll_new_line_reached = False
+            self._auto_scroll_cooldown_timer.stop()
             # 停止位置拉取定时器
             self._position_poll_timer.stop()
             # 切换到编辑模式时校验所有行时间戳
             self._validate_all_timestamps()
 
     def _on_seek(self, ms: int):
+        self._suspend_auto_scroll()
         if self._timing_service:
             self._timing_service.seek(ms)
             self.transport.set_position(ms)
@@ -1926,7 +1990,11 @@ class EditorInterface(QWidget):
 
         def _mutate():
             if delta > 0:
-                sentence.add_checkpoint(char_idx)
+                from strange_uta_game.frontend.editor.timing.dialogs import (
+                    _get_ruby_split_mode,
+                )
+                mode = _get_ruby_split_mode()
+                sentence.add_checkpoint(char_idx, ruby_split_mode=mode)
             else:
                 # 减到 0 时自动退化为 Nicokara 无 mora 格式（注音文本保留）
                 sentence.remove_checkpoint(char_idx, force=True)
@@ -1987,15 +2055,15 @@ class EditorInterface(QWidget):
 
         ch = sentence.characters[char_idx]
         new_linked = not ch.linked_to_next
-        ch.linked_to_next = new_linked
 
-        if self._timing_service:
-            self._timing_service.rebuild_global_checkpoints()
-        self.refresh_lyric_display()
-        self.preview.repaint()  # 强制同步重绘，确保连词视觉立即更新
-        self._update_status()
-        if hasattr(self, "_store") and self._store:
-            self._store.notify("checkpoints")
+        def _mutate():
+            ch.linked_to_next = new_linked
+            return (line_idx, char_idx, 0, "checkpoints")
+
+        self._execute_structural_edit(
+            "连词" if new_linked else "取消连词",
+            _mutate,
+        )
 
         InfoBar.success(
             title="连词" if new_linked else "取消连词",
@@ -2168,8 +2236,8 @@ class EditorInterface(QWidget):
         # 从当前行往前找
         for li in range(line_idx, -1, -1):
             sentence = self._project.sentences[li]
-            # 确定本行搜索的字符范围
-            end_char = char_idx if li == line_idx else len(sentence.characters) - 1
+            # 当前行从 char_idx - 1 开始（跳过当前字符），其他行从末尾开始
+            end_char = char_idx - 1 if li == line_idx else len(sentence.characters) - 1
 
             for ci in range(end_char, -1, -1):
                 char = sentence.get_character(ci)
@@ -2266,7 +2334,7 @@ class EditorInterface(QWidget):
         
         # 删除后自动移动到前一个有时间戳的cp，方便连续删除
         prev_char = self._find_prev_char_with_cp(line_idx, char_idx)
-        if prev_cp:
+        if prev_char:
             prev_line, prev_char_idx, prev_cp_idx = prev_char
             if self._timing_service:
                 self._timing_service.move_to_checkpoint(prev_line, prev_char_idx, prev_cp_idx)
@@ -2347,13 +2415,17 @@ class EditorInterface(QWidget):
             return
         project = self._project
 
-        self._execute_structural_edit(
-            "增加节奏点",
-            lambda: (
-                project.sentences[line_idx].add_checkpoint(char_idx)
-                or (line_idx, char_idx, 0, "checkpoints")
-            ),
-        )
+        def _mutate():
+            from strange_uta_game.frontend.editor.timing.dialogs import (
+                _get_ruby_split_mode,
+            )
+            mode = _get_ruby_split_mode()
+            project.sentences[line_idx].add_checkpoint(
+                char_idx, ruby_split_mode=mode
+            )
+            return line_idx, char_idx, 0, "checkpoints"
+
+        self._execute_structural_edit("增加节奏点", _mutate)
 
     def _on_remove_checkpoint_requested(self, line_idx: int, char_idx: int):
         if not self._project or line_idx < 0 or line_idx >= len(self._project.sentences):
@@ -2480,6 +2552,30 @@ class EditorInterface(QWidget):
         self._pending_press_action_long = None
         if action:
             self._execute_action(action, 0)
+
+    def eventFilter(self, obj, event):
+        """捕获 preview 子控件的键盘和鼠标交互，触发自动滚动挂起。"""
+        if obj is self.preview:
+            etype = event.type()
+            if etype == QEvent.Type.KeyPress:
+                self._suspend_auto_scroll()
+            elif etype == QEvent.Type.MouseButtonPress:
+                if event.button() == Qt.MouseButton.LeftButton:
+                    self._auto_scroll_mouse_press_pos = (
+                        int(event.position().x()),
+                        int(event.position().y()),
+                    )
+                self._suspend_auto_scroll()
+            elif etype == QEvent.Type.MouseMove:
+                if self._auto_scroll_mouse_press_pos is not None:
+                    dx = int(event.position().x()) - self._auto_scroll_mouse_press_pos[0]
+                    dy = int(event.position().y()) - self._auto_scroll_mouse_press_pos[1]
+                    if dx * dx + dy * dy > 100:  # 10px threshold
+                        self._suspend_auto_scroll()
+            elif etype == QEvent.Type.MouseButtonRelease:
+                self._auto_scroll_mouse_press_pos = None
+                self._suspend_auto_scroll()
+        return False
 
     def keyPressEvent(self, a0: Optional[QKeyEvent]):
         if a0 is None:
@@ -2778,6 +2874,37 @@ class EditorInterface(QWidget):
             self.transport.set_playing(False)
             self.preview.set_playing(False)
             self._position_poll_timer.stop()
+
+    # ==================== 自动滚动状态机 ====================
+
+    def _suspend_auto_scroll(self):
+        """挂起自动滚动：重置冷却状态，通知 preview 暂停。"""
+        self._auto_scroll_suspended = True
+        self._auto_scroll_new_line_reached = False
+        self._auto_scroll_cooldown_timer.stop()
+        self.preview._suspend_auto_scroll()
+
+    def _on_user_interaction_during_auto_scroll(self):
+        """preview 用户交互信号的槽：同步挂起状态并停止冷却计时器。"""
+        self._auto_scroll_suspended = True
+        self._auto_scroll_new_line_reached = False
+        self._auto_scroll_cooldown_timer.stop()
+
+    def _on_auto_scroll_line_changed(self):
+        """preview 自动滚动换行信号的槽：标记新行已到达，启动 3s 冷却。"""
+        if self._auto_scroll_suspended:
+            self._auto_scroll_new_line_reached = True
+            if not self._auto_scroll_cooldown_timer.isActive():
+                self._auto_scroll_cooldown_timer.start()
+
+    def _on_auto_scroll_cooldown_timeout(self):
+        """冷却超时：若播放已到达新行，恢复自动滚动。"""
+        if self._auto_scroll_suspended and self._auto_scroll_new_line_reached:
+            self._auto_scroll_suspended = False
+            self._auto_scroll_new_line_reached = False
+            self.preview.resume_auto_scroll()
+
+    # ========================================================
 
     def _handle_position_changed(
         self, position_ms: int, duration_ms: int, singer_positions
