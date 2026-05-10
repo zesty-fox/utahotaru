@@ -370,6 +370,38 @@ class ExportInterface(QWidget):
                 parent=self,
             )
 
+        # 校验 rubyPart 数量与 checkCount 是否匹配
+        ruby_mismatches = self._export_service.validate_ruby_parts(self._project)
+        if ruby_mismatches:
+            # 构建提醒信息
+            mismatch_info = []
+            for m in ruby_mismatches[:10]:  # 最多显示 10 个
+                parts_str = ",".join(m['ruby_parts'])
+                mismatch_info.append(
+                    f"行 {m['sentence_idx']+1} 字符 '{m['char']}': "
+                    f"check_count={m['check_count']} "
+                    f"ruby_parts={m['ruby_parts_count']} "
+                    f"注音='{''.join(m['ruby_parts'])}' "
+                    f"拆分=[{parts_str}]"
+                )
+            if len(ruby_mismatches) > 10:
+                mismatch_info.append(f"...还有 {len(ruby_mismatches)-10} 个不匹配")
+
+            # 弹窗提醒用户
+            msg = QMessageBox(self)
+            msg.setWindowTitle("注音分段不匹配")
+            msg.setText("以下字符的注音分段数量与节奏点数量不匹配：")
+            msg.setInformativeText(
+                "\n".join(mismatch_info) +
+                "\n\n缺失的注音分段将自动补充为空格。是否继续导出？"
+            )
+            msg.setStandardButtons(
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            msg.setDefaultButton(QMessageBox.StandardButton.Yes)
+            if msg.exec() == QMessageBox.StandardButton.No:
+                return
+
         name = selected.data(Qt.ItemDataRole.UserRole)
         # 获取扩展名
         formats = self._export_service.get_available_formats()

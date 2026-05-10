@@ -74,6 +74,7 @@ class AppSettings:
             "last_export_dir": "",
             "offset_ms": -230,
         },
+        "ruby_split_mode": "mora",  # 注音分段方式: "direct", "char", "mora"
         "ruby_dictionary": {
             "enabled": True,
         },

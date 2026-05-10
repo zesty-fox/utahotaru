@@ -770,6 +770,8 @@ class SettingsInterface(ScrollArea):
         ("redo", FIF.SYNC, "重做", "重做操作", "CTRL+Y:short", "CTRL+Y:short", "both", None, None, True),
         ("save", FIF.SAVE, "保存", "保存项目", "CTRL+S:short", "CTRL+S:short", "both", None, None, True),
         ("paste_lyrics", FIF.PASTE, "粘贴歌词", "粘贴歌词", "CTRL+V:short", "CTRL+V:short", "both", None, None, True),
+        ("insert_line_break", FIF.RETURN, "插入换行", "在光标处插入换行", "Enter:short", "Enter:short", "both", None, None, True),
+        ("delete_char", FIF.DELETE, "删除字符", "删除选中内容或当前字符", "Delete:short", "Delete:short", "both", None, None, True),
     ]
 
     # 两种模式的中文标签，供 UI 标题与冲突提示使用

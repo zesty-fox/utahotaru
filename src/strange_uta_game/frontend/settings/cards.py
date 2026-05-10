@@ -241,14 +241,17 @@ class _KeyCaptureButton(PushButton):
         ):
             a0.accept()
             return
-        # ESC 取消捕获，不设置按键
+        # ESC 清除快捷键
         if key == Qt.Key.Key_Escape:
             self._listening = False
             self._hold_timer.stop()
             self._pending_key = None
+            self._captured_key = ""
+            self._trigger_type = "short"
             self._update_display()
             self.setStyleSheet("")
             self.clearFocus()
+            self.key_captured.emit("")
             a0.accept()
             return
         if a0.isAutoRepeat():
