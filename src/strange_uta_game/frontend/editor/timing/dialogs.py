@@ -327,6 +327,13 @@ class InsertGuideSymbolDialog(QDialog):
         self._char_idx = char_idx
         self._modified = False
 
+        # 从 AppSettings 读取记忆的设置
+        from strange_uta_game.frontend.settings.settings_interface import AppSettings
+        settings = AppSettings()
+        saved_symbol = settings.get("timing.guide_symbol", "")
+        saved_count = settings.get("timing.guide_count", 1)
+        saved_duration = settings.get("timing.guide_duration_ms", 1000)
+
         self.setWindowTitle("插入导唱符")
         self.resize(400, 280)
         self.setFont(QFont("Microsoft YaHei", 10))
@@ -342,17 +349,17 @@ class InsertGuideSymbolDialog(QDialog):
         form.addRow("当前选中字符:", lbl_current)
 
         # Field 2: Guide symbol text
-        self.edit_symbol = QLineEdit("")
+        self.edit_symbol = QLineEdit(saved_symbol)
         self.edit_symbol.setPlaceholderText("请填写要插入的导唱符")
         form.addRow("导唱符:", self.edit_symbol)
 
         # Field 3: Count
-        self.edit_count = QLineEdit("1")
+        self.edit_count = QLineEdit(str(saved_count))
         self.edit_count.setPlaceholderText("个数")
         form.addRow("个数:", self.edit_count)
 
         # Field 4: Duration per symbol
-        self.edit_duration = QLineEdit("1000")
+        self.edit_duration = QLineEdit(str(saved_duration))
         self.edit_duration.setPlaceholderText("每个导唱符持续时间（毫秒）")
         form.addRow("持续时间 (ms):", self.edit_duration)
 
@@ -386,6 +393,14 @@ class InsertGuideSymbolDialog(QDialog):
             duration_ms = max(100, int(self.edit_duration.text().strip()))
         except ValueError:
             duration_ms = 1000
+
+        # 保存设置到 AppSettings
+        from strange_uta_game.frontend.settings.settings_interface import AppSettings
+        settings = AppSettings()
+        settings.set("timing.guide_symbol", symbol)
+        settings.set("timing.guide_count", count)
+        settings.set("timing.guide_duration_ms", duration_ms)
+        settings.save()
 
         # Get reference char's timestamp and singer
         ref_char = self._sentence.characters[self._char_idx]
