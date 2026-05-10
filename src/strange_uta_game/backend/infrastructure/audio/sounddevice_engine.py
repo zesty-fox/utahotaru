@@ -20,12 +20,13 @@
    "原始时间轴"映射到新 PCM 上）。
 
 4. **音频回调**：极简——只调 ``ring.read_into(outdata)``，不足补零，
-   零分配、零锁、零 Python 重活。
+   零分配、零锁、零 Python 重活。同时更新消费者侧时基锚点
+   （``_consumed_in_active_pcm`` + ``_last_callback_perf_time``）。
 
 位置语义保持不变：
 - 对外暴露的 ``position_ms`` 始终指**原始音频时间轴**（不随速度伸缩）。
-- 内部 ``_read_pos_samples`` 是当前 active PCM 上的偏移；位置查询时通过
-  ``_read_pos_samples / _active_speed`` 还原到原始时间轴。
+- 位置查询基于消费者侧锚点 + ``time.perf_counter()`` 外推，精度 <1ms，
+  消除轮询抖动和 RingBuffer 竞态。
 """
 
 from __future__ import annotations
@@ -65,9 +66,6 @@ _PRODUCER_TICK = 0.005
 
 class SoundDeviceEngine(IAudioEngine):
     """音频引擎（离线预渲染 + RingBuffer）。"""
-
-    # 位置回调频率：60fps
-    CALLBACK_INTERVAL = 0.016
 
     def __init__(self) -> None:
         # ---- 音频元数据 ----
@@ -115,10 +113,15 @@ class SoundDeviceEngine(IAudioEngine):
         # 当音频回调检测到底层设备异常时置位，由 producer 线程执行恢复
         self._needs_recovery = threading.Event()
 
-        # ---- 位置回调 ----
+        # ---- 消费者侧高精度时基锚点 ----
+        # 由 _audio_callback（PortAudio 实时线程）更新，无竞态：
+        # _consumed_in_active_pcm = 当前 active PCM 上已消费的帧数
+        # _last_callback_perf_time = 上次回调的 perf_counter 时间戳
+        self._consumed_in_active_pcm: int = 0
+        self._last_callback_perf_time: float = 0.0
+
+        # ---- 位置回调（保留接口，不再主动轮询）----
         self._position_callback: Optional[Callable[[int], None]] = None
-        self._callback_thread: Optional[threading.Thread] = None
-        self._callback_stop = threading.Event()
 
         # ---- 渲染进度回调 ----
         # 签名 ``(speed, progress∈[0,1])``；progress=1.0 表示已就绪/切换完成。
@@ -207,6 +210,8 @@ class SoundDeviceEngine(IAudioEngine):
             self._file_path = None
             self._duration_ms = 0
             self._read_pos_samples = 0
+            self._consumed_in_active_pcm = 0
+            self._last_callback_perf_time = 0.0
         self._ring = None
 
     # ==================== 播放控制 ====================
@@ -220,6 +225,8 @@ class SoundDeviceEngine(IAudioEngine):
 
         if self._state == PlaybackState.PAUSED:
             self._state = PlaybackState.PLAYING
+            # 恢复外推锚点（暂停期间 perf_counter 已停更）
+            self._last_callback_perf_time = time.perf_counter()
             return
 
         # 启动流 + producer
@@ -227,15 +234,6 @@ class SoundDeviceEngine(IAudioEngine):
         self._maybe_swap_active_speed()
         self._start_streaming()
         self._state = PlaybackState.PLAYING
-
-        if self._position_callback and (
-            self._callback_thread is None or not self._callback_thread.is_alive()
-        ):
-            self._callback_stop.clear()
-            self._callback_thread = threading.Thread(
-                target=self._callback_loop, daemon=True, name="AudioPosCb"
-            )
-            self._callback_thread.start()
 
     def pause(self) -> None:
         if self._state == PlaybackState.PLAYING:
@@ -245,13 +243,11 @@ class SoundDeviceEngine(IAudioEngine):
     def stop(self) -> None:
         self._state = PlaybackState.STOPPED
         self._stop_streaming()
-        self._callback_stop.set()
-        if self._callback_thread and self._callback_thread.is_alive():
-            self._callback_thread.join(timeout=0.5)
-        self._callback_thread = None
 
         with self._state_lock:
             self._read_pos_samples = 0
+            self._consumed_in_active_pcm = 0
+            self._last_callback_perf_time = 0.0
             if self._original_data is not None:
                 # 始终让 active 与当前速度保持一致
                 if abs(self._speed - 1.0) < 1e-9:
@@ -271,23 +267,31 @@ class SoundDeviceEngine(IAudioEngine):
     # ==================== 位置 ====================
 
     def get_position_ms(self) -> int:
+        """获取当前播放位置（毫秒），基于高精度时钟外推。
+
+        锚点由 PortAudio 实时回调线程维护（零竞态），调用时通过
+        ``time.perf_counter()`` 外推至当前微秒，消除轮询抖动。
+        """
         with self._state_lock:
             if self._active_pcm is None or self._sample_rate == 0:
                 return 0
-            # pedalboard 输出的 PCM 是变速后的，长度不同
-            # 播放变速后 PCM 的 N 个采样 = 原始时间轴 N * speed 个采样
-            # 因为变速后 PCM 长度 = 原始长度 / speed
-            read_pos = self._read_pos_samples
+            base_consumed = self._consumed_in_active_pcm
+            base_time = self._last_callback_perf_time
+            speed = self._active_speed
+            sr = self._sample_rate
 
-            # 减去 RingBuffer 中尚未播放的样本数，得到实际播放位置
-            if self._ring is not None and self._state == PlaybackState.PLAYING:
-                buffered_frames = self._ring.available_read()
-                read_pos = max(0, read_pos - buffered_frames)
+        # 播放中：用 perf_counter 外推自上次回调以来的额外帧数
+        if self._state == PlaybackState.PLAYING and base_time > 0:
+            elapsed = time.perf_counter() - base_time
+            extra_frames = elapsed * sr
+            total_consumed = base_consumed + extra_frames
+        else:
+            total_consumed = base_consumed
 
-            # 位置计算：read_pos * active_speed = 原始时间轴上的采样位置
-            orig_samples = read_pos * self._active_speed
-            ms = int(orig_samples / self._sample_rate * 1000)
-            return min(max(ms, 0), self._duration_ms)
+        # 换算到原始时间轴：consumed_frames * speed = 原始采样位置
+        orig_samples = total_consumed * speed
+        ms = int(orig_samples / sr * 1000)
+        return min(max(ms, 0), self._duration_ms)
 
     def set_position_ms(self, position_ms: int) -> None:
         if self._original_data is None:
@@ -306,6 +310,9 @@ class SoundDeviceEngine(IAudioEngine):
             new_pos = int(orig_samples / self._active_speed)
             new_pos = max(0, min(new_pos, len(self._active_pcm)))
             self._read_pos_samples = new_pos
+            # 重置消费者锚点（seek 后回调线程会从新位置开始消费）
+            self._consumed_in_active_pcm = new_pos
+            self._last_callback_perf_time = time.perf_counter()
         # 丢弃 ring 里的旧样本
         if self._ring is not None:
             self._ring.reset()
@@ -368,15 +375,8 @@ class SoundDeviceEngine(IAudioEngine):
     # ==================== 回调注册 ====================
 
     def set_position_callback(self, callback: Callable[[int], None]) -> None:
+        """保留接口兼容性。UI 侧应改用 QTimer 主动拉取 get_position_ms()。"""
         self._position_callback = callback
-        if self._state == PlaybackState.PLAYING and (
-            self._callback_thread is None or not self._callback_thread.is_alive()
-        ):
-            self._callback_stop.clear()
-            self._callback_thread = threading.Thread(
-                target=self._callback_loop, daemon=True, name="AudioPosCb"
-            )
-            self._callback_thread.start()
 
     def clear_position_callback(self) -> None:
         self._position_callback = None
@@ -489,6 +489,10 @@ class SoundDeviceEngine(IAudioEngine):
             # underrun：补零，不抛错（旧版会触发 PortAudio 错位）
             outdata[n:].fill(0)
 
+        # 更新消费者侧锚点（PortAudio 实时线程，GIL 保证原子性）
+        self._consumed_in_active_pcm += n
+        self._last_callback_perf_time = time.perf_counter()
+
         if self._volume != 1.0:
             outdata *= self._volume
 
@@ -519,7 +523,6 @@ class SoundDeviceEngine(IAudioEngine):
             with self._state_lock:
                 pcm = self._active_pcm
                 pos = self._read_pos_samples
-                speed = self._active_speed
                 total = 0 if pcm is None else len(pcm)
 
             if pcm is None:
@@ -554,8 +557,8 @@ class SoundDeviceEngine(IAudioEngine):
             if abs(pending - current) < 1e-9:
                 return
             cur_pcm = self._active_pcm
-            cur_pos = self._read_pos_samples
             cur_speed = self._active_speed
+            cur_consumed = self._consumed_in_active_pcm
 
         # 检查缓存是否已就绪
         new_pcm = self._cache.get(pending)
@@ -565,16 +568,18 @@ class SoundDeviceEngine(IAudioEngine):
         # 计算"当前原始时间轴位置" → 在新 PCM 上的偏移
         if cur_pcm is None or self._sample_rate == 0:
             return
-        # orig_samples = read_pos * cur_speed（原始时间轴位置）
-        orig_samples = cur_pos * cur_speed
+        # orig_samples = consumed * cur_speed（原始时间轴位置）
+        orig_samples = cur_consumed * cur_speed
         # 在新 PCM 上的位置 = orig_samples / pending
-        new_pos = int(orig_samples / max(pending, 1e-6))
-        new_pos = max(0, min(new_pos, len(new_pcm)))
+        new_consumed = int(orig_samples / max(pending, 1e-6))
+        new_consumed = max(0, min(new_consumed, len(new_pcm)))
 
         with self._state_lock:
             self._active_pcm = new_pcm
             self._active_speed = pending  # 使用用户设置的速度
-            self._read_pos_samples = new_pos
+            self._read_pos_samples = new_consumed
+            self._consumed_in_active_pcm = new_consumed
+            self._last_callback_perf_time = time.perf_counter()
             # 更新 pending_speed 为当前 speed，避免重复 swap
             self._pending_speed = self._speed
 
@@ -641,16 +646,4 @@ class SoundDeviceEngine(IAudioEngine):
             # 如果实在救不回来，暂停播放，让用户后续手动点击播放重试
             self._state = PlaybackState.PAUSED
 
-    def _callback_loop(self) -> None:
-        """位置回调线程（独立于音频回调，~60fps）。"""
-        last = -1
-        while not self._callback_stop.is_set():
-            if self._state == PlaybackState.PLAYING and self._position_callback:
-                pos = self.get_position_ms()
-                if pos != last:
-                    try:
-                        self._position_callback(pos)
-                    except Exception as e:
-                        print(f"[SoundDeviceEngine] position_callback error: {e}")
-                    last = pos
-            time.sleep(self.CALLBACK_INTERVAL)
+
