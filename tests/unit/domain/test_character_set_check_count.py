@@ -73,9 +73,11 @@ class TestSetCheckCountGrow:
         ch.set_check_count(3)
         assert ch.check_count == 3
         assert ch.ruby is not None
-        # ruby 在增大时不主动改写，由调用方负责后续 set_ruby
-        assert len(ch.ruby.parts) == 1
-        assert ch.ruby.parts[0].text == "はる"
+        # 增大时按 mora 模式重新拆分 ruby.parts 以维持不变式
+        assert len(ch.ruby.parts) == 3
+        assert ch.ruby.parts[0].text == "は"
+        assert ch.ruby.parts[1].text == "る"
+        assert ch.ruby.parts[2].text == ""
 
 
 class TestSetCheckCountZero:
