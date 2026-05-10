@@ -66,7 +66,7 @@
   "export": {
     "default_format": "LRC (增强型)",
     "auto_add_extension": true,
-    "last_export_dir": "E:\\ニコカラ\\043大橋彩香 - ワガママMIRROR HEART",
+    "last_export_dir": "D:\\",
     "offset_ms": -230
   },
   "ruby_split_mode": "mora",
@@ -115,7 +115,7 @@
       "bulk_change": "CTRL+H:short",
       "modify_char": "",
       "insert_guide": "",
-      "modify_line": "T:long",
+      "modify_line": "",
       "analyze_rubies": "",
       "delete_rubies_by_type": "",
       "set_singer_by_line": "",
@@ -153,7 +153,7 @@
       "bulk_change": "CTRL+H:short",
       "modify_char": "",
       "insert_guide": "",
-      "modify_line": "T:long",
+      "modify_line": "",
       "analyze_rubies": "",
       "delete_rubies_by_type": "",
       "set_singer_by_line": "",
