@@ -48,7 +48,8 @@
       "sokuon",
       "other",
       "space"
-    ]
+    ],
+    "space_as_line_end": true
   },
   "ui": {
     "theme": "auto",
@@ -66,8 +67,9 @@
     "default_format": "LRC (增强型)",
     "auto_add_extension": true,
     "last_export_dir": "E:\\ニコカラ\\043大橋彩香 - ワガママMIRROR HEART",
-    "offset_ms": 0
+    "offset_ms": -230
   },
+  "ruby_split_mode": "mora",
   "ruby_dictionary": {
     "enabled": true
   },
@@ -102,7 +104,7 @@
       "nav_prev_char": "LEFT:short",
       "nav_next_char": "RIGHT:short",
       "cycle_checkpoint_prev": "ALT+LEFT:short",
-      "toggle_line_end": ".:long",
+      "toggle_line_end": "F4:short",
       "toggle_word_join": "F3:short",
       "timestamp_up": "ALT+UP:short",
       "timestamp_down": "ALT+DOWN:short",
@@ -113,7 +115,7 @@
       "bulk_change": "CTRL+H:short",
       "modify_char": "",
       "insert_guide": "",
-      "modify_line": "",
+      "modify_line": "T:long",
       "analyze_rubies": "",
       "delete_rubies_by_type": "",
       "set_singer_by_line": "",
@@ -151,7 +153,7 @@
       "bulk_change": "CTRL+H:short",
       "modify_char": "",
       "insert_guide": "",
-      "modify_line": "",
+      "modify_line": "T:long",
       "analyze_rubies": "",
       "delete_rubies_by_type": "",
       "set_singer_by_line": "",
