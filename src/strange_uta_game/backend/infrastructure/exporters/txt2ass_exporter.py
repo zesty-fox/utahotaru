@@ -233,10 +233,16 @@ class ASSDirectExporter(BaseExporter):
         - 行尾 post-roll \\k 让退出平滑。
         """
         chars = sentence.characters
-        if not chars:
-            return f"{{\\k{_PRE_ROLL_MS // 10}}}{{\\k{_POST_ROLL_MS // 10}}}"
 
-        parts: List[str] = [f"{{\\k{_PRE_ROLL_MS // 10}}}"]
+        # 动态计算实际 pre-roll：当 line_start_ms < _PRE_ROLL_MS 时
+        # Dialogue Start 被 clamp 到 0，pre-roll \k 时长也必须等比例缩减，
+        # 否则视觉高亮会比实际进唱时间晚 (_PRE_ROLL_MS - line_start_ms) 毫秒。
+        actual_pre_roll_ms = min(_PRE_ROLL_MS, max(0, line_start_ms))
+
+        if not chars:
+            return f"{{\\k{actual_pre_roll_ms // 10}}}{{\\k{_POST_ROLL_MS // 10}}}"
+
+        parts: List[str] = [f"{{\\k{actual_pre_roll_ms // 10}}}"]
 
         # 1. 行首未打轴字符并入 pre-roll \k 区
         idx = 0
