@@ -90,7 +90,7 @@ class TXTExporter(BaseExporter):
 
         # 时间标签（使用导出时间戳，含偏移）
         if sentence.has_timetags:
-            start_ms = sentence.export_timing_start_ms
+            start_ms = sentence.global_timing_start_ms
             parts.append(
                 self._format_timestamp(start_ms, "lrc")
                 if start_ms is not None

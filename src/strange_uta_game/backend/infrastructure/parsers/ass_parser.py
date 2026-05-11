@@ -1,21 +1,25 @@
 """ASS 字幕格式解析器
 
-支持 ASS/SSA 字幕文件的解析，提取卡拉OK时间标签（\\k/\\kf/\\ko/\\K/\\kF/\\kO 标签）。
+支持 ASS/SSA 字幕文件的解析。提取卡拉OK时间标签（\\k/\\kf/\\ko/\\K/\\kF/\\kO）、
+Aegisub 注音 (`{\\k...}汉字|<かな`)，以及末尾 \\k 的尾部时长（绑为句尾释放点）。
+
+设计原则（与 entities.py 对齐）：
+1. 末尾 \\k 的时长不再丢弃，作为 ParsedLine.line_end_ts 输出，
+   parse_to_sentences 会把它绑给末字符的 sentence_end_ts。
+2. Aegisub 注音 `{\\k...}汉字|<かな` 不再被无差别去掉，而是按段提取，
+   写入 ParsedLine.ruby_map。
+3. 仅保留卡拉OK相关的 `\\k/\\kf/\\ko/\\K/\\kF/\\kO` 计算；其他 ASS 标签
+   （`\\b`, `\\r`, `\\c` 等）剥除时不连带删掉注音文本。
 """
 
 import re
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from .lyric_parser import LyricParser, ParsedLine
 
 
 class ASSParser(LyricParser):
-    """ASS 字幕格式解析器
-
-    解析 ASS 字幕文件的 [Events] 区段中的 Dialogue 行，
-    提取卡拉OK标签（\\kf, \\k, \\ko 等）的持续时间，
-    转换为逐字时间标签。
-    """
+    """ASS 字幕格式解析器"""
 
     # ASS 时间戳格式: H:MM:SS.cc
     ASS_TIME_PATTERN = re.compile(r"(\d+):(\d{2}):(\d{2})\.(\d{2})")
@@ -23,7 +27,7 @@ class ASSParser(LyricParser):
     # 卡拉OK标签: {\kf32}, {\k50}, {\ko10}, {\K30}, {\kF20}, {\kO15}
     KARAOKE_TAG_PATTERN = re.compile(r"\{\\[kK][oOfF]?(\d+)\}")
 
-    # Dialogue 行格式（10 个逗号分隔字段）
+    # Dialogue 行（10 个字段）
     DIALOGUE_PATTERN = re.compile(
         r"^Dialogue:\s*\d+,"  # Layer
         r"([^,]+),"  # Start time
@@ -45,12 +49,10 @@ class ASSParser(LyricParser):
         for raw_line in content.split("\n"):
             raw_line = raw_line.strip()
 
-            # 检测 [Events] 区段
             if raw_line.lower() == "[events]":
                 in_events = True
                 continue
 
-            # 检测其他区段开始（退出 Events）
             if raw_line.startswith("[") and raw_line.endswith("]") and in_events:
                 if raw_line.lower() != "[events]":
                     in_events = False
@@ -59,11 +61,9 @@ class ASSParser(LyricParser):
             if not in_events:
                 continue
 
-            # 跳过 Format 行和注释
             if raw_line.startswith("Format:") or raw_line.startswith(";"):
                 continue
 
-            # 解析 Dialogue 行
             match = self.DIALOGUE_PATTERN.match(raw_line)
             if not match:
                 continue
@@ -71,12 +71,10 @@ class ASSParser(LyricParser):
             start_time_str = match.group(1).strip()
             text_field = match.group(3)
 
-            # 解析起始时间
             start_ms = self._parse_ass_timestamp(start_time_str)
             if start_ms is None:
                 continue
 
-            # 解析卡拉OK标签
             parsed_line = self._parse_karaoke_text(text_field, start_ms)
             if parsed_line and parsed_line.text.strip():
                 lines.append(parsed_line)
@@ -96,62 +94,128 @@ class ASSParser(LyricParser):
 
         return ((hours * 3600 + minutes * 60 + seconds) * 1000) + (centis * 10)
 
-    def _parse_karaoke_text(self, text: str, start_ms: int) -> Optional[ParsedLine]:
-        """解析含卡拉OK标签的文本
+    # ──────────────────────────────────────────────
+    # 段内文本处理
+    # ──────────────────────────────────────────────
 
-        {\\kf32}翼{\\kf32}を → 逐字时间标签
-        每个 \\k 标签的值为持续时间（厘秒），乘以 10 得到毫秒。
+    @staticmethod
+    def _strip_non_karaoke_tags(text: str) -> str:
+        """剥除非卡拉OK的 ASS 标签（如 {\\r}, {\\b1}, {\\c&HFFFFFF&}）。
+
+        卡拉OK标签 {\\k.../\\kf.../\\ko...} 在外部已经先抽走，这里只用
+        去除残留装饰性标签。注音文本（| 后内容）保持原样。
         """
-        # 查找所有卡拉OK标签
+        return re.sub(r"\{[^}]*\}", "", text)
+
+    @staticmethod
+    def _split_ruby(segment: str) -> Tuple[str, str]:
+        """拆分 Aegisub 注音段。
+
+        语法：`汉字|<かな` 或 `汉字|かな`（部分工具不带 `<`）。
+        - 含 `|` 时：左侧为主文本（用于歌词），右侧为注音；
+          右侧若以 `<` 开头则去掉该前缀（Aegisub 习惯）。
+        - 不含 `|` 时：整段为主文本，注音为空。
+
+        Returns:
+            (主文本, 注音文本)
+        """
+        if "|" not in segment:
+            return segment, ""
+        main, _, ruby = segment.partition("|")
+        ruby = ruby.lstrip("<")
+        return main, ruby
+
+    def _parse_karaoke_text(
+        self, text: str, start_ms: int
+    ) -> Optional[ParsedLine]:
+        """解析含卡拉OK标签的文本。
+
+        策略：
+        - 把整段按 `\\k...` 切片，每片 = (duration_cs, 后续文本)。
+        - 每片先剥掉非卡拉OK ASS 标签，再用 `|` 拆分注音。
+        - 每片首字符获得 (char_idx, current_ms) 时间标签；
+          若该片有注音，把注音绑给该首字符。
+        - 累加 duration → 下一片的起始时间。
+        - **末尾片的 duration 不丢弃**，作为 `line_end_ts`（绝对时间）。
+        - 若不含任何卡拉OK标签，整行视为一个段，时间标签仅在首字符。
+        """
         karaoke_tags = list(self.KARAOKE_TAG_PATTERN.finditer(text))
 
         if not karaoke_tags:
-            # 没有卡拉OK标签，去除其他 ASS 标签后返回纯文本
-            clean_text = re.sub(r"\{[^}]*\}", "", text).strip()
-            if clean_text:
-                return ParsedLine(text=clean_text, timetags=[(0, start_ms)])
+            clean_text = self._strip_non_karaoke_tags(text)
+            # 兼容无 \k 但带 `|<` 注音：拆出主文本即可（无 ruby_map，
+            # 因为没有按字粒度的对应关系）
+            main_text, _ = self._split_ruby(clean_text)
+            main_text = main_text.strip()
+            if main_text:
+                return ParsedLine(text=main_text, timetags=[(0, start_ms)])
             return None
 
-        # 逐段提取字符和时间戳
         lyric_chars: List[str] = []
         timetags: List[Tuple[int, int]] = []
+        ruby_map: Dict[int, str] = {}
         current_ms = start_ms
         char_idx = 0
+        last_duration_ms = 0
 
         for i, tag_match in enumerate(karaoke_tags):
-            duration_cs = int(tag_match.group(1))  # 厘秒
-            duration_ms = duration_cs * 10  # → 毫秒
+            duration_cs = int(tag_match.group(1))
+            duration_ms = duration_cs * 10
+            last_duration_ms = duration_ms
 
-            # 提取标签后的文本（到下一个标签或行尾）
             text_start = tag_match.end()
-            if i + 1 < len(karaoke_tags):
-                text_end = karaoke_tags[i + 1].start()
-            else:
-                text_end = len(text)
+            text_end = (
+                karaoke_tags[i + 1].start()
+                if i + 1 < len(karaoke_tags)
+                else len(text)
+            )
 
-            segment_text = text[text_start:text_end]
-            # 移除非卡拉OK的 ASS 标签（如 {\r} 等）
-            segment_text = re.sub(r"\{[^}]*\}", "", segment_text)
+            raw_segment = text[text_start:text_end]
+            # 先剥掉装饰性 ASS 标签，再拆注音
+            cleaned = self._strip_non_karaoke_tags(raw_segment)
+            main_text, ruby_text = self._split_ruby(cleaned)
 
-            if segment_text:
-                # 记录第一个字符的时间标签
-                timetags.append((char_idx, current_ms))
+            if main_text:
+                first_char_idx_in_segment = char_idx
+                timetags.append((first_char_idx_in_segment, current_ms))
+                if ruby_text:
+                    ruby_map[first_char_idx_in_segment] = ruby_text
 
-                for ch in segment_text:
+                for ch in main_text:
                     lyric_chars.append(ch)
                     char_idx += 1
 
-            # 累加持续时间
             current_ms += duration_ms
 
         lyric_text = "".join(lyric_chars).strip()
         if not lyric_text:
             return None
 
-        # 重新计算索引（去除前导字符偏移）
+        # 去除前导空白带来的 char_idx 偏移
         full_text = "".join(lyric_chars)
         leading = len(full_text) - len(full_text.lstrip())
         if leading > 0:
-            timetags = [(ci - leading, ts) for ci, ts in timetags if ci >= leading]
+            timetags = [
+                (ci - leading, ts) for ci, ts in timetags if ci >= leading
+            ]
+            ruby_map = {
+                ci - leading: rb for ci, rb in ruby_map.items() if ci >= leading
+            }
 
-        return ParsedLine(text=lyric_text, timetags=timetags)
+        # 句尾释放：最后一片 \k 的 duration_ms 不丢弃
+        line_end_ts: Optional[int] = None
+        if timetags:
+            # current_ms 此时已经累加完最后一片 duration，即"行结束绝对时间"
+            line_end_ts = current_ms
+            # 防御：若解析过程异常导致 line_end_ts 反而小于等于末 ts，
+            # 退化为「末 ts + 末片 duration」
+            last_ts = timetags[-1][1]
+            if line_end_ts <= last_ts:
+                line_end_ts = last_ts + max(0, last_duration_ms)
+
+        return ParsedLine(
+            text=lyric_text,
+            timetags=timetags,
+            line_end_ts=line_end_ts,
+            ruby_map=ruby_map,
+        )

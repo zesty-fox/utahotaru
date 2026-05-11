@@ -20,10 +20,21 @@ class ParseError(Exception):
 
 @dataclass
 class ParsedLine:
-    """解析后的歌词行数据"""
+    """解析后的歌词行数据
+
+    Attributes:
+        text: 行文本
+        timetags: [(char_idx, timestamp_ms), ...] 列表
+        line_end_ts: 行尾释放时间戳（句尾拖音终止点，毫秒）。
+            ASS 解析器会把最后一个 \\k 的尾部时长写到这里，
+            转换时绑给末字符的 sentence_end_ts。
+        ruby_map: char_idx → ruby 文本，从 ASS 的 `汉字|<かな` 语法提取。
+    """
 
     text: str
     timetags: List[Tuple[int, int]]  # (char_idx, timestamp_ms) 列表
+    line_end_ts: Optional[int] = None
+    ruby_map: Dict[int, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -1257,7 +1268,15 @@ class LyricParserFactory:
 def parse_to_sentences(
     parsed_lines: List[ParsedLine], singer_id: str
 ) -> List[Sentence]:
-    """将解析结果转换为 Sentence 对象
+    """将解析结果转换为 Sentence 对象。
+
+    对齐 entities.py 重构后契约（与 `nicokara_result_to_sentences` 同源）：
+    1. 多 timestamps 同一字符 → 第二个 ts 自动绑为 sentence_end_ts。
+    2. ParsedLine.line_end_ts（如 ASS 末尾 \\k 的尾时长）→ 末字符的
+       sentence_end_ts；缺省时退化为「末 ts + 500ms」兜底拖音。
+    3. ParsedLine.ruby_map（如 ASS 的 `汉字|<かな`）→ Character.set_ruby。
+    4. 最后强制 set_offset(0) 触发 global_timestamps / global_sentence_end_ts
+       派生，否则导出器读不到任何全局时间。
 
     Args:
         parsed_lines: 解析后的行列表
@@ -1266,19 +1285,61 @@ def parse_to_sentences(
     Returns:
         Sentence 对象列表
     """
+    from strange_uta_game.backend.domain import Ruby, RubyPart  # 局部导入避免环依赖
+
     sentences = []
 
     for parsed in parsed_lines:
-        # 创建句子（from_text 设置默认 checkpoint 配置）
+        # 空行：保留为空 Sentence（用户排版意图）
+        if not parsed.text:
+            sentences.append(Sentence(singer_id=singer_id, characters=[]))
+            continue
+
         sentence = Sentence.from_text(
             text=parsed.text,
             singer_id=singer_id,
         )
 
-        # 添加时间标签
+        # 按字符分组时间戳（同一字符多个 ts 时第二个作为 sentence_end_ts）
+        char_ts_map: Dict[int, List[int]] = {}
         for char_idx, timestamp_ms in parsed.timetags:
             if 0 <= char_idx < len(sentence.characters):
-                sentence.characters[char_idx].add_timestamp(timestamp_ms)
+                char_ts_map.setdefault(char_idx, []).append(timestamp_ms)
+
+        last_idx_with_ts: Optional[int] = None
+        for char_idx, ts_list in char_ts_map.items():
+            char = sentence.characters[char_idx]
+            char.add_timestamp(ts_list[0])
+            if len(ts_list) >= 2:
+                char.is_sentence_end = True
+                char.sentence_end_ts = ts_list[1]
+                if char.check_count == 0:
+                    char.check_count = 1
+            if last_idx_with_ts is None or char_idx > last_idx_with_ts:
+                last_idx_with_ts = char_idx
+
+        # 注入 ruby（如 ASS 的 `汉字|<かな`）
+        for char_idx, ruby_text in parsed.ruby_map.items():
+            if 0 <= char_idx < len(sentence.characters) and ruby_text:
+                ch = sentence.characters[char_idx]
+                ch.set_ruby(Ruby(parts=[RubyPart(text=ruby_text)]))
+                ch.push_to_ruby()
+
+        # 行尾释放点：优先用解析器给的 line_end_ts，没有就兜底
+        if last_idx_with_ts is not None:
+            last_char = sentence.characters[last_idx_with_ts]
+            if parsed.line_end_ts is not None:
+                last_char.is_sentence_end = True
+                last_char.sentence_end_ts = parsed.line_end_ts
+            elif not last_char.is_sentence_end:
+                # 兜底：给一个 500ms 拖音，保证导出有句尾释放点
+                last_char.is_sentence_end = True
+                last_char.sentence_end_ts = last_char.timestamps[-1] + 500
+
+        # 核心：派生 global_timestamps / global_sentence_end_ts，
+        # 否则导出器无法读到全局时间（这是旧版 bug）。
+        for ch in sentence.characters:
+            ch.set_offset(0)
 
         sentences.append(sentence)
 
