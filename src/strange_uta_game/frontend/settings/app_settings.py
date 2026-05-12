@@ -224,11 +224,25 @@ class AppSettings:
         self._force_upgrade_dictionary_if_needed()
 
     def _force_upgrade_dictionary_if_needed(self) -> None:
-        """老用户强制升级一次词典：当 is_dictionary_real_sugdic 缺失或为 False 时，
-        用内置 dictionary.json 覆盖用户 dictionary.json，并写入标志位。
+        """老用户强制升级一次词典：当用户 config.json 中 is_dictionary_real_sugdic
+        缺失或为 False 时，用内置 dictionary.json 覆盖用户 dictionary.json，并写入标志位。
         用户之前自定义的词条会丢失（一次性破坏性升级）。
+
+        注意：判断依据是用户 config.json 的原始内容，而非 merge 后的 _settings。
+        内置 config.json 已预设 is_dictionary_real_sugdic=True，若以 _settings
+        判断则永远不会触发。
         """
-        if self._settings.get("is_dictionary_real_sugdic") is True:
+        # 读用户 config.json 原始内容（非 merge 后的 _settings）
+        user_flag = False
+        if self._config_path.exists():
+            try:
+                with open(self._config_path, "r", encoding="utf-8") as f:
+                    user_cfg = json.load(f)
+                user_flag = user_cfg.get("is_dictionary_real_sugdic") is True
+            except Exception:
+                user_flag = False
+
+        if user_flag:
             return
         packaged = self._get_packaged_config_path("dictionary.json")
         if not packaged:
