@@ -2,7 +2,7 @@
 
 一款由 RhythmicaLyrics 启发的歌词打轴软件，专注于低延迟、高精度的卡拉OK时间标签制作。
 
-**当前版本**：v0.2.0 | **许可证**：GPL-3.0 | **平台**：Windows 10/11
+**当前版本**：v0.3.0 | **许可证**：GPL-3.0 | **平台**：Windows 10/11
 
 ## 功能概览
 
@@ -169,12 +169,12 @@ python build.py
 
 | 格式 | 说明 |
 |------|------|
-| `.sug` | StrangeUtaGame 项目文件（JSON 格式，v0.2.0） |
+| `.sug` | StrangeUtaGame 项目文件（JSON 格式，v0.3.0） |
 | `.sug.temp` | 自动保存临时文件（存放在程序目录 `.cache` 文件夹下，正常退出时自动清理） |
 
 **特性**：
 - 项目文件不保存音频路径，每次使用时需重新选择音频文件
-- 支持 v0.1 → v0.2.0 自动迁移（Ruby → RubyPart 结构升级）
+- 支持 v0.1 → v0.3.0 自动迁移（Ruby → RubyPart 结构升级）
 - 配置文件分离：`config.json`（主配置）、`dictionary.json`（用户词典）、`singers.json`（演唱者预设）
 
 ## 常见问题

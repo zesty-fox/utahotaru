@@ -6,7 +6,7 @@ StrangeUtaGame 项目文件格式 (.sug)
 版本历史:
   - v1.0: 初始版本（lines + checkpoints + timetags + rubies 分离存储）
   - v2.0: 层次化模型（sentences + characters 一体化存储）
-  - v0.2.0: Ruby 分组模型（Ruby.text 支持 # 分组）
+  - v0.3.0: Ruby 分组模型（Ruby.text 支持 # 分组）
 """
 
 import json
@@ -73,7 +73,7 @@ class SugMigrator:
     处理不同版本之间的数据迁移。
     """
 
-    CURRENT_VERSION = "0.2.0" # 实际已更新至0.2.8，但是没有更改数据因此不更改
+    CURRENT_VERSION = "0.3.0" # 实际已更新至0.3.0，但是没有更改数据因此不更改
 
     @classmethod
     def migrate(cls, data: Dict[str, Any], from_version: str) -> Dict[str, Any]:
@@ -123,7 +123,7 @@ class SugMigrator:
 
     @classmethod
     def _migrate_v2_to_v0_2_0(cls, data: Dict[str, Any]) -> Dict[str, Any]:
-        """v2.0 → v0.2.0 迁移。
+        """v2.0 → v0.3.0 迁移。
 
         丢弃旧的 char-level Ruby，基于当前 sentence 文本和 checkpoint
         重新分析生成带 # 分组的 Ruby 文本。
@@ -251,7 +251,7 @@ class SugProjectParser:
     """SUG 项目文件解析器
 
     负责 Project 对象的序列化和反序列化。
-        支持 v0.2.0 格式读写，以及 v1.0/v2.0 格式向上兼容读取。
+        支持 v0.3.0 格式读写，以及 v1.0/v2.0 格式向上兼容读取。
     """
 
     @staticmethod
@@ -281,7 +281,7 @@ class SugProjectParser:
     def load(file_path: str) -> Project:
         """从 SUG 文件加载项目
 
-        支持 v1.0、v2.0 和 v0.2.0 格式。旧文件会自动迁移到当前模型。
+        支持 v1.0、v2.0 和 v0.3.0 格式。旧文件会自动迁移到当前模型。
 
         Args:
             file_path: 文件路径

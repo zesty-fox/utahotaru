@@ -4,7 +4,7 @@
 
 一款由 RhythmicaLyrics 启发的歌词打轴软件，专注于低延迟、高精度的卡拉OK时间标签制作。
 
-**当前版本**：v0.2.0 | **许可证**：GPL-3.0 | **平台**：Windows 10/11
+**当前版本**：v0.3.0 | **许可证**：GPL-3.0 | **平台**：Windows 10/11
 
 ## 核心特性
 
@@ -322,11 +322,11 @@ pytest tests/ --cov=src --cov-report=html
 ## 项目文件格式
 
 - **.sug** - StrangeUtaGame 项目文件（**S**trange **U**ta **G**ame 的缩写）
-  - 基于 JSON 格式（v0.2.0）
+  - 基于 JSON 格式（v0.3.0）
   - 存储歌词、时间标签、节奏点配置、注音等
   - **不存储音频路径**，用户每次使用时重新选择音频（更灵活）
   - 存储音频时长用于验证（可选）
-  - 旧版 v0.1 文件自动迁移到 v0.2.0（Ruby → RubyPart）
+  - 旧版 v0.1 文件自动迁移到 v0.3.0（Ruby → RubyPart）
 
 ## 支持的导入格式
 
@@ -360,7 +360,7 @@ pytest tests/ --cov=src --cov-report=html
 - [UI 层设计](docs/ui.md)
 - [经验教训](docs/lessons_learned.md)
 - [修复记录](docs/fixes_summary.md)
-- [更新日志 v0.2.0](docs/更新日志-0.2.0.md)
+- [更新日志 v0.3.0](docs/更新日志-0.3.0.md)
 
 ## 测试
 
@@ -468,7 +468,7 @@ pyinstaller --noconfirm --onedir --windowed \
 | **GitHub** | https://github.com/Xuan-cc/StrangeUtaGame |
 | **许可证** | GPL-3.0 License |
 | **作者** | Xuan-cc |
-| **版本** | v0.2.0 |
+| **版本** | v0.3.0 |
 
 ## 依赖
 
