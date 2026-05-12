@@ -509,6 +509,34 @@ class AppSettings:
         self._save_json(self._singers_path, presets)
 
 
+def build_annotated_reading(word: str, per_char_ruby: list) -> str:
+    """把 ``(word, per_char_ruby)`` 忠实序列化为 annotated 行内格式 reading 字符串。
+
+    Args:
+        word: 原文词（N 个字符）。
+        per_char_ruby: 长度为 N 的列表，每项是对应字符的 ``Ruby`` 对象或 ``None``。
+            ``Ruby.parts`` 中每个 ``RubyPart.text`` 对应一个 mora，用 ``|`` 连接写入。
+
+    完全尊重用户输入：不做自注音剥离、不做额外 mora 拆分、不做任何读音变换。
+    有 parts → ``{c||part1|part2|...}``；无 parts / None → 字面 ``c``。
+
+    例：
+        "微" ruby.parts=[RubyPart("ほ"), RubyPart("ほ")] → ``{微||ほ|ほ}``
+        "ん" ruby.parts=[RubyPart("ん")]                  → ``{ん||ん}``
+        "べ" ruby=None                                    → ``べ``
+    """
+    out: list = []
+    for i, c in enumerate(word):
+        ruby = per_char_ruby[i] if i < len(per_char_ruby) else None
+        if ruby is not None and hasattr(ruby, "parts") and ruby.parts:
+            parts_text = "|".join(p.text for p in ruby.parts if p.text)
+            if parts_text:
+                out.append(f"{{{c}||{parts_text}}}")
+                continue
+        out.append(c)
+    return "".join(out)
+
+
 def _parse_rl_dictionary(text: str) -> list:
     """解析 RL 字典文件格式（薄包装，实现位于后端
     :mod:`strange_uta_game.backend.infrastructure.parsers.rl_dictionary`）。

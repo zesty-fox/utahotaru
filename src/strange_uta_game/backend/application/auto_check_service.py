@@ -1266,6 +1266,7 @@ class AutoCheckService:
         split_config: Optional[SplitConfig] = None,
         keep_existing_timetags: bool = True,
         only_noruby: bool = False,
+        apply_user_dict: bool = True,
     ) -> None:
         """分析并应用自动检查结果到句子
 
@@ -1277,6 +1278,9 @@ class AutoCheckService:
             split_config: 拆分配置
             keep_existing_timetags: 是否保留现有时间标签
             only_noruby: 仅对未注音字符应用（已注音字符的 Ruby/check_count/linked_to_next 保留）
+            apply_user_dict: 是否在末尾执行 Phase 5 用户词典覆盖（默认 True）。
+                传 False 可推迟词典覆盖到删除注音之后，再手动调用
+                :meth:`apply_user_dict_to_project`。
         """
         # only_noruby 模式：预先快照已注音字符的状态
         preserved: Dict[int, Tuple[Optional[Ruby], int, bool]] = {}
@@ -1450,7 +1454,8 @@ class AutoCheckService:
         # Phase 5: 用户词典覆盖（优先级最高，覆盖一切包括 only_noruby preserved）。
         # 按词典数组顺序逐条扫描，先命中锁定 span，后命中若与已锁定区间重叠则跳过。
         # 子串严格匹配 sentence 字面文本，不跨 Sentence。
-        if self._dict:
+        # apply_user_dict=False 时跳过，由调用方在删除注音后手动调用。
+        if apply_user_dict and self._dict:
             self._apply_user_dictionary_to_sentence(sentence)
 
     def _apply_user_dictionary_to_sentence(self, sentence: Sentence) -> None:
@@ -1564,6 +1569,7 @@ class AutoCheckService:
         split_config: Optional[SplitConfig] = None,
         keep_existing_timetags: bool = True,
         only_noruby: bool = False,
+        apply_user_dict: bool = True,
     ) -> None:
         """分析并应用到整个项目
 
@@ -1572,14 +1578,28 @@ class AutoCheckService:
             split_config: 拆分配置
             keep_existing_timetags: 是否保留现有时间标签
             only_noruby: 仅对未注音字符应用
+            apply_user_dict: 是否执行 Phase 5 用户词典覆盖（默认 True）。
+                传 False 时推迟词典覆盖，由调用方在删除注音后手动调用
+                :meth:`apply_user_dict_to_project`。
         """
         for sentence in project.sentences:
             self.apply_to_sentence(
-                sentence, split_config, keep_existing_timetags, only_noruby
+                sentence, split_config, keep_existing_timetags, only_noruby,
+                apply_user_dict=apply_user_dict,
             )
 
         # check_count 变更后，自动顺延越界的选中 cp
         project.shift_selected_checkpoint_if_lost()
+
+    def apply_user_dict_to_project(self, project: Project) -> None:
+        """对整个项目执行 Phase 5 用户词典覆盖。
+
+        供调用方在按类型删除注音之后单独调用，确保用户词典覆盖在删除之后生效。
+        """
+        if not self._dict:
+            return
+        for sentence in project.sentences:
+            self._apply_user_dictionary_to_sentence(sentence)
 
     def update_checkpoints_from_rubies(
         self,
@@ -1918,6 +1938,41 @@ _SMALL_HIRAGANA = set("ぁぃぅぇぉゃゅょゎ")
 _SMALL_KATAKANA = set("ァィゥェォャュョヮゕゖ")
 
 
+def get_kanji_linked_indices(characters: list) -> set:
+    """返回"处于含汉字连词链中"的所有字符索引集合。
+
+    连词链由 ``linked_to_next`` 构成：``ch.linked_to_next=True`` 表示该字符与
+    下一字符在同一连词块内。对每条连续链，若链内存在任意汉字字符，则链内所有
+    字符索引均纳入保护集合——删除注音时这些字符视为汉字，不删除其注音。
+
+    Args:
+        characters: ``Sentence.characters`` 列表。
+
+    Returns:
+        需要保护的字符索引集合（``set[int]``）。
+    """
+    n = len(characters)
+    if n == 0:
+        return set()
+
+    # 先构建连词链：连续的 linked_to_next=True 把相邻字符串联成一组
+    protected: set = set()
+    i = 0
+    while i < n:
+        # 找到从 i 开始的连词链尾部
+        j = i
+        while j < n - 1 and characters[j].linked_to_next:
+            j += 1
+        # 链覆盖 [i..j]
+        if j > i:
+            chain = characters[i : j + 1]
+            if any(get_char_type(ch.char) == CharType.KANJI for ch in chain):
+                protected.update(range(i, j + 1))
+        i = j + 1
+
+    return protected
+
+
 def delete_rubies_by_type_names(
     project: "Project", type_names: List[str]
 ) -> int:
@@ -1926,6 +1981,7 @@ def delete_rubies_by_type_names(
     与 DeleteRubyByTypeDialog 的逻辑保持一致：
     - 勾选 HIRAGANA → 同时移除小假名(ぁぃ等)与促音 っ
     - 勾选 KATAKANA → 同时移除小假名(ァィ等)与促音 ッ
+    - 与汉字处于同一连词链中的字符视为汉字，不删除其注音。
 
     Args:
         project: 项目
@@ -1946,9 +2002,12 @@ def delete_rubies_by_type_names(
 
     removed = 0
     for sentence in project.sentences:
-        for ch in sentence.characters:
+        kanji_linked = get_kanji_linked_indices(sentence.characters)
+        for idx, ch in enumerate(sentence.characters):
             if not ch.ruby:
                 continue
+            if idx in kanji_linked:
+                continue  # 与汉字连词，视为汉字，保留注音
             ct = get_char_type(ch.char)
             if ct in extended:
                 if ct == CharType.SOKUON:

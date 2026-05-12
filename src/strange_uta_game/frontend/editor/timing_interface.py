@@ -48,6 +48,9 @@ from strange_uta_game.backend.application import (
 )
 from strange_uta_game.backend.domain import Character, Project
 from strange_uta_game.backend.infrastructure.audio import AudioLoadError
+from strange_uta_game.backend.application.auto_check_service import (
+    get_kanji_linked_indices,
+)
 from strange_uta_game.backend.infrastructure.parsers.text_splitter import (
     CharType,
     get_char_type,
@@ -1120,9 +1123,12 @@ class EditorInterface(QWidget):
             assert self._project is not None
             removed = 0
             for sentence in self._project.sentences:
-                for ch in sentence.characters:
+                kanji_linked = get_kanji_linked_indices(sentence.characters)
+                for idx, ch in enumerate(sentence.characters):
                     if not ch.ruby:
                         continue
+                    if idx in kanji_linked:
+                        continue  # 与汉字连词，视为汉字，保留注音
                     ct = get_char_type(ch.char)
                     if ct in extended:
                         if ct == CharType.SOKUON:
@@ -3107,16 +3113,24 @@ class EditorInterface(QWidget):
             auto_check = AutoCheckService(
                 auto_check_flags=auto_check_flags, user_dictionary=user_dict
             )
-            auto_check.apply_to_project(self._project, only_noruby=only_noruby)
+            # apply_user_dict=False：先分析注音，推迟用户词典覆盖（Phase 5）
+            # 到按类型删除注音之后，确保用户词典不会被删除操作误删
+            delete_types = auto_check_flags.get("delete_ruby_types", [])
+            auto_check.apply_to_project(
+                self._project,
+                only_noruby=only_noruby,
+                apply_user_dict=not bool(delete_types),
+            )
             auto_check.update_checkpoints_for_project(self._project)
 
-            # 自动删除指定类型的注音
-            delete_types = auto_check_flags.get("delete_ruby_types", [])
+            # 自动删除指定类型的注音（在用户词典覆盖之前）
             deleted_count = 0
             if delete_types:
                 deleted_count = delete_rubies_by_type_names(
                     self._project, delete_types
                 )
+                # 删除注音后再应用用户词典覆盖（Phase 5）
+                auto_check.apply_user_dict_to_project(self._project)
 
             self.refresh_lyric_display()
             if hasattr(self, "_store") and self._store:

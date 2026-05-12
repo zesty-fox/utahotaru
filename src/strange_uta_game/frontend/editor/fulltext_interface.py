@@ -39,6 +39,9 @@ from strange_uta_game.backend.domain import (
     RubyPart,
 )
 from strange_uta_game.backend.application import AutoCheckService
+from strange_uta_game.backend.application.auto_check_service import (
+    get_kanji_linked_indices,
+)
 from strange_uta_game.backend.infrastructure.parsers.text_splitter import (
     CharType,
     get_char_type,
@@ -621,9 +624,12 @@ class RubyInterface(QWidget):
 
         removed = 0
         for sentence in self._project.sentences:
-            for ch in sentence.characters:
+            kanji_linked = get_kanji_linked_indices(sentence.characters)
+            for idx, ch in enumerate(sentence.characters):
                 if not ch.ruby:
                     continue
+                if idx in kanji_linked:
+                    continue  # 与汉字连词，视为汉字，保留注音
                 ct = get_char_type(ch.char)
                 if ct in extended:
                     # SOKUON 同时覆盖平假名/片假名两侧，需按实际字符过滤

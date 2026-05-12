@@ -629,19 +629,16 @@ class BulkChangeDialog(QDialog):
     def _register_to_dictionary(
         self, word: str, per_char_ruby: List[Optional[Ruby]]
     ):
-        """将词注册到用户字典（去重 + 顶部插入）。"""
+        """将词注册到用户词典，完整保留用户设定的 Ruby parts（mora）与连词信息。"""
         try:
             from strange_uta_game.frontend.settings.settings_interface import (
                 AppSettings,
             )
+            from strange_uta_game.frontend.settings.app_settings import (
+                build_annotated_reading,
+            )
 
-            readings = []
-            for r in per_char_ruby:
-                if r and r.parts:
-                    readings.append("".join(p.text for p in r.parts))
-                else:
-                    readings.append("")
-            reading = ",".join(s for s in readings if s)
+            reading = build_annotated_reading(word, per_char_ruby)
             AppSettings().register_dictionary_word(word, reading)
         except Exception:
             pass

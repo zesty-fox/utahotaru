@@ -468,15 +468,9 @@ class ModifyCharacterDialog(QDialog):
                     new_ch.linked_to_next = req_linked
             self._sentence.characters[self._start_idx : self._end_idx + 1] = new_chars
 
-        # 词典注册：用户输入的第一段 ruby 拼接
+        # 词典注册：直接传 Ruby 对象列表，完整保留 parts/mora 信息
         if self.chk_register.isChecked():
-            readings = []
-            for r in per_char_ruby:
-                if r and r.parts:
-                    readings.append("".join(p.text for p in r.parts))
-                else:
-                    readings.append("")
-            self._register_to_dictionary(new_text, readings)
+            self._register_to_dictionary(new_text, per_char_ruby)
 
         # 保存注音分段方式配置
         _save_ruby_split_mode(self._radio_direct, self._radio_by_char, self._radio_by_mora)
@@ -488,14 +482,17 @@ class ModifyCharacterDialog(QDialog):
         """返回应用连词时因末字/句尾/行尾被跳过的项列表（abs_idx, char, reason）。"""
         return list(self._linked_failures)
 
-    def _register_to_dictionary(self, word: str, ruby_parts: list):
-        """Register word to user dictionary (dedup + top-insert)."""
+    def _register_to_dictionary(self, word: str, per_char_ruby: list):
+        """将词注册到用户词典，完整保留用户设定的 Ruby parts（mora）与连词信息。"""
         try:
             from strange_uta_game.frontend.settings.settings_interface import (
                 AppSettings,
             )
+            from strange_uta_game.frontend.settings.app_settings import (
+                build_annotated_reading,
+            )
 
-            reading = ",".join(r for r in ruby_parts if r)
+            reading = build_annotated_reading(word, per_char_ruby)
             AppSettings().register_dictionary_word(word, reading)
         except Exception:
             pass
