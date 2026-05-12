@@ -293,6 +293,8 @@ class ExportInterface(QWidget):
         for singer in self._project.singers:
             if singer.id not in used_singer_ids:
                 continue
+            if not singer.enabled:
+                continue
             chk = CheckBox(f"{singer.name}")
             chk.setProperty("singer_id", singer.id)
             chk.setStyleSheet(

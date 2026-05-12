@@ -89,7 +89,10 @@ class Txt2AssExporter(BaseExporter):
 # ASSDirectExporter
 # ──────────────────────────────────────────────
 
-# 行前后留白（毫秒），让字幕进入/退出更自然
+# 行前后留白（毫秒），让 Dialogue Start/End 之外有一点缓冲，
+# 字幕进入/退出更自然。
+# 注意：留白只作用于 Dialogue Start/End 时间，不再额外生成 \k 段时长——
+# 行首 / 行尾的 \k 占位符固定输出 {\k0}，让用户自行用模板/特效填充。
 _PRE_ROLL_MS = 200
 _POST_ROLL_MS = 200
 # 行末若无 sentence_end_ts 时的兜底拖音时长（毫秒）
@@ -171,6 +174,9 @@ class ASSDirectExporter(BaseExporter):
             "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
         ]
 
+        # 预建 singer_id → Singer 映射，避免每行 O(n) 查找
+        singer_map = {s.id: s for s in project.singers}
+
         for sentence in project.sentences:
             if not sentence.has_timetags:
                 continue
@@ -182,7 +188,7 @@ class ASSDirectExporter(BaseExporter):
             # 行结束时间：优先用本行 sentence_end_ts，否则用最大全局时间戳 + 兜底
             line_end_ms = self._compute_line_end_ms(sentence)
 
-            # 行首尾留白
+            # 行首尾留白（只作用于 Dialogue Start/End 时间，不影响 \k 段）
             start_str = self._format_timestamp(
                 max(0, line_start_ms - _PRE_ROLL_MS), "ass"
             )
@@ -193,8 +199,14 @@ class ASSDirectExporter(BaseExporter):
                 sentence, line_start_ms, line_end_ms
             )
 
+            # Name 字段：非默认演唱者写 singer.name，默认（未命名）留空
+            singer = singer_map.get(sentence.singer_id)
+            name_field = ""
+            if singer is not None and not singer.is_default:
+                name_field = self._escape_ass_field(singer.name)
+
             event_line = (
-                f"Dialogue: 0,{start_str},{end_str},Karaoke,,0,0,0,,{karaoke_text}"
+                f"Dialogue: 0,{start_str},{end_str},Default,{name_field},0,0,0,karaoke,{karaoke_text}"
             )
             lines.append(event_line)
 
@@ -233,24 +245,20 @@ class ASSDirectExporter(BaseExporter):
 
         - 无时间戳字符（标点、未打轴的连词后续字）追加到**前一个 \\k 块尾**，
             不产生新的 \\k 标签，避免时间轴偏移。
-        - 行首所有未打轴字符并入 pre-roll \\k 区。
-        - 行尾 post-roll \\k 让退出平滑。
+        - 行首所有未打轴字符并入 pre-roll 占位 `{\\k0}` 后。
+        - 行首/行尾固定输出 `{\\k0}` 占位符，让用户自行用 Aegisub 模板/特效填充。
 
         参考用户提供的真实样例（一行 Aegisub 卡拉OK）：
-            {\\k200}{\\k23}い{\\k8}つ{\\k36}か{\\k20}見|<み{\\k26}た
-            {\\k10}夢|<ゆ{\\k31}#|め{\\k5}　{\\k10}届|<と{\\k12}#|ど
+            {\\k0}い{\\k8}つ{\\k36}か{\\k20}見|<み{\\k26}た
+            {\\k10}夢|<ゆ{\\k31}#|め{\\k5}　{\\k10}届|<と{\\k12}#|ど{\\k0}
         """
         chars = sentence.characters
 
-        # 动态计算实际 pre-roll：当 line_start_ms < _PRE_ROLL_MS 时
-        # Dialogue Start 被 clamp 到 0，pre-roll \k 时长也必须等比例缩减，
-        # 否则视觉高亮会比实际进唱时间晚 (_PRE_ROLL_MS - line_start_ms) 毫秒。
-        actual_pre_roll_ms = min(_PRE_ROLL_MS, max(0, line_start_ms))
-
         if not chars:
-            return f"{{\\k{actual_pre_roll_ms // 10}}}{{\\k{_POST_ROLL_MS // 10}}}"
+            return "{\\k0}{\\k0}"
 
-        parts: List[str] = [f"{{\\k{actual_pre_roll_ms // 10}}}"]
+        # 行首占位 {\k0}（pre-roll 由 Dialogue Start 时间承担）
+        parts: List[str] = ["{\\k0}"]
 
         # 1. 收集所有「有 ts 的字符」做为锚点；记录每个锚点的 ts 列表起点
         #    用于计算每个 \k 段的时长
@@ -258,10 +266,10 @@ class ASSDirectExporter(BaseExporter):
             i for i, ch in enumerate(chars) if ch.global_timestamps
         ]
         if not anchor_indices:
-            # 全行无打轴：整段并入 pre-roll，仅给 post-roll 收尾
+            # 全行无打轴：整段并入 pre-roll，仅给 post-roll 占位收尾
             plain_text = "".join(self._escape_ass_text(c.char) for c in chars)
             parts.append(plain_text)
-            parts.append(f"{{\\k{_POST_ROLL_MS // 10}}}")
+            parts.append("{\\k0}")
             return "".join(parts)
 
         # 2. 行首未打轴字符（在第一个锚点前）并入 pre-roll \k 区，
@@ -336,10 +344,20 @@ class ASSDirectExporter(BaseExporter):
             seg_body += tail_text.get(seg_idx, "")
             parts.append(f"{{\\k{k_cs}}}{seg_body}")
 
-        # 6. 行尾 post-roll
-        parts.append(f"{{\\k{_POST_ROLL_MS // 10}}}")
+        # 6. 行尾占位 {\k0}（post-roll 由 Dialogue End 时间承担）
+        parts.append("{\\k0}")
 
         return "".join(parts)
+
+    @staticmethod
+    def _escape_ass_field(text: str) -> str:
+        """转义 ASS Dialogue 字段值中的逗号。
+
+        Dialogue 行以逗号分隔字段，Name 等字段里的逗号会破坏解析。
+        """
+        if not text:
+            return ""
+        return text.replace(",", "_").replace("\n", " ").replace("\r", "")
 
     @staticmethod
     def _escape_ass_text(text: str) -> str:

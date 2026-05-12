@@ -31,6 +31,65 @@ from strange_uta_game.frontend.theme import theme
 # 卡拉OK 歌词预览
 # ──────────────────────────────────────────────
 
+
+def _anchor_ratio(anchors: list[int], current_time: int) -> float:
+    """根据锚点序列计算总 wipe 进度比例。
+
+    anchors 形如 ``[ts_0, ts_1, ..., ts_N]``，共 N+1 个时间戳，
+    把演唱划成 N 个 part 段。第 i 段区间为 ``[ts_i, ts_{i+1})``。
+
+    返回值 = ``(i + segment_ratio) / N``，其中 i 为 current_time 落入的段索引，
+    segment_ratio 为段内线性比例。clamp 到 [0.0, 1.0]。
+
+    - ``current_time < anchors[0]`` → 0.0
+    - ``current_time >= anchors[-1]`` → 1.0
+    - 段时长 <= 0（异常数据）→ 该段视为瞬时完成
+    - 锚点数 < 2 → 1.0（无法分段，按已完成处理；调用方负责回退）
+    """
+    n = len(anchors) - 1
+    if n <= 0:
+        return 1.0
+    if current_time < anchors[0]:
+        return 0.0
+    if current_time >= anchors[-1]:
+        return 1.0
+    # 线性扫描即可（part 数极少，N <= 10 量级）
+    for i in range(n):
+        seg_start = anchors[i]
+        seg_end = anchors[i + 1]
+        if current_time < seg_end:
+            seg_dur = seg_end - seg_start
+            seg_ratio = (current_time - seg_start) / seg_dur if seg_dur > 0 else 1.0
+            seg_ratio = max(0.0, min(1.0, seg_ratio))
+            return (i + seg_ratio) / n
+    return 1.0
+
+
+def _anchor_segment(anchors: list[int], current_time: int) -> tuple[int, float, int]:
+    """与 _anchor_ratio 同义，但返回 (段索引 i, 段内比例 seg_ratio, 段数 N)。
+
+    - 已完成（>=anchors[-1]）→ (N-1, 1.0, N)
+    - 未开始（<anchors[0]）→ (0, 0.0, N)
+    - anchors 不足 2 元素 → (0, 1.0, 0)
+    """
+    n = len(anchors) - 1
+    if n <= 0:
+        return (0, 1.0, 0)
+    if current_time < anchors[0]:
+        return (0, 0.0, n)
+    if current_time >= anchors[-1]:
+        return (n - 1, 1.0, n)
+    for i in range(n):
+        seg_start = anchors[i]
+        seg_end = anchors[i + 1]
+        if current_time < seg_end:
+            seg_dur = seg_end - seg_start
+            seg_ratio = (current_time - seg_start) / seg_dur if seg_dur > 0 else 1.0
+            seg_ratio = max(0.0, min(1.0, seg_ratio))
+            return (i, seg_ratio, n)
+    return (n - 1, 1.0, n)
+
+
 class KaraokePreview(QWidget):
     """多行歌词预览，带逐字高亮、注音显示和滚动支持。
 
@@ -937,6 +996,67 @@ class KaraokePreview(QWidget):
                     char_end_ts = int(leader_start_ts + (leader_end_ts - leader_start_ts) * next_ratio)
                     char_wipe_times[ci] = (char_start_ts, char_end_ts)
 
+        # ---------- 每字符的 part 锚点序列（用于 check_count>=2 的多 checkpoint 字符） ----------
+        # char_part_anchors[ci] = [ts_0, ts_1, ..., ts_N]，N = part 数
+        #   - 仅在 ch.global_timestamps 数量 >= 2 时构造（即 check_count>=2 且至少打了 2 个轴）
+        #   - 末尾的 ts_N 取 char_wipe_times[ci][1]（沿用现状的回退链：下一字符 ts[0] /
+        #     global_sentence_end_ts / 下一行首 ts / _duration_ms）
+        #   - ruby.parts 数与 check_count 不匹配也启用：渲染层会按 ruby 文本像素 N 等分回退
+        char_part_anchors: dict[int, list[int]] = {}
+        for ci, ch_obj in enumerate(characters):
+            gts = list(ch_obj.global_timestamps)
+            if len(gts) < 2:
+                continue
+            wt = char_wipe_times.get(ci)
+            if not wt:
+                continue
+            seg_end_ts = wt[1]
+            # 末尾锚点必须严格大于倒数第二个，否则视为脏数据，跳过
+            if seg_end_ts <= gts[-1]:
+                continue
+            char_part_anchors[ci] = gts + [int(seg_end_ts)]
+
+        # ---------- 连词组的总锚点轴（组内 char 的 global_timestamps 串成总轴） ----------
+        # group_anchors[leader_ci] = [ts_0, ts_1, ..., ts_M]，M = 组内总 part 数
+        #   - 仅当组内至少有一个字符具备多 checkpoint 时启用
+        #   - 末尾用组最后一个字符的 wipe end_ts
+        #   - 组内中间字符若有 global_timestamps[0]，会自然加入（保证时序单调）
+        group_anchors: dict[int, list[int]] = {}
+        group_char_pixel_starts: dict[int, dict[int, int]] = {}  # leader_ci -> {ci: cum_w_before}
+        group_char_total_w: dict[int, int] = {}  # leader_ci -> 组总像素宽
+        for leader_ci, group in linked_leader_groups.items():
+            ts_list: list[int] = []
+            for _gci in group:
+                ch_obj = characters[_gci]
+                gts = list(ch_obj.global_timestamps)
+                ts_list.extend(int(t) for t in gts)
+            if len(ts_list) < 1:
+                continue
+            # 末尾锚点：组最后一个字符的 wipe 结束时间
+            last_ci = group[-1]
+            last_wt = char_wipe_times.get(last_ci)
+            if not last_wt:
+                continue
+            seg_end_ts = int(last_wt[1])
+            # 必须严格单调递增，否则跳过
+            if any(ts_list[i] >= ts_list[i + 1] for i in range(len(ts_list) - 1)):
+                continue
+            if seg_end_ts <= ts_list[-1]:
+                continue
+            # 至少要有 2 个锚点（含末尾），否则没必要走新模型
+            if len(ts_list) < 2 and seg_end_ts > ts_list[-1]:
+                # ts_list 只有 1 个值 → 与旧 char_wipe_times 等价，不启用新模型
+                continue
+            group_anchors[leader_ci] = ts_list + [seg_end_ts]
+            # 累计像素分布（用 char_widths，含已 inflate 的 ruby 对齐宽度）
+            cum = 0
+            offsets: dict[int, int] = {}
+            for _gci in group:
+                offsets[_gci] = cum
+                cum += int(char_widths[_gci])
+            group_char_pixel_starts[leader_ci] = offsets
+            group_char_total_w[leader_ci] = cum
+
         entry = {
             "v": line_version,
             "gv": self._global_version,
@@ -946,6 +1066,10 @@ class KaraokePreview(QWidget):
             "char_wipe_times": char_wipe_times,
             "linked_leader_groups": linked_leader_groups,
             "linked_non_leader": linked_non_leader,
+            "char_part_anchors": char_part_anchors,
+            "group_anchors": group_anchors,
+            "group_char_pixel_starts": group_char_pixel_starts,
+            "group_char_total_w": group_char_total_w,
         }
         self._sentence_cache[idx] = entry
         return entry
@@ -1117,6 +1241,16 @@ class KaraokePreview(QWidget):
             char_wipe_times = _rd["char_wipe_times"]
             _linked_leader_groups = _rd["linked_leader_groups"]
             _linked_non_leader = _rd["linked_non_leader"]
+            _char_part_anchors = _rd["char_part_anchors"]
+            _group_anchors = _rd["group_anchors"]
+            _group_char_pixel_starts = _rd["group_char_pixel_starts"]
+            _group_char_total_w = _rd["group_char_total_w"]
+            # 反查表：组员 ci -> leader_ci（用于主文字段判断是否走组总轴）
+            _ci_to_leader: dict[int, int] = {}
+            for _l_ci, _grp in _linked_leader_groups.items():
+                if _l_ci in _group_anchors:
+                    for _g in _grp:
+                        _ci_to_leader[_g] = _l_ci
 
             # 根据对齐方式计算起始 x 坐标
             text_area_left = self._line_number_margin + 5  # 行号区域右侧留 5px 间距
@@ -1199,13 +1333,54 @@ class KaraokePreview(QWidget):
                         painter.setFont(font_ruby)
                         painter.setPen(base_color)
                         painter.drawText(int(ruby_x), ruby_y, _merged)
-                        # Wipe
+                        # Wipe — 优先使用组锚点轴；缺锚点回退旧整段线性
                         _fw = char_wipe_times.get(_grp[0])
                         _lw = char_wipe_times.get(_grp[-1])
                         _rs = _fw[0] if _fw else None
                         _re = _lw[1] if _lw else None
                         _rh = _char_singer_colors.get(_grp[0], highlight_color)
-                        if _rs is not None and _re is not None:
+                        _g_anchors_r = _group_anchors.get(char_pos)
+                        if _g_anchors_r is not None and len(_g_anchors_r) >= 2:
+                            _i, _sr, _n = _anchor_segment(_g_anchors_r, current_time)
+                            if _n > 0:
+                                # 收集组内所有 part 顺序排列
+                                _all_parts: list = []
+                                for _r in _grp_rubies:
+                                    if _r.parts:
+                                        _all_parts.extend(_r.parts)
+                                if len(_all_parts) == _n and _n > 0:
+                                    _part_ws = [
+                                        fm_ruby.horizontalAdvance(p.text)
+                                        for p in _all_parts
+                                    ]
+                                    _total_pw = sum(_part_ws)
+                                    if _total_pw > 0:
+                                        _cum = sum(_part_ws[:_i])
+                                        _local = _part_ws[_i] * _sr
+                                        _rww = int(
+                                            ruby_text_w * (_cum + _local) / _total_pw
+                                        )
+                                    else:
+                                        _rww = int(ruby_text_w * (_i + _sr) / _n)
+                                else:
+                                    _rww = int(ruby_text_w * (_i + _sr) / _n)
+                                if _rww >= ruby_text_w:
+                                    painter.setPen(_rh)
+                                    painter.drawText(int(ruby_x), ruby_y, _merged)
+                                elif _rww > 0:
+                                    painter.save()
+                                    painter.setClipRect(
+                                        QRect(
+                                            int(ruby_x),
+                                            ruby_y - fm_ruby.ascent() - 2,
+                                            _rww,
+                                            fm_ruby.height() + 4,
+                                        )
+                                    )
+                                    painter.setPen(_rh)
+                                    painter.drawText(int(ruby_x), ruby_y, _merged)
+                                    painter.restore()
+                        elif _rs is not None and _re is not None:
                             if current_time >= _re:
                                 painter.setPen(_rh)
                                 painter.drawText(int(ruby_x), ruby_y, _merged)
@@ -1258,28 +1433,41 @@ class KaraokePreview(QWidget):
                         painter.setFont(font_ruby)
                         painter.setPen(base_color)
                         painter.drawText(int(ruby_x), ruby_y, _ruby_disp)
-                        # Wipe
-                        ruby_wipe_st = char_wipe_times.get(char_pos)
-                        ruby_st = ruby_wipe_st[0] if ruby_wipe_st else None
+                        # Wipe — 优先用 part 锚点轴分段；缺锚点回退旧整段线性
                         ruby_highlight = _char_singer_colors.get(
                             char_pos, highlight_color
                         )
-                        if ruby_st is not None:
-                            ruby_wipe_et = char_wipe_times.get(char_pos)
-                            ruby_et = ruby_wipe_et[1] if ruby_wipe_et else ruby_st + 300
-                            if current_time >= ruby_et:
-                                painter.setPen(ruby_highlight)
-                                painter.drawText(int(ruby_x), ruby_y, _ruby_disp)
-                            elif current_time >= ruby_st:
-                                r_dur = ruby_et - ruby_st
-                                r_ratio = (
-                                    min(1.0, (current_time - ruby_st) / r_dur)
-                                    if r_dur > 0
-                                    else 1.0
-                                )
-                                if r_ratio > 0:
+                        _r_anchors = _char_part_anchors.get(char_pos)
+                        if _r_anchors is not None and len(_r_anchors) >= 2:
+                            _i, _sr, _n = _anchor_segment(_r_anchors, current_time)
+                            if _n > 0:
+                                # 决定每段像素宽：parts 数与段数 N 匹配则按 part 实际像素，否则等分
+                                _parts = ruby.parts if ruby.parts else []
+                                if len(_parts) == _n and _n > 0:
+                                    _part_ws = [
+                                        fm_ruby.horizontalAdvance(p.text)
+                                        for p in _parts
+                                    ]
+                                    _total_pw = sum(_part_ws)
+                                    if _total_pw > 0:
+                                        # 按 part 像素比例映射回 ruby_text_w（消除 kerning 差异）
+                                        _cum = sum(_part_ws[:_i])
+                                        _local = _part_ws[_i] * _sr
+                                        r_wipe_w = int(
+                                            ruby_text_w * (_cum + _local) / _total_pw
+                                        )
+                                    else:
+                                        r_wipe_w = int(
+                                            ruby_text_w * (_i + _sr) / _n
+                                        )
+                                else:
+                                    # parts 数与 anchor 段数不等 → 按 ruby 文本像素 N 等分
+                                    r_wipe_w = int(ruby_text_w * (_i + _sr) / _n)
+                                if r_wipe_w >= ruby_text_w:
+                                    painter.setPen(ruby_highlight)
+                                    painter.drawText(int(ruby_x), ruby_y, _ruby_disp)
+                                elif r_wipe_w > 0:
                                     painter.save()
-                                    r_wipe_w = int(ruby_text_w * r_ratio)
                                     painter.setClipRect(
                                         QRect(
                                             int(ruby_x),
@@ -1291,6 +1479,36 @@ class KaraokePreview(QWidget):
                                     painter.setPen(ruby_highlight)
                                     painter.drawText(int(ruby_x), ruby_y, _ruby_disp)
                                     painter.restore()
+                        else:
+                            ruby_wipe_st = char_wipe_times.get(char_pos)
+                            ruby_st = ruby_wipe_st[0] if ruby_wipe_st else None
+                            if ruby_st is not None:
+                                ruby_wipe_et = char_wipe_times.get(char_pos)
+                                ruby_et = ruby_wipe_et[1] if ruby_wipe_et else ruby_st + 300
+                                if current_time >= ruby_et:
+                                    painter.setPen(ruby_highlight)
+                                    painter.drawText(int(ruby_x), ruby_y, _ruby_disp)
+                                elif current_time >= ruby_st:
+                                    r_dur = ruby_et - ruby_st
+                                    r_ratio = (
+                                        min(1.0, (current_time - ruby_st) / r_dur)
+                                        if r_dur > 0
+                                        else 1.0
+                                    )
+                                    if r_ratio > 0:
+                                        painter.save()
+                                        r_wipe_w = int(ruby_text_w * r_ratio)
+                                        painter.setClipRect(
+                                            QRect(
+                                                int(ruby_x),
+                                                ruby_y - fm_ruby.ascent() - 2,
+                                                r_wipe_w,
+                                                fm_ruby.height() + 4,
+                                            )
+                                        )
+                                        painter.setPen(ruby_highlight)
+                                        painter.drawText(int(ruby_x), ruby_y, _ruby_disp)
+                                        painter.restore()
 
                 # 主文字 — 基于 checkpoint 的逐字 wipe
                 painter.setFont(main_font)
@@ -1304,37 +1522,63 @@ class KaraokePreview(QWidget):
                 if char_pos in char_wipe_times:
                     char_time, next_time = char_wipe_times[char_pos]
 
-                    if current_time >= next_time:
+                    # 决定 wipe ratio 来源：
+                    # 1) 组总轴（连词组且组锚点足够）→ 组 ratio 映射回该字符像素区间
+                    # 2) 字符 part 锚点（check_count>=2 且打过轴）→ 该字符 ratio
+                    # 3) 否则 → 旧的整字线性
+                    _grp_leader = _ci_to_leader.get(char_pos)
+                    if _grp_leader is not None:
+                        _g_anchors = _group_anchors[_grp_leader]
+                        _g_total_w = _group_char_total_w[_grp_leader]
+                        _g_offset = _group_char_pixel_starts[_grp_leader][char_pos]
+                        _g_ratio = _anchor_ratio(_g_anchors, current_time)
+                        # 组累计已 wipe 像素，clip 到 [0, char_w]
+                        _wiped_total_px = _g_total_w * _g_ratio
+                        local_wipe_px = _wiped_total_px - _g_offset
+                        if local_wipe_px <= 0:
+                            wipe_ratio = 0.0
+                        elif local_wipe_px >= char_w:
+                            wipe_ratio = 1.0
+                        else:
+                            wipe_ratio = local_wipe_px / char_w
+                    elif char_pos in _char_part_anchors:
+                        wipe_ratio = _anchor_ratio(
+                            _char_part_anchors[char_pos], current_time
+                        )
+                    else:
+                        if current_time >= next_time:
+                            wipe_ratio = 1.0
+                        elif current_time >= char_time:
+                            duration = next_time - char_time
+                            wipe_ratio = (
+                                min(1.0, (current_time - char_time) / duration)
+                                if duration > 0
+                                else 1.0
+                            )
+                        else:
+                            wipe_ratio = 0.0
+
+                    if wipe_ratio >= 1.0:
                         # 已唱完 → 全高亮
                         painter.setPen(char_highlight)
                         painter.drawText(int(char_draw_x), int(y_center), ch)
-                    elif current_time >= char_time:
+                    elif wipe_ratio > 0.0:
                         # 正在唱 → wipe 渐变
                         painter.setPen(base_color)
                         painter.drawText(int(char_draw_x), int(y_center), ch)
 
-                        duration = next_time - char_time
-                        if duration > 0:
-                            wipe_ratio = min(
-                                1.0,
-                                (current_time - char_time) / duration,
-                            )
-                        else:
-                            wipe_ratio = 1.0
-
-                        if wipe_ratio > 0:
-                            painter.save()
-                            wipe_w = int(char_w * wipe_ratio)
-                            clip_rect = QRect(
-                                int(curr_x),
-                                int(y_center - main_fm.ascent() - 5),
-                                wipe_w,
-                                main_fm.height() + 10,
-                            )
-                            painter.setClipRect(clip_rect)
-                            painter.setPen(char_highlight)
-                            painter.drawText(int(char_draw_x), int(y_center), ch)
-                            painter.restore()
+                        painter.save()
+                        wipe_w = int(char_w * wipe_ratio)
+                        clip_rect = QRect(
+                            int(curr_x),
+                            int(y_center - main_fm.ascent() - 5),
+                            wipe_w,
+                            main_fm.height() + 10,
+                        )
+                        painter.setClipRect(clip_rect)
+                        painter.setPen(char_highlight)
+                        painter.drawText(int(char_draw_x), int(y_center), ch)
+                        painter.restore()
                     else:
                         # 未唱 → 基色
                         painter.setPen(base_color)

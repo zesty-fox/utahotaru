@@ -168,6 +168,41 @@ class Project:
                 return singer
         raise DomainError("没有默认演唱者")
 
+    def reorder_singers(self, ordered_ids: List[str]) -> None:
+        """按给定 ID 顺序重排演唱者列表。
+
+        会同时把每个演唱者的 ``display_priority`` 重写为新的索引值，
+        以便排序结果可被持久化（.sug 存档已序列化 display_priority）。
+
+        Args:
+            ordered_ids: 新顺序下的演唱者 ID 列表。必须与当前 ``singers``
+                覆盖相同的 ID 集合（不允许缺漏或重复），否则抛 ``ValidationError``。
+        """
+        if len(ordered_ids) != len(self.singers):
+            raise ValidationError(
+                f"reorder_singers: 数量不匹配（期望 {len(self.singers)}, 实际 {len(ordered_ids)}）"
+            )
+        if len(set(ordered_ids)) != len(ordered_ids):
+            raise ValidationError("reorder_singers: ID 列表存在重复")
+
+        id_to_singer = {s.id: s for s in self.singers}
+        current_ids = set(id_to_singer.keys())
+        if set(ordered_ids) != current_ids:
+            missing = current_ids - set(ordered_ids)
+            extra = set(ordered_ids) - current_ids
+            raise ValidationError(
+                f"reorder_singers: ID 集合不一致 (missing={missing}, extra={extra})"
+            )
+
+        new_list: List[Singer] = []
+        for idx, sid in enumerate(ordered_ids):
+            singer = id_to_singer[sid]
+            singer.display_priority = idx
+            new_list.append(singer)
+
+        self.singers = new_list
+        self._update_timestamp()
+
     # ==================== 句子管理 ====================
 
     def add_sentence(

@@ -215,11 +215,17 @@ class NicokaraExporter(BaseExporter):
                 prev_singer_id = effective_singer
 
             # 字符起始时间戳（第一个 checkpoint，使用导出时间戳含偏移）
+            # 注意：无 global_timestamps 时**不**填占位（如 [00:00:00]），
+            # 直接输出字符。Nicokara 解析器会把该字符视为与前一字"连读"。
             if ch.global_timestamps:
                 parts.append(_format_nicokara_ts(ch.global_timestamps[0]))
             parts.append(ch.char)
 
-            # 非行尾句尾字符的释放时间戳（句中句尾需要输出一前一后两个时间戳）
+            # 句中演唱停顿点的释放时间戳：当某个非行尾字符被标为
+            # "演唱停顿"（is_sentence_end，命名遗留，真实语义是
+            # "演唱时的呼吸/停顿"），需要在该字符之后立即输出
+            # 一个停顿释放 ts，形成 [ts前]字[ts后] 的双时间戳结构。
+            # 这与"连词"无关，连词信息仅在 @RubyN 中体现。
             if (
                 i < len(sentence.characters) - 1
                 and ch.is_sentence_end
@@ -435,19 +441,26 @@ class NicokaraWithRubyExporter(NicokaraExporter):
     def _collect_ruby_entries(
         self, project: Project, singer_ids: Optional[Set[str]] = None
     ) -> List[str]:
-        """收集所有注音并生成 @Ruby 条目列表（朴素版 — 每段独立 entry）
+        """收集所有注音并生成 @Ruby 条目列表（按 linked_to_next 切段）
 
-        策略（用户指定，2026-05-11）：
-          - 按 body 顺序扫描 sentence，遇到连续的有 ruby 的 char 即为一段。
-          - 每段独立输出一个 @RubyN，N 严格递增，不复用、不去重、不按 kanji 合并。
+        策略（用户修订，2026-05-13）：
+          - 一个 @RubyN tag 内的多字符必须语义上构成「连词」。
+            连词信息**唯一**由 `Character.linked_to_next` 字段承载。
+            解析侧 N3 `_apply_ruby_entries` 与编辑器
+            `sentence_to_annotated_line` 共同维护此字段。
+          - 切段规则：从某个有 ruby 的字符开始扫描，仅当当前字
+            `linked_to_next == True` 时把下一字纳入同段；
+            遇到 `linked_to_next == False` 立刻收尾。
+          - **注意**：`Character.is_sentence_end` 表示的是「演唱时的
+            呼吸/语句停顿」，**不是语义层面的句子边界**，因此**不**
+            参与 ruby 切段判断。一个连词内部允许出现演唱停顿
+            （linked_to_next=True 且 is_sentence_end=True 是合法的）。
+          - 相邻两个有 ruby 但未设为连词的字符（典型：解析后的两个
+            单字 @Ruby tag）必须输出为两个独立 `@RubyN` entry。
+          - 每段独立输出，N 严格递增，不复用、不去重、不按 kanji 合并。
           - 作用域写死在该段自身的时间范围内：
-              pos1 = 段首字第一个 global timestamp
-              pos2 = 段尾字 sentence_end_ts（若是句尾）或最后一个 timestamp
-          - reading 由 _build_reading_with_timestamps 按段内 char.ruby.parts 原样拼出。
-
-        这一版**不做任何省略**：每个 entry 都完整写 kanji,reading,pos1,pos2，
-        即使作用域只覆盖两三个字符。语义最清晰，不依赖任何 substring 消歧或
-        kanji+reading 折叠规则。
+              pos1 = 段首字第一个 global timestamp（缺失则向上回溯）
+              pos2 = 段尾字 sentence_end_ts（若是演唱停顿）或下一字起始 ts
 
         Args:
             project: 项目数据
@@ -473,14 +486,21 @@ class NicokaraWithRubyExporter(NicokaraExporter):
                 if chars[i].ruby is None:
                     i += 1
                     continue
-                # 扫一段连续 ruby char [start_idx, end_idx)
-                # 终止条件：
-                #   1. 下一个 char 无 ruby
-                #   2. 当前 char 是句尾（is_sentence_end=True）—— 句子边界天然切段，
-                #      避免把同一 lrc 行中跨"释放 ts"的两句 ruby 合并（如 乙女|心）
+                # 扫一段连词组 [start_idx, end_idx)。
+                # 终止条件（满足任一立即收尾，当前字仍纳入本段）：
+                #   1. 当前字 linked_to_next == False —— 连词链断
+                #   2. 下一字无 ruby —— 段自然结束
+                # 注意：is_sentence_end 表示「演唱停顿」而非语义边界，
+                # **不参与**切段判断（连词内允许演唱停顿）。
                 start_idx = i
-                while i < n and chars[i].ruby is not None:
-                    if chars[i].is_sentence_end:
+                while i < n:
+                    cur = chars[i]
+                    if not cur.linked_to_next:
+                        i += 1
+                        break
+                    # linked_to_next=True 但下一字越界或无 ruby
+                    # （异常数据保护）：本字仍属本段，下一轮 outer loop 处理 i+1
+                    if i + 1 >= n or chars[i + 1].ruby is None:
                         i += 1
                         break
                     i += 1
@@ -528,9 +548,11 @@ class NicokaraWithRubyExporter(NicokaraExporter):
                         if found:
                             break
                 # pos2: 段尾字"作用结束"时刻
-                #   - 若段尾字是句尾 → 句尾释放 ts（global_sentence_end_ts）
+                #   - 若段尾字标有演唱停顿（is_sentence_end，命名遗留，
+                #     真实语义是"演唱时的呼吸/停顿"，非语义句末）
+                #     → 取该字 global_sentence_end_ts（停顿释放 ts）
                 #   - 否则 → 下一个有 ts 的 char 的起始 ts（下字开始 = 本字结束）
-                #   - 找不到下一字（全文末尾且用户未标句尾）→ pos2 省略
+                #   - 找不到下一字（全文末尾且用户未标停顿）→ pos2 省略
                 last_ch = chars[end_idx - 1]
                 pos2_ts: Optional[int] = None
                 pos2_omit = False

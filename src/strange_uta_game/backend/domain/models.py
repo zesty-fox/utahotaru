@@ -168,8 +168,19 @@ class Character:
     check_count: int = 1
     timestamps: List[int] = field(default_factory=list)
     sentence_end_ts: Optional[int] = None
+    # linked_to_next: 是否与下一字组成"连词"（语义上的复合词），
+    # 是连词信息的**唯一**权威载体。@RubyN tag 内多字合并、
+    # editor 的 {...||...} 序列化、N3 解析回灌均以此字段为准。
     linked_to_next: bool = False
     is_line_end: bool = False
+    # is_sentence_end: ⚠ 命名遗留 —— 真实语义是「**演唱时的呼吸/语句停顿**」，
+    # **不是语义层面的句末**。用于：
+    #   - LRC/Nicokara 行末或句中停顿点的释放时间戳输出
+    #   - ASS/txt2ass 行结束时刻计算
+    # **不应**用来判断：
+    #   - 是否构成连词（用 linked_to_next）
+    #   - 语义句子边界（本字段做不到这件事）
+    # 因重构成本过高未改名，所有调用点请按"演唱停顿"语义解读。
     is_sentence_end: bool = False
     is_rest: bool = False
     singer_id: str = ""

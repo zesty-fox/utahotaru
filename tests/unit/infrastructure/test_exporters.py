@@ -409,10 +409,15 @@ class TestNicokaraWithRubyExporter:
 
 
     def test_export_ruby_multi_reading_disambiguation(self):
-        """朴素分段策略：每段连续 ruby 独立成 @RubyN，不做 kanji 合并 / 去重。
+        """linked_to_next 切段策略：同 ruby tag 内的多字必须语义构成连词，
+        即 `Character.linked_to_next == True` 才能合并；否则必须切为独立 entry。
 
-        即使同一 kanji（言）在不同句子里有不同读音（こと vs ゆ），
-        两段也独立输出，各自带自身的位置范围 [pos1],[pos2]。
+        本测试构造两个相邻但**未设连词**的单字 ruby（「言」「葉」），
+        以及第二句独立的「言」ruby（不同读音）。预期输出 3 个独立 @RubyN：
+          - @Ruby1: 言, こ[ts]と  （单字 + 字内相对时间戳）
+          - @Ruby2: 葉, ば
+          - @Ruby3: 言, ゆ
+        三段各带独立位置范围。
         """
         from strange_uta_game.backend.domain import Ruby, RubyPart
         from strange_uta_game.backend.infrastructure.exporters import (
@@ -423,6 +428,7 @@ class TestNicokaraWithRubyExporter:
         singer = project.singers[0]
 
         # 第一句: 言 with reading こ[0]と[163]，葉 with reading ば
+        # 两个 ruby 独立、未 linked → 必须切为两个 entry
         s1 = Sentence.from_text("言葉は", singer.id)
         s1.characters[0].check_count = 2
         s1.characters[0].set_ruby(
@@ -430,6 +436,7 @@ class TestNicokaraWithRubyExporter:
         )
         s1.characters[0].add_timestamp(1000, checkpoint_idx=0)
         s1.characters[0].add_timestamp(1163, checkpoint_idx=1)
+        # 注意：linked_to_next 默认 False，符合「未设为连词」的语义
         s1.characters[1].set_ruby(Ruby(parts=[RubyPart(text="ば")]))
         s1.characters[1].add_timestamp(1300)
         s1.characters[2].add_timestamp(1500)
@@ -455,18 +462,139 @@ class TestNicokaraWithRubyExporter:
             with open(temp_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            # 第一段：连续 ruby 段 = 言+葉（汉字拼接），reading 内含子时间戳
-            # 形如：@RubyN=言葉,こ[mm:ss.cc]と[mm:ss.cc]ば,[00:01:00],[00:01:50]
+            # 第一段：「言」单独 entry，reading 含字内相对 ts
             assert re.search(
-                r"@Ruby\d+=言葉,こ\[\d{2}:\d{2}:\d{2}\]と\[\d{2}:\d{2}:\d{2}\]ば,"
-                r"\[00:01:00\],\[00:01:50\]",
+                r"@Ruby\d+=言,こ\[\d{2}:\d{2}:\d{2}\]と,"
+                r"\[00:01:00\],\[00:01:30\]",
                 content,
-            ), f"未匹配第一段 ruby:\n{content}"
-            # 第二段：独立 entry，自身位置范围
+            ), f"未匹配「言」段 (单字+相对 ts):\n{content}"
+            # 第二段：「葉」单独 entry
+            assert re.search(
+                r"@Ruby\d+=葉,ば,\[00:01:30\],\[00:01:50\]",
+                content,
+            ), f"未匹配「葉」段:\n{content}"
+            # 第三段：第二句「言」独立 entry，自身位置范围
             assert re.search(
                 r"@Ruby\d+=言,ゆ,\[00:05:00\],\[00:05:20\]",
                 content,
-            ), f"未匹配第二段 ruby:\n{content}"
+            ), f"未匹配第二句「言」段:\n{content}"
+            # 严格不允许把「言葉」合并（未 linked）
+            assert "@Ruby1=言葉" not in content
+            assert "@Ruby2=言葉" not in content
+            assert "@Ruby3=言葉" not in content
+        finally:
+            os.unlink(temp_path)
+
+    def test_export_ruby_linked_merges_into_single_entry(self):
+        """linked_to_next=True 正向用例：相邻 ruby 字显式连词，
+        必须合并为单一 @RubyN entry（与 disambiguation 测试构成正/反对照）。
+
+        构造「言葉」两字均有 ruby、且 `言.linked_to_next == True`，
+        预期输出：
+          @Ruby1=言葉,こと[..]ば,[pos1],[pos2]
+        其中 pos1 取「言」首 ts，pos2 取「は」(下一字) ts。
+        """
+        from strange_uta_game.backend.domain import Ruby, RubyPart
+        from strange_uta_game.backend.infrastructure.exporters import (
+            NicokaraWithRubyExporter,
+        )
+
+        project = Project()
+        singer = project.singers[0]
+
+        # 「言葉は」：言+葉 同为 ruby 且 linked → 合并 entry
+        sentence = Sentence.from_text("言葉は", singer.id)
+        sentence.characters[0].set_ruby(Ruby(parts=[RubyPart(text="こと")]))
+        sentence.characters[0].add_timestamp(1000)
+        sentence.characters[0].linked_to_next = True  # 显式连词
+        sentence.characters[1].set_ruby(Ruby(parts=[RubyPart(text="ば")]))
+        sentence.characters[1].add_timestamp(1300)
+        sentence.characters[2].add_timestamp(1500)
+        project.add_sentence(sentence)
+
+        exporter = NicokaraWithRubyExporter()
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".lrc", delete=False, encoding="utf-8"
+        ) as f:
+            temp_path = f.name
+
+        try:
+            exporter.export(project, temp_path)
+
+            with open(temp_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # 合并段：亲文字「言葉」，ruby「ことば」（含字间相对 ts），
+            # pos1=言首 [00:01:00]，pos2=は开始 [00:01:50]
+            assert re.search(
+                r"@Ruby\d+=言葉,こと\[\d{2}:\d{2}:\d{2}\]ば,"
+                r"\[00:01:00\],\[00:01:50\]",
+                content,
+            ), f"未匹配 linked 合并 entry:\n{content}"
+            # 严格不允许被切成两段
+            assert not re.search(r"@Ruby\d+=言,こと", content), (
+                f"linked 字被错误切段:\n{content}"
+            )
+            assert not re.search(r"@Ruby\d+=葉,ば", content), (
+                f"linked 字被错误切段:\n{content}"
+            )
+        finally:
+            os.unlink(temp_path)
+
+    def test_export_ruby_linked_allows_internal_singing_pause(self):
+        """`is_sentence_end` 表示「演唱停顿」而非语义句末，**不参与**
+        ruby 切段判断。即使连词内部某字 is_sentence_end=True，
+        只要 linked_to_next=True，整个连词仍合并为单一 @RubyN entry。
+
+        构造「言葉」连词，「言」同时 linked_to_next=True 且
+        is_sentence_end=True（演唱时此处有呼吸停顿），预期：
+          - 仍合并为单 entry @Ruby1=言葉,...
+          - pos2 取「葉」段尾的下一字 ts（不是被「言」的 sentence_end_ts 切断）
+        """
+        from strange_uta_game.backend.domain import Ruby, RubyPart
+        from strange_uta_game.backend.infrastructure.exporters import (
+            NicokaraWithRubyExporter,
+        )
+
+        project = Project()
+        singer = project.singers[0]
+
+        sentence = Sentence.from_text("言葉は", singer.id)
+        sentence.characters[0].set_ruby(Ruby(parts=[RubyPart(text="こと")]))
+        sentence.characters[0].add_timestamp(1000)
+        sentence.characters[0].linked_to_next = True
+        # 演唱停顿但仍为连词：is_sentence_end 不应破坏切段
+        sentence.characters[0].is_sentence_end = True
+        sentence.characters[0].sentence_end_ts = 1200
+        sentence.characters[1].set_ruby(Ruby(parts=[RubyPart(text="ば")]))
+        sentence.characters[1].add_timestamp(1300)
+        sentence.characters[2].add_timestamp(1500)
+        project.add_sentence(sentence)
+
+        exporter = NicokaraWithRubyExporter()
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".lrc", delete=False, encoding="utf-8"
+        ) as f:
+            temp_path = f.name
+
+        try:
+            exporter.export(project, temp_path)
+
+            with open(temp_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # 合并段：「言葉」仍为单 entry，pos2=「は」起始 ts [00:01:50]
+            # 关键反断言：不允许在「言」处被切断 → 不允许出现单独的「言」段
+            assert re.search(
+                r"@Ruby\d+=言葉,こと\[\d{2}:\d{2}:\d{2}\]ば,"
+                r"\[00:01:00\],\[00:01:50\]",
+                content,
+            ), f"linked + is_sentence_end 被错误切段:\n{content}"
+            assert not re.search(r"@Ruby\d+=言,こと", content), (
+                f"is_sentence_end 错误地切断了 linked 连词:\n{content}"
+            )
         finally:
             os.unlink(temp_path)
 

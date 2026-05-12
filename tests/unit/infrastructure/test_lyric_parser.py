@@ -196,8 +196,12 @@ class TestApplyRubyEntries:
         ruby_text_2 = "".join(p.text for p in s2.characters[0].ruby.parts)
         assert ruby_text_2 == "い"
 
-    def test_no_position_falls_back_to_sequential(self):
-        """无位置范围时按顺序匹配第一个未标注出现"""
+    def test_no_position_later_entry_overrides_earlier(self):
+        """SHINTA 2025 规格：同 kanji 多个 @RubyN 条目均无 position 时，
+        后到的覆盖先到的（N 大者覆盖 N 小者），所有出现统一取最后一个 reading。
+
+        这取代了 RhythmicaLyrics 历史的「第 N 条 → 第 N 次出现」顺序分配行为。
+        """
         from strange_uta_game.backend.infrastructure.parsers.lyric_parser import (
             _apply_ruby_entries,
             NicokaraRubyEntry,
@@ -212,9 +216,316 @@ class TestApplyRubyEntries:
 
         _apply_ruby_entries(s, entries)
 
-        # 第一个嫌 → きら
+        # 两个「嫌」均被第二个 entry 覆盖为 いや（规格合规）
         ruby1 = "".join(p.text for p in s.characters[0].ruby.parts)
-        assert ruby1 == "きら"
-        # 第二个嫌 → いや
+        assert ruby1 == "いや"
         ruby2 = "".join(p.text for p in s.characters[2].ruby.parts)
         assert ruby2 == "いや"
+
+    # ---- SHINTA 2025 规格附加测试 ----------------------------------------
+
+    def test_position_range_inclusive_upper_bound_G(self):
+        """差异表 G：适用区间右端点是闭合的 (`char_ms <= pos_end_ms` 通过)。
+
+        char ts 恰好等于 pos_end 时，旧逻辑（>=）会判断失败、跳过这次出现；
+        新逻辑应当落到 ruby。
+        """
+        from strange_uta_game.backend.infrastructure.parsers.lyric_parser import (
+            _apply_ruby_entries,
+            NicokaraRubyEntry,
+        )
+
+        # 「嫌」位于 ts=3000，区间 [1000, 3000] 闭合上端必须命中
+        s = self._make_sentence("嫌い", [3000, 3300])
+        entries = [
+            NicokaraRubyEntry(
+                kanji="嫌",
+                reading="いや",
+                positions=["[00:01:00]", "[00:03:00]"],
+            ),
+        ]
+        _apply_ruby_entries(s, entries)
+
+        assert s.characters[0].ruby is not None, "上端闭合区间应命中"
+        ruby_text = "".join(p.text for p in s.characters[0].ruby.parts)
+        assert ruby_text == "いや"
+
+    def test_position_range_inclusive_lower_bound_G(self):
+        """差异表 G：适用区间左端点闭合 (`pos_start_ms <= char_ms` 通过)。"""
+        from strange_uta_game.backend.infrastructure.parsers.lyric_parser import (
+            _apply_ruby_entries,
+            NicokaraRubyEntry,
+        )
+
+        s = self._make_sentence("嫌い", [1000, 1300])
+        entries = [
+            NicokaraRubyEntry(
+                kanji="嫌",
+                reading="いや",
+                positions=["[00:01:00]", "[00:03:00]"],
+            ),
+        ]
+        _apply_ruby_entries(s, entries)
+
+        assert s.characters[0].ruby is not None
+        ruby_text = "".join(p.text for p in s.characters[0].ruby.parts)
+        assert ruby_text == "いや"
+
+    def test_empty_reading_clears_existing_ruby_I(self):
+        """差异表 I：`@RubyN=漢字,,...`（reading 为空）应清除区间内的 ruby。"""
+        from strange_uta_game.backend.infrastructure.parsers.lyric_parser import (
+            _apply_ruby_entries,
+            NicokaraRubyEntry,
+        )
+
+        s = self._make_sentence("嫌い", [1000, 1300])
+
+        # 第一遍：给「嫌」附 ruby
+        _apply_ruby_entries(
+            s, [NicokaraRubyEntry(kanji="嫌", reading="いや")]
+        )
+        assert s.characters[0].ruby is not None
+
+        # 第二遍：reading="" 清除
+        _apply_ruby_entries(
+            s, [NicokaraRubyEntry(kanji="嫌", reading="")]
+        )
+        assert s.characters[0].ruby is None
+        assert s.characters[0].linked_to_next is False
+
+    def test_empty_reading_resets_linked_to_next_I(self):
+        """差异表 I：清除多字 ruby 时同步重置 linked_to_next，
+        防止历史连字残留导致后续渲染异常。
+
+        构造：「葉」无独立 ts（只有「言」「は」有 ts），第一次应用 ruby
+        会让「言」linked_to_next=True；reading="" 清除后必须复位。
+        """
+        from strange_uta_game.backend.infrastructure.parsers.lyric_parser import (
+            _apply_ruby_entries,
+            NicokaraRubyEntry,
+        )
+
+        # 「葉」对应 ts=None，让首字 linked_to_next 第一遍能设为 True
+        s = self._make_sentence("言葉は", [1000, None, 1600])
+        _apply_ruby_entries(
+            s, [NicokaraRubyEntry(kanji="言葉", reading="ことば")]
+        )
+        # 前置断言：首字应 link 到下一字
+        assert s.characters[0].linked_to_next is True
+
+        # 清除 → 必须把 linked_to_next 也复位
+        _apply_ruby_entries(
+            s, [NicokaraRubyEntry(kanji="言葉", reading="")]
+        )
+        assert s.characters[0].ruby is None
+        assert s.characters[1].ruby is None
+        assert s.characters[0].linked_to_next is False
+
+
+class TestNicokaraParserSpecCompliance:
+    """SHINTA 2025 规格诊断 warning 测试（差异表 A / H）。"""
+
+    def test_loose_minute_segment_emits_warning_A(self, caplog):
+        """差异表 A：分钟段非 2 位（如 `[0:01:00]`）应 emit warning。"""
+        from strange_uta_game.backend.infrastructure.parsers.lyric_parser import (
+            NicokaraParser,
+        )
+        import logging
+
+        # 单字符分钟段 `[0:` 触发宽松违规
+        content = "[0:01:00]【sv1】テスト\n"
+        with caplog.at_level(
+            logging.WARNING,
+            logger="strange_uta_game.backend.infrastructure.parsers.lyric_parser",
+        ):
+            NicokaraParser().parse(content)
+
+        msgs = [r.message for r in caplog.records if "非规格 ts" in r.message]
+        assert msgs, f"应包含非规格 ts 警告, 实际记录: {caplog.records}"
+
+    def test_strict_minute_segment_no_warning_A(self, caplog):
+        """差异表 A：合规 `[MM:SS:CC]` 不应触发 ts 警告。"""
+        from strange_uta_game.backend.infrastructure.parsers.lyric_parser import (
+            NicokaraParser,
+        )
+        import logging
+
+        content = "[00:01:00]【sv1】テスト\n"
+        with caplog.at_level(
+            logging.WARNING,
+            logger="strange_uta_game.backend.infrastructure.parsers.lyric_parser",
+        ):
+            NicokaraParser().parse(content)
+
+        ts_warnings = [
+            r.message for r in caplog.records if "非规格 ts" in r.message
+        ]
+        assert ts_warnings == []
+
+    def test_ruby_index_gap_emits_warning_H(self, caplog):
+        """差异表 H：@RubyN 编号跳号（1,3）应 emit warning。"""
+        from strange_uta_game.backend.infrastructure.parsers.lyric_parser import (
+            NicokaraParser,
+        )
+        import logging
+
+        content = (
+            "[00:01:00]【sv1】嫌い\n"
+            "@Ruby1=嫌,いや\n"
+            "@Ruby3=い,い\n"  # 跳号：缺 Ruby2
+        )
+        with caplog.at_level(
+            logging.WARNING,
+            logger="strange_uta_game.backend.infrastructure.parsers.lyric_parser",
+        ):
+            NicokaraParser().parse(content)
+
+        msgs = [r.message for r in caplog.records if "@RubyN 编号违规" in r.message]
+        assert msgs, f"应包含 @RubyN 编号违规警告, 实际: {caplog.records}"
+
+    def test_ruby_index_duplicate_emits_warning_H(self, caplog):
+        """差异表 H：@RubyN 编号重复（1,1）应 emit warning。"""
+        from strange_uta_game.backend.infrastructure.parsers.lyric_parser import (
+            NicokaraParser,
+        )
+        import logging
+
+        content = (
+            "[00:01:00]【sv1】嫌い\n"
+            "@Ruby1=嫌,いや\n"
+            "@Ruby1=い,い\n"
+        )
+        with caplog.at_level(
+            logging.WARNING,
+            logger="strange_uta_game.backend.infrastructure.parsers.lyric_parser",
+        ):
+            NicokaraParser().parse(content)
+
+        msgs = [r.message for r in caplog.records if "@RubyN 编号违规" in r.message]
+        assert msgs
+
+    def test_ruby_index_sequential_no_warning_H(self, caplog):
+        """差异表 H：合规 @Ruby1, @Ruby2 不应触发编号警告。"""
+        from strange_uta_game.backend.infrastructure.parsers.lyric_parser import (
+            NicokaraParser,
+        )
+        import logging
+
+        content = (
+            "[00:01:00]【sv1】嫌い\n"
+            "@Ruby1=嫌,いや\n"
+            "@Ruby2=い,い\n"
+        )
+        with caplog.at_level(
+            logging.WARNING,
+            logger="strange_uta_game.backend.infrastructure.parsers.lyric_parser",
+        ):
+            NicokaraParser().parse(content)
+
+        ruby_warnings = [
+            r.message for r in caplog.records if "@RubyN 编号违规" in r.message
+        ]
+        assert ruby_warnings == []
+
+
+class TestNicokaraTagsRoundTrip:
+    """差异表 K：未知 @ 标签写入 AppSettings.nicokara_tags（覆盖式）。"""
+
+    def test_sync_known_and_custom_tags_to_settings_K(self, tmp_path, monkeypatch):
+        """已知 key 映射到 known map，其他 @ 标签 push 到 tags["custom"]。"""
+        from strange_uta_game.frontend.editor.timing.lyric_loader import (
+            _sync_nicokara_metadata_to_settings,
+        )
+        from strange_uta_game.frontend.settings.app_settings import AppSettings
+
+        # AppSettings 是 singleton：用 monkeypatch 替换 __new__ 行为绕过
+        # 这里直接构造独立实例 + monkeypatch __init__ 调用链
+        cfg_path = tmp_path / "config.json"
+        cfg_path.write_text("{}", encoding="utf-8")
+
+        # 让 lyric_loader 内部 AppSettings() 调用走我们的临时 config
+        # AppSettings 单例机制无 reset 接口；改为直接调用 settings.set 并验证
+        settings = AppSettings(config_path=str(cfg_path))
+        settings.set("nicokara_tags", {})  # 清空旧值
+
+        # monkeypatch lyric_loader 内的 AppSettings 名称指向 lambda 返回本实例
+        import strange_uta_game.frontend.editor.timing.lyric_loader as ll
+
+        class _StubSettings:
+            @staticmethod
+            def __call__():
+                return settings
+
+        # 用 module-level patch：替换 AppSettings 解析路径
+        import strange_uta_game.frontend.settings.settings_interface as si
+
+        monkeypatch.setattr(si, "AppSettings", lambda: settings)
+
+        metadata = {
+            "Title": "テスト曲",
+            "Artist": "テスト歌手",
+            "Album": "テストアルバム",
+            "TaggingBy": "tester",
+            "SilencemSec": "500",
+            "Offset": "1000",  # 应被跳过
+            "FooBar": "baz",  # 未知 → custom
+            "Hello": "World",  # 未知 → custom
+        }
+        _sync_nicokara_metadata_to_settings(metadata)
+
+        tags = settings.get("nicokara_tags") or {}
+        assert tags.get("title") == "テスト曲"
+        assert tags.get("artist") == "テスト歌手"
+        assert tags.get("album") == "テストアルバム"
+        assert tags.get("tagging_by") == "tester"
+        assert tags.get("silence_ms") == 500
+
+        # @Offset 跳过：不在 tags 也不在 custom
+        custom = tags.get("custom") or []
+        assert all("Offset" not in c for c in custom), custom
+
+        # 未知键完整保留 @Key=Value
+        assert "@FooBar=baz" in custom
+        assert "@Hello=World" in custom
+
+    def test_sync_overwrites_previous_tags_K(self, tmp_path, monkeypatch):
+        """覆盖式：第二次同步完全替换前次写入，无合并。"""
+        from strange_uta_game.frontend.editor.timing.lyric_loader import (
+            _sync_nicokara_metadata_to_settings,
+        )
+        from strange_uta_game.frontend.settings.app_settings import AppSettings
+        import strange_uta_game.frontend.settings.settings_interface as si
+
+        cfg_path = tmp_path / "config.json"
+        cfg_path.write_text("{}", encoding="utf-8")
+        settings = AppSettings(config_path=str(cfg_path))
+        monkeypatch.setattr(si, "AppSettings", lambda: settings)
+
+        # 第一次：写入 OldTag
+        _sync_nicokara_metadata_to_settings(
+            {"Title": "Old", "OldTag": "v1"}
+        )
+        tags1 = settings.get("nicokara_tags") or {}
+        assert tags1.get("title") == "Old"
+        assert "@OldTag=v1" in (tags1.get("custom") or [])
+
+        # 第二次：完全不同的元数据
+        _sync_nicokara_metadata_to_settings(
+            {"Title": "New", "NewTag": "v2"}
+        )
+        tags2 = settings.get("nicokara_tags") or {}
+        assert tags2.get("title") == "New"
+        custom2 = tags2.get("custom") or []
+        # OldTag 必须消失（覆盖语义），NewTag 必须存在
+        assert all("OldTag" not in c for c in custom2), custom2
+        assert "@NewTag=v2" in custom2
+
+    def test_sync_empty_metadata_noop_K(self, tmp_path, monkeypatch):
+        """空 metadata 不应崩溃也不应写入。"""
+        from strange_uta_game.frontend.editor.timing.lyric_loader import (
+            _sync_nicokara_metadata_to_settings,
+        )
+
+        # 不应抛出
+        _sync_nicokara_metadata_to_settings({})
+        _sync_nicokara_metadata_to_settings(None)  # type: ignore[arg-type]

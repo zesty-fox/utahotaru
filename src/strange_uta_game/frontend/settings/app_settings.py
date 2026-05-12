@@ -221,6 +221,31 @@ class AppSettings:
         self._settings = self._load_settings()
         self._migrate_to_separate_files()
         self._ensure_default_dictionary()
+        self._force_upgrade_dictionary_if_needed()
+
+    def _force_upgrade_dictionary_if_needed(self) -> None:
+        """老用户强制升级一次词典：当 is_dictionary_real_sugdic 缺失或为 False 时，
+        用内置 dictionary.json 覆盖用户 dictionary.json，并写入标志位。
+        用户之前自定义的词条会丢失（一次性破坏性升级）。
+        """
+        if self._settings.get("is_dictionary_real_sugdic") is True:
+            return
+        packaged = self._get_packaged_config_path("dictionary.json")
+        if not packaged:
+            return
+        try:
+            import shutil
+
+            shutil.copy2(str(packaged), str(self._dict_path))
+        except Exception as e:
+            print(f"强制升级词典失败: {e}")
+            return
+        # 写入标志位，避免下次再次覆盖
+        self._settings["is_dictionary_real_sugdic"] = True
+        try:
+            self._save_json(self._config_path, self._settings)
+        except Exception as e:
+            print(f"写入 is_dictionary_real_sugdic 标志失败: {e}")
 
     def _ensure_default_dictionary(self) -> None:
         """首次启动时，将内置 RL 字典固化为默认 dictionary.json。"""

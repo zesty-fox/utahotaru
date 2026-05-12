@@ -211,6 +211,171 @@ class SingerService:
         else:
             return [s for s in self._project.singers if s.enabled]
 
+    # ==================== 顺序与批量操作 ====================
+
+    def reorder_singers(self, ordered_ids: List[str]) -> bool:
+        """按 ID 列表重排演唱者。
+
+        Args:
+            ordered_ids: 新顺序下的完整 ID 列表
+
+        Returns:
+            是否成功
+        """
+        try:
+            self._project.reorder_singers(ordered_ids)
+        except Exception:
+            return False
+        return True
+
+    def move_singers(self, ids: List[str], direction: str) -> bool:
+        """批量移动多个演唱者，保持选中项之间的相对顺序。
+
+        语义（与用户对齐）：
+        - up:     每个选中项依次向上滑动一位，撞到顶部或另一个选中项时停下。
+        - down:   每个选中项依次向下滑动一位，撞到底部或另一个选中项时停下。
+        - top:    选中项整体置顶，保持选中项之间的相对顺序。
+        - bottom: 选中项整体置底，保持选中项之间的相对顺序。
+
+        Args:
+            ids: 待移动的演唱者 ID 集合（顺序无关，按当前列表中的位置处理）
+            direction: 'up' | 'down' | 'top' | 'bottom'
+
+        Returns:
+            是否成功（顺序未变也算成功；非法方向或空 ids 返回 False）
+        """
+        if not ids or direction not in ("up", "down", "top", "bottom"):
+            return False
+
+        singers = self._project.singers
+        all_ids = [s.id for s in singers]
+        selected_set = set(ids)
+        if not selected_set.issubset(set(all_ids)):
+            return False
+
+        if direction in ("top", "bottom"):
+            # 保持选中项在原列表中的相对顺序
+            ordered_selected = [sid for sid in all_ids if sid in selected_set]
+            others = [sid for sid in all_ids if sid not in selected_set]
+            new_order = (
+                ordered_selected + others
+                if direction == "top"
+                else others + ordered_selected
+            )
+        else:
+            new_order = list(all_ids)
+            # 逐项滑动：up 从前往后扫，down 从后往前扫；
+            # 选中项之间因为先后顺序的约束，自然形成"撞墙保间隔"。
+            if direction == "up":
+                indices = range(len(new_order))
+            else:  # down
+                indices = range(len(new_order) - 1, -1, -1)
+
+            moved_positions: set = set()  # 已落定的选中项位置（防止被后续覆盖）
+            for i in indices:
+                if new_order[i] not in selected_set:
+                    continue
+                if direction == "up":
+                    j = i - 1
+                    if j < 0 or j in moved_positions or new_order[j] in selected_set:
+                        moved_positions.add(i)
+                        continue
+                    new_order[i], new_order[j] = new_order[j], new_order[i]
+                    moved_positions.add(j)
+                else:  # down
+                    j = i + 1
+                    if (
+                        j >= len(new_order)
+                        or j in moved_positions
+                        or new_order[j] in selected_set
+                    ):
+                        moved_positions.add(i)
+                        continue
+                    new_order[i], new_order[j] = new_order[j], new_order[i]
+                    moved_positions.add(j)
+
+        try:
+            self._project.reorder_singers(new_order)
+        except Exception:
+            return False
+        return True
+
+    def batch_remove_singers(
+        self, ids: List[str], transfer_to: Optional[str]
+    ) -> bool:
+        """批量删除演唱者。
+
+        所有被删除演唱者所属的句子都会转移到 ``transfer_to`` 指向的演唱者；
+        若 ``transfer_to`` 为 None，则级联删除其句子。
+
+        若被删除集合中包含当前默认演唱者，会自动将 ``transfer_to``（若存在）
+        设为新默认演唱者，避免项目失去默认演唱者。
+
+        Args:
+            ids: 要删除的演唱者 ID 列表
+            transfer_to: 接收句子的演唱者 ID；必须不在 ids 中
+
+        Returns:
+            是否成功
+        """
+        if not ids:
+            return False
+
+        ids_set = set(ids)
+        if transfer_to is not None and transfer_to in ids_set:
+            return False
+
+        # 校验：不能删空（必须至少保留一个演唱者）
+        if len(self._project.singers) - len(ids_set) < 1:
+            return False
+
+        # 是否需要在删除后重新指定默认演唱者
+        default = self._project.get_default_singer()
+        need_reassign_default = default.id in ids_set
+
+        try:
+            for sid in ids:
+                # 复用单删（已含句子转移/级联逻辑）。当 transfer_to 也是默认演唱者
+                # 但该演唱者并未被删除时，安全无副作用。
+                self._project.remove_singer(sid, transfer_to)
+        except Exception:
+            return False
+
+        if need_reassign_default and transfer_to is not None:
+            new_default = self._project.get_singer(transfer_to)
+            if new_default is not None:
+                for s in self._project.singers:
+                    s.is_default = s.id == transfer_to
+
+        if self._callbacks.on_singer_removed:
+            for sid in ids:
+                self._callbacks.on_singer_removed(sid)
+
+        return True
+
+    def batch_set_enabled(self, ids: List[str], enabled: bool) -> bool:
+        """批量设置演唱者启用/禁用状态。
+
+        Args:
+            ids: 演唱者 ID 列表
+            enabled: True 启用，False 禁用
+
+        Returns:
+            是否全部成功
+        """
+        if not ids:
+            return False
+        ok = True
+        for sid in ids:
+            singer = self._project.get_singer(sid)
+            if not singer:
+                ok = False
+                continue
+            singer.set_enabled(enabled)
+            if self._callbacks.on_singer_updated:
+                self._callbacks.on_singer_updated(singer)
+        return ok
+
     def _assign_color(self) -> str:
         """自动分配颜色
 

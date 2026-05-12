@@ -55,6 +55,67 @@ def _is_json_content(content: str) -> bool:
         return False
 
 
+def _sync_nicokara_metadata_to_settings(metadata: dict) -> None:
+    """把 Nicokara 解析出的 @ 元数据写回 AppSettings.nicokara_tags（覆盖式）。
+
+    SHINTA 2025 规格 K：未知 @ 标签需要保留并在导出时原样回写，
+    实现跨工具 round-trip 兼容。
+
+    Args:
+        metadata: NicokaraParseResult.metadata，{key: value} 扁平字典（key 不含 @）。
+
+    映射：
+        Title         → tags["title"]
+        Artist        → tags["artist"]
+        Album         → tags["album"]
+        TaggingBy     → tags["tagging_by"]
+        SilencemSec   → tags["silence_ms"] (int)
+        Offset        → 跳过（由 Project.offset_ms 承载）
+        其余 *        → tags["custom"]，每项形如 "@Key=Value"
+
+    覆盖式：旧的 nicokara_tags 全部被替换，不做合并——
+    用户「每次写入项目都换」的语义。
+    """
+    if not metadata:
+        return
+    try:
+        from strange_uta_game.frontend.settings.settings_interface import (
+            AppSettings,
+        )
+    except Exception:
+        return
+
+    known_map = {
+        "Title": "title",
+        "Artist": "artist",
+        "Album": "album",
+        "TaggingBy": "tagging_by",
+    }
+    tags: dict = {}
+    custom: list = []
+    for key, value in metadata.items():
+        if key in known_map:
+            tags[known_map[key]] = value
+        elif key == "SilencemSec":
+            try:
+                tags["silence_ms"] = int(value)
+            except (TypeError, ValueError):
+                custom.append(f"@{key}={value}")
+        elif key == "Offset":
+            # @Offset 由 Project.offset_ms 单独承载，跳过避免双重写入
+            continue
+        else:
+            custom.append(f"@{key}={value}")
+    if custom:
+        tags["custom"] = custom
+
+    try:
+        AppSettings().set("nicokara_tags", tags)
+    except Exception:
+        # 写入失败不阻断导入；exporter 端 fallback 仍可用旧值
+        pass
+
+
 def detect_lyric_format(content: str) -> str:
     """检测歌词内容的格式。
 
@@ -159,6 +220,13 @@ def parse_lyric_content(
         sentences = nicokara_result_to_sentences(
             result, singer_key_to_id, default_singer_id
         )
+
+        # SHINTA 2025 规格透明性 (差异 K)：把解析到的 @ 元数据写回 AppSettings.nicokara_tags，
+        # 覆盖式（每次导入一个 Nicokara 文件即代表用户切换到新项目）。
+        # 已知键 (@Title/@Artist/@Album/@TaggingBy/@SilencemSec) 落到对应字段；
+        # 其余未知 @ 标签原样收集到 tags["custom"]，导出器 round-trip 时按行回写。
+        _sync_nicokara_metadata_to_settings(result.metadata)
+
         return sentences, is_nicokara, new_singers
 
     # ASS 格式

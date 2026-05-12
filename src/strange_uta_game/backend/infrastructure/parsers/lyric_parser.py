@@ -3,6 +3,7 @@
 支持 TXT、LRC（逐行/逐字/增强型）、KRA、ASS、SRT、Nicokara 格式的解析。
 """
 
+import logging
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -10,6 +11,8 @@ from typing import List, Optional, Tuple, Dict
 from pathlib import Path
 
 from strange_uta_game.backend.domain import Sentence, Character, Ruby, RubyPart
+
+logger = logging.getLogger(__name__)
 
 
 class ParseError(Exception):
@@ -495,8 +498,13 @@ class NicokaraParser:
         @Ruby1=押,お                       # @Ruby: 汉字→假名映射
     """
 
-    # Nicokara 时间戳: [MM:SS:CC] 冒号分隔
+    # Nicokara 时间戳: [MM:SS:CC] 冒号分隔。
+    # SHINTA 2025 规格严格要求每段 2 位数字；解析端宽松接受 \d{1,2}（向后兼容
+    # 早期手写文件），但 NicokaraParser.parse() 会对违规第 1 段做 warning，
+    # 不阻断解析（默认宽松策略）。
     NICOKARA_TS_PATTERN = re.compile(r"\[(\d{1,2}):(\d{2}):(\d{2})\]")
+    # 严格规格匹配（仅用于诊断 warning，不替换主匹配）
+    NICOKARA_TS_STRICT_PATTERN = re.compile(r"\[(\d{2}):(\d{2}):(\d{2})\]")
     # 标准 LRC 时间戳: [MM:SS.CC] 或 [MM:SS:CC]
     FLEXIBLE_TS_PATTERN = re.compile(r"\[(\d{1,2}):(\d{2})[:.](\d{2,3})\]")
     # 演唱者标签: 【svN】或【演唱者名】
@@ -535,9 +543,28 @@ class NicokaraParser:
         """
         # 去除 UTF-8 BOM（Python str.strip() 不会移除 \ufeff）
         content = content.lstrip("\ufeff")
+
+        # SHINTA 2025 规格诊断（宽松+warning）：
+        #   - 严格 ts 形如 [MM:SS:CC]（M/S/C 均 2 位）
+        #   - 解析仍走 NICOKARA_TS_PATTERN（接受 \d{1,2}:\d{2}:\d{2}）
+        #   - 此处仅统计违规并 log warning，不阻断
+        loose_ts_count = 0
+        for _m in self.NICOKARA_TS_PATTERN.finditer(content):
+            mm = _m.group(1)
+            if len(mm) != 2:
+                loose_ts_count += 1
+        if loose_ts_count:
+            logger.warning(
+                "Nicokara: 检测到 %d 个非规格 ts (分钟段非 2 位)，"
+                "SHINTA 2025 规格要求 [MM:SS:CC] 每段均为 2 位数字；"
+                "已宽松接受。",
+                loose_ts_count,
+            )
+
         raw_lines = content.split("\n")
         body_lines: List[str] = []
         ruby_entries: List[NicokaraRubyEntry] = []
+        ruby_indices: List[int] = []  # 用于 SHINTA 规格连号校验（@Ruby1..N）
         singer_definitions: Dict[str, str] = {}
         metadata: Dict[str, str] = {}
 
@@ -549,6 +576,7 @@ class NicokaraParser:
             # 解析 @Ruby 元数据
             ruby_match = self.RUBY_PATTERN.match(stripped) if stripped else None
             if ruby_match:
+                ruby_indices.append(int(ruby_match.group(1)))
                 entry = self._parse_ruby_entry(ruby_match.group(2))
                 if entry:
                     ruby_entries.append(entry)
@@ -594,6 +622,18 @@ class NicokaraParser:
             parsed = self._parse_body_line(line_text)
             if parsed is not None:
                 parsed_lines.append(parsed)
+
+        # SHINTA 2025 规格：@RubyN 编号应从 1 连号递增、不跳号、不重复。
+        # 宽松模式：仅 warning，不阻断；解析顺序仍按文件中出现顺序。
+        if ruby_indices:
+            expected = list(range(1, len(ruby_indices) + 1))
+            if ruby_indices != expected:
+                logger.warning(
+                    "Nicokara: @RubyN 编号违规：实际 %s，规格期望 %s "
+                    "(从 1 连号递增、不跳号、不重复)。已宽松接受。",
+                    ruby_indices,
+                    expected,
+                )
 
         return NicokaraParseResult(
             lines=parsed_lines,
@@ -887,7 +927,9 @@ def nicokara_result_to_sentences(
             # 第一个时间戳是起始时间戳
             char.add_timestamp(ts_list[0])
 
-            # 如果有第二个时间戳，是句尾释放时间戳
+            # 如果有第二个时间戳，是演唱停顿释放时间戳
+            # 注意：is_sentence_end 是命名遗留，真实语义是"演唱时的停顿"
+            # 而非语义句末。详见 models.Character.is_sentence_end 注释。
             if len(ts_list) >= 2:
                 char.is_sentence_end = True
                 char.sentence_end_ts = ts_list[1]
@@ -949,7 +991,8 @@ def _apply_ruby_entries(sentence: Sentence, ruby_entries: List[NicokaraRubyEntry
 
     当条目携带位置范围（positions）时，利用字符时间戳精确定位到正确的出现，
     避免同一词组在不同句子/位置有不同读音时被错误匹配。
-    严格区间 [pos_start, pos_end) 匹配失败的 entry 直接忽略——
+    严格区间 [pos_start, pos_end]（左闭右闭，符合 SHINTA 2025 规格
+    「適用開始時刻 ≤ t ≤ 適用終了時刻」）匹配失败的 entry 直接忽略——
     源文件手写偏差视为可接受的数据噪声，不做容差回退。
     """
     text = sentence.text
@@ -983,19 +1026,23 @@ def _apply_ruby_entries(sentence: Sentence, ruby_entries: List[NicokaraRubyEntry
                 if pos_start_ms is not None and char_ms < pos_start_ms:
                     start = end_pos
                     continue
-                if pos_end_ms is not None and char_ms >= pos_end_ms:
+                if pos_end_ms is not None and char_ms > pos_end_ms:
                     start = end_pos
                     continue
 
-            # 检查是否已有 ruby 覆盖该范围
-            has_existing = any(
-                sentence.characters[ci].ruby is not None
-                for ci in range(pos, min(end_pos, len(sentence.characters)))
-            )
-            if not has_existing:
+            # SHINTA 2025 规格：
+            #   - ルビ留空 (entry.reading=="") ⇒ 取消区间内已存在的 ruby（清除）。
+            #   - 后到的 @RubyN 覆盖先到的（ruby_entries 已按文件顺序追加，
+            #     for-loop 自然实现 N 大者覆盖 N 小者）。
+            actual_end = min(end_pos, len(sentence.characters))
+            if entry.reading == "":
+                # 清除区间内所有字符的 ruby
+                for ci in range(pos, actual_end):
+                    sentence.characters[ci].set_ruby(None)
+                    sentence.characters[ci].linked_to_next = False
+            else:
                 block_len = end_pos - pos
                 _distribute_reading_to_chars(sentence, pos, block_len, reading_parts)
-                actual_end = min(end_pos, len(sentence.characters))
                 # linked_to_next 判定（双条件，缺一不可）：
                 #   (1) 两字处于同一 @Ruby tag 内
                 #       —— 由本循环 range(pos, actual_end - 1) 限定边界天然保证
@@ -1005,8 +1052,8 @@ def _apply_ruby_entries(sentence: Sentence, ruby_entries: List[NicokaraRubyEntry
                 for ci in range(pos, actual_end - 1):
                     next_char = sentence.characters[ci + 1]
                     sentence.characters[ci].linked_to_next = not bool(next_char.timestamps)
-                # 不 break：n3 spec 中一个 @Ruby entry 的 [pos1, pos2) 区间可覆盖
-                # 区间内 kanji 的全部出现（同 reading）。继续向后扫描。
+            # 不 break：n3 spec 中一个 @Ruby entry 的区间 [pos1, pos2] 可覆盖
+            # 区间内 kanji 的全部出现（同 reading）。继续向后扫描。
             start = end_pos
 
 

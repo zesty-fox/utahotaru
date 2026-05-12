@@ -1195,7 +1195,7 @@ class EditorInterface(QWidget):
 
         dlg = SetSingerByLineDialog(
             self._project.sentences,
-            self._project.singers,
+            [s for s in self._project.singers if s.enabled],
             self,
         )
         dlg.apply_requested.connect(self._on_apply_singer_by_line)
