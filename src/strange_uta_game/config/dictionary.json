@@ -3287,7 +3287,7 @@
   {
     "enabled": true,
     "word": "0年",
-    "reading": "{0||じゅう/}{年||ね|ん}"
+    "reading": "{0||じゅう}{年||ね|ん}"
   },
   {
     "enabled": true,
@@ -6517,7 +6517,7 @@
   {
     "enabled": true,
     "word": "000％",
-    "reading": "{000％||せん/ぱーせんと/,,,}"
+    "reading": "{000％||せん|ぱーせんと|,,,}"
   },
   {
     "enabled": true,
@@ -6632,7 +6632,7 @@
   {
     "enabled": true,
     "word": "2人",
-    "reading": "{2||ふ|た}{人||り}"
+    "reading": "{2人||ふ|た|り,}"
   },
   {
     "enabled": true,
@@ -7132,7 +7132,7 @@
   {
     "enabled": true,
     "word": "日",
-    "reading": "{日||にち}"
+    "reading": "{日||に|ち}"
   },
   {
     "enabled": true,
@@ -7302,6 +7302,6 @@
   {
     "enabled": true,
     "word": "私",
-    "reading": "{私||わたし}"
+    "reading": "{私||わ|た|し}"
   }
 ]
