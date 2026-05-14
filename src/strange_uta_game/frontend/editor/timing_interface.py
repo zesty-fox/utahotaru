@@ -2536,7 +2536,7 @@ class EditorInterface(QWidget):
             ref_char = sentence.characters[char_idx]
             new_char = Character(
                 char=" ",
-                check_count=1,
+                check_count=0,
                 singer_id=ref_char.singer_id or sentence.singer_id,
             )
             sentence.insert_character(char_idx + 1, new_char)
