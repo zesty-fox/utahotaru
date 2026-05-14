@@ -199,7 +199,7 @@ class MainWindow(MSFluentWindow):
         self.addSubInterface(self.exportInterface, FIF.SHARE, "导出")
         self.addSubInterface(self.singerInterface, FIF.PEOPLE, "演唱者")
         # 尝试废弃掉全文本编辑，不能直接删除有些功能被其他模块服用
-        self.addSubInterface(self.rubyInterface, FIF.FONT, "全文本编辑（已废弃不建议使用）")
+        self.addSubInterface(self.rubyInterface, FIF.FONT, "（已废弃）")
         self.addSubInterface(self.onlineInterface, FIF.GLOBE, "在线查询")
 
         # 底部
