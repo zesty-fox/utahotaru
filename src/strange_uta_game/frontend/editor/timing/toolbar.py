@@ -110,7 +110,7 @@ class EditorToolBar(QFrame):
         layout.addWidget(self.btn_singer)
 
         self.btn_complete_timestamp = PushButton("补全时间戳", self)
-        self.btn_complete_timestamp.setIcon(FIF.CLOCK)
+        self.btn_complete_timestamp.setIcon(FIF.DATE_TIME)
         self.btn_complete_timestamp.setFixedHeight(32)
         self.btn_complete_timestamp.clicked.connect(self.complete_timestamp_clicked.emit)
         layout.addWidget(self.btn_complete_timestamp)
