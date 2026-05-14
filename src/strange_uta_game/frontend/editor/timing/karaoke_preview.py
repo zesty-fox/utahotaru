@@ -485,6 +485,7 @@ class KaraokePreview(QWidget):
         self._fm_ruby = QFontMetrics(self._font_ruby)
         self._fm_checkpoint = QFontMetrics(self._font_checkpoint)
         self._ruby_spacing = ruby_spacing
+        self._line_height_factor = line_height_factor
 
         # 行高以当前行（放大后）字体大小为准，需容纳 ruby + ruby_spacing + cp
         total_height = self._fm_current.height() + self._fm_ruby.height() + ruby_spacing + self._fm_checkpoint.height()
@@ -523,6 +524,19 @@ class KaraokePreview(QWidget):
         for line_idx in list(self._line_versions.keys()):
             self._line_versions[line_idx] += 1
         self.update()
+
+    # ---- 窗口大小变化 ----
+
+    def resizeEvent(self, event):
+        """窗口大小变化时重新计算可见行数，保持行高不变。"""
+        super().resizeEvent(event)
+        if hasattr(self, '_fm_current') and hasattr(self, '_fm_ruby'):
+            total_height = (self._fm_current.height() + self._fm_ruby.height()
+                           + self._ruby_spacing + self._fm_checkpoint.height())
+            line_h = total_height * getattr(self, '_line_height_factor', 1.20)
+            h = self.height() if self.height() > 0 else 600
+            self._visible_lines = max(3, min(15, int(h / line_h)))
+            self.update()
 
     # ---- 滚动 ----
 
