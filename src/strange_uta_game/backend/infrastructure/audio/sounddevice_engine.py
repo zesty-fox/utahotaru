@@ -192,10 +192,13 @@ class SoundDeviceEngine(IAudioEngine):
         common_speeds = [
             (0.75, 0),  # 最高优先级
             (0.5, 1),   # 第二优先级
-            (0.9, 2),
+            (0.9, 2),   # 第三优先级
             (0.8, 3),
             (0.7, 4),
             (0.6, 5),
+            (0.4, 6),
+            (0.3, 7),
+            (0.2, 8),   
         ]
         print(f"[SoundDeviceEngine] Prewarming common speeds: {[s for s, _ in common_speeds]}")
         for speed, priority in common_speeds:
@@ -338,8 +341,8 @@ class SoundDeviceEngine(IAudioEngine):
           否则触发后台渲染，**继续用当前速度播放**直到渲染完成（无缝切）。
         - 永远非阻塞。
         """
-        if not 0.5 <= speed <= 2.0:
-            raise ValueError(f"速度 {speed} 超出范围 [0.5, 2.0]")
+        if not 0.2 <= speed <= 2.0:
+            raise ValueError(f"速度 {speed} 超出范围 [0.2, 2.0]")
         self._speed = float(speed)
 
         with self._state_lock:

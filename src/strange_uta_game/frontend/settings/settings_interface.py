@@ -275,7 +275,7 @@ class SettingsInterface(ScrollArea):
             FIF.SPEED_HIGH,
             "默认速度",
             "音频加载后的初始播放速度",
-            min_val=0.5,
+            min_val=0.2,
             max_val=2.0,
             step=0.1,
             suffix=" x",
