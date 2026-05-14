@@ -37,6 +37,8 @@ class EditorToolBar(QFrame):
     insert_guide_clicked = pyqtSignal()
     delete_rubies_by_type_clicked = pyqtSignal()
     set_singer_by_line_clicked = pyqtSignal()
+    apply_singer_clicked = pyqtSignal()
+    singer_manager_clicked = pyqtSignal()
     offset_changed = pyqtSignal(int)  # 偏移量变化（毫秒）
 
     def __init__(self, parent=None):
@@ -100,6 +102,18 @@ class EditorToolBar(QFrame):
         self.btn_set_singer_by_line.setFixedHeight(32)
         self.btn_set_singer_by_line.clicked.connect(self.set_singer_by_line_clicked.emit)
         layout.addWidget(self.btn_set_singer_by_line)
+
+        self.btn_apply_singer = PushButton("应用演唱者", self)
+        self.btn_apply_singer.setIcon(FIF.PEOPLE)
+        self.btn_apply_singer.setFixedHeight(32)
+        self.btn_apply_singer.clicked.connect(self.apply_singer_clicked.emit)
+        layout.addWidget(self.btn_apply_singer)
+
+        self.btn_singer_manager = PushButton("演唱者管理", self)
+        self.btn_singer_manager.setIcon(FIF.PEOPLE)
+        self.btn_singer_manager.setFixedHeight(32)
+        self.btn_singer_manager.clicked.connect(self.singer_manager_clicked.emit)
+        layout.addWidget(self.btn_singer_manager)
 
         layout.addSpacing(10)
 

@@ -127,8 +127,10 @@ class AppSettings:
                 "analyze_rubies": "",
                 "delete_rubies_by_type": "",
                 "set_singer_by_line": "",
+                "apply_singer": "",
                 "clear_timestamp": "",
                 "timestamps_to_sentence_end": "",
+                "quick_export": "",
             },
             # 编辑模式：音乐暂停/停止时生效（以歌词/注音编辑为主）
             "edit_mode": {
@@ -164,8 +166,10 @@ class AppSettings:
                 "analyze_rubies": "",
                 "delete_rubies_by_type": "",
                 "set_singer_by_line": "",
+                "apply_singer": "",
                 "clear_timestamp": "",
                 "timestamps_to_sentence_end": "",
+                "quick_export": "",
             },
         },
     }

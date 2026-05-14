@@ -120,11 +120,13 @@
       "analyze_rubies": "",
       "delete_rubies_by_type": "",
       "set_singer_by_line": "",
+      "apply_singer": "",
       "undo": "CTRL+Z:short",
       "redo": "CTRL+Y:short",
       "save": "CTRL+S:short",
       "paste_lyrics": "CTRL+V:short",
-      "timestamps_to_sentence_end": ""
+      "timestamps_to_sentence_end": "",
+      "quick_export": ""
     },
     "edit_mode": {
       "play_pause": "D:short",
@@ -159,11 +161,13 @@
       "analyze_rubies": "",
       "delete_rubies_by_type": "",
       "set_singer_by_line": "",
+      "apply_singer": "",
       "undo": "CTRL+Z:short",
       "redo": "CTRL+Y:short",
       "save": "CTRL+S:short",
       "paste_lyrics": "CTRL+V:short",
-      "timestamps_to_sentence_end": ""
+      "timestamps_to_sentence_end": "",
+      "quick_export": ""
     },
     "play_pause": "D",
     "stop": "S",

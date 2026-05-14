@@ -14,6 +14,7 @@ from .dialogs import (
 )
 from .file_loader import FileLoader
 from .karaoke_preview import KaraokePreview
+from .singer_manager_window import MiniSingerManager
 from .timeline_widget import TimelineWidget
 from .toolbar import EditorToolBar
 from .transport_bar import TransportBar
@@ -25,6 +26,7 @@ __all__ = [
     "EditorToolBar",
     "FileLoader",
     "KaraokePreview",
+    "MiniSingerManager",
     "TimelineWidget",
     "ModifyCharacterDialog",
     "InsertGuideSymbolDialog",

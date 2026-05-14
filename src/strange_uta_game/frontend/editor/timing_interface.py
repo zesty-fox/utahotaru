@@ -35,6 +35,8 @@ from PyQt6.QtWidgets import (
 )
 from qfluentwidgets import (
     FluentIcon as FIF,
+)
+from qfluentwidgets import (
     InfoBar,
     InfoBarPosition,
     PrimaryPushButton,
@@ -46,11 +48,13 @@ from strange_uta_game.backend.application import (
     CheckpointPosition,
     TimingService,
 )
-from strange_uta_game.backend.domain import Character, Project
-from strange_uta_game.backend.infrastructure.audio import AudioLoadError
 from strange_uta_game.backend.application.auto_check_service import (
     get_kanji_linked_indices,
 )
+from strange_uta_game.backend.application.export_service import ExportService
+from strange_uta_game.backend.domain import Character, Project
+from strange_uta_game.backend.infrastructure.audio import AudioLoadError
+from strange_uta_game.backend.infrastructure.exporters import get_exporter_by_name
 from strange_uta_game.backend.infrastructure.parsers.text_splitter import (
     CharType,
     get_char_type,
@@ -64,11 +68,12 @@ from .timing import (
     FileLoader,
     InsertGuideSymbolDialog,
     KaraokePreview,
+    MiniSingerManager,
     ModifyCharacterDialog,
+    SentenceSnapshotCommand,
     TimelineWidget,
     TransportBar,
     _SentenceSnapshotCommand,
-    SentenceSnapshotCommand,
 )
 
 __all__ = [
@@ -79,6 +84,7 @@ __all__ = [
     "TransportBar",
     "EditorToolBar",
     "KaraokePreview",
+    "MiniSingerManager",
     "TimelineWidget",
     "ModifyCharacterDialog",
     "InsertGuideSymbolDialog",
@@ -129,6 +135,7 @@ class EditorInterface(QWidget):
         # 区分：selected_cp（cp 标记选中态）vs selected_char（光标/选中字符态）。
         self._suppress_cp_cursor_move = False
         self._file_loader = FileLoader(self)
+        self._mini_singer_manager: Optional[MiniSingerManager] = None
         self._init_ui()
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAcceptDrops(True)
@@ -182,6 +189,8 @@ class EditorInterface(QWidget):
         self.toolbar.analyze_rubies_clicked.connect(self._on_analyze_rubies)
         self.toolbar.delete_rubies_by_type_clicked.connect(self._on_delete_rubies_by_type)
         self.toolbar.set_singer_by_line_clicked.connect(self._on_set_singer_by_line)
+        self.toolbar.apply_singer_clicked.connect(self._on_apply_singer)
+        self.toolbar.singer_manager_clicked.connect(self._on_singer_manager_clicked)
         self.toolbar.offset_changed.connect(self._on_offset_changed)
         layout.addWidget(self.toolbar)
 
@@ -312,6 +321,8 @@ class EditorInterface(QWidget):
         """响应 ProjectStore 的数据变更。"""
         if change_type == "project":
             self.set_project(self._store.project)
+            if self._mini_singer_manager is not None:
+                self._mini_singer_manager.set_project(self._store.project)
         elif change_type in ("rubies", "lyrics", "checkpoints"):
             self.refresh_lyric_display()
         elif change_type == "timetags":
@@ -370,7 +381,9 @@ class EditorInterface(QWidget):
             "analyze_rubies",
             "delete_rubies_by_type",
             "set_singer_by_line",
+            "apply_singer",
             "timestamps_to_sentence_end",
+            "quick_export",
         ]
         # 默认值兜底（当设置未写入新 schema 时使用）
         defaults = {
@@ -404,7 +417,9 @@ class EditorInterface(QWidget):
             "analyze_rubies": "",
             "delete_rubies_by_type": "",
             "set_singer_by_line": "",
+            "apply_singer": "",
             "timestamps_to_sentence_end": "",
+            "quick_export": "",
         }
 
         def _normalize_trigger(raw: str) -> str:
@@ -1091,8 +1106,9 @@ class EditorInterface(QWidget):
         if not self._project:
             return
         # 复用 fulltext_interface 的对话框（CharType 复选 + 默认勾选平假名/片假名）
-        from .fulltext_interface import DeleteRubyByTypeDialog
         from strange_uta_game.frontend.settings.settings_interface import AppSettings
+
+        from .fulltext_interface import DeleteRubyByTypeDialog
 
         app_settings = AppSettings()
         saved_types = app_settings.get("auto_check.delete_ruby_types", [])
@@ -1254,6 +1270,136 @@ class EditorInterface(QWidget):
             duration=4000,
             parent=self,
         )
+
+    def _on_apply_singer(self):
+        """工具栏「应用演唱者」入口。
+
+        弹出对话框显示当前选中字符信息，用户可选择演唱者并应用到选中字符。
+        通过 _execute_structural_edit 包装，支持撤销/重做。
+        """
+        if not self._project:
+            return
+        if not self._project.singers:
+            InfoBar.warning(
+                title="无演唱者",
+                content="项目中没有演唱者，请先添加演唱者",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2500,
+                parent=self,
+            )
+            return
+
+        line_idx = self._current_line_idx
+        char_idx = self.preview._current_char_idx
+
+        if line_idx < 0 or line_idx >= len(self._project.sentences):
+            return
+        sentence = self._project.sentences[line_idx]
+        if char_idx < 0 or char_idx >= len(sentence.characters):
+            return
+
+        # 获取选中字符范围
+        start_idx = char_idx
+        end_idx = char_idx
+        if (
+            self.preview._focus_line_idx == line_idx
+            and self.preview._focus_char_idx >= 0
+            and self.preview._focus_char_range_end >= 0
+        ):
+            start_idx = min(self.preview._focus_char_idx, self.preview._focus_char_range_end)
+            end_idx = max(self.preview._focus_char_idx, self.preview._focus_char_range_end)
+
+        chars = sentence.characters[start_idx:end_idx + 1]
+        char_text = "".join(c.char for c in chars)
+
+        # 获取当前演唱者信息
+        singer_ids = set()
+        for ch in chars:
+            if ch.singer_id:
+                singer_ids.add(ch.singer_id)
+
+        singer_map = {s.id: s for s in self._project.singers}
+        current_singers = [singer_map[sid] for sid in singer_ids if sid in singer_map]
+
+        from .timing.dialogs import ApplySingerDialog
+
+        dlg = ApplySingerDialog(
+            char_text,
+            current_singers,
+            [s for s in self._project.singers if s.enabled],
+            self,
+        )
+        dlg.apply_requested.connect(lambda singer_id: self._on_apply_singer_to_chars(line_idx, start_idx, end_idx, singer_id))
+        dlg.exec()
+
+    def _on_apply_singer_to_chars(self, line_idx: int, start_idx: int, end_idx: int, singer_id: str):
+        """处理应用演唱者到选中字符的请求"""
+        if not self._project:
+            return
+
+        def _mutate() -> Optional[tuple[int, int, Optional[int], str]]:
+            assert self._project is not None
+            sentence = self._project.sentences[line_idx]
+            changed = False
+            for ci in range(start_idx, end_idx + 1):
+                if 0 <= ci < len(sentence.characters):
+                    ch = sentence.characters[ci]
+                    if ch.singer_id != singer_id:
+                        ch.singer_id = singer_id
+                        if ch.ruby:
+                            ch.push_to_ruby()
+                        changed = True
+            # 如果整个行都被选中，也更新 sentence.singer_id
+            if start_idx == 0 and end_idx >= len(sentence.characters) - 1:
+                if sentence.singer_id != singer_id:
+                    sentence.singer_id = singer_id
+                    changed = True
+            if not changed:
+                return None
+            return (line_idx, start_idx, None, "singers")
+
+        ok = self._execute_structural_edit("应用演唱者", _mutate)
+        if not ok:
+            InfoBar.info(
+                title="无变化",
+                content="所选字符的演唱者未发生变化",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2500,
+                parent=self,
+            )
+            return
+
+        InfoBar.success(
+            title="设置完成",
+            content="已为选中字符设置演唱者",
+            orient=Qt.Orientation.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=4000,
+            parent=self,
+        )
+
+    def _on_singer_manager_clicked(self):
+        """工具栏「演唱者管理」入口。
+
+        打开一个微型浮动窗口，复用 SingerManagerInterface 的全部功能，
+        允许用户在打轴的同时随时编辑演唱者。
+        """
+        if self._mini_singer_manager is not None and self._mini_singer_manager.isVisible():
+            self._mini_singer_manager.raise_()
+            self._mini_singer_manager.activateWindow()
+            return
+
+        self._mini_singer_manager = MiniSingerManager(self)
+        if self._project:
+            self._mini_singer_manager.set_project(self._project)
+        if hasattr(self, "_store") and self._store:
+            self._mini_singer_manager.set_store(self._store)
+        self._mini_singer_manager.show_at_cursor()
 
     def _on_insert_guide(self):
         """打开插入导唱符对话框"""
@@ -2585,8 +2731,96 @@ class EditorInterface(QWidget):
             self._on_delete_rubies_by_type()
         elif action == "set_singer_by_line":
             self._on_set_singer_by_line()
+        elif action == "apply_singer":
+            self._on_apply_singer()
         elif action == "timestamps_to_sentence_end":
             self._convert_timestamps_to_sentence_end()
+        elif action == "quick_export":
+            self._on_quick_export()
+
+    def _on_quick_export(self):
+        """快捷导出：使用默认导出格式弹出保存对话框并导出。"""
+        if not self._project:
+            InfoBar.warning(
+                title="无项目",
+                content="请先创建或打开项目",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+            return
+
+        from strange_uta_game.frontend.settings.app_settings import AppSettings
+
+        settings = AppSettings()
+        format_name = settings.get("export.default_format", "Nicokara (带注音)")
+
+        try:
+            exporter = get_exporter_by_name(format_name)
+        except ValueError:
+            InfoBar.error(
+                title="导出失败",
+                content=f"未知的导出格式: {format_name}",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+            return
+
+        ext = exporter.file_extension
+        file_filter = exporter.file_filter
+
+        base_name = self._project.metadata.title or "untitled"
+        suggested_dir = ""
+        store = getattr(self, "_store", None)
+        if store:
+            suggested_dir = store.working_dir
+        if not suggested_dir:
+            suggested_dir = settings.get("export.last_export_dir", "")
+        suggested_path = str(Path(suggested_dir) / (base_name + ext)) if suggested_dir else base_name + ext
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "快捷导出", suggested_path, file_filter
+        )
+        if not file_path:
+            return
+
+        if not Path(file_path).suffix:
+            file_path += ext
+
+        export_service = ExportService()
+        result = export_service.export(
+            self._project,
+            format_name,
+            file_path,
+            offset_ms=settings.get("export.offset_ms", 0),
+        )
+        if result.success:
+            settings.set("export.last_export_dir", str(Path(file_path).parent))
+            settings.save()
+            InfoBar.success(
+                title="导出成功",
+                content=result.file_path,
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=5000,
+                parent=self,
+            )
+        else:
+            InfoBar.error(
+                title="导出失败",
+                content=result.error_message or "未知错误",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=5000,
+                parent=self,
+            )
 
     def _on_long_press_timeout(self):
         """长按定时器超时，执行 long 动作。"""
@@ -3130,7 +3364,9 @@ class EditorInterface(QWidget):
             from strange_uta_game.backend.application.auto_check_service import (
                 delete_rubies_by_type_names,
             )
-            from strange_uta_game.frontend.settings.settings_interface import AppSettings
+            from strange_uta_game.frontend.settings.settings_interface import (
+                AppSettings,
+            )
 
             app_settings = AppSettings()
             auto_check_flags = app_settings.get_all().get("auto_check", {})

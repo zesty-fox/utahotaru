@@ -1121,3 +1121,116 @@ class SetSingerByLineDialog(QDialog):
     def result_map(self) -> dict[int, str]:
         """返回 {line_idx: singer_id} 映射"""
         return self._result_map
+
+
+class ApplySingerDialog(QDialog):
+    """应用演唱者对话框 — 为选中字符设置演唱者。
+
+    显示当前选中字符内容、当前演唱者信息、过滤器和演唱者列表。
+    用户可选择一个演唱者并应用到选中的字符。
+    """
+
+    apply_requested = pyqtSignal(str)  # singer_id
+
+    def __init__(self, char_text: str, current_singers: list[Singer], all_singers: list[Singer], parent=None):
+        super().__init__(parent)
+        self._current_singers = current_singers
+        self._all_singers = all_singers
+        self._selected_singer_id = None
+
+        self.setWindowTitle("应用演唱者")
+        self.resize(400, 500)
+        self.setFont(QFont("Microsoft YaHei", 10))
+
+        layout = QVBoxLayout(self)
+
+        # 第一行：当前选中的字符内容（不可编辑）
+        form = QFormLayout()
+        lbl_char = QLabel(char_text)
+        lbl_char.setStyleSheet("font-size: 16px; font-weight: bold;")
+        form.addRow("选中字符:", lbl_char)
+
+        # 第二行：当前演唱者信息
+        if current_singers:
+            singer_names = ", ".join(s.name for s in current_singers)
+        else:
+            singer_names = "无"
+        lbl_current_singer = QLabel(singer_names)
+        lbl_current_singer.setStyleSheet("font-size: 14px;")
+        form.addRow("当前演唱者:", lbl_current_singer)
+        layout.addLayout(form)
+
+        # 第三行：过滤器
+        filter_layout = QHBoxLayout()
+        filter_layout.addWidget(QLabel("过滤:"))
+        self.edit_filter = QLineEdit()
+        self.edit_filter.setPlaceholderText("输入演唱者名称进行过滤")
+        self.edit_filter.textChanged.connect(self._on_filter_changed)
+        filter_layout.addWidget(self.edit_filter, stretch=1)
+        layout.addLayout(filter_layout)
+
+        # 第四行：演唱者列表
+        self.list_singers = QTableWidget(len(all_singers), 2, self)
+        self.list_singers.setHorizontalHeaderLabels(["演唱者", "颜色"])
+        self.list_singers.horizontalHeader().setStretchLastSection(True)
+        self.list_singers.verticalHeader().setVisible(False)
+        self.list_singers.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.list_singers.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self.list_singers.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.list_singers.itemSelectionChanged.connect(self._on_selection_changed)
+
+        # 填充列表
+        for idx, singer in enumerate(all_singers):
+            name_item = QTableWidgetItem(singer.name)
+            name_item.setData(Qt.ItemDataRole.UserRole, singer.id)
+            self.list_singers.setItem(idx, 0, name_item)
+
+            color_item = QTableWidgetItem("")
+            color_item.setBackground(QColor(singer.color))
+            self.list_singers.setItem(idx, 1, color_item)
+
+        layout.addWidget(self.list_singers, stretch=1)
+
+        # 底部按钮
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        self.btn_apply = PrimaryPushButton("应用", self)
+        self.btn_apply.clicked.connect(self._on_apply)
+        self.btn_apply.setEnabled(False)
+        btn_layout.addWidget(self.btn_apply)
+        btn_cancel = PushButton("取消", self)
+        btn_cancel.clicked.connect(self.reject)
+        btn_layout.addWidget(btn_cancel)
+        layout.addLayout(btn_layout)
+
+    def _on_filter_changed(self, text: str):
+        """过滤器文本变化时更新列表显示"""
+        filter_text = text.strip().lower()
+        for row in range(self.list_singers.rowCount()):
+            name_item = self.list_singers.item(row, 0)
+            if name_item:
+                singer_name = name_item.text().lower()
+                self.list_singers.setRowHidden(row, filter_text not in singer_name)
+
+    def _on_selection_changed(self):
+        """列表选择变化时更新应用按钮状态"""
+        selected_items = self.list_singers.selectedItems()
+        if selected_items:
+            row = selected_items[0].row()
+            name_item = self.list_singers.item(row, 0)
+            if name_item:
+                self._selected_singer_id = name_item.data(Qt.ItemDataRole.UserRole)
+                self.btn_apply.setEnabled(True)
+                return
+        self._selected_singer_id = None
+        self.btn_apply.setEnabled(False)
+
+    def _on_apply(self):
+        """应用按钮点击处理"""
+        if self._selected_singer_id:
+            self.apply_requested.emit(self._selected_singer_id)
+            self.accept()
+
+    def get_selected_singer_id(self) -> str:
+        """返回选中的演唱者ID"""
+        return self._selected_singer_id
