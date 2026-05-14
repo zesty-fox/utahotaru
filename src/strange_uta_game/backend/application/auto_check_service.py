@@ -1524,8 +1524,15 @@ class AutoCheckService:
                     parts = per_char_parts[k]
                     if parts:
                         ch.ruby = Ruby(parts=[RubyPart(text=p) for p in parts])
+                        ch.check_count = len(parts)
                     else:
                         ch.ruby = None
+                        # 无 parts 时：汉字或被 linked（连词块内）→ cp=0；
+                        # 其他情况保留主流程默认值（如假名默认 cp=1）。
+                        ct = get_char_type(ch.char) if len(ch.char) == 1 else CharType.OTHER
+                        is_linked = k > 0 and chars[idx + k - 1].linked_to_next
+                        if ct == CharType.KANJI or is_linked:
+                            ch.check_count = 0
                     # linked_to_next：同 block 内相邻字符 → True；否则 False。
                     # 词末字符（k == wlen-1）的 linked_to_next 不在 word 内部决定，
                     # 保守置 False（不连到 word 之外的下一字符）。
