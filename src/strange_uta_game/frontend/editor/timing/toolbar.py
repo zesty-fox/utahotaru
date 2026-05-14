@@ -97,23 +97,16 @@ class EditorToolBar(QFrame):
         self.btn_ruby.setMenu(ruby_menu)
         layout.addWidget(self.btn_ruby)
 
-        self.btn_set_singer_by_line = PushButton("按行设置演唱者", self)
-        self.btn_set_singer_by_line.setIcon(FIF.PEOPLE)
-        self.btn_set_singer_by_line.setFixedHeight(32)
-        self.btn_set_singer_by_line.clicked.connect(self.set_singer_by_line_clicked.emit)
-        layout.addWidget(self.btn_set_singer_by_line)
-
-        self.btn_apply_singer = PushButton("应用演唱者", self)
-        self.btn_apply_singer.setIcon(FIF.PEOPLE)
-        self.btn_apply_singer.setFixedHeight(32)
-        self.btn_apply_singer.clicked.connect(self.apply_singer_clicked.emit)
-        layout.addWidget(self.btn_apply_singer)
-
-        self.btn_singer_manager = PushButton("演唱者管理", self)
-        self.btn_singer_manager.setIcon(FIF.PEOPLE)
-        self.btn_singer_manager.setFixedHeight(32)
-        self.btn_singer_manager.clicked.connect(self.singer_manager_clicked.emit)
-        layout.addWidget(self.btn_singer_manager)
+        # 演唱者相关下拉菜单
+        self.btn_singer = DropDownPushButton("演唱者相关", self)
+        self.btn_singer.setIcon(FIF.PEOPLE)
+        self.btn_singer.setFixedHeight(32)
+        singer_menu = RoundMenu(parent=self.btn_singer)
+        singer_menu.addAction(Action(FIF.PEOPLE, "演唱者管理", self, triggered=self.singer_manager_clicked.emit))
+        singer_menu.addAction(Action(FIF.PEOPLE, "应用演唱者", self, triggered=self.apply_singer_clicked.emit))
+        singer_menu.addAction(Action(FIF.PEOPLE, "按行设置演唱者", self, triggered=self.set_singer_by_line_clicked.emit))
+        self.btn_singer.setMenu(singer_menu)
+        layout.addWidget(self.btn_singer)
 
         layout.addSpacing(10)
 
