@@ -900,7 +900,9 @@ class KaraokePreview(QWidget):
                 char_widths[ci] = max(char_widths[ci], ruby_w)
 
         # 确保字符宽度 >= CP标记总宽度（避免CP标记重叠）
+        # 句尾marker独立于普通marker，在字符右侧扩展半字符宽度
         fm_checkpoint = self._fm_checkpoint
+        end_sentence_w: dict[int, int] = {}
         for ci, ch_obj in enumerate(characters):
             if ch_obj.total_timing_points > 0:
                 total_cp_w = 0
@@ -909,13 +911,16 @@ class KaraokePreview(QWidget):
                         ch_obj.is_sentence_end and cp_idx == ch_obj.check_count
                     )
                     if is_sentence_end_marker:
-                        marker_char = "  ⬟" if ch_obj.global_sentence_end_ts else "  ⬠"
+                        continue  # 句尾marker不计入普通CP宽度
                     elif cp_idx == 0:
                         marker_char = "▶" if cp_idx < len(ch_obj.global_timestamps) else "▷"
                     else:
                         marker_char = "▮" if cp_idx < len(ch_obj.global_timestamps) else "▯"
                     total_cp_w += fm_checkpoint.horizontalAdvance(marker_char)
                 char_widths[ci] = max(char_widths[ci], total_cp_w)
+            # 句尾字符扩展该字符自身宽度的一半用于放置句尾marker（单独追踪，不混入 char_widths）
+            if ch_obj.is_sentence_end:
+                end_sentence_w[ci] = char_widths[ci] // 2
 
         # ---------- wipe 时间线（离散字符开始时间模型） ----------
         # 每个字符的 wipe 开始时间 = 该字符第一个 cp 的时间戳（global_timestamps[0]）。
@@ -1063,7 +1068,8 @@ class KaraokePreview(QWidget):
             "gv": self._global_version,
             "fk": font_key,
             "char_widths": char_widths,
-            "total_text_width": sum(char_widths),
+            "end_sentence_w": end_sentence_w,
+            "total_text_width": sum(char_widths) + sum(end_sentence_w.values()),
             "char_wipe_times": char_wipe_times,
             "linked_leader_groups": linked_leader_groups,
             "linked_non_leader": linked_non_leader,
@@ -1238,6 +1244,7 @@ class KaraokePreview(QWidget):
                 idx, line, main_fm, "cur" if is_current else "ctx"
             )
             char_widths = _rd["char_widths"]
+            _end_sentence_w = _rd["end_sentence_w"]
             total_text_width = _rd["total_text_width"]
             char_wipe_times = _rd["char_wipe_times"]
             _linked_leader_groups = _rd["linked_leader_groups"]
@@ -1569,7 +1576,8 @@ class KaraokePreview(QWidget):
                         painter.drawText(int(char_draw_x), int(y_center), ch)
 
                         painter.save()
-                        wipe_w = int(char_w * wipe_ratio)
+                        _esw = _end_sentence_w.get(char_pos, 0)
+                        wipe_w = int((char_w + _esw) * wipe_ratio)
                         clip_rect = QRect(
                             int(curr_x),
                             int(y_center - main_fm.ascent() - 5),
@@ -1591,54 +1599,39 @@ class KaraokePreview(QWidget):
 
                 # 当前打轴位置指示线
                 if is_current and char_pos == self._current_char_idx:
+                    _esw = _end_sentence_w.get(char_pos, 0)
                     painter.setPen(highlight_color)
                     painter.drawLine(
                         int(curr_x),
                         int(y_center + main_fm.descent() + 2),
-                        int(curr_x + char_w),
+                        int(curr_x + char_w + _esw),
                         int(y_center + main_fm.descent() + 2),
                     )
 
                 # Checkpoint 标记（逐 checkpoint 绘制）
+                # 句尾marker独立于普通marker，绘制在字符右侧扩展区域
                 ch_obj = line.characters[char_pos]
                 if ch_obj.total_timing_points > 0:
                     painter.setFont(font_checkpoint)
 
-                    markers = []
-                    for cp_idx in range(ch_obj.total_timing_points):
-                        is_sentence_end_marker = (
-                            ch_obj.is_sentence_end and cp_idx == ch_obj.check_count
-                        )
-                        # Issue #Q1：CP marker 的"已打轴"判定与 wipe 渲染保持
-                        # 同源——使用 render_* 时间戳字段。否则当存在 render
-                        # offset 时句尾标记会与走字进度不同步。
-                        has_timed = (
-                            ch_obj.global_sentence_end_ts is not None
-                            if is_sentence_end_marker
-                            else cp_idx < len(ch_obj.global_timestamps)
-                        )
-
-                        if is_sentence_end_marker:
-                            marker_char = "  ⬟" if has_timed else "  ⬠"
-                        elif cp_idx == 0:
+                    # 普通markers（不含句尾marker）
+                    regular_markers = []
+                    for cp_idx in range(ch_obj.check_count):
+                        has_timed = cp_idx < len(ch_obj.global_timestamps)
+                        if cp_idx == 0:
                             marker_char = "▶" if has_timed else "▷"
                         else:
                             marker_char = "▮" if has_timed else "▯"
+                        regular_markers.append((cp_idx, marker_char, has_timed))
 
-                        markers.append((marker_char, has_timed))
-
-                    # 居中排列所有 marker
-                    total_markers_w = sum(
-                        fm_checkpoint.horizontalAdvance(m[0]) for m in markers
+                    # 居中排列普通marker（在原始字符宽度内）
+                    total_regular_w = sum(
+                        fm_checkpoint.horizontalAdvance(m[1]) for m in regular_markers
                     )
-                    mx = curr_x + (char_w - total_markers_w) // 2
+                    mx = curr_x + (char_w - total_regular_w) // 2
                     marker_y = int(y_center + main_fm.descent() + 14)
 
-                    for cp_idx, (marker_char, has_timed) in enumerate(markers):
-                        # checkpoint 颜色逻辑：
-                        # - 未打轴：使用主题当前文字色
-                        # - 已打轴但未选中：使用基色（不填充演唱者颜色，仅通过实心/空心区分）
-                        # - 已打轴且选中：使用演唱者颜色作为高亮
+                    for cp_idx, marker_char, has_timed in regular_markers:
                         is_selected = (
                             ch_obj.selected_checkpoint_idx == cp_idx
                         )
@@ -1654,7 +1647,6 @@ class KaraokePreview(QWidget):
                         painter.setPen(color)
                         painter.drawText(int(mx), marker_y, marker_char)
 
-                        # 存储 hitbox 用于点击检测
                         marker_rect = QRect(
                             int(mx),
                             marker_y - fm_checkpoint.ascent(),
@@ -1667,4 +1659,38 @@ class KaraokePreview(QWidget):
 
                         mx += mw
 
-                curr_x += char_w
+                    # 句尾marker：独立绘制在字符右侧扩展区域
+                    if ch_obj.is_sentence_end:
+                        se_cp_idx = ch_obj.check_count
+                        has_timed = ch_obj.global_sentence_end_ts is not None
+                        marker_char = "⬟" if has_timed else "⬠"
+
+                        is_selected = (
+                            ch_obj.selected_checkpoint_idx == se_cp_idx
+                        )
+                        if is_selected:
+                            color = _char_singer_colors.get(char_pos, highlight_color)
+                        elif not has_timed:
+                            color = theme.karaoke_text_current
+                        else:
+                            color = base_color
+
+                        # 扩展区域：字符右侧，宽度为半字符宽
+                        se_area_x = curr_x + char_w
+                        se_area_w = _end_sentence_w.get(char_pos, 0)
+
+                        painter.setPen(color)
+                        painter.drawText(int(se_area_x), marker_y, marker_char)
+
+                        # hitbox覆盖整个扩展区域（高度与字符区域一致）
+                        se_rect = QRect(
+                            int(se_area_x),
+                            _rect_top,
+                            int(se_area_w),
+                            _rect_height,
+                        )
+                        self._checkpoint_hitboxes.append(
+                            (se_rect, idx, char_pos, se_cp_idx)
+                        )
+
+                curr_x += char_w + _end_sentence_w.get(char_pos, 0)
