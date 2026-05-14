@@ -137,6 +137,8 @@ class SettingsInterface(ScrollArea):
                 card.index_changed.connect(self._schedule_auto_save)
             elif isinstance(card, BrowseSettingCard):
                 card.path_changed.connect(self._schedule_auto_save)
+            elif isinstance(card, TextSettingCard):
+                card.value_changed.connect(self._schedule_auto_save)
         # 快捷键卡片存在嵌套 dict self._shortcut_cards[mode][action]，
         # dir(self) 无法遍历到，改由 _init_shortcut_group 创建时直接 connect。
 
@@ -595,6 +597,8 @@ class SettingsInterface(ScrollArea):
             self._settings.set("ui.checkpoint_markers", markers)
             self._settings.save()
             self.settings_changed.emit()
+            if self._store is not None:
+                self._store.notify("settings")
 
     # ── 界面设定 ──
 

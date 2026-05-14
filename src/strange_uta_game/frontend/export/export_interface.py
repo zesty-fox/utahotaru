@@ -157,9 +157,18 @@ class ExportInterface(QWidget):
         )
         self._chk_insert_singer_tags.hide()
 
+        # 分色标签设置助手按钮（仅 Nicokara 格式显示，紧接「插入演唱者标签」之后）
+        self._btn_emoji_config = PushButton("分色标签设置助手...", self)
+        self._btn_emoji_config.setToolTip(
+            "为每位演唱者配置 @Emoji 分色标签，配置后自动写入 Nicokara 标签的自定义字段"
+        )
+        self._btn_emoji_config.clicked.connect(self._on_emoji_config)
+        self._btn_emoji_config.hide()
+
         self._singer_group.hide()
         right_layout.addWidget(self._singer_group)
         right_layout.addWidget(self._chk_insert_singer_tags)
+        right_layout.addWidget(self._btn_emoji_config)
 
         right_layout.addStretch()
 
@@ -218,6 +227,7 @@ class ExportInterface(QWidget):
             self.btn_tags.setVisible(is_nicokara)
             self._singer_group.setVisible(is_nicokara)
             self._chk_insert_singer_tags.setVisible(is_nicokara)
+            self._btn_emoji_config.setVisible(is_nicokara)
             if is_nicokara:
                 self._refresh_singer_checkboxes()
 
@@ -390,6 +400,50 @@ class ExportInterface(QWidget):
             new_tags = dialog.get_tag_data()
             settings.set("nicokara_tags", new_tags)
             settings.save()
+
+    def _on_emoji_config(self):
+        """打开分色标签设置助手对话框。
+
+        演唱者列表以当前过滤器勾选结果为准（无勾选则使用全部演唱者）。
+        配置确认后自动写入 nicokara_tags.custom 并记忆首行参数。
+        """
+        from strange_uta_game.frontend.export.emoji_tag_dialog import EmojiTagDialog
+
+        if not self._project:
+            InfoBar.warning(
+                title="无项目",
+                content="请先创建或打开项目",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+            return
+
+        # 以过滤器勾选结果为准；无勾选则取全部演唱者
+        selected_ids = self._get_selected_singer_ids()
+        singer_list: list[tuple[str, str]] = []
+        for singer in self._project.singers:
+            if not singer.enabled:
+                continue
+            if selected_ids is None or singer.id in selected_ids:
+                singer_list.append((singer.id, singer.name))
+
+        if not singer_list:
+            InfoBar.warning(
+                title="无演唱者",
+                content="项目中没有可用的演唱者",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+            return
+
+        dialog = EmojiTagDialog(singer_list, self)
+        dialog.exec()  # apply_emoji_tags_to_settings 在 _on_accept 内部调用
 
     def _on_export(self):
         if not self._project:
