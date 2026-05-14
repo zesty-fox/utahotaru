@@ -105,6 +105,36 @@ class DoubleSpinSettingCard(SettingCard):
         return self.spin.value()
 
 
+class TextSettingCard(SettingCard):
+    """文本输入设定卡片"""
+
+    value_changed = pyqtSignal(str)
+
+    def __init__(
+        self,
+        icon,
+        title: str,
+        content: str,
+        placeholder: str = "",
+        max_length: int = 10,
+        parent=None,
+    ):
+        super().__init__(icon, title, content, parent)
+        self.line_edit = LineEdit(self)
+        self.line_edit.setPlaceholderText(placeholder)
+        self.line_edit.setMaxLength(max_length)
+        self.line_edit.setFixedWidth(180)
+        self.line_edit.textChanged.connect(self.value_changed.emit)
+        self.hBoxLayout.addWidget(self.line_edit, 0, Qt.AlignmentFlag.AlignRight)
+        self.hBoxLayout.addSpacing(16)
+
+    def setValue(self, value: str):
+        self.line_edit.setText(value)
+
+    def value(self) -> str:
+        return self.line_edit.text()
+
+
 class SwitchSettingCard(SettingCard):
     """开关设定卡片"""
 

@@ -55,6 +55,7 @@ from .cards import (
     ShortcutSettingCard,
     SpinSettingCard,
     SwitchSettingCard,
+    TextSettingCard,
 )
 from .dictionary_dialog import DictionaryEditDialog
 from .nicokara_dialog import NicokaraTagsDialog
@@ -73,6 +74,7 @@ __all__ = [
     "ComboSettingCard",
     "BrowseSettingCard",
     "ShortcutSettingCard",
+    "TextSettingCard",
     "_parse_rl_dictionary",
 ]
 
@@ -750,10 +752,19 @@ class SettingsInterface(ScrollArea):
             suffix=" ms",
             parent=self.export_group,
         )
+        self.card_nicokara_pause_char = TextSettingCard(
+            FIF.EDIT,
+            "Nicokara停顿符",
+            "导出Nicokara（带注音）格式时，删除rubyTag中的此字符",
+            placeholder="输入停顿符",
+            max_length=5,
+            parent=self.export_group,
+        )
 
         self.export_group.addSettingCard(self.card_default_format)
         self.export_group.addSettingCard(self.card_export_dir)
         self.export_group.addSettingCard(self.card_software_compensation)
+        self.export_group.addSettingCard(self.card_nicokara_pause_char)
         self.expandLayout.addWidget(self.export_group)
 
     # ── 快捷键 ──
@@ -1240,6 +1251,7 @@ class SettingsInterface(ScrollArea):
             self.card_export_dir.setText(export_dir)
         self.card_export_offset.setValue(self._settings.get("export.offset_ms", 0))
         self.card_software_compensation.setValue(self._settings.get("export.software_compensation_ms", -90))
+        self.card_nicokara_pause_char.setValue(self._settings.get("export.nicokara_pause_char", "^"))
 
         # 自动保存
         self.card_auto_save_enabled.setChecked(
@@ -1346,6 +1358,7 @@ class SettingsInterface(ScrollArea):
             self._settings.set("export.last_export_dir", export_dir)
         self._settings.set("export.offset_ms", self.card_export_offset.value())
         self._settings.set("export.software_compensation_ms", self.card_software_compensation.value())
+        self._settings.set("export.nicokara_pause_char", self.card_nicokara_pause_char.value())
 
         # 自动保存
         self._settings.set("auto_save.enabled", self.card_auto_save_enabled.isChecked())

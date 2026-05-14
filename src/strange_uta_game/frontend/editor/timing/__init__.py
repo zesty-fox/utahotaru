@@ -9,6 +9,7 @@ from .bulk_change_dialog import BulkChangeDialog
 from .commands import SentenceSnapshotCommand, _SentenceSnapshotCommand
 from .dialogs import (
     CharEditDialog,
+    CompleteTimestampDialog,
     InsertGuideSymbolDialog,
     ModifyCharacterDialog,
 )
@@ -32,4 +33,5 @@ __all__ = [
     "InsertGuideSymbolDialog",
     "CharEditDialog",
     "BulkChangeDialog",
+    "CompleteTimestampDialog",
 ]

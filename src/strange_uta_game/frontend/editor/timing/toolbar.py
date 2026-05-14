@@ -39,6 +39,7 @@ class EditorToolBar(QFrame):
     set_singer_by_line_clicked = pyqtSignal()
     apply_singer_clicked = pyqtSignal()
     singer_manager_clicked = pyqtSignal()
+    complete_timestamp_clicked = pyqtSignal()  # 补全时间戳
     offset_changed = pyqtSignal(int)  # 偏移量变化（毫秒）
 
     def __init__(self, parent=None):
@@ -107,6 +108,12 @@ class EditorToolBar(QFrame):
         singer_menu.addAction(Action(FIF.PEOPLE, "按行设置演唱者", self, triggered=self.set_singer_by_line_clicked.emit))
         self.btn_singer.setMenu(singer_menu)
         layout.addWidget(self.btn_singer)
+
+        self.btn_complete_timestamp = PushButton("补全时间戳", self)
+        self.btn_complete_timestamp.setIcon(FIF.CLOCK)
+        self.btn_complete_timestamp.setFixedHeight(32)
+        self.btn_complete_timestamp.clicked.connect(self.complete_timestamp_clicked.emit)
+        layout.addWidget(self.btn_complete_timestamp)
 
         layout.addSpacing(10)
 

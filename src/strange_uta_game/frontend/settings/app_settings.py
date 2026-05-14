@@ -82,6 +82,7 @@ class AppSettings:
             "last_export_dir": "",
             "offset_ms": -230,
             "software_compensation_ms": -90,
+            "nicokara_pause_char": "^",
         },
         "ruby_split_mode": "mora",  # 注音分段方式: "direct", "char", "mora"
         "ruby_dictionary": {
@@ -98,6 +99,19 @@ class AppSettings:
         "auto_save": {
             "enabled": True,
             "interval_minutes": 5,
+        },
+        "complete_timestamp": {
+            "scope_types": [
+                "kanji",
+                "hiragana",
+                "katakana",
+                "sokuon",
+                "long_vowel",
+                "chisai_kana",
+            ],
+            "exclude_rules": [
+                "linked",
+            ],
         },
         "shortcuts": {
             # 打轴模式：音乐播放时生效（以实时打轴操作为主）

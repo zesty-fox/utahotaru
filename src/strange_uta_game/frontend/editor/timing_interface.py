@@ -64,6 +64,7 @@ from strange_uta_game.frontend.theme import theme
 from .line_interface import LineDetailDialog
 from .timing import (
     CharEditDialog,
+    CompleteTimestampDialog,
     EditorToolBar,
     FileLoader,
     InsertGuideSymbolDialog,
@@ -89,6 +90,7 @@ __all__ = [
     "ModifyCharacterDialog",
     "InsertGuideSymbolDialog",
     "CharEditDialog",
+    "CompleteTimestampDialog",
 ]
 
 
@@ -191,6 +193,7 @@ class EditorInterface(QWidget):
         self.toolbar.set_singer_by_line_clicked.connect(self._on_set_singer_by_line)
         self.toolbar.apply_singer_clicked.connect(self._on_apply_singer)
         self.toolbar.singer_manager_clicked.connect(self._on_singer_manager_clicked)
+        self.toolbar.complete_timestamp_clicked.connect(self._on_complete_timestamp)
         self.toolbar.offset_changed.connect(self._on_offset_changed)
         layout.addWidget(self.toolbar)
 
@@ -1453,6 +1456,241 @@ class EditorInterface(QWidget):
             self._update_status()
             if hasattr(self, "_store") and self._store:
                 self._store.notify("lyrics")
+
+    def _on_complete_timestamp(self):
+        """补全时间戳功能入口"""
+        if not self._project:
+            InfoBar.warning(
+                title="无项目",
+                content="请先创建或打开项目",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+            return
+
+        from .timing.dialogs import CompleteTimestampDialog
+
+        dlg = CompleteTimestampDialog(self)
+        if dlg.exec() != QDialog.DialogCode.Accepted or not dlg.was_apply_clicked():
+            return
+
+        scope_types = dlg.get_scope_types()
+        exclude_rules = dlg.get_exclude_rules()
+
+        if not scope_types:
+            InfoBar.warning(
+                title="未选择适用范围",
+                content="请至少选择一种字符类型",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+            return
+
+        # 执行补全时间戳
+        count = self._execute_complete_timestamp(scope_types, exclude_rules)
+
+        if count > 0:
+            InfoBar.success(
+                title="补全完成",
+                content=f"已为 {count} 个字符补全时间戳",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=4000,
+                parent=self,
+            )
+        else:
+            InfoBar.info(
+                title="无需补全",
+                content="没有找到需要补全时间戳的字符",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+
+    def _execute_complete_timestamp(self, scope_types: set[str], exclude_rules: list[str]) -> int:
+        """执行补全时间戳的核心逻辑
+
+        Args:
+            scope_types: 选中的字符类型集合
+            exclude_rules: 选中的排除规则列表
+
+        Returns:
+            补全的字符数量
+        """
+        if not self._project:
+            return 0
+
+        from strange_uta_game.backend.infrastructure.parsers.text_splitter import (
+            CharType,
+            get_char_type,
+        )
+
+        # 映射 scope_types 到 CharType
+        type_map = {
+            "kanji": CharType.KANJI,
+            "hiragana": CharType.HIRAGANA,
+            "katakana": CharType.KATAKANA,
+            "sokuon": CharType.SOKUON,
+            "long_vowel": CharType.LONG_VOWEL,
+            "alphabet": CharType.ALPHABET,
+            "number": CharType.NUMBER,
+            "symbol": CharType.SYMBOL,
+        }
+
+        target_types = set()
+        for key in scope_types:
+            if key in type_map:
+                target_types.add(type_map[key])
+
+        # 捨仮名需要特殊处理（小假名）
+        include_chisai_kana = "chisai_kana" in scope_types
+        _SMALL_KANA = set("ぁぃぅぇぉゃゅょゎァィゥェォャュョヮゕゖ")
+
+        exclude_linked = "linked" in exclude_rules
+
+        def _is_target_char(ch_obj) -> bool:
+            """判断字符是否为目标类型"""
+            char = ch_obj.char
+            # 跳过有时间戳的字符
+            if ch_obj.timestamps:
+                return False
+            # 跳过句尾字符
+            if ch_obj.is_sentence_end:
+                return False
+            # 跳过被连词字符（如果启用排除）
+            if exclude_linked and ch_obj.linked_to_next:
+                return False
+
+            # 捨仮名检查
+            if include_chisai_kana and char in _SMALL_KANA:
+                return True
+
+            # 普通类型检查
+            try:
+                char_type = get_char_type(char)
+                return char_type in target_types
+            except (ValueError, IndexError):
+                return False
+
+        def _find_prev_timestamp(line_idx: int, char_idx: int) -> Optional[int]:
+            """向前逐字查找最近的时间戳（在同一行内）
+
+            查找顺序：单字内先从后往前找普通时间戳，找不到再找句尾时间戳。
+            """
+            sentence = self._project.sentences[line_idx]
+            for ci in range(char_idx - 1, -1, -1):
+                ch = sentence.characters[ci]
+                # 先从后往前找普通时间戳
+                if ch.timestamps:
+                    return ch.timestamps[-1]
+                # 再找句尾时间戳
+                if ch.is_sentence_end and ch.timestamps:
+                    return ch.timestamps[-1]
+            return None
+
+        def _find_next_timestamp(line_idx: int, char_idx: int) -> Optional[int]:
+            """向后逐字查找最近的时间戳（在同一行内）
+
+            查找顺序：单字内先从前往后找普通时间戳，找不到再找句尾时间戳。
+            """
+            sentence = self._project.sentences[line_idx]
+            for ci in range(char_idx + 1, len(sentence.characters)):
+                ch = sentence.characters[ci]
+                # 先从前往后找普通时间戳
+                if ch.timestamps:
+                    return ch.timestamps[0]
+                # 再找句尾时间戳
+                if ch.is_sentence_end and ch.timestamps:
+                    return ch.timestamps[0]
+            return None
+
+        total_count = 0
+
+        def _mutate() -> Optional[tuple[int, int, Optional[int], str]]:
+            nonlocal total_count
+            assert self._project is not None
+
+            for line_idx, sentence in enumerate(self._project.sentences):
+                chars = sentence.characters
+                i = 0
+                while i < len(chars):
+                    # 找到连续的待补全字符段
+                    if not _is_target_char(chars[i]):
+                        i += 1
+                        continue
+
+                    # 找到连续段的结束位置
+                    segment_start = i
+                    while i < len(chars) and _is_target_char(chars[i]):
+                        i += 1
+                    segment_end = i  # 不包含
+
+                    # 向前查找时间戳
+                    prev_ts = _find_prev_timestamp(line_idx, segment_start)
+
+                    # 向后查找时间戳
+                    next_ts = _find_next_timestamp(line_idx, segment_end - 1)
+
+                    # 根据找到的时间戳进行补全
+                    segment_len = segment_end - segment_start
+
+                    if prev_ts is not None and next_ts is not None:
+                        # 前后都有时间戳：均匀分配
+                        if segment_len == 1:
+                            # 单个字符：取平均值
+                            avg_ts = (prev_ts + next_ts) // 2
+                            chars[segment_start].timestamps = [avg_ts]
+                            chars[segment_start].check_count = 1
+                            chars[segment_start]._update_offset_timestamps()
+                            chars[segment_start].push_to_ruby()
+                            total_count += 1
+                        else:
+                            # N 个连续字符：把时间区域均匀切 N+1 份
+                            time_diff = next_ts - prev_ts
+                            for idx, ci in enumerate(range(segment_start, segment_end)):
+                                # 计算每个字符的时间戳位置
+                                ts = prev_ts + time_diff * (idx + 1) // (segment_len + 1)
+                                chars[ci].timestamps = [ts]
+                                chars[ci].check_count = 1
+                                chars[ci]._update_offset_timestamps()
+                                chars[ci].push_to_ruby()
+                                total_count += 1
+                    elif prev_ts is not None:
+                        # 只有前面的时间戳：赋给所有待补全字符
+                        for ci in range(segment_start, segment_end):
+                            chars[ci].timestamps = [prev_ts]
+                            chars[ci].check_count = 1
+                            chars[ci]._update_offset_timestamps()
+                            chars[ci].push_to_ruby()
+                            total_count += 1
+                    elif next_ts is not None:
+                        # 只有后面的时间戳：赋给所有待补全字符
+                        for ci in range(segment_start, segment_end):
+                            chars[ci].timestamps = [next_ts]
+                            chars[ci].check_count = 1
+                            chars[ci]._update_offset_timestamps()
+                            chars[ci].push_to_ruby()
+                            total_count += 1
+                    # 如果前后都没有时间戳，跳过这个段
+
+            if total_count == 0:
+                return None
+            return (self._current_line_idx, self.preview._current_char_idx, None, "timetags")
+
+        ok = self._execute_structural_edit("补全时间戳", _mutate)
+        if not ok:
+            return 0
+
+        return total_count
 
     # ==================== 音频 ====================
 

@@ -76,7 +76,8 @@
     "auto_add_extension": true,
     "last_export_dir": "D:\\",
     "offset_ms": -390,
-    "software_compensation_ms": -90
+    "software_compensation_ms": -90,
+    "nicokara_pause_char": "^"
   },
   "ruby_split_mode": "mora",
   "ruby_dictionary": {
@@ -94,6 +95,19 @@
   "auto_save": {
     "enabled": true,
     "interval_minutes": 5
+  },
+  "complete_timestamp": {
+    "scope_types": [
+      "kanji",
+      "hiragana",
+      "katakana",
+      "sokuon",
+      "long_vowel",
+      "chisai_kana"
+    ],
+    "exclude_rules": [
+      "linked"
+    ]
   },
   "shortcuts": {
     "timing_mode": {

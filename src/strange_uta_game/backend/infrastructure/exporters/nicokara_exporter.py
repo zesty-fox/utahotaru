@@ -427,6 +427,21 @@ class NicokaraWithRubyExporter(NicokaraExporter):
         for idx, entry in enumerate(ruby_entries, 1):
             output_lines.append(f"@Ruby{idx}={entry}")
 
+        # 读取nicokara停顿符配置，删除rubyTag中的停顿符
+        pause_char = ""
+        try:
+            from strange_uta_game.frontend.settings.settings_interface import (
+                AppSettings,
+            )
+            pause_char = AppSettings().get("export.nicokara_pause_char", "^")
+        except Exception:
+            pause_char = "^"
+
+        if pause_char:
+            for i, line in enumerate(output_lines):
+                if line.startswith("@Ruby"):
+                    output_lines[i] = line.replace(pause_char, "")
+
         try:
             # 与 nicokara3 原生格式一致：UTF-8-BOM + CRLF 行尾 + 末尾 newline
             with open(file_path, "w", encoding="utf-8-sig", newline="") as f:

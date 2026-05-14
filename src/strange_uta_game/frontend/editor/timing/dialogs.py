@@ -1234,3 +1234,121 @@ class ApplySingerDialog(QDialog):
     def get_selected_singer_id(self) -> str:
         """返回选中的演唱者ID"""
         return self._selected_singer_id
+
+
+class CompleteTimestampDialog(QDialog):
+    """补全时间戳对话框 — 自动查找需要补轴点的字符并补全时间戳。
+
+    本功能用于所有打轴过程完成后，自动查找需要补轴点的字符（仅无普通时间戳字符），
+    查找前后时间戳取平均值均分给待补偿时间戳。
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("补全时间戳")
+        self.resize(480, 400)
+        self.setFont(QFont("Microsoft YaHei", 10))
+        self._apply_clicked = False
+
+        # 读取配置
+        try:
+            from strange_uta_game.frontend.settings.app_settings import AppSettings
+            settings = AppSettings()
+            self._saved_scope_types = settings.get("complete_timestamp.scope_types", [
+                "kanji", "hiragana", "katakana", "sokuon", "long_vowel", "chisai_kana"
+            ])
+            self._saved_exclude_rules = settings.get("complete_timestamp.exclude_rules", ["linked"])
+        except Exception:
+            self._saved_scope_types = ["kanji", "hiragana", "katakana", "sokuon", "long_vowel", "chisai_kana"]
+            self._saved_exclude_rules = ["linked"]
+
+        layout = QVBoxLayout(self)
+
+        # 第一行：功能说明
+        desc_label = QLabel(
+            "本功能用于所有打轴过程完成后，自动查找需要补轴点的字符（仅无普通时间戳字符），"
+            "查找前后时间戳取平均值均分给待补偿时间戳。"
+        )
+        desc_label.setWordWrap(True)
+        desc_label.setStyleSheet("font-size: 12px; color: #555; padding: 8px;")
+        layout.addWidget(desc_label)
+
+        # 第二行：适用范围（多选）
+        scope_group = QGroupBox("适用范围")
+        scope_layout = QVBoxLayout(scope_group)
+
+        self._scope_checkboxes: dict[str, QCheckBox] = {}
+        scope_items = [
+            ("kanji", "汉字"),
+            ("hiragana", "平假名"),
+            ("katakana", "片假名"),
+            ("sokuon", "促音（っ/ッ）"),
+            ("long_vowel", "长音符号"),
+            ("chisai_kana", "捨仮名"),
+            ("alphabet", "英文字母"),
+            ("number", "数字"),
+            ("symbol", "特殊符号"),
+        ]
+
+        for key, label in scope_items:
+            chk = QCheckBox(label)
+            chk.setChecked(key in self._saved_scope_types)
+            self._scope_checkboxes[key] = chk
+            scope_layout.addWidget(chk)
+
+        layout.addWidget(scope_group)
+
+        # 第三行：排除规则（多选）
+        exclude_group = QGroupBox("排除规则")
+        exclude_layout = QVBoxLayout(exclude_group)
+
+        self._exclude_checkboxes: dict[str, QCheckBox] = {}
+        exclude_items = [
+            ("linked", "排除被连词字符"),
+        ]
+
+        for key, label in exclude_items:
+            chk = QCheckBox(label)
+            chk.setChecked(key in self._saved_exclude_rules)
+            self._exclude_checkboxes[key] = chk
+            exclude_layout.addWidget(chk)
+
+        layout.addWidget(exclude_group)
+
+        # 底部按钮
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_apply = PrimaryPushButton("应用", self)
+        btn_apply.clicked.connect(self._on_apply)
+        btn_layout.addWidget(btn_apply)
+        btn_cancel = PushButton("取消", self)
+        btn_cancel.clicked.connect(self.reject)
+        btn_layout.addWidget(btn_cancel)
+        layout.addLayout(btn_layout)
+
+    def _on_apply(self):
+        """应用按钮点击处理"""
+        self._apply_clicked = True
+        # 保存适用范围和排除规则到配置
+        scope_types = self.get_scope_types()
+        exclude_rules = self.get_exclude_rules()
+        try:
+            from strange_uta_game.frontend.settings.app_settings import AppSettings
+            settings = AppSettings()
+            settings.set("complete_timestamp.scope_types", list(scope_types))
+            settings.set("complete_timestamp.exclude_rules", exclude_rules)
+            settings.save()
+        except Exception:
+            pass
+        self.accept()
+
+    def was_apply_clicked(self) -> bool:
+        return self._apply_clicked
+
+    def get_scope_types(self) -> set[str]:
+        """返回选中的适用范围类型集合"""
+        return {key for key, chk in self._scope_checkboxes.items() if chk.isChecked()}
+
+    def get_exclude_rules(self) -> list[str]:
+        """返回选中的排除规则列表"""
+        return [key for key, chk in self._exclude_checkboxes.items() if chk.isChecked()]
