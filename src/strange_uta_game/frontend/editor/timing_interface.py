@@ -2826,6 +2826,7 @@ class EditorInterface(QWidget):
             format_name,
             file_path,
             offset_ms=settings.get("export.offset_ms", 0),
+            software_compensation_ms=settings.get("export.software_compensation_ms", -90),
         )
         if result.success:
             settings.set("export.last_export_dir", str(Path(file_path).parent))

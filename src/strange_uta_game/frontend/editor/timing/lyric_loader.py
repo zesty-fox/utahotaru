@@ -143,6 +143,7 @@ def parse_lyric_content(
     content: str,
     default_singer_id: str,
     project_singers: Optional[List[Singer]] = None,
+    software_compensation_ms: int = 0,
 ) -> Tuple[List[Sentence], bool, List[Singer]]:
     """解析歌词内容，返回解析后的句子列表。
 
@@ -150,6 +151,7 @@ def parse_lyric_content(
         content: 歌词文本内容
         default_singer_id: 默认演唱者 ID
         project_singers: 当前项目的演唱者列表（用于 Nicokara 格式的演唱者匹配）
+        software_compensation_ms: 软件导出补偿（毫秒），导入时减去此值
 
     Returns:
         (sentences, is_nicokara, new_singers):
@@ -160,6 +162,24 @@ def parse_lyric_content(
     Raises:
         ValueError: 当内容是 SUG 项目文件格式时（由调用方处理为项目加载）
     """
+
+    def _apply_compensation(sentences: List[Sentence]) -> List[Sentence]:
+        """应用导入补偿（减去软件导出补偿）"""
+        if software_compensation_ms == 0:
+            return sentences
+        for sentence in sentences:
+            for ch in sentence.characters:
+                if ch.timestamps:
+                    ch.timestamps = [
+                        max(0, ts - software_compensation_ms)
+                        for ts in ch.timestamps
+                    ]
+                if ch.sentence_end_ts is not None:
+                    ch.sentence_end_ts = max(
+                        0, ch.sentence_end_ts - software_compensation_ms
+                    )
+        return sentences
+
     fmt = detect_lyric_format(content)
     is_nicokara = False
     new_singers: List[Singer] = []
@@ -171,7 +191,7 @@ def parse_lyric_content(
     # 内联格式（包括 inline 和纯 RLF 文本格式）
     if fmt == "inline":
         sentences = sentences_from_inline_text(content, default_singer_id)
-        return sentences, False, []
+        return _apply_compensation(sentences), False, []
 
     # Nicokara 格式
     if fmt == "nicokara":
@@ -227,7 +247,7 @@ def parse_lyric_content(
         # 其余未知 @ 标签原样收集到 tags["custom"]，导出器 round-trip 时按行回写。
         _sync_nicokara_metadata_to_settings(result.metadata)
 
-        return sentences, is_nicokara, new_singers
+        return _apply_compensation(sentences), is_nicokara, new_singers
 
     # ASS 格式
     if fmt == "ass":
@@ -238,7 +258,7 @@ def parse_lyric_content(
         parser = ASSParser()
         parsed_lines = parser.parse(content)
         sentences = parse_to_sentences(parsed_lines, default_singer_id)
-        return sentences, False, []
+        return _apply_compensation(sentences), False, []
 
     # SRT 格式
     if fmt == "srt":
@@ -249,14 +269,14 @@ def parse_lyric_content(
         parser = SRTParser()
         parsed_lines = parser.parse(content)
         sentences = parse_to_sentences(parsed_lines, default_singer_id)
-        return sentences, False, []
+        return _apply_compensation(sentences), False, []
 
     # LRC 格式
     if fmt == "lrc":
         lrc_parser = LRCParser()
         parsed_lines = lrc_parser.parse(content)
         sentences = parse_to_sentences(parsed_lines, default_singer_id)
-        return sentences, False, []
+        return _apply_compensation(sentences), False, []
 
     # 纯文本：按行分割
     sentences = []
@@ -270,7 +290,7 @@ def parse_lyric_content(
         )
         sentences.append(sentence)
 
-    return sentences, False, []
+    return _apply_compensation(sentences), False, []
 
 
 def read_lyric_file(path: str) -> Optional[str]:

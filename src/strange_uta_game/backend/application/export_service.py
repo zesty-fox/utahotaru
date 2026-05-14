@@ -72,6 +72,7 @@ class ExportService:
         singer_ids: Optional[Set[str]] = None,
         insert_singer_tags: bool = False,
         singer_map: Optional[Dict[str, str]] = None,
+        software_compensation_ms: int = 0,
     ) -> ExportResult:
         """导出项目
 
@@ -84,6 +85,7 @@ class ExportService:
             singer_ids: 要输出的演唱者 ID 集合（None=全部，仅 Nicokara 格式有效）
             insert_singer_tags: 是否在演唱者切换处插入【演唱者名】标签
             singer_map: singer_id → 演唱者显示名的映射
+            software_compensation_ms: 软件导出补偿（毫秒），导出时给时间戳加上此值
 
         Returns:
             导出结果
@@ -96,6 +98,22 @@ class ExportService:
             # Character.set_offset() 写入 global_timestamps / global_sentence_end_ts，
             # 各导出器从中直接读取，不再需要 service 层再次叠加。
             _ = offset_ms
+
+            # 应用软件导出补偿
+            if software_compensation_ms != 0:
+                import copy
+                project = copy.deepcopy(project)
+                for sentence in project.sentences:
+                    for ch in sentence.characters:
+                        if ch.global_timestamps:
+                            ch.global_timestamps = [
+                                max(0, ts + software_compensation_ms)
+                                for ts in ch.global_timestamps
+                            ]
+                        if ch.global_sentence_end_ts is not None:
+                            ch.global_sentence_end_ts = max(
+                                0, ch.global_sentence_end_ts + software_compensation_ms
+                            )
 
             # 报告进度
             if self._progress_callback:

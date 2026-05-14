@@ -437,9 +437,15 @@ class FileLoader:
 
             default_singer = self._project.get_default_singer()
 
+            # 读取软件导出补偿配置
+            from strange_uta_game.frontend.settings.app_settings import AppSettings
+            settings = AppSettings()
+            software_compensation_ms = settings.get("export.software_compensation_ms", -90)
+
             # 解析歌词
             sentences, is_nicokara, new_singers = parse_lyric_content(
-                content, default_singer.id, self._project.singers
+                content, default_singer.id, self._project.singers,
+                software_compensation_ms=software_compensation_ms
             )
 
             # 添加新演唱者

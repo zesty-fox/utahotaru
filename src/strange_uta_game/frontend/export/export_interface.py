@@ -229,6 +229,11 @@ class ExportInterface(QWidget):
         settings = AppSettings()
         return settings.get("export.offset_ms", 0)
 
+    def _get_software_compensation(self) -> int:
+        """从设置中获取软件导出补偿（毫秒）。"""
+        settings = AppSettings()
+        return settings.get("export.software_compensation_ms", -90)
+
     def set_store(self, store):
         """接入 ProjectStore 统一数据中心。"""
         self._store = store
@@ -508,6 +513,7 @@ class ExportInterface(QWidget):
             singer_ids=self._get_selected_singer_ids(),
             insert_singer_tags=self._chk_insert_singer_tags.isChecked(),
             singer_map=self._get_singer_map(),
+            software_compensation_ms=self._get_software_compensation(),
         )
         if result.success:
             # 将本次使用的格式持久化为默认导出格式
