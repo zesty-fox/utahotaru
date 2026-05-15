@@ -28,7 +28,13 @@ from PyQt6.QtWidgets import (
     QWidget,
     QButtonGroup,
 )
-from qfluentwidgets import PrimaryPushButton, PushButton, CaptionLabel
+from qfluentwidgets import (
+    InfoBar,
+    InfoBarPosition,
+    PrimaryPushButton,
+    PushButton,
+    CaptionLabel,
+)
 
 from strange_uta_game.backend.domain import (
     Character,
@@ -610,8 +616,18 @@ class InsertGuideSymbolDialog(QDialog):
                 if ref_ts is not None and is_last_of_symbol:
                     # For i-th symbol (0-indexed), timestamp = ref_ts - duration_ms * (count - i)
                     ts = ref_ts - duration_ms * (count - i)
-                    if ts >= 0:
-                        new_ch.add_timestamp(ts)
+                    if ts < 0:
+                        InfoBar.warning(
+                            title="时间戳越界",
+                            content=f"导唱符时间戳 {ts}ms 小于0，已自动设为0ms",
+                            orient=Qt.Orientation.Horizontal,
+                            isClosable=True,
+                            position=InfoBarPosition.TOP,
+                            duration=3000,
+                            parent=self,
+                        )
+                        ts = 0
+                    new_ch.add_timestamp(ts)
                 guide_chars.append(new_ch)
 
         # Insert guide chars BEFORE the selected char

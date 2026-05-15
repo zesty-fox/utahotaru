@@ -182,9 +182,12 @@ class EmojiTagDialog(QDialog):
         btn_row.addStretch()
         btn_ok = PrimaryPushButton("应用并保存", self)
         btn_ok.clicked.connect(self._on_accept)
+        btn_copy = PushButton("将首行参数复制到其他行", self)
+        btn_copy.clicked.connect(self._copy_first_row_params)
         btn_cancel = PushButton("取消", self)
         btn_cancel.clicked.connect(self.reject)
         btn_row.addWidget(btn_ok)
+        btn_row.addWidget(btn_copy)
         btn_row.addWidget(btn_cancel)
         layout.addLayout(btn_row)
 
@@ -236,6 +239,13 @@ class EmojiTagDialog(QDialog):
             params = params_edit.text().strip()
             result.append((singer_name, trigger, params))
         return result
+
+    def _copy_first_row_params(self):
+        if not self._rows:
+            return
+        first_params = self._rows[0][2].text()
+        for _, _, params_edit in self._rows[1:]:
+            params_edit.setText(first_params)
 
     def _on_accept(self):
         singer_params = self.get_singer_params()

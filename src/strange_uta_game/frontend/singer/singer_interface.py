@@ -881,7 +881,11 @@ class SingerManagerInterface(QWidget):
     # ==================== 演唱者预设 ====================
 
     def _on_save_preset(self):
-        """将当前项目的演唱者保存到软件全局设置"""
+        """将当前项目的演唱者保存到软件全局设置
+        
+        比较现有预设：同名则覆盖，不同名则新增。
+        预设中有但本次项目未使用的保留。新更新的预设放在顶部。
+        """
         if not self._project or not self._project.singers:
             self._warn("无法保存", "当前没有演唱者可保存")
             return
@@ -889,9 +893,21 @@ class SingerManagerInterface(QWidget):
         from strange_uta_game.frontend.settings.settings_interface import AppSettings
 
         app_settings = AppSettings()
-        presets = []
+        existing_presets = app_settings.load_singer_presets()
+
+        # 构建当前项目演唱者名称集合
+        current_names = {s.name for s in self._project.singers}
+
+        # 保留本次项目未使用的预设（名称不在当前项目中的）
+        kept_presets = [
+            p for p in existing_presets
+            if p.get("name", "") not in current_names
+        ]
+
+        # 当前项目演唱者转预设（放在顶部）
+        new_presets = []
         for s in self._project.singers:
-            presets.append(
+            new_presets.append(
                 {
                     "name": s.name,
                     "color": s.color,
@@ -899,10 +915,13 @@ class SingerManagerInterface(QWidget):
                     "backend_number": s.backend_number,
                 }
             )
-        app_settings.save_singer_presets(presets)
+
+        # 合并：新预设在前，保留的旧预设在后
+        merged = new_presets + kept_presets
+        app_settings.save_singer_presets(merged)
 
         self._info(
-            "保存成功", f"已保存 {len(presets)} 位演唱者预设到软件设置"
+            "保存成功", f"已保存 {len(new_presets)} 位演唱者预设到软件设置"
         )
 
     def _on_load_preset(self):
