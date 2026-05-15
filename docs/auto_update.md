@@ -227,7 +227,30 @@ GitHub Actions 会在 Windows runner 上：
 **推荐策略**：日常用本地脚本（快、能调试）；正式发布前过一遍 GitHub Actions
 确认能稳定通过（避免"在我机器上能跑"）。
 
-### 常见踩坑：Windows runner stdout 编码
+### 常见踩坑 ①：`GITHUB_TOKEN` 没有写权限（403 创建 Release 失败）
+
+**症状**：所有构建步骤都成功，最后 `Create GitHub Release` 步骤崩在：
+
+```
+GitHub release failed with status: 403
+{"message":"Resource not accessible by integration"}
+Skip retry — your GitHub token/PAT does not have the required permission to create a release
+```
+
+**原因**：自 2023 年起 GitHub 新建仓库的默认 `GITHUB_TOKEN` 是「只读」，
+`softprops/action-gh-release` 调 GitHub API 创建 Release / 上传 Asset 会被拒。
+
+**修复**：工作流文件顶层声明 `permissions: contents: write`（仓库已经这么做了）：
+
+```yaml
+permissions:
+  contents: write
+```
+
+或者：仓库 Settings → Actions → General → Workflow permissions → 选
+"Read and write permissions"。两个二选一即可，不要都做。
+
+### 常见踩坑 ②：Windows runner stdout 编码
 
 GitHub 的 `windows-latest` runner Python 默认 stdout 编码是 **cp1252**
 （Western European），无法编码中文字符。脚本里的 `print("开始打包 …")`

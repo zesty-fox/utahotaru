@@ -27,6 +27,16 @@ env:
   PYTHONIOENCODING: utf-8
   PYTHONUTF8: '1'
 
+# 显式声明本工作流需要的最小权限。
+# 自 2023 年起，GitHub 新建仓库的默认 GITHUB_TOKEN 是「只读」，``softprops/action-gh-release``
+# 创建 Release / 上传 Asset 会被 GitHub API 以 ``403 Resource not accessible by integration``
+# 拒绝。这里显式声明 ``contents: write`` 即可解锁。
+#
+# 备选方案：到仓库 Settings → Actions → General → Workflow permissions 选
+# "Read and write permissions"。但当前显式写在工作流里更清楚，避免依赖仓库设置。
+permissions:
+  contents: write
+
 jobs:
   build-and-release:
     runs-on: windows-latest
