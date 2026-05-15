@@ -146,7 +146,7 @@ class TransportBar(QFrame):
         text = self.edit_speed.text().strip().replace("%", "")
         try:
             val = int(text)
-            val = max(50, min(200, val))
+            val = max(20, min(200, val))
         except ValueError:
             val = 100
         self.edit_speed.setText(f"{val}%")
@@ -154,7 +154,7 @@ class TransportBar(QFrame):
 
     def set_speed_value(self, pct: int):
         """设置速度值（百分比整数，如 100）"""
-        pct = max(50, min(200, pct))
+        pct = max(20, min(200, pct))
         self.edit_speed.setText(f"{pct}%")
         self.speed_changed.emit(pct / 100.0)
 
@@ -162,7 +162,7 @@ class TransportBar(QFrame):
         """获取当前速度值（百分比整数，如 100）"""
         text = self.edit_speed.text().strip().replace("%", "")
         try:
-            return max(50, min(200, int(text)))
+            return max(20, min(200, int(text)))
         except ValueError:
             return 100
 

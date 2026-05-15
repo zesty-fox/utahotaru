@@ -133,7 +133,7 @@ class IAudioEngine(ABC):
         """设置播放速度
 
         Args:
-            speed: 速度倍率（0.5 ~ 2.0）
+            speed: 速度倍率（0.2 ~ 2.0）
 
         Raises:
             ValueError: 速度超出范围
