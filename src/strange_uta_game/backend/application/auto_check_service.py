@@ -1138,6 +1138,10 @@ class AutoCheckService:
                     check_counts[i] = 0
                     continue
 
+                if ct == CharType.LONG_VOWEL and not self._flags.get("check_long_vowel", True):
+                    check_counts[i] = 0
+                    continue
+
                 # 小写假名（排除促音っ/ッ，已有独立flag）
                 _SMALL_KANA = set("ぁぃぅぇぉゃゅょゎァィゥェォャュョヮゕゖ")
                 if char in _SMALL_KANA and not self._flags.get("small_kana", False):
@@ -1731,6 +1735,10 @@ class AutoCheckService:
                     continue
 
                 if ct == CharType.SOKUON and not self._flags.get("check_sokuon", False):
+                    check_counts[i] = 0
+                    continue
+
+                if ct == CharType.LONG_VOWEL and not self._flags.get("check_long_vowel", True):
                     check_counts[i] = 0
                     continue
 
