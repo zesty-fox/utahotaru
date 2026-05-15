@@ -13,6 +13,22 @@ import os
 import sys
 from pathlib import Path
 
+
+def _force_utf8_stdio() -> None:
+    """强制 stdout/stderr 使用 UTF-8。GitHub Actions Windows runner 默认 cp1252
+    会让我们脚本里的中文 print 直接抛 UnicodeEncodeError。"""
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream is None or not hasattr(stream, "reconfigure"):
+            continue
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
+_force_utf8_stdio()
+
 # 项目根目录
 PROJECT_ROOT = Path(__file__).parent.absolute()
 

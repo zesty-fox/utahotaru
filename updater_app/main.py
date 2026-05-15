@@ -51,6 +51,22 @@ from typing import List, Optional, Tuple
 
 import requests
 
+
+def _force_utf8_stdio() -> None:
+    """强制 stdout/stderr 使用 UTF-8 —— 避免 Windows 控制台默认 cp1252/cp936 时
+    在打包后的 Updater.exe 中 ``print/log`` 抛 ``UnicodeEncodeError``。"""
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream is None or not hasattr(stream, "reconfigure"):
+            continue
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
+_force_utf8_stdio()
+
 LOG_FORMAT = "[%(asctime)s] %(levelname)s %(message)s"
 DATE_FORMAT = "%H:%M:%S"
 

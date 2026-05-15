@@ -60,7 +60,35 @@
 
 ---
 
-## 三、正常发布流程（一键脚本版）
+## 三、关键问答：什么时候 git push？
+
+无论本地脚本还是 GitHub Actions，**都需要先 `git push`**。区别只是顺序：
+
+| 流程            | 顺序                                                                 |
+| --------------- | -------------------------------------------------------------------- |
+| 本地脚本        | prepare → 改 CHANGELOG → **build** → commit → push → tag → push tag → 上 GitHub Web 创建 Release |
+| GitHub Actions  | prepare → 改 CHANGELOG → commit → push → tag → **push tag**（触发 Actions 自动 build + Release）|
+
+原因：
+
+* **本地脚本**：build 在你本机跑，产物（zip + release_notes.md）也在本机；
+  push 只是为了同步代码、打 tag 并发布。你可以"先 build 再 push"。
+* **GitHub Actions**：runner 是 fresh checkout，**只能看到已经 push 到远端的提交**。
+  所以你本地的所有改动（`__version__.py`、`CHANGELOG.md`、新模块）都必须先 push，
+  然后再 push tag 触发工作流。
+
+最常见的踩坑：改完 `__version__.py` 和 `CHANGELOG.md` 后忘了 commit / push，
+就 `git tag SUGv0.3.3 && git push --tags`，结果 Actions 用的还是旧版本号或缺新文件。
+
+> **首次启用 GitHub Actions 时**：本次的 `.github/workflows/release.yml`、
+> `updater_app/`、`scripts/release.py`、`docs/auto_update.md`、`src/updater/`
+> 等所有新增文件都必须先 push 到 main，**再** push tag。如果之前 tag 触发
+> Actions 失败、然后你又删了 tag 重打，要确保 main 上的代码已经包含了对应
+> 修复（比如下面要说的 UTF-8 编码修复）。
+
+---
+
+## 三-A、正常发布流程（一键脚本版）
 
 ### 0. 第一次发布前的准备（仅一次性）
 
@@ -126,6 +154,40 @@ git push origin main --tags
 
 ---
 
+## 三-B、本地一键流程（不依赖 GitHub Actions）
+
+完整时序如下（每条命令都可独立运行）：
+
+```bat
+:: A. 改版本号 + CHANGELOG 占位
+python scripts\release.py prepare 0.3.3
+
+:: B. 手动编辑 CHANGELOG.md 把 [0.3.3] 段落补完
+
+:: C. 本地完成所有构建（产物在 dist/）
+python scripts\release.py build
+
+:: D. 同步到远端
+git add -A
+git commit -m "release v0.3.3"
+git push origin main
+
+:: E. 打 tag 并推送
+git tag SUGv0.3.3
+git push origin SUGv0.3.3
+
+:: F. 上 GitHub Web 创建 Release（地址脚本会在 build 末尾打印）：
+::    - Tag = SUGv0.3.3
+::    - Title = v0.3.3
+::    - Body = 粘 dist/release_notes-v0.3.3.md 全文
+::    - Attach = dist/StrangeUtaGame-v0.3.3.zip
+```
+
+> 如果你启用了 GitHub Actions，**E 步会自动触发**远端构建。两边可能会重复构建，
+> 但 Actions 创建 Release 时如果 tag 已存在 release，会失败。两种流程二选一。
+
+---
+
 ## 四、GitHub Actions 全自动版（可选）
 
 仓库已包含 `.github/workflows/release.yml`。开启方式：**只要你 push 一个
@@ -164,6 +226,37 @@ GitHub Actions 会在 Windows runner 上：
 
 **推荐策略**：日常用本地脚本（快、能调试）；正式发布前过一遍 GitHub Actions
 确认能稳定通过（避免"在我机器上能跑"）。
+
+### 常见踩坑：Windows runner stdout 编码
+
+GitHub 的 `windows-latest` runner Python 默认 stdout 编码是 **cp1252**
+（Western European），无法编码中文字符。脚本里的 `print("开始打包 …")`
+在本机能跑（中文 Windows 一般是 cp936），上 Actions 直接抛
+`UnicodeEncodeError: 'charmap' codec can't encode characters`。
+
+**仓库已经做了双保险**：
+
+1. `.github/workflows/release.yml` 顶部 `env:` 设置了 `PYTHONIOENCODING=utf-8` /
+   `PYTHONUTF8=1` —— Python 进程一律走 UTF-8。
+2. 所有有中文输出的 Python 脚本（`build.py` / `updater_app/build_updater.py` /
+   `updater_app/main.py` / `scripts/release.py`）顶部都加了
+   `_force_utf8_stdio()`，即便没设 env 也能跑。
+
+如果你后续新增脚本，**写中文 print 前先复制这个函数**：
+
+```python
+def _force_utf8_stdio() -> None:
+    import sys
+    for s in ("stdout", "stderr"):
+        st = getattr(sys, s, None)
+        if st is not None and hasattr(st, "reconfigure"):
+            try:
+                st.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+
+_force_utf8_stdio()
+```
 
 ---
 

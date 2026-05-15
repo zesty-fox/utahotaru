@@ -37,6 +37,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+
+def _force_utf8_stdio() -> None:
+    """强制 stdout/stderr 使用 UTF-8。Windows 默认 cp1252/cp936 都会令中文 print 抛错。"""
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream is None or not hasattr(stream, "reconfigure"):
+            continue
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
+_force_utf8_stdio()
+
 ROOT = Path(__file__).resolve().parent.parent
 VERSION_FILE = ROOT / "src" / "strange_uta_game" / "__version__.py"
 CHANGELOG = ROOT / "CHANGELOG.md"

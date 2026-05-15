@@ -20,6 +20,13 @@ on:
         description: '版本号 X.Y.Z（用于本地手动触发）'
         required: true
 
+# 全局 UTF-8：Windows runner 上 Python stdout 默认是 cp1252，会让我们脚本里的
+# 中文 print 直接抛 UnicodeEncodeError。这两个环境变量让 Python 在所有子步骤
+# 里都用 UTF-8 处理 stdout/stderr/打开文件。
+env:
+  PYTHONIOENCODING: utf-8
+  PYTHONUTF8: '1'
+
 jobs:
   build-and-release:
     runs-on: windows-latest
@@ -68,6 +75,8 @@ jobs:
       - name: Sync version
         shell: pwsh
         run: |
+          $OutputEncoding = [System.Text.UTF8Encoding]::new()
+          [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
           $v = "${{ steps.ver.outputs.version }}"
           $f = "src/strange_uta_game/__version__.py"
           (Get-Content -LiteralPath $f -Raw) `
@@ -84,6 +93,8 @@ jobs:
       - name: Package zip
         shell: pwsh
         run: |
+          $OutputEncoding = [System.Text.UTF8Encoding]::new()
+          [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
           $v = "${{ steps.ver.outputs.version }}"
           $zip = "dist/StrangeUtaGame-v$v.zip"
           if (Test-Path $zip) { Remove-Item $zip -Force }
@@ -93,6 +104,8 @@ jobs:
       - name: Extract release notes
         shell: pwsh
         run: |
+          $OutputEncoding = [System.Text.UTF8Encoding]::new()
+          [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
           $v = "${{ steps.ver.outputs.version }}"
           python scripts/release.py extract-notes $v -o "dist/release_notes-v$v.md"
           Get-Content "dist/release_notes-v$v.md"

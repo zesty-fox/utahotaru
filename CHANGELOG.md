@@ -18,7 +18,11 @@
 - （在这里写未发布的改动内容…）
 
 ### Fixed
-- （在这里写未发布的修复内容…）
+- **修复 GitHub Actions Windows runner 的 UTF-8 编码问题**：runner 默认 stdout
+  编码为 cp1252，会让发布脚本的中文 `print` 抛 `UnicodeEncodeError`。
+  解决方案：`.github/workflows/release.yml` 顶部加 `PYTHONIOENCODING=utf-8` /
+  `PYTHONUTF8=1`，并给 `build.py` / `build_updater.py` / `updater_app/main.py`
+  / `scripts/release.py` 加 `_force_utf8_stdio()` 兜底。
 
 ## [0.3.3] - 2026-05-16
 

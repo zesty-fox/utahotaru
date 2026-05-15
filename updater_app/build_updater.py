@@ -23,6 +23,26 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+
+def _force_utf8_stdio() -> None:
+    """强制 stdout/stderr 用 UTF-8。
+
+    Windows 终端默认编码可能是 cp1252（GitHub Actions runner）或 cp936（中文系统），
+    在那些环境下 ``print("中文")`` 会触发 ``UnicodeEncodeError``。Python 3.7+ 的
+    ``TextIOWrapper.reconfigure`` 可以无侵入地改写已存在的 stdout/stderr 流。
+    """
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream is None or not hasattr(stream, "reconfigure"):
+            continue
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
+_force_utf8_stdio()
+
 PROJECT_ROOT = Path(__file__).resolve().parent
 REPO_ROOT = PROJECT_ROOT.parent
 
