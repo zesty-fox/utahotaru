@@ -72,18 +72,6 @@ class _CheckRunnable(QObject):
         if not self._settings.enabled:
             return CheckResult(ok=False, error="更新功能已禁用")
 
-        # 0) 防抖：仅启动期检查（manual=False）受 8h 间隔限制
-        if not self._manual and self._settings.is_within_check_cooldown():
-            log.info(
-                "距上次更新检查不足 %sh，跳过本次启动期检查",
-                self._settings.min_check_interval_hours,
-            )
-            return CheckResult(
-                ok=True,
-                has_update=False,
-                skipped_due_to_cooldown=True,
-            )
-
         # 1) 代理
         _info, proxies = resolve_proxy(self._settings.proxy_mode, self._settings.proxy_manual_url)
 
