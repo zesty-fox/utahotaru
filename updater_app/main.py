@@ -324,6 +324,12 @@ def download_one(
                     # 服务器支持 Range 请求，继续下载
                     if attempt == 1:
                         log.info("  服务器支持断点续传，从 %.1f MB 处继续", existing_size / 1024 / 1024)
+                elif existing_size > 0 and resp.status_code == 416:
+                    # HTTP 416 Range Not Satisfiable：请求的起始偏移超出文件大小，
+                    # 说明本地文件已等于或超过服务端文件大小，视为下载完成。
+                    log.info("  收到 HTTP 416，本地文件已完整（%.1f MB），跳过下载",
+                             existing_size / 1024 / 1024)
+                    return True, ""
                 elif resp.status_code != 200:
                     last_error = f"HTTP {resp.status_code}"
                     if attempt < DOWNLOAD_RETRY_COUNT:
@@ -380,7 +386,16 @@ def try_download_from_sources(
     proxies = {"http": args.proxy_url, "https": args.proxy_url} if args.proxy_url else None
     if proxies:
         log.info("使用代理: %s", args.proxy_url)
+    last_source_id = None
     for source_id, url in args.urls:
+        # 切换到新源时，删除上一个源留下的部分文件，防止跨源数据拼接导致 zip 损坏
+        if last_source_id is not None and download_path.exists():
+            log.info("切换源 [%s] → [%s]，删除残留部分文件以防跨源数据混合", last_source_id, source_id)
+            try:
+                download_path.unlink()
+            except OSError as e:
+                log.warning("删除部分文件失败: %s", e)
+        last_source_id = source_id
         log.info("[%s] 尝试下载: %s", source_id, url)
         ok, err = download_one(url, download_path, proxies, log)
         if ok:
@@ -799,20 +814,32 @@ def _download_part(
     # 优先用 manifest 命中源；失败再轮转所有源
     primary_prefix = manifest.get("_url_prefix", "")
     candidates: List[Tuple[str, str]] = []
+    seen_urls: set = set()
     if primary_prefix:
-        candidates.append(("primary", f"{primary_prefix}/{asset_name}"))
+        primary_url = f"{primary_prefix}/{asset_name}"
+        candidates.append(("primary", primary_url))
+        seen_urls.add(primary_url)
     for source_id, zip_url in args.urls:
         prefix = zip_url.rsplit("/", 1)[0]
         url = f"{prefix}/{asset_name}"
-        if url not in [u for _, u in candidates]:
+        if url not in seen_urls:
+            seen_urls.add(url)
             candidates.append((source_id, url))
 
     dest = work_dir / "parts" / asset_name
     dest.parent.mkdir(parents=True, exist_ok=True)
-    # 不再删除已存在的部分下载文件，让 download_one 处理断点续传
 
     log.info("下载 part %s（预期 %.1f MB）", part_id, expected_size / 1024 / 1024 if expected_size else 0)
+    last_src_id = None
     for src_id, url in candidates:
+        # 切换到新源时，删除上一个源留下的部分文件，防止跨源数据拼接导致 zip 损坏
+        if last_src_id is not None and dest.exists():
+            log.info("  切换源 [%s] → [%s]，删除残留部分文件以防跨源数据混合", last_src_id, src_id)
+            try:
+                dest.unlink()
+            except OSError as e:
+                log.warning("  删除部分文件失败: %s", e)
+        last_src_id = src_id
         log.info("  [%s] %s", src_id, url)
         ok, err = download_one(url, dest, proxies, log)
         if ok:
@@ -1070,7 +1097,7 @@ def run(args: Args) -> int:
 
     # ───── 2b. 全量更新 fallback ─────
     download_path = work_dir / "download" / args.asset_name
-    # 不再删除已存在的部分下载文件，让 download_one 处理断点续传
+    # 首次尝试时保留部分文件以支持断点续传；切换源时由 try_download_from_sources 自动删除
     ok, success_url = try_download_from_sources(args, download_path, log)
     if not ok:
         log.error("所有源均下载失败")

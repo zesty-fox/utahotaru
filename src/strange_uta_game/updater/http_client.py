@@ -153,6 +153,10 @@ def download(
                 elif resp.status_code == 206:
                     # 服务器支持 Range 请求，继续下载
                     pass
+                elif existing_size > 0 and resp.status_code == 416:
+                    # HTTP 416 Range Not Satisfiable：请求的起始偏移超出文件大小，
+                    # 说明本地文件已等于或超过服务端文件大小，视为下载完成。
+                    return HttpResult(ok=True, status=416, file_path=dest_path)
                 elif resp.status_code != 200:
                     last_error = f"HTTP {resp.status_code}"
                     if attempt < DOWNLOAD_RETRY_COUNT:
@@ -170,6 +174,8 @@ def download(
                     total += existing_size
                 done = existing_size
 
+                # 确保目标目录存在
+                os.makedirs(os.path.dirname(os.path.abspath(dest_path)), exist_ok=True)
                 # 以追加模式打开文件（如果是续传）或写入模式（如果是新下载）
                 mode = "ab" if existing_size > 0 and resp.status_code == 206 else "wb"
                 with open(dest_path, mode) as f:

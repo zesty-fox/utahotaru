@@ -22,7 +22,6 @@
 
 from __future__ import annotations
 
-import io
 import logging
 import os
 import shutil
@@ -179,20 +178,32 @@ def _update_updater_from_remote(
 
     for source_id, url in candidates:
         log.info("[self-update] 尝试下载 app part: %s", url)
+        tmp_zip: Optional[str] = None
         try:
-            resp = requests.get(
+            # 流式下载到临时文件，避免把整个 zip 包加载进内存
+            with tempfile.NamedTemporaryFile(
+                suffix=".zip", prefix="sug_selfupdate_", delete=False
+            ) as tf:
+                tmp_zip = tf.name
+
+            with requests.get(
                 url,
                 headers={"User-Agent": "StrangeUtaGame-MainApp/self-update"},
                 proxies=proxies_dict,
                 timeout=(10, 60),
                 allow_redirects=True,
-            )
-            if resp.status_code != 200:
-                log.warning("[self-update] HTTP %d from %s", resp.status_code, source_id)
-                continue
+                stream=True,
+            ) as resp:
+                if resp.status_code != 200:
+                    log.warning("[self-update] HTTP %d from %s", resp.status_code, source_id)
+                    continue
+                with open(tmp_zip, "wb") as f:
+                    for chunk in resp.iter_content(chunk_size=64 * 1024):
+                        if chunk:
+                            f.write(chunk)
 
-            # 从 zip 中提取 Updater.exe
-            with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
+            # 从临时 zip 中提取 Updater.exe
+            with zipfile.ZipFile(tmp_zip) as zf:
                 names = zf.namelist()
                 # 查找 Updater.exe（可能在根目录或子目录下）
                 updater_entry = None
@@ -221,6 +232,12 @@ def _update_updater_from_remote(
         except Exception as e:
             log.warning("[self-update] 从 %s 下载/提取失败: %s", source_id, e)
             continue
+        finally:
+            if tmp_zip:
+                try:
+                    os.unlink(tmp_zip)
+                except OSError:
+                    pass
 
     log.warning("[self-update] 所有源均失败，将使用旧版 Updater.exe")
     return False
