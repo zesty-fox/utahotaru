@@ -337,6 +337,15 @@ class Sentence:
         char = self.get_character(char_idx)
         return char.all_timestamps if char else []
 
+    def get_global_timetags_for_char(self, char_idx: int) -> List[int]:
+        """获取指定字符的所有全局时间戳（含偏移）
+
+        Returns:
+            带全局偏移的时间戳列表（按 checkpoint_idx 顺序）
+        """
+        char = self.get_character(char_idx)
+        return char.all_global_timestamps if char else []
+
     def clear_all_timestamps(self) -> None:
         """清空所有字符的时间戳"""
         for char in self.characters:

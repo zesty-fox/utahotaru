@@ -265,10 +265,10 @@ class LineDetailDialog(QDialog):
             item_end = QTableWidgetItem(is_end)
             self.table.setItem(row, 3, item_end)
 
-            # 时间标签 (editable) — 连词每字符用 | 分隔
+            # 时间标签 (editable) — 使用全局偏移后的时间戳（所见即所得）
             tag_parts: list[str] = []
             for ci in group:
-                timetags = self.sentence.get_timetags_for_char(ci)
+                timetags = self.sentence.get_global_timetags_for_char(ci)
                 tag_texts = [_fmt_time(t) for t in timetags]
                 tag_parts.append(", ".join(tag_texts) if tag_texts else "")
             time_display = " | ".join(tag_parts) if len(group) > 1 else tag_parts[0]
@@ -426,6 +426,13 @@ class LineDetailDialog(QDialog):
         errors: List[str] = []
         characters = self.sentence.characters
 
+        # 获取全局偏移量（用于将用户输入的全局时间戳转换回原始时间戳）
+        global_offset = 0
+        if characters:
+            global_offset = characters[0]._global_offset_ms
+        elif self._project and self._project.global_offset_ms is not None:
+            global_offset = self._project.global_offset_ms
+
         # Singer name → id 映射
         name_to_id: dict[str, str] = {}
         if self._project:
@@ -559,22 +566,34 @@ class LineDetailDialog(QDialog):
                         segments = [p.strip() for p in part.split(",") if p.strip()]
                         normal_segments = segments[: characters[ci].check_count]
                         for cp_idx, seg in enumerate(normal_segments):
-                            ms = _parse_time(seg)
-                            if ms is None:
+                            global_ms = _parse_time(seg)
+                            if global_ms is None:
                                 errors.append(f"字符 {ci + 1}: 无法解析 '{seg}'")
                                 continue
-                            characters[ci].add_timestamp(ms, checkpoint_idx=cp_idx)
+                            raw_ms = global_ms - global_offset
+                            if raw_ms < 0:
+                                errors.append(
+                                    f"字符 {ci + 1}: 时间戳 '{seg}' 减去偏移后为负值"
+                                )
+                                raw_ms = 0
+                            characters[ci].add_timestamp(raw_ms, checkpoint_idx=cp_idx)
                         if (
                             characters[ci].is_sentence_end
                             and len(segments) > characters[ci].check_count
                         ):
-                            ms = _parse_time(segments[characters[ci].check_count])
-                            if ms is None:
+                            global_ms = _parse_time(segments[characters[ci].check_count])
+                            if global_ms is None:
                                 errors.append(
                                     f"字符 {ci + 1}: 无法解析 '{segments[characters[ci].check_count]}'"
                                 )
                             else:
-                                characters[ci].set_sentence_end_ts(ms)
+                                raw_ms = global_ms - global_offset
+                                if raw_ms < 0:
+                                    errors.append(
+                                        f"字符 {ci + 1}: 句尾时间戳减去偏移后为负值"
+                                    )
+                                    raw_ms = 0
+                                characters[ci].set_sentence_end_ts(raw_ms)
                 else:
                     ci = group[0]
                     characters[ci].clear_timestamps()
@@ -582,22 +601,34 @@ class LineDetailDialog(QDialog):
                         segments = [p.strip() for p in raw_time.split(",") if p.strip()]
                         normal_segments = segments[: characters[ci].check_count]
                         for cp_idx, seg in enumerate(normal_segments):
-                            ms = _parse_time(seg)
-                            if ms is None:
+                            global_ms = _parse_time(seg)
+                            if global_ms is None:
                                 errors.append(f"字符 {ci + 1}: 无法解析 '{seg}'")
                                 continue
-                            characters[ci].add_timestamp(ms, checkpoint_idx=cp_idx)
+                            raw_ms = global_ms - global_offset
+                            if raw_ms < 0:
+                                errors.append(
+                                    f"字符 {ci + 1}: 时间戳 '{seg}' 减去偏移后为负值"
+                                )
+                                raw_ms = 0
+                            characters[ci].add_timestamp(raw_ms, checkpoint_idx=cp_idx)
                         if (
                             characters[ci].is_sentence_end
                             and len(segments) > characters[ci].check_count
                         ):
-                            ms = _parse_time(segments[characters[ci].check_count])
-                            if ms is None:
+                            global_ms = _parse_time(segments[characters[ci].check_count])
+                            if global_ms is None:
                                 errors.append(
                                     f"字符 {ci + 1}: 无法解析 '{segments[characters[ci].check_count]}'"
                                 )
                             else:
-                                characters[ci].set_sentence_end_ts(ms)
+                                raw_ms = global_ms - global_offset
+                                if raw_ms < 0:
+                                    errors.append(
+                                        f"字符 {ci + 1}: 句尾时间戳减去偏移后为负值"
+                                    )
+                                    raw_ms = 0
+                                characters[ci].set_sentence_end_ts(raw_ms)
 
             # --- 演唱者编辑 (col 5) ---
             item_singer = self.table.item(row_idx, 5)
@@ -831,10 +862,10 @@ class EditInterface(QWidget):
             item_total_cp.setFlags(item_total_cp.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(i, 5, item_total_cp)
 
-            # 7. 时间范围
+            # 7. 时间范围（使用全局偏移后的时间戳，与渲染/导出一致）
             if sentence.has_timetags:
-                start_ms = sentence.timing_start_ms
-                end_ms = sentence.timing_end_ms
+                start_ms = sentence.global_timing_start_ms
+                end_ms = sentence.global_timing_end_ms
                 if start_ms is not None and end_ms is not None:
                     first_time = _fmt_time(start_ms)
                     last_time = _fmt_time(end_ms)
