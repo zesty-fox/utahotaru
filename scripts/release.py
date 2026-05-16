@@ -224,7 +224,7 @@ def _updater_sources_max_mtime() -> float:
     return max(mtimes) if mtimes else 0.0
 
 
-def _ensure_updater_exe(force: bool = False) -> None:
+def _ensure_updater_exe(force: bool = False, clean: bool = False) -> None:
     """确保 ``Updater.exe`` 存在且不落后于源代码。
 
     判定规则：
@@ -238,12 +238,12 @@ def _ensure_updater_exe(force: bool = False) -> None:
     """
     if force:
         print("  ! --rebuild-updater 强制重打 Updater.exe …")
-        _do_rebuild_updater()
+        _do_rebuild_updater(clean=clean)
         return
 
     if not UPDATER_EXE.exists():
         print("  ! 未发现 updater_app/dist/Updater.exe，开始构建 …")
-        _do_rebuild_updater()
+        _do_rebuild_updater(clean=clean)
         return
 
     exe_mtime = UPDATER_EXE.stat().st_mtime
@@ -256,15 +256,16 @@ def _ensure_updater_exe(force: bool = False) -> None:
             f"  ! Updater.exe 已过期（exe mtime={exe_dt}, 源码 mtime={src_dt}），"
             f"重新打包 Updater.exe …"
         )
-        _do_rebuild_updater()
+        _do_rebuild_updater(clean=clean)
         return
 
     size_mb = UPDATER_EXE.stat().st_size / 1024 / 1024
     print(f"  ✓ 已存在 Updater.exe，源码未更新（{size_mb:.1f} MB）")
 
 
-def _do_rebuild_updater() -> None:
-    rc = _run_python(UPDATER_BUILD)
+def _do_rebuild_updater(clean: bool = False) -> None:
+    extra = ["--clean"] if clean else []
+    rc = _run_python(UPDATER_BUILD, extra)
     if rc != 0:
         raise SystemExit(f"构建 Updater 失败，退出码 {rc}")
     if not UPDATER_EXE.exists():
@@ -380,16 +381,14 @@ def _content_hash_of_zip(zip_path: Path) -> str:
     return hashlib.sha256(combined.encode("ascii")).hexdigest().lower()
 
 
-def _write_sha256(target: Path, use_content_hash: bool = False) -> Path:
+def _write_sha256(target: Path) -> Path:
     """为 ``target`` 生成同名 ``.sha256`` 文件，与 sha256sum / coreutils 兼容。
 
-    ``use_content_hash=True`` 时对 zip 内文件的路径+内容计算 sha256（用于 manifest 中）。
-    默认使用文件本身的 sha256（用于 .sha256 校验文件，兼容旧 Updater）。
+    始终使用文件本身的 raw-file SHA256（供 Updater 的 ``verify_sha256`` 校验全量 zip 用）。
+    增量分包的内容哈希（content-hash）由 ``_content_hash_of_zip`` 单独计算并写入 manifest，
+    两者算法不同，不要混用。
     """
-    if use_content_hash and target.suffix.lower() == ".zip":
-        digest = _content_hash_of_zip(target)
-    else:
-        digest = _sha256_of(target)
+    digest = _sha256_of(target)
     sha_path = target.with_name(target.name + ".sha256")
     sha_path.write_text(f"{digest}  {target.name}\n", encoding="ascii")
     print(f"  ✓ {sha_path.name}  (sha256={digest})")
@@ -399,13 +398,20 @@ def _write_sha256(target: Path, use_content_hash: bool = False) -> Path:
 # ───────────────────────── 增量打包：app + runtime 分包 ─────────────────────────
 
 # 局部约定：app 部分（用户自己的应用代码，~5MB），其余归 runtime（依赖，~178MB）。
+# 注意：以下字面量需与 updater_app/main.py 中的同名常量保持同步：
+#   UPDATER_EXE_NAME          = "Updater.exe"
+#   LOCAL_MANIFEST_FILENAME   = ".installed_manifest.json"
+# 如果改名，两处都要同步修改。
 APP_TARGETS_BASE: List[str] = [
     "StrangeUtaGame.exe",
-    "Updater.exe",
+    "Updater.exe",               # 同步自 main.py:UPDATER_EXE_NAME
     "_internal/strange_uta_game",
 ]
 # `_internal/` 顶层下 **不** 归入 runtime 的条目（要么是 app 的、要么是 Updater 运行时维护的）。
-INTERNAL_NON_RUNTIME_NAMES = {"strange_uta_game", ".installed_manifest.json"}
+INTERNAL_NON_RUNTIME_NAMES = {
+    "strange_uta_game",
+    ".installed_manifest.json",  # 同步自 main.py:LOCAL_MANIFEST_FILENAME
+}
 
 
 def _compute_runtime_targets(dist_root: Path) -> List[str]:
@@ -568,7 +574,7 @@ def _dump_release_notes(version: str) -> Optional[Path]:
 def cmd_build(rebuild_updater: bool = False, clean: bool = False) -> int:
     version = _read_version()
     print(f"== build for v{version} ==")
-    _ensure_updater_exe(force=rebuild_updater)
+    _ensure_updater_exe(force=rebuild_updater, clean=clean)
     _run_main_build(clean=clean)
 
     # 关键顺序：

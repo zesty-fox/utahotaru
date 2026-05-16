@@ -20,6 +20,7 @@
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -48,6 +49,15 @@ REPO_ROOT = PROJECT_ROOT.parent
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser(description="打包 Updater.exe")
+    ap.add_argument(
+        "--clean",
+        action="store_true",
+        default=False,
+        help="传给 PyInstaller --clean，完整重建（改了 import 或打包配置时使用）",
+    )
+    cli = ap.parse_args()
+
     try:
         import PyInstaller.__main__  # noqa: F401
     except ImportError:
@@ -59,7 +69,6 @@ def main() -> int:
         "--name=Updater",
         "--onefile",
         "--console",          # Updater 走控制台 UI，让用户能看到进度
-        "--clean",
         "--noconfirm",
         "--distpath", str(PROJECT_ROOT / "dist"),
         "--workpath", str(PROJECT_ROOT / "build"),
@@ -110,6 +119,9 @@ def main() -> int:
     icon = REPO_ROOT / "src" / "strange_uta_game" / "resource" / "icon.ico"
     if icon.exists():
         args.append(f"--icon={icon}")
+
+    if cli.clean:
+        args.append("--clean")
 
     import PyInstaller.__main__ as pi_main
     print("开始打包 Updater.exe ...")

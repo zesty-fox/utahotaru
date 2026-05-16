@@ -176,31 +176,67 @@ def _update_updater_from_remote(
 
     proxies_dict = {"http": plan.proxy_url, "https": plan.proxy_url} if plan.proxy_url else None
 
+    _RETRY_COUNT = 3
+    _RETRY_INTERVAL = 2.0
+
     for source_id, url in candidates:
         log.info("[self-update] 尝试下载 app part: %s", url)
         tmp_zip: Optional[str] = None
         try:
-            # 流式下载到临时文件，避免把整个 zip 包加载进内存
-            with tempfile.NamedTemporaryFile(
-                suffix=".zip", prefix="sug_selfupdate_", delete=False
-            ) as tf:
-                tmp_zip = tf.name
+            # 流式下载到临时文件，避免把整个 zip 包加载进内存；带重试
+            import time as _time
+            last_err = ""
+            downloaded = False
+            for attempt in range(1, _RETRY_COUNT + 1):
+                try:
+                    with tempfile.NamedTemporaryFile(
+                        suffix=".zip", prefix="sug_selfupdate_", delete=False
+                    ) as tf:
+                        tmp_zip = tf.name
 
-            with requests.get(
-                url,
-                headers={"User-Agent": "StrangeUtaGame-MainApp/self-update"},
-                proxies=proxies_dict,
-                timeout=(10, 60),
-                allow_redirects=True,
-                stream=True,
-            ) as resp:
-                if resp.status_code != 200:
-                    log.warning("[self-update] HTTP %d from %s", resp.status_code, source_id)
-                    continue
-                with open(tmp_zip, "wb") as f:
-                    for chunk in resp.iter_content(chunk_size=64 * 1024):
-                        if chunk:
-                            f.write(chunk)
+                    with requests.get(
+                        url,
+                        headers={"User-Agent": "StrangeUtaGame-MainApp/self-update"},
+                        proxies=proxies_dict,
+                        timeout=(10, 60),
+                        allow_redirects=True,
+                        stream=True,
+                    ) as resp:
+                        if resp.status_code != 200:
+                            last_err = f"HTTP {resp.status_code}"
+                            log.warning("[self-update] %s from %s (attempt %d/%d)",
+                                        last_err, source_id, attempt, _RETRY_COUNT)
+                            # 清理空的临时文件
+                            try:
+                                os.unlink(tmp_zip)
+                            except OSError:
+                                pass
+                            tmp_zip = None
+                            if attempt < _RETRY_COUNT:
+                                _time.sleep(_RETRY_INTERVAL)
+                            continue
+                        with open(tmp_zip, "wb") as f:
+                            for chunk in resp.iter_content(chunk_size=64 * 1024):
+                                if chunk:
+                                    f.write(chunk)
+                    downloaded = True
+                    break
+                except requests.RequestException as e:
+                    last_err = f"网络错误: {e}"
+                    log.warning("[self-update] %s from %s (attempt %d/%d)",
+                                last_err, source_id, attempt, _RETRY_COUNT)
+                    if tmp_zip:
+                        try:
+                            os.unlink(tmp_zip)
+                        except OSError:
+                            pass
+                        tmp_zip = None
+                    if attempt < _RETRY_COUNT:
+                        _time.sleep(_RETRY_INTERVAL)
+
+            if not downloaded:
+                log.warning("[self-update] 源 %s 全部重试失败: %s", source_id, last_err)
+                continue
 
             # 从临时 zip 中提取 Updater.exe
             with zipfile.ZipFile(tmp_zip) as zf:
