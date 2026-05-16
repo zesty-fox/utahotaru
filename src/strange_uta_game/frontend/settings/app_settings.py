@@ -264,7 +264,10 @@ class AppSettings:
 
         内置 config.json 含 ``dictionary_version``（整数），用户 config.json 含
         ``applied_dictionary_version``（整数，首次无此字段视为 0）。
-        若用户版本 < 内置版本，用内置 dictionary.json 覆盖用户词典并更新版本号。
+        若用户版本 < 内置版本，按以下规则合并词典：
+        - word 相同但 reading 不同：替换为内置版本
+        - 用户词典中没有的 word：添加
+        - 用户词典中有但内置没有的：保留（用户自定义）
 
         好处：之后只需递增内置 config.json 的 ``dictionary_version``，
         所有用户下次启动即自动升级，无需改代码。
@@ -296,16 +299,63 @@ class AppSettings:
         if user_version >= packaged_version:
             return  # 已是最新版本
 
-        # 覆盖用户词典
-        packaged_dict = self._get_packaged_config_path("dictionary.json")
-        if not packaged_dict:
+        # 加载内置词典和用户词典
+        packaged_dict_path = self._get_packaged_config_path("dictionary.json")
+        if not packaged_dict_path:
             return
         try:
-            import shutil
-            shutil.copy2(str(packaged_dict), str(self._dict_path))
+            with open(packaged_dict_path, "r", encoding="utf-8") as f:
+                packaged_entries = json.load(f)
         except Exception as e:
-            print(f"词典版本升级失败: {e}")
+            print(f"读取内置词典失败: {e}")
             return
+
+        # 加载用户词典（如果存在）
+        user_entries = []
+        if self._dict_path.exists():
+            try:
+                user_entries = self.load_dictionary()
+            except Exception:
+                user_entries = []
+
+        # 构建用户词典索引：word -> (index, entry)
+        user_index = {}
+        for i, entry in enumerate(user_entries):
+            word = (entry.get("word") or "").strip()
+            if word:
+                user_index[word] = (i, entry)
+
+        # 合并逻辑：
+        # 1. 遍历内置词典，替换 reading 不同的条目，添加新条目
+        updated = 0
+        added = 0
+        for packaged_entry in packaged_entries:
+            packaged_word = (packaged_entry.get("word") or "").strip()
+            packaged_reading = (packaged_entry.get("reading") or "").strip()
+            if not packaged_word:
+                continue
+
+            if packaged_word in user_index:
+                # word 存在，检查 reading 是否相同
+                idx, user_entry = user_index[packaged_word]
+                user_reading = (user_entry.get("reading") or "").strip()
+                if user_reading != packaged_reading:
+                    # reading 不同，替换
+                    user_entries[idx] = packaged_entry
+                    updated += 1
+            else:
+                # word 不存在，添加到词典末尾
+                user_entries.append(packaged_entry)
+                added += 1
+
+        # 保存更新后的用户词典
+        try:
+            self.save_dictionary(user_entries)
+        except Exception as e:
+            print(f"保存合并词典失败: {e}")
+            return
+
+        print(f"词典合并完成: 更新 {updated} 条，新增 {added} 条")
 
         # 写入已应用版本号到用户 config.json
         self._settings["applied_dictionary_version"] = packaged_version
