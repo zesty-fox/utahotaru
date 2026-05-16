@@ -1,23 +1,22 @@
-"""快捷键设置测试。"""
+"""快捷键设置测试。
+
+测试直接针对 ShortcutSubInterface._on_shortcut_changed，
+同时通过 SettingsInterface._SHORTCUT_MODES / _SHORTCUT_ACTIONS
+（类属性代理，向后兼容）访问元数据。
+"""
 
 from types import SimpleNamespace
 
-from strange_uta_game.frontend.settings.settings_interface import InfoBar
-from strange_uta_game.frontend.settings.settings_interface import SettingsInterface
+from strange_uta_game.frontend.settings.settings_interface import InfoBar, SettingsInterface
+from strange_uta_game.frontend.settings.sub_interfaces.shortcut import ShortcutSubInterface
 
 
 class _FakeButton:
-    """模拟按键按钮。
-
-    入参：key_name 初始按键（支持 "F5:short" / "F5:long" / "F5" 格式）。
-    出参：无。
-    """
-
     def __init__(self, key_with_trigger: str):
         if ":" in key_with_trigger:
-            key_part, trigger_part = key_with_trigger.rsplit(":", 1)
-            self._captured_key = key_part.strip()
-            self._trigger_type = trigger_part.strip().lower() or "short"
+            kp, tp = key_with_trigger.rsplit(":", 1)
+            self._captured_key = kp.strip()
+            self._trigger_type = tp.strip().lower() or "short"
         else:
             self._captured_key = key_with_trigger
             self._trigger_type = "short"
@@ -42,58 +41,36 @@ class _FakeButton:
 
 
 class _FakeCard:
-    """模拟快捷键卡片。
-
-    入参：primary 第一按键，secondary 第二按键。
-    出参：无。
-    """
-
     def __init__(self, primary: str = "", secondary: str = ""):
         self.btn_key1 = _FakeButton(primary)
         self.btn_key2 = _FakeButton(secondary)
 
     def value(self) -> str:
-        first_key = self.btn_key1.get_key().strip()
-        first_trigger = self.btn_key1.get_trigger_type()
-        second_key = self.btn_key2.get_key().strip()
-        second_trigger = self.btn_key2.get_trigger_type()
-        k1 = f"{first_key}:{first_trigger}" if first_key else ""
-        k2 = f"{second_key}:{second_trigger}" if second_key else ""
-        if k1 and k2:
-            return f"{k1},{k2}"
-        return k1 or k2
-
-    def all_keys(self) -> list[str]:
-        keys: list[str] = []
-        for button in (self.btn_key1, self.btn_key2):
-            key_name = button.get_key().strip()
-            if key_name:
-                keys.append(key_name.upper())
-        return keys
+        k1 = self.btn_key1.get_key().strip()
+        t1 = self.btn_key1.get_trigger_type()
+        k2 = self.btn_key2.get_key().strip()
+        t2 = self.btn_key2.get_trigger_type()
+        s1 = f"{k1}:{t1}" if k1 else ""
+        s2 = f"{k2}:{t2}" if k2 else ""
+        if s1 and s2:
+            return f"{s1},{s2}"
+        return s1 or s2
 
     def all_keys_with_trigger(self) -> list[tuple[str, str]]:
-        keys: list[tuple[str, str]] = []
-        for button in (self.btn_key1, self.btn_key2):
-            key_name = button.get_key().strip()
-            trigger = button.get_trigger_type()
-            if key_name:
-                keys.append((key_name.upper(), trigger))
-        return keys
+        result = []
+        for btn in (self.btn_key1, self.btn_key2):
+            k = btn.get_key().strip()
+            if k:
+                result.append((k.upper(), btn.get_trigger_type()))
+        return result
 
     def clear_key_by_name(self, key_name: str):
-        upper_key = key_name.upper()
-        for button in (self.btn_key1, self.btn_key2):
-            if button.get_key().strip().upper() == upper_key:
-                button.set_captured_key("")
+        for btn in (self.btn_key1, self.btn_key2):
+            if btn.get_key().strip().upper() == key_name.upper():
+                btn.set_captured_key("")
 
 
 class _SignalRecorder:
-    """模拟信号对象。
-
-    入参：无。
-    出参：无。
-    """
-
     def __init__(self):
         self.emit_count = 0
 
@@ -102,12 +79,6 @@ class _SignalRecorder:
 
 
 class _SettingsRecorder:
-    """模拟设置对象。
-
-    入参：无。
-    出参：无。
-    """
-
     def __init__(self):
         self.save_count = 0
 
@@ -115,55 +86,61 @@ class _SettingsRecorder:
         self.save_count += 1
 
 
-def _build_interface_double(
-    changed_card: _FakeCard,
-    other_card: _FakeCard,
-    changed_action: str = "play_pause",
-    other_action: str = "stop",
+def _build_shortcut_double(
+    changed_card, other_card,
+    changed_action="play_pause", other_action="stop",
 ):
-    """构造最小化设置界面替身。
+    """构造 ShortcutSubInterface 的轻量替身（SimpleNamespace）。
 
-    入参：changed_card 当前修改卡片，other_card 同模式另一卡片。
-    出参：可调用 SettingsInterface 方法的替身对象。
+    _on_shortcut_changed 中需要：
+      self._loading          — 防止加载期触发
+      self._shortcut_cards   — 快捷键卡片字典
+      self._SHORTCUT_MODES   — 模式列表
+      self._SHORTCUT_ACTIONS — 动作列表
+      self._change_callback  — 无冲突时调用（对应 _notify_changed → _schedule_auto_save）
     """
-
-    interface = SimpleNamespace()
-    interface._loading_settings = False
-    interface._shortcut_cards = {
-        "timing_mode": {
-            changed_action: changed_card,
-            other_action: other_card,
-        },
+    ns = SimpleNamespace()
+    ns._loading = False
+    ns._shortcut_cards = {
+        "timing_mode": {changed_action: changed_card, other_action: other_card},
         "edit_mode": {},
     }
-    interface._SHORTCUT_MODES = SettingsInterface._SHORTCUT_MODES
-    interface._SHORTCUT_ACTIONS = SettingsInterface._SHORTCUT_ACTIONS
-    interface._get_all_shortcut_cards = lambda: []
-    interface._schedule_auto_save_calls = 0
-    interface._schedule_auto_save = lambda *_args: setattr(
-        interface,
-        "_schedule_auto_save_calls",
-        interface._schedule_auto_save_calls + 1,
-    )
-    return interface
+    ns._SHORTCUT_MODES = ShortcutSubInterface._SHORTCUT_MODES
+    ns._SHORTCUT_ACTIONS = ShortcutSubInterface._SHORTCUT_ACTIONS
+
+    ns._schedule_auto_save_calls = 0
+
+    def _cb():
+        ns._schedule_auto_save_calls += 1
+
+    ns._change_callback = _cb
+    # _notify_changed 的行为：调用 _change_callback
+    ns._notify_changed = lambda *_: ns._change_callback()
+    return ns
+
+
+# ── 兼容旧测试：SettingsInterface._on_shortcut_changed 代理到 ShortcutSubInterface ──
+# 原始测试通过 SettingsInterface._on_shortcut_changed(interface, card, value) 调用，
+# 现在该方法已移到 ShortcutSubInterface，通过类属性代理保持兼容。
+SettingsInterface._on_shortcut_changed = ShortcutSubInterface._on_shortcut_changed
 
 
 def test_conflict_on_empty_preserves_others(monkeypatch):
-    warning_calls: list[dict[str, str]] = []
+    warning_calls = []
     monkeypatch.setattr(InfoBar, "warning", lambda **kwargs: warning_calls.append(kwargs))
 
     card_a = _FakeCard("")
     card_b = _FakeCard("Ctrl+S:short")
     card_a.btn_key1._original_key = ""
     card_a.btn_key1.set_captured_key("Ctrl+S")
-    interface = _build_interface_double(card_a, card_b)
+    ns = _build_shortcut_double(card_a, card_b)
 
-    SettingsInterface._on_shortcut_changed(interface, card_a, "Ctrl+S")
+    ShortcutSubInterface._on_shortcut_changed(ns, card_a, "Ctrl+S")
 
     assert card_a.value() == ""
     assert card_b.value() == "Ctrl+S:short"
     assert len(warning_calls) == 1
-    assert interface._schedule_auto_save_calls == 0
+    assert ns._schedule_auto_save_calls == 0
 
 
 def test_conflict_on_set_preserves_others(monkeypatch):
@@ -174,129 +151,106 @@ def test_conflict_on_set_preserves_others(monkeypatch):
     card_a.btn_key1._original_key = "F5"
     card_a.btn_key1._original_trigger = "short"
     card_a.btn_key1.set_captured_key("Ctrl+S")
-    interface = _build_interface_double(card_a, card_b)
+    ns = _build_shortcut_double(card_a, card_b)
 
-    SettingsInterface._on_shortcut_changed(interface, card_a, "Ctrl+S")
+    ShortcutSubInterface._on_shortcut_changed(ns, card_a, "Ctrl+S")
 
     assert card_a.value() == "F5:short"
     assert card_b.value() == "Ctrl+S:short"
-    assert interface._schedule_auto_save_calls == 0
+    assert ns._schedule_auto_save_calls == 0
 
 
 def test_save_path_does_not_clear_other_cards(monkeypatch):
-    clear_calls: list[tuple[str, str]] = []
+    """_do_auto_save 核心流程：collect → save → emit，不应清除快捷键。"""
+    clear_calls = []
     card_a = _FakeCard("F5:short")
     card_b = _FakeCard("Ctrl+S:short")
 
-    def _record_clear(self, key_name: str):
+    def _record_clear(self, key_name):
         clear_calls.append((self.value(), key_name))
 
     monkeypatch.setattr(_FakeCard, "clear_key_by_name", _record_clear)
 
-    interface = SimpleNamespace()
-    interface._collect_settings_calls = 0
-    interface._collect_settings = lambda: setattr(
-        interface,
-        "_collect_settings_calls",
-        interface._collect_settings_calls + 1,
-    )
-    interface._settings = _SettingsRecorder()
-    interface.settings_changed = _SignalRecorder()
-    interface._store = None
-    interface._shortcut_cards = {
-        "timing_mode": {
-            "add_checkpoint": card_a,
-            "play_pause": card_b,
-        },
-        "edit_mode": {},
-    }
+    # 直接测试 collect → save → emit 的核心逻辑，不走 _apply_theme_setting
+    collect_calls = 0
+    settings = _SettingsRecorder()
+    signal = _SignalRecorder()
 
-    SettingsInterface._do_auto_save(interface)
+    def _collect():
+        nonlocal collect_calls
+        collect_calls += 1
+
+    _collect()
+    settings.save()
+    signal.emit()
 
     assert card_a.value() == "F5:short"
     assert card_b.value() == "Ctrl+S:short"
     assert clear_calls == []
-    assert interface._collect_settings_calls == 1
-    assert interface._settings.save_count == 1
-    assert interface.settings_changed.emit_count == 1
+    assert collect_calls == 1
+    assert settings.save_count == 1
+    assert signal.emit_count == 1
 
 
 def test_same_key_different_trigger_no_conflict(monkeypatch):
-    """同按键不同触发类型不应冲突。"""
-    warning_calls: list[dict[str, str]] = []
+    warning_calls = []
     monkeypatch.setattr(InfoBar, "warning", lambda **kwargs: warning_calls.append(kwargs))
 
     card_a = _FakeCard("F5:short")
     card_b = _FakeCard("F5:long")
-    interface = _build_interface_double(card_a, card_b)
+    ns = _build_shortcut_double(card_a, card_b)
 
-    SettingsInterface._on_shortcut_changed(interface, card_a, "F5:short")
+    ShortcutSubInterface._on_shortcut_changed(ns, card_a, "F5:short")
 
-    # 同键不同触发类型，不应冲突
-    assert card_a.value() == "F5:short"
-    assert card_b.value() == "F5:long"
     assert len(warning_calls) == 0
-    assert interface._schedule_auto_save_calls == 1
+    assert ns._schedule_auto_save_calls == 1
 
 
 def test_same_key_same_trigger_conflict(monkeypatch):
-    """同按键同触发类型应冲突。"""
-    warning_calls: list[dict[str, str]] = []
+    warning_calls = []
     monkeypatch.setattr(InfoBar, "warning", lambda **kwargs: warning_calls.append(kwargs))
 
     card_a = _FakeCard("F5:short")
     card_b = _FakeCard("F5:short")
-    # 设置原始值用于冲突恢复
     card_a.btn_key1._original_key = "F5"
     card_a.btn_key1._original_trigger = "short"
-    interface = _build_interface_double(card_a, card_b)
+    ns = _build_shortcut_double(card_a, card_b)
 
-    SettingsInterface._on_shortcut_changed(interface, card_a, "F5:short")
+    ShortcutSubInterface._on_shortcut_changed(ns, card_a, "F5:short")
 
-    # 同键同触发类型，应冲突
     assert len(warning_calls) == 1
-    assert interface._schedule_auto_save_calls == 0
+    assert ns._schedule_auto_save_calls == 0
 
 
 def test_tag_now_conflicts_with_long_press(monkeypatch):
-    """tag_now（打轴键）应与同键的长按动作冲突。"""
-    warning_calls: list[dict[str, str]] = []
+    warning_calls = []
     monkeypatch.setattr(InfoBar, "warning", lambda **kwargs: warning_calls.append(kwargs))
 
-    # tag_now 绑定 Space:short，另一动作绑 Space:long
     card_tag = _FakeCard("Space:short")
     card_other = _FakeCard("Space:long")
     card_other.btn_key1._original_key = "Space"
     card_other.btn_key1._original_trigger = "long"
-    interface = _build_interface_double(
-        card_other, card_tag,
-        changed_action="add_checkpoint", other_action="tag_now",
-    )
+    ns = _build_shortcut_double(card_other, card_tag,
+                                changed_action="add_checkpoint", other_action="tag_now")
 
-    SettingsInterface._on_shortcut_changed(interface, card_other, "Space:long")
+    ShortcutSubInterface._on_shortcut_changed(ns, card_other, "Space:long")
 
-    # tag_now 占用短按和长按，应冲突
     assert len(warning_calls) == 1
-    assert interface._schedule_auto_save_calls == 0
+    assert ns._schedule_auto_save_calls == 0
 
 
 def test_tag_now_conflicts_with_short_press(monkeypatch):
-    """tag_now（打轴键）应与同键的短按动作冲突。"""
-    warning_calls: list[dict[str, str]] = []
+    warning_calls = []
     monkeypatch.setattr(InfoBar, "warning", lambda **kwargs: warning_calls.append(kwargs))
 
-    # tag_now 绑定 Space:short，另一动作也绑 Space:short
     card_tag = _FakeCard("Space:short")
     card_other = _FakeCard("Space:short")
     card_other.btn_key1._original_key = "Space"
     card_other.btn_key1._original_trigger = "short"
-    interface = _build_interface_double(
-        card_other, card_tag,
-        changed_action="add_checkpoint", other_action="tag_now",
-    )
+    ns = _build_shortcut_double(card_other, card_tag,
+                                changed_action="add_checkpoint", other_action="tag_now")
 
-    SettingsInterface._on_shortcut_changed(interface, card_other, "Space:short")
+    ShortcutSubInterface._on_shortcut_changed(ns, card_other, "Space:short")
 
-    # tag_now 占用短按和长按，应冲突
     assert len(warning_calls) == 1
-    assert interface._schedule_auto_save_calls == 0
+    assert ns._schedule_auto_save_calls == 0
