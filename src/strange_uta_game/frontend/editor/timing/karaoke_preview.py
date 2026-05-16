@@ -621,6 +621,30 @@ class KaraokePreview(QWidget):
                 self.update()
                 return
 
+        # 点击在行内空白区域：按水平距离找最近的 hitbox
+        nearest = self._find_nearest_hitbox(click_x, click_y)
+        if nearest:
+            hit_type, line_idx, char_idx, cp_idx = nearest
+            self._focus_line_idx = line_idx
+            self._focus_char_idx = char_idx
+            self._focus_char_range_end = char_idx
+            self._focus_dragging = True
+            if hit_type == "cp":
+                self._pending_click = {
+                    "type": "cp",
+                    "line_idx": line_idx,
+                    "char_idx": char_idx,
+                    "cp_idx": cp_idx,
+                }
+            else:
+                self._pending_click = {
+                    "type": "char",
+                    "line_idx": line_idx,
+                    "char_idx": char_idx,
+                }
+            self.update()
+            return
+
         # 回退到行级别点击：根据 y 坐标反算行索引
         # 清除选中状态
         self._focus_line_idx = -1
@@ -1185,7 +1209,51 @@ class KaraokePreview(QWidget):
         }
         self._sentence_cache[idx] = entry
         return entry
-            
+
+    def _find_nearest_hitbox(self, click_x: int, click_y: int) -> tuple[str, int, int, int | None] | None:
+        """在行内空白区域找水平距离最近的 hitbox
+
+        Returns:
+            (hit_type, line_idx, char_idx, cp_idx) 或 None
+        """
+        # 收集所有 hitbox（字符和 checkpoint），按行分组
+        line_hitboxes: dict[int, list[tuple[QRect, str, int, int, int | None]]] = {}
+        for char_rect, line_idx, char_idx in self._char_hitboxes:
+            if line_idx not in line_hitboxes:
+                line_hitboxes[line_idx] = []
+            line_hitboxes[line_idx].append((char_rect, "char", line_idx, char_idx, None))
+        for marker_rect, line_idx, char_idx, cp_idx in self._checkpoint_hitboxes:
+            if line_idx not in line_hitboxes:
+                line_hitboxes[line_idx] = []
+            line_hitboxes[line_idx].append((marker_rect, "cp", line_idx, char_idx, cp_idx))
+
+        # 找到点击所在的行（垂直范围内）
+        for line_idx, hitboxes in line_hitboxes.items():
+            if not hitboxes:
+                continue
+            # 检查是否在行内垂直范围内
+            first_rect = hitboxes[0][0]
+            rect_top = first_rect.top()
+            rect_bottom = first_rect.bottom()
+            if not (rect_top <= click_y <= rect_bottom):
+                continue
+            # 在该行内找水平距离最近的 hitbox
+            min_dist = float('inf')
+            nearest = None
+            for rect, hit_type, li, ci, cpi in hitboxes:
+                # 计算水平距离
+                if click_x < rect.left():
+                    dist = rect.left() - click_x
+                elif click_x > rect.right():
+                    dist = click_x - rect.right()
+                else:
+                    dist = 0
+                if dist < min_dist:
+                    min_dist = dist
+                    nearest = (hit_type, li, ci, cpi)
+            return nearest
+        return None
+
     def mouseDoubleClickEvent(self, a0: Optional[QMouseEvent]):
         """双击 → 跳转到时间戳"""
         if not a0 or not self._project or not self._project.sentences:
@@ -1223,78 +1291,15 @@ class KaraokePreview(QWidget):
                 self.seek_to_char_requested.emit(line_idx, char_idx)
                 return
 
-        # 双击在行内空白区域：根据就近原则跳转到行首或行尾时间戳
-        # 按行分组，找到每行的第一个和最后一个字符 hitbox
-        line_hitboxes: dict[int, list[tuple[int, QRect]]] = {}  # line_idx -> [(char_idx, char_rect)]
-        for char_rect, line_idx, char_idx in self._char_hitboxes:
-            if line_idx not in line_hitboxes:
-                line_hitboxes[line_idx] = []
-            line_hitboxes[line_idx].append((char_idx, char_rect))
-
-        for line_idx, chars in line_hitboxes.items():
-            if not chars:
-                continue
-            # 按 char_idx 排序
-            chars.sort(key=lambda x: x[0])
-            first_char_idx, first_rect = chars[0]
-            last_char_idx, last_rect = chars[-1]
-
-            # 检查是否在行内垂直范围内（使用第一个字符的矩形高度作为行高参考）
-            rect_top = first_rect.top()
-            rect_bottom = first_rect.bottom()
-            if not (rect_top <= click_y <= rect_bottom):
-                continue
-
-            # 检查是否在行内水平范围内（第一个字符左侧到最后一个字符右侧）
-            line_left = first_rect.left()
-            line_right = last_rect.right()
-            if click_x < line_left or click_x > line_right:
-                continue
-
-            # 双击在行内空白区域，根据就近原则判断
-            line_center_x = (line_left + line_right) / 2
-            if click_x < line_center_x:
-                # 双击在行左侧，跳转到本行第一个有时间戳的字符的第一个时间戳
-                self._seek_to_line_first_timestamp(line_idx)
+        # 双击在行内空白区域：按水平距离找最近的 hitbox
+        nearest = self._find_nearest_hitbox(click_x, click_y)
+        if nearest:
+            hit_type, line_idx, char_idx, cp_idx = nearest
+            if hit_type == "cp":
+                self.seek_to_checkpoint_requested.emit(line_idx, char_idx, cp_idx)
             else:
-                # 双击在行右侧，跳转到本行最后一个有时间戳的字符的最后一个时间戳
-                self._seek_to_line_last_timestamp(line_idx)
-            return
-
-    def _seek_to_line_first_timestamp(self, line_idx: int):
-        """跳转到本行第一个有时间戳的字符的第一个时间戳"""
-        if not self._project or line_idx >= len(self._project.sentences):
-            return
-        sentence = self._project.sentences[line_idx]
-        # 遍历本行所有字符，找到第一个有时间戳的字符
-        for char_idx, char in enumerate(sentence.characters):
-            if char.all_global_timestamps:
-                # 找到有时间戳的字符，发出信号跳转到该字符
                 self.seek_to_char_requested.emit(line_idx, char_idx)
-                return
-        # 如果本行没有时间戳，跳转到本行第一个字符
-        if sentence.characters:
-            self.seek_to_char_requested.emit(line_idx, 0)
-
-    def _seek_to_line_last_timestamp(self, line_idx: int):
-        """跳转到本行最后一个有时间戳的字符的最后一个时间戳"""
-        if not self._project or line_idx >= len(self._project.sentences):
             return
-        sentence = self._project.sentences[line_idx]
-        # 从后向前遍历本行所有字符，找到最后一个有时间戳的字符
-        for char_idx in range(len(sentence.characters) - 1, -1, -1):
-            char = sentence.characters[char_idx]
-            if char.all_global_timestamps:
-                # 找到有时间戳的字符，发出信号跳转到该字符的最后一个时间戳
-                # all_global_timestamps 包含普通时间戳 + 句尾时间戳（如果有）
-                # 所以 len(all_global_timestamps) - 1 会指向句尾时间戳（如果存在）
-                last_cp_idx = len(char.all_global_timestamps) - 1
-                self.seek_to_checkpoint_requested.emit(line_idx, char_idx, last_cp_idx)
-                return
-        # 如果本行没有时间戳，跳转到本行最后一个字符
-        if sentence.characters:
-            last_char_idx = len(sentence.characters) - 1
-            self.seek_to_char_requested.emit(line_idx, last_char_idx)
 
     # ---- 绘制 ----
 
