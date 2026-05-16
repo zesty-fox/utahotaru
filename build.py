@@ -70,7 +70,6 @@ args = [
     "--name=StrangeUtaGame",  # 应用名称
     "--onedir",  # 使用目录模式（推荐，启动更快）
     "--windowed",  # Windows GUI 应用（无控制台窗口）
-    "--clean",  # 清理临时文件
     "--noconfirm",  # 不确认覆盖
     # 数据文件
     "--add-data=src/strange_uta_game;strange_uta_game",  # 源代码

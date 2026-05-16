@@ -494,8 +494,8 @@ def _write_installed_manifest_into_dist(
         "version": version,
         "schema": 1,
         "parts": {
-            "app": {"sha256": _sha256_of(app_zip), "asset": app_zip.name},
-            "runtime": {"sha256": _sha256_of(runtime_zip), "asset": runtime_zip.name},
+            "app": {"sha256": _content_hash_of_zip(app_zip), "asset": app_zip.name},
+            "runtime": {"sha256": _content_hash_of_zip(runtime_zip), "asset": runtime_zip.name},
         },
         "installed_at": int(_time.time()),
     }
