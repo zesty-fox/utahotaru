@@ -395,6 +395,7 @@ class EditorInterface(QWidget):
             "timestamps_to_sentence_end",
             "quick_export",
             "insert_space",
+            "merge_line_up",
         ]
         # 默认值兜底（当设置未写入新 schema 时使用）
         defaults = {
@@ -433,6 +434,7 @@ class EditorInterface(QWidget):
             "timestamps_to_sentence_end": "",
             "quick_export": "",
             "insert_space": "M",
+            "merge_line_up": "Shift+Enter",
         }
 
         def _normalize_trigger(raw: str) -> str:
@@ -3038,6 +3040,15 @@ class EditorInterface(QWidget):
 
         self._execute_structural_edit("插入空格", _mutate)
 
+    def _merge_line_up_at_current(self):
+        """将当前行合并到上一行（快捷键触发）。"""
+        if not self._project:
+            return
+        line_idx = self._current_line_idx
+        if line_idx <= 0 or line_idx >= len(self._project.sentences):
+            return
+        self._on_merge_line_up_requested(line_idx)
+
     def _on_merge_line_up_requested(self, line_idx: int):
         if not self._project:
             return
@@ -3243,6 +3254,8 @@ class EditorInterface(QWidget):
             self._on_quick_export()
         elif action == "insert_space":
             self._insert_space_at_current()
+        elif action == "merge_line_up":
+            self._merge_line_up_at_current()
 
     def _on_quick_export(self):
         """快捷导出：使用默认导出格式弹出保存对话框并导出。"""
@@ -3623,6 +3636,7 @@ class EditorInterface(QWidget):
             "ALT+DOWN": "timestamp_down",
             "ALT+LEFT": "cycle_checkpoint_prev",
             "ALT+RIGHT": "cycle_checkpoint",
+            "SHIFT+ENTER": "merge_line_up",
         }
         return defaults.get(key_name.upper())
 
