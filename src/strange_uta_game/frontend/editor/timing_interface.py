@@ -601,13 +601,17 @@ class EditorInterface(QWidget):
 
     def _on_offset_changed(self, offset_ms: int):
         """工具栏偏移控件变更 — 更新设置、字符偏移时间戳和渲染缓存"""
-        # 写入设置（与设置页面联动）
+        # 写入设置（与设置页面联动）—— 必须用 settingInterface 的共享实例，
+        # 否则 _store.notify("settings") 触发 _apply_settings() 时读到的还是旧值，
+        # 会立刻把刚设的偏移回滚掉。
         try:
-            from strange_uta_game.frontend.settings.settings_interface import (
-                AppSettings,
-            )
-
-            app_settings = AppSettings()
+            main_window = self.window()
+            setting_iface = getattr(main_window, "settingInterface", None)
+            if setting_iface:
+                app_settings = setting_iface.get_settings()
+            else:
+                from strange_uta_game.frontend.settings.app_settings import AppSettings
+                app_settings = AppSettings()
             app_settings.set("export.offset_ms", offset_ms)
             app_settings.save()
         except Exception:
