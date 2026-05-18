@@ -168,7 +168,7 @@ class ModifyCharacterDialog(QDialog):
 
     字符级独立输入框方案（批 18 #1/#2/#3）：
       - 顶部"新字符"文本框决定字符序列
-      - 下方按新文本长度动态生成每字符一行：[字符] [注音] [节奏点] [是否连词]
+      - 下方按新文本长度动态生成每字符一行：[字符] [注音] [节奏点] [向后连词]
       - 注音框内用半角逗号分隔 RubyPart（如 わ,た,し → 3 个 RubyPart）
       - 文本修改时自动重建字符行，并按位置尽量保留已输入值
       - 单字符修改时直接原地 set_ruby/check_count/linked_to_next/push_to_ruby，保留 timestamps
@@ -278,7 +278,7 @@ class ModifyCharacterDialog(QDialog):
         edit_check = QLineEdit(check_str)
         edit_check.setPlaceholderText("节奏点")
         edit_check.setFixedWidth(64)
-        chk_linked = QCheckBox("是否连词")
+        chk_linked = QCheckBox("向后连词")
         chk_linked.setChecked(bool(linked))
         chk_linked.setToolTip(
             "连接到下一字符（末字/行尾不可连词，提交时将跳过并提示；句尾=停顿点，允许连词）"
@@ -659,7 +659,7 @@ class CharEditDialog(QDialog):
     UI 布局：
     - 当前字符显示（只读）
     - 新字符输入
-    - 每字符一行：[字符] [注音] [节奏点] [是否连词]
+    - 每字符一行：[字符] [注音] [节奏点] [向后连词]
     - 处理方式选择（直接应用/按字符均分/按 mora 均分）
     - 预览区域
     - 全文件替换选项
@@ -780,7 +780,7 @@ class CharEditDialog(QDialog):
         edit_check = QLineEdit(check_str)
         edit_check.setPlaceholderText("节奏点")
         edit_check.setFixedWidth(64)
-        chk_linked = QCheckBox("是否连词")
+        chk_linked = QCheckBox("向后连词")
         chk_linked.setChecked(bool(linked))
         chk_linked.setToolTip(
             "连接到下一字符（末字/行尾不可连词，提交时将跳过并提示；句尾=停顿点，允许连词）"
