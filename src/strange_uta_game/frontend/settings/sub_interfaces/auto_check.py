@@ -38,7 +38,9 @@ class AutoCheckSubInterface(SubSettingInterface):
         self.card_delete_ruby_types = MultiCheckSettingCard(
             FIF.DELETE, "自动删除注音", "自动注音完成后，自动删除指定类型的注音",
             options=[
-                ("hiragana", "ひらがな（平假名）"), ("katakana", "カタカナ（片假名）"),
+                ("hiragana", "ひらがな（平假名）"),
+                ("katakana_hiragana_ruby", "カタカナ（片假名・注音为平假名）"),
+                ("katakana_english_ruby", "カタカナ（片假名・注音含有英文）"),
                 ("kanji", "漢字（汉字）"), ("alphabet", "アルファベット（英文字母）"),
                 ("number", "数字"), ("symbol", "記号（符号）"),
                 ("long_vowel", "長音符号（ー、～等）"), ("sokuon", "促音（っ/ッ）"),
@@ -82,7 +84,15 @@ class AutoCheckSubInterface(SubSettingInterface):
             "check_english_word_end": s.get("auto_check.check_english_word_end", True),
         })
         self.card_auto_on_load.setChecked(s.get("auto_check.auto_on_load", True))
-        self.card_delete_ruby_types.setSelectedValues(s.get("auto_check.delete_ruby_types", []))
+        saved_delete_types = s.get("auto_check.delete_ruby_types", [])
+        # 向后兼容：将旧的 "katakana" 转换为新的两个子类型
+        if "katakana" in saved_delete_types:
+            saved_delete_types.remove("katakana")
+            if "katakana_hiragana_ruby" not in saved_delete_types:
+                saved_delete_types.append("katakana_hiragana_ruby")
+            if "katakana_english_ruby" not in saved_delete_types:
+                saved_delete_types.append("katakana_english_ruby")
+        self.card_delete_ruby_types.setSelectedValues(saved_delete_types)
 
     def collect_settings(self, s):
         for key, val in self.card_checkpoint_chars.values().items():
