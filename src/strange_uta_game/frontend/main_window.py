@@ -234,6 +234,8 @@ class MainWindow(MSFluentWindow):
 
     def switchTo(self, interface):
         """切换标签页"""
+        # 重置目标页面的 y 坐标，防止动画被打断时 widget 残留偏移，导致下次动画越来越快
+        interface.move(interface.x(), 0)
         # 切换到设置界面时从磁盘重新加载配置
         if hasattr(self, "settingInterface") and interface is self.settingInterface:
             self.settingInterface.reload_from_disk()
