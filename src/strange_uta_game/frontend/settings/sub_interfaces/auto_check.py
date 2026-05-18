@@ -85,13 +85,15 @@ class AutoCheckSubInterface(SubSettingInterface):
         })
         self.card_auto_on_load.setChecked(s.get("auto_check.auto_on_load", True))
         saved_delete_types = s.get("auto_check.delete_ruby_types", [])
-        # 向后兼容：将旧的 "katakana" 转换为新的两个子类型
+        # 向后兼容：将旧的 "katakana" 转换为新的两个子类型并自动更新配置
         if "katakana" in saved_delete_types:
             saved_delete_types.remove("katakana")
             if "katakana_hiragana_ruby" not in saved_delete_types:
                 saved_delete_types.append("katakana_hiragana_ruby")
             if "katakana_english_ruby" not in saved_delete_types:
                 saved_delete_types.append("katakana_english_ruby")
+            s.set("auto_check.delete_ruby_types", saved_delete_types)
+            s.save()
         self.card_delete_ruby_types.setSelectedValues(saved_delete_types)
 
     def collect_settings(self, s):
