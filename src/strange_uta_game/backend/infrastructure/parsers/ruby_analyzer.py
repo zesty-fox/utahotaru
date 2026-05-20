@@ -1,6 +1,7 @@
 """注音分析器 - 为日文文本提供假名注音。
 
-优先使用 SudachiPy（上下文感知复合词分析），回退到 pykakasi（单字分析）。
+主引擎为 WinRT IME（Windows.Globalization.JapanesePhoneticAnalyzer，上下文
+感知复合词分析）；不可用时降级 pykakasi（单字分析），最后 DummyAnalyzer。
 """
 
 from abc import ABC, abstractmethod
@@ -38,15 +39,15 @@ class RubyAnalyzer(ABC):
 
 
 # ──────────────────────────────────────────────
-# SudachiPy 上下文感知分析器
+# 假名分配基类（分词器无关，Sudachi / WinRT 共用）
 # ──────────────────────────────────────────────
 
 
-class SudachiAnalyzer(RubyAnalyzer):
-    """基于 SudachiPy 的上下文感知注音分析器。
+class KanaDistributingAnalyzer(RubyAnalyzer):
+    """把 (surface, 平假名读音) 序列分配为逐字/逐块注音的共享基类。
 
-    使用 SudachiPy Mode C（最长分割）获取复合词的正确读音，
-    例如 迷い→まよい 而非 めい+い、世界→せかい 而非 せい+かい。
+    不依赖任何具体分词器；子类只需产出 (surface, reading) 序列并复用
+    :meth:`_results_from_pairs`，保证下游 block 分组逻辑完全一致。
 
     对于含漢字的形態素：
     1. 先用假名字符作为锚点分配读音（如 迷い → 迷{まよ}い）
@@ -55,66 +56,17 @@ class SudachiAnalyzer(RubyAnalyzer):
     3. 分配失败时保持复合词读音不拆分（如 今日{きょう}）
     """
 
-    def __init__(self):
-        try:
-            from sudachipy import Dictionary
+    def _results_from_pairs(
+        self, pairs: List[Tuple[str, str]]
+    ) -> List[RubyResult]:
+        """将 (surface, 平假名读音) 序列分配为逐块 RubyResult。
 
-            self._tokenizer = Dictionary().create()
-            # 兼容不同版本的 SplitMode
-            try:
-                from sudachipy import SplitMode
-
-                self._mode = SplitMode.C
-            except ImportError:
-                from sudachipy import Tokenizer as _Tok
-
-                self._mode = _Tok.SplitMode.C
-        except ImportError:
-            raise ImportError(
-                "sudachipy is required. Install with: "
-                "pip install sudachipy sudachidict_core"
-            )
-        # pykakasi 用于单字读音参考查询
-        self._pykakasi_conv = None
-        try:
-            import pykakasi
-
-            kks = pykakasi.kakasi()
-            kks.setMode("J", "H")
-            self._pykakasi_conv = kks.getConverter()
-        except ImportError:
-            pass
-
-    def get_reading(self, text: str) -> str:
-        """获取文本的平假名读音"""
-        if not text:
-            return ""
-        try:
-            morphemes = self._tokenizer.tokenize(text, self._mode)
-            return "".join(self._kata_to_hira(m.reading_form()) for m in morphemes)
-        except Exception:
-            return text
-
-    def analyze(self, text: str) -> List[RubyResult]:
-        """分析文本并返回注音结果"""
-        if not text:
-            return []
-
-        try:
-            morphemes = self._tokenizer.tokenize(text, self._mode)
-        except Exception:
-            return [
-                RubyResult(text=c, reading=c, start_idx=i, end_idx=i + 1)
-                for i, c in enumerate(text)
-            ]
-
+        供各分词器实现（如 WinRTAnalyzer）共用，保证下游 block 分组逻辑一致。
+        """
         results: List[RubyResult] = []
         pos = 0
 
-        for m in morphemes:
-            surface = m.surface()
-            reading_kata = m.reading_form()
-            reading = self._kata_to_hira(reading_kata)
+        for surface, reading in pairs:
             start = pos
             end = pos + len(surface)
 
@@ -367,6 +319,118 @@ class SudachiAnalyzer(RubyAnalyzer):
 
 
 # ──────────────────────────────────────────────
+# WinRT IME 分析器（日语注音主引擎）
+# ──────────────────────────────────────────────
+
+
+class WinRTJapaneseUnavailable(ImportError):
+    """WinRT 日语注音引擎不可用（通常缺少日语 IME 功能）。
+
+    继承 ImportError 使 create_analyzer 的回退路径可统一捕获；
+    ``reason`` 为机器可读原因，``guidance`` 为面向用户的安装引导文案。
+    """
+
+    def __init__(self, reason: str, guidance: str):
+        self.reason = reason
+        self.guidance = guidance
+        super().__init__(f"WinRT Japanese engine unavailable ({reason})")
+
+
+class WinRTAnalyzer(KanaDistributingAnalyzer):
+    """基于 Windows.Globalization.JapanesePhoneticAnalyzer 的注音分析器。
+
+    复用 KanaDistributingAnalyzer 的读音分配逻辑（_results_from_pairs /
+    _distribute_morpheme_reading），仅把"分词 + 读音获取"换成 WinRT IME 接口。
+
+    要点（来自调研结论）：
+    - WinRT 默认粒度≈Sudachi Mode A，依赖上下文消歧 → 必须按整段输入。
+    - GetWords 单次上限 100 字符，超长返回空 → 此处按 ≤100 字切块。
+    - display_text 会半角→全角归一，但字符数 1:1 → surface 取原文切片、不用 display_text。
+    - yomi_text 已是平假名。
+    """
+
+    _MAX_LEN = 100
+
+    def __init__(self):
+        available, reason = winrt_japanese_status()
+        if not available:
+            if reason == "no_winrt_package":
+                raise ImportError(
+                    "winrt-Windows.Globalization is required. Install with: "
+                    "pip install winrt-Windows.Globalization"
+                )
+            # 引擎缺失（缺日语 IME 功能）或其他异常：抛带安装引导的错误，
+            # 供 create_analyzer 优雅回退，调用方可捕获后向用户展示引导。
+            raise WinRTJapaneseUnavailable(reason, winrt_install_guidance())
+
+        from winrt._winrt import init_apartment, STA
+
+        try:
+            init_apartment(STA)
+        except OSError:
+            # 线程已初始化为某 apartment（如 PyQt 主线程已是 STA）→ 忽略
+            pass
+        from winrt.windows.globalization import JapanesePhoneticAnalyzer
+
+        self._jpa = JapanesePhoneticAnalyzer
+        # 预热：首次调用有冷启开销，启动时空跑一次
+        try:
+            self._jpa.get_words("予熱")
+        except Exception:
+            pass
+        # pykakasi 用于单字读音参考查询
+        self._pykakasi_conv = None
+        try:
+            import pykakasi
+
+            kks = pykakasi.kakasi()
+            kks.setMode("J", "H")
+            self._pykakasi_conv = kks.getConverter()
+        except ImportError:
+            pass
+
+    def _get_pairs(self, text: str) -> List[Tuple[str, str]]:
+        """整段 → [(原文 surface, 平假名读音)]，按 ≤100 字切块。"""
+        pairs: List[Tuple[str, str]] = []
+        for off in range(0, len(text), self._MAX_LEN):
+            chunk = text[off : off + self._MAX_LEN]
+            words = self._jpa.get_words(chunk)
+            cursor = 0
+            for w in words:
+                disp_len = len(w.display_text)
+                # surface 取原文切片（display_text 已全角归一，不可信）
+                surface = chunk[cursor : cursor + disp_len]
+                reading = w.yomi_text or surface
+                pairs.append((surface, reading))
+                cursor += disp_len
+            # 兜底：若 GetWords 返回空（超长或异常），逐字回退
+            if cursor < len(chunk):
+                for c in chunk[cursor:]:
+                    pairs.append((c, c))
+        return pairs
+
+    def get_reading(self, text: str) -> str:
+        if not text:
+            return ""
+        try:
+            return "".join(r for _, r in self._get_pairs(text))
+        except Exception:
+            return text
+
+    def analyze(self, text: str) -> List[RubyResult]:
+        if not text:
+            return []
+        try:
+            pairs = self._get_pairs(text)
+        except Exception:
+            return [
+                RubyResult(text=c, reading=c, start_idx=i, end_idx=i + 1)
+                for i, c in enumerate(text)
+            ]
+        return self._results_from_pairs(pairs)
+
+
+# ──────────────────────────────────────────────
 # pykakasi 分析器（回退用）
 # ──────────────────────────────────────────────
 
@@ -480,26 +544,134 @@ class DummyAnalyzer(RubyAnalyzer):
         return text
 
 
+# ──────────────────────────────────────────────
+# WinRT 日语注音引擎：可用性探测 + 安装引导
+# ──────────────────────────────────────────────
+
+# 日语「Basic」语言功能（含微软日语 IME），JapanesePhoneticAnalyzer 的注音引擎来源
+WINRT_JA_CAPABILITY = "Language.Basic~~~ja-JP~0.0.1.0"
+
+
+def winrt_japanese_status() -> Tuple[bool, str]:
+    """探测 WinRT 日语注音引擎是否可用。
+
+    返回 (available, reason)。reason 取值：
+      - "ok"                  引擎可用
+      - "no_winrt_package"    未安装 winrt-Windows.Globalization
+      - "engine_unavailable"  缺少日语 IME 功能（GetWords 返回空/无假名）
+      - "error:<类型>"        其他异常
+
+    探测方式：对确定含汉字读音的 "日本語" 调 GetWords，引擎缺失时会返回空
+    或读音等于原文（无假名），据此判定。
+    """
+    try:
+        from winrt._winrt import init_apartment, STA  # type: ignore
+    except ImportError:
+        return (False, "no_winrt_package")
+    try:
+        try:
+            init_apartment(STA)
+        except OSError:
+            pass  # 线程已初始化为某 apartment
+        from winrt.windows.globalization import JapanesePhoneticAnalyzer  # type: ignore
+
+        words = JapanesePhoneticAnalyzer.get_words("日本語")
+        reading = "".join(w.yomi_text or "" for w in words)
+        has_kana = any("぀" <= c <= "ヿ" for c in reading)
+        if words and reading and reading != "日本語" and has_kana:
+            return (True, "ok")
+        return (False, "engine_unavailable")
+    except Exception as e:  # noqa: BLE001
+        return (False, f"error:{type(e).__name__}")
+
+
+def winrt_install_guidance() -> str:
+    """缺少日语 IME 功能时的安装引导文案（面向用户）。"""
+    return (
+        "WinRT 日语注音需要 Windows 的日语功能（含日语 IME）。当前系统未安装。\n"
+        "\n"
+        "方式一（命令行，需管理员）：以管理员身份运行 PowerShell，执行\n"
+        f"    Add-WindowsCapability -Online -Name {WINRT_JA_CAPABILITY}\n"
+        "需联网，约几十 MB，从 Windows Update 下载（非完整语言包）。\n"
+        "\n"
+        "方式二（图形界面）：设置 → 时间和语言 → 语言和区域 → 添加语言 →\n"
+        "搜索「日本語」→ 安装（勾选「基本键入/Basic typing」即可）。\n"
+        "\n"
+        "安装后无需把日语设为显示语言，也无需加入语言列表，重启应用即可生效。"
+    )
+
+
+def install_winrt_japanese(timeout: int = 600) -> Tuple[bool, str]:
+    """通过 UAC 提权安装日语 IME 功能（Add-WindowsCapability）。
+
+    用 ``Start-Process -Verb RunAs`` 触发 UAC 弹窗提权运行 PowerShell；
+    用户拒绝提权或安装失败时返回 (False, 原因)，调用方应转为展示
+    :func:`winrt_install_guidance` 引导用户手动安装。
+
+    注意：本函数会弹出 UAC，**调用前应先向用户说明用途并征得同意**。
+
+    返回 (success, message)。
+    """
+    import subprocess
+
+    # 子进程以管理员身份执行安装并按结果设置退出码；-Verb RunAs 触发 UAC。
+    inner = (
+        f"$ErrorActionPreference='Stop';"
+        f"try{{Add-WindowsCapability -Online -Name {WINRT_JA_CAPABILITY};exit 0}}"
+        f"catch{{exit 2}}"
+    )
+    launcher = (
+        "$p=Start-Process powershell "
+        "-ArgumentList '-NoProfile','-NonInteractive','-Command',"
+        f"'{inner}' -Verb RunAs -Wait -PassThru;"
+        "exit $p.ExitCode"
+    )
+    try:
+        proc = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", launcher],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except FileNotFoundError:
+        return (False, "powershell_not_found")
+    except subprocess.TimeoutExpired:
+        return (False, "timeout")
+
+    if proc.returncode == 0:
+        # 安装命令成功；复测引擎确认可用
+        ok, reason = winrt_japanese_status()
+        return (ok, "ok" if ok else f"installed_but_{reason}")
+    # 1603/RunAs 取消等：UAC 被拒或安装失败
+    if "拒绝" in (proc.stderr or "") or proc.returncode in (1223, -1):
+        return (False, "uac_declined")
+    return (False, f"install_failed:{proc.returncode}")
+
+
 def create_analyzer(use_pykakasi: bool = True) -> RubyAnalyzer:
     """创建注音分析器。
 
-    优先使用 SudachiPy（上下文感知复合词分析），
-    回退到 pykakasi（单字分析），最后使用 DummyAnalyzer。
+    主分析器为 WinRT IME（移除 Sudachi 依赖的目标方向）。WinRT 不可用时
+    **不回退 Sudachi**，仅降级到 pykakasi（单字分析），最后 DummyAnalyzer。
+    引擎缺失（缺日语 IME）应由 UI 层探测并引导安装，见 :func:`winrt_japanese_status`
+    / :func:`install_winrt_japanese` / :func:`winrt_install_guidance`。
     """
-    # 优先尝试 SudachiPy
     try:
-        return SudachiAnalyzer()
+        return WinRTAnalyzer()
+    except WinRTJapaneseUnavailable:
+        # 缺日语 IME 引擎：交由 UI 引导安装；此处先降级，不使用 Sudachi
+        pass
     except ImportError:
+        # 缺 winrt 包：同样降级
         pass
 
-    # 回退到 pykakasi
     if use_pykakasi:
         try:
             return PykakasiAnalyzer()
         except ImportError:
             pass
 
-    print("Warning: neither sudachipy nor pykakasi available, using DummyAnalyzer")
+    print("Warning: WinRT/pykakasi unavailable, using DummyAnalyzer")
     return DummyAnalyzer()
 
 

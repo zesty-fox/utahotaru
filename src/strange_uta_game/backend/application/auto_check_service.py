@@ -332,10 +332,11 @@ class AutoCheckService:
         return merged, covered
 
     def _try_split_to_chars(self, word: str, reading: str) -> Optional[List[str]]:
-        """尝试将多字词的读音拆分到各字符（Sudachi 分词 + 汉字音读字典组合匹配）。
+        """尝试将多字词的读音拆分到各字符（分析器分词边界 + 汉字音读字典组合匹配）。
 
-        1. 先用 Sudachi 对多字词进行分词，如果分词后的子 part 读音拼接与原 part 读音完全一致，就允许继续分
-        2. 对每个子 part 调用汉字音读字典组合匹配
+        1. 先用注音分析器（WinRT/Sudachi 等，引擎无关）对多字词分词，若各子块
+           读音拼接与给定读音完全一致，则按子块边界继续分
+        2. 对每个多字子块调用汉字音读字典组合匹配
 
         注意：不查用户字典（用户字典由上游独立路径处理）。
 
@@ -353,10 +354,10 @@ class AutoCheckService:
         if not clean_reading:
             return None
 
-        # 尝试用 Sudachi 分词
-        sudachi_result = self._try_sudachi_split(word, clean_reading)
-        if sudachi_result is not None:
-            return sudachi_result
+        # 用分析器分词边界拆分
+        seg_result = self._try_analyzer_split(word, clean_reading)
+        if seg_result is not None:
+            return seg_result
 
         # 单字音读字典匹配
         result = self._split_by_kanji_dict(word, clean_reading)
@@ -366,74 +367,52 @@ class AutoCheckService:
         # 匹配失败，不拆分
         return None
 
-    def _try_sudachi_split(self, word: str, reading: str) -> Optional[List[str]]:
-        """尝试用 Sudachi 分词（Mode A 最短分割），如果分词后的子 part 读音拼接与原 part 读音完全一致，就允许继续分。
+    def _try_analyzer_split(self, word: str, reading: str) -> Optional[List[str]]:
+        """用注音分析器的分词边界把读音拆到各字符（引擎无关）。
+
+        依赖 ``RubyAnalyzer.analyze`` 产出的 (surface, reading) 块；仅当各块
+        读音拼接与给定 reading 完全一致时才采用（避免分析器自带读音与字典/
+        用户给定读音冲突时误拆）。多字子块再走汉字音读字典。
 
         Args:
             word: 多字词
-            reading: 词的总读音
+            reading: 词的总读音（平假名，已去逗号）
 
         Returns:
             各字符读音列表（长度等于 word 长度），如果可拆分，否则 None
         """
         try:
-            # 用 Sudachi Mode A（最短分割）分词
-            from sudachipy import SplitMode
-            mode_a = SplitMode.A
-            morphemes = self._analyzer._tokenizer.tokenize(word, mode_a)
-            results = list(morphemes)
-
-            if len(results) <= 1:
-                # Sudachi 没有进一步分词
-                return None
-
-            # 检查分词后的子 part 读音拼接是否与原 part 读音完全一致
-            # 需要将 Sudachi 的片假名读音转换为平假名
-            combined_reading = ""
-            for r in results:
-                reading_form = r.reading_form()
-                if reading_form:
-                    # 将片假名转换为平假名
-                    hira_reading = self._kata_to_hira(reading_form)
-                    combined_reading += hira_reading
-                else:
-                    # 如果没有读音，使用原文
-                    combined_reading += r.surface()
-
-            # 检查拼接后的读音是否与原读音一致
-            if combined_reading != reading:
-                return None
-
-            # 读音一致，尝试拆分每个子 part
-            # 对每个子 part 调用汉字音读字典组合匹配
-            # 返回的列表长度必须等于 word 长度
-            final_result = []
-            for r in results:
-                surface = r.surface()
-                reading_form = r.reading_form()
-                hira_reading = self._kata_to_hira(reading_form) if reading_form else surface
-
-                if len(surface) == 1:
-                    # 单字，直接使用读音
-                    final_result.append(hira_reading)
-                else:
-                    # 多字，尝试用汉字音读字典拆分
-                    sub_result = self._split_by_kanji_dict(surface, hira_reading)
-                    if sub_result is not None:
-                        final_result.extend(sub_result)
-                    else:
-                        # 无法拆分，将读音分配给第一个字，其余字为空
-                        final_result.append(hira_reading)
-                        final_result.extend([""] * (len(surface) - 1))
-
-            # 检查长度是否一致
-            if len(final_result) != len(word):
-                return None
-
-            return final_result
-
+            blocks = self._analyzer.analyze(word)
         except Exception:
             return None
+
+        if len(blocks) <= 1:
+            # 分析器未进一步分词
+            return None
+
+        # 各子块读音拼接需与给定读音完全一致，否则放弃（交由单字字典）
+        combined = "".join(b.reading for b in blocks)
+        if combined != reading:
+            return None
+
+        final_result: List[str] = []
+        for b in blocks:
+            surface = b.text
+            sub_reading = b.reading
+            if len(surface) == 1:
+                final_result.append(sub_reading)
+            else:
+                sub = self._split_by_kanji_dict(surface, sub_reading)
+                if sub is not None:
+                    final_result.extend(sub)
+                else:
+                    # 无法拆分：读音给第一个字，其余空
+                    final_result.append(sub_reading)
+                    final_result.extend([""] * (len(surface) - 1))
+
+        if len(final_result) != len(word):
+            return None
+        return final_result
 
     def _get_single_char_candidates(self, ch: str) -> List[str]:
         """收集单个字符的候选读音（仅库：库分析器 + pykakasi）。
