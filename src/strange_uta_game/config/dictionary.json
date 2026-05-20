@@ -7653,5 +7653,10 @@
     "enabled": true,
     "word": "私",
     "reading": "{私||わ|た|し}"
+  },
+  {
+    "enabled": true,
+    "word": "傷痕",
+    "reading": "{傷||しょ|う}{痕||こ|ん}"
   }
 ]
