@@ -864,6 +864,8 @@ def _write_installed_manifest_into_dist(
     version: str,
     app_zip: Path,
     runtime_zip: Path,
+    app_targets: Optional[List[str]] = None,
+    runtime_targets: Optional[List[str]] = None,
 ) -> Path:
     """把"出厂版本"的 .installed_manifest.json 直接写到 ``dist/StrangeUtaGame/_internal/``。
 
@@ -873,14 +875,25 @@ def _write_installed_manifest_into_dist(
 
     生成的字段与 Updater 运行时 ``write_local_manifest`` 保持完全一致，避免一安装
     完就被 Updater 覆写时格式漂移。
+
+    ``targets`` 字段用于下次增量更新时的孤儿清理：当 runtime 缩小（某个库被删除），
+    Updater 会把上次安装的 targets 与新版本 targets 对比，删除不再存在的条目。
     """
     dist_root = MAIN_DIST
     payload = {
         "version": version,
         "schema": 1,
         "parts": {
-            "app": {"sha256": _content_hash_of_zip(app_zip), "asset": app_zip.name},
-            "runtime": {"sha256": _content_hash_of_zip(runtime_zip), "asset": runtime_zip.name},
+            "app": {
+                "sha256": _content_hash_of_zip(app_zip),
+                "asset": app_zip.name,
+                "targets": list(app_targets or []),
+            },
+            "runtime": {
+                "sha256": _content_hash_of_zip(runtime_zip),
+                "asset": runtime_zip.name,
+                "targets": list(runtime_targets or []),
+            },
         },
         "installed_at": int(_time.time()),
     }
@@ -974,7 +987,7 @@ def cmd_build(
 
     print()
     print("[step] 写出厂本地清单到 _internal/.installed_manifest.json ...")
-    _write_installed_manifest_into_dist(version, app_zip, runtime_zip)
+    _write_installed_manifest_into_dist(version, app_zip, runtime_zip, app_targets, runtime_targets)
 
     print()
     print("[step] 打全量 zip（含本地清单）...")

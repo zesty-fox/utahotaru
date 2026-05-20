@@ -759,13 +759,22 @@ def read_local_manifest(args: Args, log: logging.Logger) -> Optional[Dict[str, A
 
 
 def write_local_manifest(args: Args, remote_manifest: Dict[str, Any], log: logging.Logger) -> None:
-    """在更新成功后，把"当前已安装"的 part sha256 写到本地清单。"""
+    """在更新成功后，把"当前已安装"的 part sha256 + targets 写到本地清单。
+
+    ``targets`` 字段供下次增量更新时做"孤儿清理"：把上次存在但新版本不再包含的
+    条目从磁盘删除，确保 runtime 缩小时用户磁盘占用也真正减少。
+    """
     p = _local_manifest_path(args)
     payload = {
         "version": remote_manifest.get("version"),
         "schema": remote_manifest.get("schema", 1),
         "parts": {
-            pid: {"sha256": pinfo.get("sha256", ""), "asset": pinfo.get("asset", "")}
+            pid: {
+                "sha256": pinfo.get("sha256", ""),
+                "asset": pinfo.get("asset", ""),
+                # 保存本次安装的 targets，供下次增量更新做孤儿清理
+                "targets": list(pinfo.get("targets") or []),
+            }
             for pid, pinfo in remote_manifest.get("parts", {}).items()
         },
         "installed_at": int(time.time()),
@@ -1033,6 +1042,41 @@ def run_incremental(
             return 33
         log.info("[%s] 应用成功", pid)
         applied.append(pid)
+
+        # ── 孤儿清理：删除上次存在但新版本不再包含的 targets ────────────────────
+        # 场景：runtime 缩小（某个库被删除），新 manifest.targets 里没有它，
+        # _apply_part 不会主动删除旧文件。这里补做清理，让用户磁盘真正减负。
+        #
+        # 安全策略：
+        #   - 只删除本地 manifest 里明确记录的 targets（不猜测任何其他路径）
+        #   - 不删除新 targets 里仍然存在的条目（即便旧版也有）
+        #   - 目录用 rmtree，文件用 unlink；任一失败都只 warning，不影响更新结果
+        local_targets: List[str] = []
+        if local and isinstance(local.get("parts"), dict):
+            local_targets = list((local["parts"].get(pid) or {}).get("targets") or [])
+        new_targets_set = set(targets)
+        orphans = [t for t in local_targets if t not in new_targets_set]
+        if orphans:
+            log.info("[%s] 检测到 %d 个孤儿条目（旧版有、新版无），开始清理", pid, len(orphans))
+            freed_bytes = 0
+            for rel in orphans:
+                victim = args.app_dir / rel
+                if not victim.exists():
+                    continue
+                try:
+                    size = sum(
+                        f.stat().st_size for f in victim.rglob("*") if f.is_file()
+                    ) if victim.is_dir() else victim.stat().st_size
+                    if victim.is_dir():
+                        shutil.rmtree(str(victim), ignore_errors=False)
+                    else:
+                        victim.unlink()
+                    freed_bytes += size
+                    log.info("[%s]   已删除: %s（%.1f MB）", pid, rel, size / 1024 / 1024)
+                except OSError as e:
+                    log.warning("[%s]   删除 %s 失败（可忽略）: %s", pid, rel, e)
+            if freed_bytes > 0:
+                log.info("[%s] 孤儿清理完成，释放约 %.1f MB", pid, freed_bytes / 1024 / 1024)
 
     # 3) 写本地 manifest（仅在所有 part 成功后）
     write_local_manifest(args, manifest, log)
