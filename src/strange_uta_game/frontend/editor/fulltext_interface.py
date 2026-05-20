@@ -1,10 +1,8 @@
-"""全文本编辑（已废弃不建议使用）界面。
+"""全文本编辑界面。
 
-全文本视图编辑歌词注音（ルビ），支持批量操作。
-格式: {大冒険||だ|い,ぼ|う,け|ん} — `||` 分开汉字块与 ruby；
-`,` 分开不同字的读音；`|` 分开同一字的多个 RubyPart（mora）。
-示例 {大冒険||だ|い,ぼ|う,け|ん} = 大(だ・い) 冒(ぼ・う) 険(け・ん)。
-注意：切换动作不触发自动注音 / 自动节奏点，只做字符 diff 增删。
+以带内联时间戳的全文本格式编辑整篇歌词，自带完整时间轴（编解码委托后端
+:mod:`strange_uta_game.backend.infrastructure.parsers.annotated_text`）。
+应用时逐行独立解码，行的增删/重排/文本撞车都不会丢失或错配时间戳。
 """
 
 from PyQt6.QtWidgets import (
@@ -13,23 +11,33 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPlainTextEdit,
+    QTextEdit,
     QDialog,
     QCheckBox,
     QMessageBox,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, pyqtSignal, QRect, QSize
+from PyQt6.QtGui import (
+    QColor,
+    QFont,
+    QPainter,
+    QSyntaxHighlighter,
+    QTextCharFormat,
+    QTextCursor,
+    QTextFormat,
+)
 from qfluentwidgets import (
     PushButton,
     PrimaryPushButton,
+    SpinBox,
     InfoBar,
     InfoBarPosition,
     FluentIcon as FIF,
     CaptionLabel,
 )
 
-from typing import Optional, List, Tuple, Dict
-from difflib import SequenceMatcher
+import re
+from typing import Optional, List
 
 from strange_uta_game.backend.domain import (
     Project,
@@ -48,151 +56,158 @@ from strange_uta_game.backend.infrastructure.parsers.text_splitter import (
 )
 
 
-def _rebuild_characters(
-    old_sentence: Sentence,
-    new_chars: List[str],
-    ruby_map: Dict[int, List[str]],
-) -> List[Character]:
-    """文本变更后重建 Character 列表，保留匹配字符的时间戳和配置。
-
-    使用 SequenceMatcher 计算旧字符到新字符的映射，
-    匹配到的旧字符保留 timestamps/check_count/linked_to_next/singer_id，
-    新插入的字符使用默认设置。最后一个字符标记为句尾。
-
-    ruby_map[j] 为 RubyPart.text 列表（来自新格式解析，可能为多段 mora）。
-    - 匹配到的旧字符：优先保留 old_ch.ruby（含多段 RubyPart 切分），
-      仅当用户在文本框里**显式改动**了该字符的 ruby 文本（ruby_map[j]
-      拼接后与 old_ch.ruby.text 不同）时，才用 ruby_map[j] 覆盖。
-    - 新插入字符：仅当 ruby_map[j] 明确给出时应用，否则保持空 ruby
-      （切换动作不自动注音，需用户主动触发）。
-    """
-    old_chars_str = [c.char for c in old_sentence.characters]
-
-    if old_chars_str == new_chars:
-        # 文本未变，仅在用户显式改动 ruby 时更新
-        for i, ch in enumerate(old_sentence.characters):
-            if i not in ruby_map:
-                continue
-            new_parts = ruby_map[i]
-            new_text = "".join(new_parts)
-            old_text = ch.ruby.text if ch.ruby else ""
-            if new_text == old_text:
-                # ruby 文本一致，保留 old_ch.ruby 的完整 RubyPart 切分
-                continue
-            # 用户改了注音：使用 parse_ruby_text 统一处理
-            from strange_uta_game.frontend.editor.timing.dialogs import parse_ruby_text
-            ruby_text = ",".join(new_parts)
-            ruby_obj = parse_ruby_text(ruby_text, ch.check_count)
-            ch.set_ruby(ruby_obj)
-        return old_sentence.characters
-
-    # 构建 old_idx → new_idx 映射
-    sm = SequenceMatcher(None, old_chars_str, new_chars)
-    new_to_old: Dict[int, int] = {}
-    for tag, i1, i2, j1, j2 in sm.get_opcodes():
-        if tag == "equal":
-            for k in range(i2 - i1):
-                new_to_old[j1 + k] = i1 + k
-
-    characters: List[Character] = []
-    for j in range(len(new_chars)):
-        is_last = j == len(new_chars) - 1
-        old_idx = new_to_old.get(j)
-
-        if old_idx is not None:
-            old_ch = old_sentence.characters[old_idx]
-            ch = Character(
-                char=new_chars[j],
-                check_count=old_ch.check_count,
-                timestamps=list(old_ch.timestamps),
-                sentence_end_ts=old_ch.sentence_end_ts,
-                linked_to_next=old_ch.linked_to_next if not is_last else False,
-                is_line_end=is_last,
-                is_sentence_end=is_last or old_ch.is_sentence_end,
-                is_rest=old_ch.is_rest,
-                singer_id=old_ch.singer_id,
-            )
-            # 默认保留原字符的完整 ruby（含多段 RubyPart）
-            if old_ch.ruby:
-                ch.set_ruby(
-                    Ruby(parts=[RubyPart(text=p.text) for p in old_ch.ruby.parts])
-                )
-            # 仅当用户显式改动 ruby 文本时才覆盖
-            if j in ruby_map:
-                new_parts = ruby_map[j]
-                new_text = "".join(new_parts)
-                old_text = old_ch.ruby.text if old_ch.ruby else ""
-                if new_text != old_text:
-                    from strange_uta_game.frontend.editor.timing.dialogs import parse_ruby_text
-                    ruby_text = ",".join(new_parts)
-                    ruby_obj = parse_ruby_text(ruby_text, old_ch.check_count)
-                    ch.set_ruby(ruby_obj)
-        else:
-            # 新插入字符：默认 check_count=1，空 ruby
-            ch = Character(
-                char=new_chars[j],
-                check_count=1,
-                is_line_end=is_last,
-                is_sentence_end=is_last,
-                singer_id=old_sentence.singer_id,
-            )
-            # 仅当用户在文本框里显式给新字符加了 ruby 才应用
-            if j in ruby_map:
-                new_parts = ruby_map[j]
-                from strange_uta_game.frontend.editor.timing.dialogs import parse_ruby_text
-                ruby_text = ",".join(new_parts)
-                ruby_obj = parse_ruby_text(ruby_text, ch.check_count)
-                ch.set_ruby(ruby_obj)
-
-        characters.append(ch)
-
-    return characters
-
-
-def _apply_ruby_map(sentence: Sentence, ruby_map: Dict[int, List[str]]) -> None:
-    """将 ruby_map 应用到句子的字符上（用于新插入行）。
-
-    仅当 ruby_map[ci] 明确给出时才应用（新行默认保持空 ruby，
-    不触发自动注音）。使用 parse_ruby_text 统一处理注音分段。
-    """
-    from strange_uta_game.frontend.editor.timing.dialogs import parse_ruby_text
-    for ci, parts in ruby_map.items():
-        if 0 <= ci < len(sentence.characters) and parts:
-            ruby_text = ",".join(parts)
-            ruby_obj = parse_ruby_text(ruby_text, sentence.characters[ci].check_count)
-            sentence.characters[ci].set_ruby(ruby_obj)
-
-
-def _is_kanji_char(char: str) -> bool:
-    """判断是否为汉字（公用辅助）。"""
-    if len(char) != 1:
-        return False
-    code = ord(char)
-    return (
-        (0x4E00 <= code <= 0x9FFF)
-        or (0x3400 <= code <= 0x4DBF)
-        or (0xF900 <= code <= 0xFAFF)
-    )
-
-
-def _parse_annotated_line(
-    line_text: str,
-) -> Tuple[str, List[str], Dict[int, List[str]]]:
-    """解析带注音标注的文本行（薄包装，实现位于后端
-    :mod:`strange_uta_game.backend.infrastructure.parsers.annotated_text`）。
-
-    保留此函数以兼容模块内历史调用路径。
-    """
-    from strange_uta_game.backend.infrastructure.parsers.annotated_text import (
-        parse_annotated_line,
-    )
-
-    return parse_annotated_line(line_text)
-
-
 def _ruby_is_all_hiragana(ruby_text: str) -> bool:
     """注音文本是否全为平假名（含小假名、促音っ，范围 U+3040-U+309F）。"""
     return bool(ruby_text) and all("぀" <= c <= "ゟ" for c in ruby_text)
+
+
+class _LineNumberArea(QWidget):
+    """行号栏（绘制委托给 LineNumberPlainTextEdit）。"""
+
+    def __init__(self, editor: "LineNumberPlainTextEdit"):
+        super().__init__(editor)
+        self._editor = editor
+
+    def sizeHint(self) -> QSize:
+        return QSize(self._editor.line_number_area_width(), 0)
+
+    def paintEvent(self, event):
+        self._editor.line_number_area_paint_event(event)
+
+
+class LineNumberPlainTextEdit(QPlainTextEdit):
+    """带左侧行号栏的纯文本编辑器。
+
+    行号即文本块编号（每行对应一条 Sentence），从 1 起。
+    """
+
+    zoom_requested = pyqtSignal(int)  # Alt+滚轮缩放：+1 放大 / -1 缩小
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._line_number_area = _LineNumberArea(self)
+        self.blockCountChanged.connect(lambda _=0: self._update_width())
+        self.updateRequest.connect(self._on_update_request)
+        self._update_width()
+
+    def line_number_area_width(self) -> int:
+        digits = max(2, len(str(max(1, self.blockCount()))))
+        return 10 + self.fontMetrics().horizontalAdvance("9") * digits + 6
+
+    def _update_width(self):
+        self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)
+
+    def _on_update_request(self, rect, dy):
+        if dy:
+            self._line_number_area.scroll(0, dy)
+        else:
+            self._line_number_area.update(
+                0, rect.y(), self._line_number_area.width(), rect.height()
+            )
+        if rect.contains(self.viewport().rect()):
+            self._update_width()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        cr = self.contentsRect()
+        self._line_number_area.setGeometry(
+            QRect(cr.left(), cr.top(), self.line_number_area_width(), cr.height())
+        )
+
+    def line_number_area_paint_event(self, event):
+        from strange_uta_game.frontend.theme import theme
+
+        painter = QPainter(self._line_number_area)
+        painter.fillRect(event.rect(), theme.editor_gutter_bg)
+        painter.setPen(theme.editor_gutter_fg)
+
+        block = self.firstVisibleBlock()
+        block_number = block.blockNumber()
+        top = round(
+            self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
+        )
+        bottom = top + round(self.blockBoundingRect(block).height())
+        line_h = self.fontMetrics().height()
+        width = self._line_number_area.width() - 4
+
+        while block.isValid() and top <= event.rect().bottom():
+            if block.isVisible() and bottom >= event.rect().top():
+                painter.drawText(
+                    0, top, width, line_h,
+                    Qt.AlignmentFlag.AlignRight, str(block_number + 1),
+                )
+            block = block.next()
+            top = bottom
+            bottom = top + round(self.blockBoundingRect(block).height())
+            block_number += 1
+
+    def wheelEvent(self, event):
+        """Alt+滚轮缩放字体（放大/缩小），其余情况维持默认滚动。
+
+        注意：Windows 下按住 Alt 滚动时，滚轮增量会被转到水平轴
+        （angleDelta().x()），故需同时读取 x/y，否则 y 恒为 0、缩放失效。
+        """
+        if event.modifiers() & Qt.KeyboardModifier.AltModifier:
+            ad = event.angleDelta()
+            delta = ad.y() or ad.x()
+            if delta > 0:
+                self.zoom_requested.emit(1)
+            elif delta < 0:
+                self.zoom_requested.emit(-1)
+            event.accept()
+            return
+        super().wheelEvent(event)
+
+
+class _TimedFormatHighlighter(QSyntaxHighlighter):
+    """带时间戳全文本格式的语法着色（类 VSCode）。
+
+    着色：起始时间戳 [..]、句尾时间戳 [>..]、演唱者标签 【..】、
+    花括号/分隔符 { } || | ,。颜色随深/浅主题切换。
+    """
+
+    # (正则, 颜色键) —— 顺序即应用顺序，后者可覆盖前者重叠区
+    _SEP_RE = re.compile(r"\|\||[{}|,]")
+    _SINGER_RE = re.compile(r"【[^】]*】")
+    _END_TS_RE = re.compile(r"\[>[^\]]*\]")
+    _START_TS_RE = re.compile(r"\[(?!>)[^\]]*\]")
+
+    def __init__(self, document):
+        super().__init__(document)
+        self._formats = self._build_formats()
+
+    @staticmethod
+    def _build_formats():
+        from strange_uta_game.frontend.theme import theme
+
+        palette = {
+            "sep": theme.syntax_separator,
+            "singer": theme.syntax_singer,
+            "start": theme.syntax_timestamp,
+            "end": theme.syntax_timestamp_end,
+        }
+        fmts = {}
+        for key, color in palette.items():
+            f = QTextCharFormat()
+            f.setForeground(QColor(color))
+            fmts[key] = f
+        return fmts
+
+    def rehighlight_with_theme(self):
+        """主题切换后重建颜色并重刷。"""
+        self._formats = self._build_formats()
+        self.rehighlight()
+
+    def highlightBlock(self, text: str) -> None:
+        for regex, key in (
+            (self._SEP_RE, "sep"),
+            (self._SINGER_RE, "singer"),
+            (self._START_TS_RE, "start"),
+            (self._END_TS_RE, "end"),
+        ):
+            fmt = self._formats[key]
+            for m in regex.finditer(text):
+                self.setFormat(m.start(), m.end() - m.start(), fmt)
 
 
 class DeleteRubyByTypeDialog(QDialog):
@@ -303,28 +318,27 @@ class RubyInterface(QWidget):
     def _init_ui(self):
         """初始化界面"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(15)
+        layout.setContentsMargins(20, 16, 20, 16)
+        layout.setSpacing(8)
 
         # 标题
-        title = QLabel("全文本编辑（已废弃不建议使用）")
-        title.setStyleSheet("font-size: 24px; font-weight: bold;")
-        title_tip = CaptionLabel("（本页面预定删除，直接编辑本页面会导致字符改变的行，时间戳丢失需要重新打轴）")
+        title = QLabel("全文本编辑")
+        title.setStyleSheet("font-size: 22px; font-weight: bold;")
+        title_tip = CaptionLabel("（编辑后点「应用更改」写回；行号对应歌词行，时间轴随文本保留）")
         title_layout = QHBoxLayout()
         title_layout.addWidget(title)
         title_layout.addWidget(title_tip)
         title_layout.addStretch()
         layout.addLayout(title_layout)
 
-        # 说明
+        # 说明（功能 + 格式，简洁）
         desc = CaptionLabel(
-            "全文本编辑：格式 {原文||读音1,读音2,...}，`||` 分开原文与读音，\n"
-            "`,` 分开不同字，`|` 分开同一字的多 mora。例：{大冒険||だ|い,ぼ|う,け|ん}\n"
-            "切换标签页时只做增删字符/行，不会重新自动注音，请主动点击「自动分析」"
+            "逐行编辑整篇歌词，时间轴内联保留。格式：{原文||读音} 为注音块，"
+            "`|` 分 mora、`,` 分字；每点前 [分:秒.厘秒]（空=[T]），"
+            "句尾 [>…] 贴字后，演唱者切换用 【名】。"
         )
+        desc.setWordWrap(True)
         layout.addWidget(desc)
-
-        layout.addSpacing(5)
 
         # 批量操作按钮
         batch_layout = QHBoxLayout()
@@ -347,22 +361,46 @@ class RubyInterface(QWidget):
         self.btn_update_cp.setEnabled(False)
         batch_layout.addWidget(self.btn_update_cp)
 
+        # 字号调整（与上面按钮同栏；也可用 Alt+滚轮）
+        batch_layout.addSpacing(12)
+        batch_layout.addWidget(CaptionLabel("字号"))
+        self.spin_font = SpinBox(self)
+        self.spin_font.setRange(8, 48)
+        self.spin_font.setValue(12)
+        self.spin_font.setFixedWidth(90)
+        self.spin_font.valueChanged.connect(self._apply_font_size)
+        batch_layout.addWidget(self.spin_font)
+
         batch_layout.addStretch()
 
         layout.addLayout(batch_layout)
 
-        # 全文本编辑器
-        self.text_edit = QPlainTextEdit()
+        # 全文本编辑器（带行号栏 + 语法着色，Alt+滚轮缩放字体）
+        self.text_edit = LineNumberPlainTextEdit()
         self.text_edit.setFont(QFont("Microsoft YaHei", 12))
         self.text_edit.setPlaceholderText(
-            "加载项目后，歌词将以注音标注格式显示在此处...\n"
-            "示例: {大冒険||だ|い,ぼ|う,け|ん}"
+            "加载项目后，歌词将以带时间戳的注音格式显示在此处...\n"
+            "示例: {大冒険||[00:01.00]だ|[00:01.20]い,...}"
         )
         self.text_edit.setMinimumHeight(300)
+        self._highlighter = _TimedFormatHighlighter(self.text_edit.document())
+        # 实时高亮光标所在行
+        self.text_edit.cursorPositionChanged.connect(self._highlight_current_line)
+        # Alt+滚轮缩放字体 → 同步到字号 SpinBox（由其驱动实际字号）
+        self.text_edit.zoom_requested.connect(self._on_zoom_requested)
+        # 主题切换时刷新着色 / 行号栏 / 当前行高亮颜色
+        from strange_uta_game.frontend.theme import theme
+        theme.changed.connect(self._on_theme_changed)
         layout.addWidget(self.text_edit, stretch=1)
 
-        # 还原
+        # 应用 / 还原
         action_layout = QHBoxLayout()
+
+        self.btn_apply = PrimaryPushButton("应用更改", self)
+        self.btn_apply.setIcon(FIF.ACCEPT)
+        self.btn_apply.clicked.connect(self._on_apply_changes)
+        self.btn_apply.setEnabled(False)
+        action_layout.addWidget(self.btn_apply)
 
         self.btn_revert = PushButton("还原", self)
         self.btn_revert.setIcon(FIF.CANCEL)
@@ -404,13 +442,12 @@ class RubyInterface(QWidget):
         return self.text_edit.toPlainText() != self._lines_to_text()
 
     def scroll_to_line(self, line_idx: int, char_idx: int = 0):
-        """#1：从打轴界面切换至全文本编辑时，将 QPlainTextEdit 输入光标
-        跳转到 (line_idx, char_idx) 对应位置。
+        """从打轴界面切换至全文本编辑时，将输入光标跳转到 (line_idx, char_idx)。
 
-        文本由 _lines_to_text() 生成：每条 Sentence 占一行，连词组渲染为
-        `{原文|读音,...}`。本方法用同样的遍历逻辑把"字符索引"映射到
-        行内的列号（列号计入花括号/竖线/逗号等语法字符的长度），尽量把
-        光标停在 char_idx 字符的起始位置。
+        文本由 _lines_to_text() 以带时间戳格式生成；这里用后端
+        :func:`...annotated_text.timed_line_columns` 复算同一编码、得到目标
+        字符的字形列号（计入内联时间戳 token、演唱者标签、花括号等语法长度），
+        并按相同的跨行演唱者延续计算行首继承，保证列号与渲染严格对齐。
         """
         if not self._project or not self._project.sentences:
             return
@@ -423,32 +460,40 @@ class RubyInterface(QWidget):
         if char_idx > len(chars):
             char_idx = len(chars)
 
-        # 复刻 _lines_to_text 对单行的生成，同时累计到目标 char_idx 为止的列数
-        column = 0
-        i = 0
-        while i < len(chars) and i < char_idx:
-            if chars[i].ruby:
-                group_start = i
-                while i < len(chars) - 1 and chars[i].linked_to_next:
-                    i += 1
-                i += 1
-                # 整组包含目标字符：跳到组的起始 `{` 之后的原文部分
-                if group_start <= char_idx < i:
-                    # 起始 `{`
-                    column += 1
-                    # 目标字符在原文段中的偏移（按字符计）
-                    column += char_idx - group_start
-                    char_idx = -1  # 提前结束
-                    break
-                # 整组在目标之前：累加整组生成文本长度
-                text_part = "".join(ch.char for ch in chars[group_start:i])
-                readings = ",".join(
-                    ch.ruby.text if ch.ruby else "" for ch in chars[group_start:i]
-                )
-                column += len(f"{{{text_part}|{readings}}}")
-            else:
-                column += len(chars[i].char)
-                i += 1
+        from strange_uta_game.backend.infrastructure.parsers.annotated_text import (
+            sentence_to_timed_line,
+            timed_line_columns,
+        )
+
+        id_to_name, _name_to_id, default_id = self._singer_context()
+        offset = self._global_offset()
+        # 按 _lines_to_text 的跨行演唱者延续，算出本行行首继承的 singer
+        inherited = default_id
+        for s in self._project.sentences[:line_idx]:
+            _, inherited = sentence_to_timed_line(
+                s.characters,
+                singer_id_to_name=id_to_name,
+                line_singer_id=s.singer_id,
+                default_singer_id=default_id,
+                inherited_singer_id=inherited,
+                offset_ms=offset,
+            )
+
+        cols = timed_line_columns(
+            chars,
+            singer_id_to_name=id_to_name,
+            line_singer_id=sentence.singer_id,
+            default_singer_id=default_id,
+            inherited_singer_id=inherited,
+            offset_ms=offset,
+        )
+        if 0 <= char_idx < len(cols):
+            column = cols[char_idx]
+        elif cols:
+            # char_idx == len(chars)：定位到末字符之后
+            column = cols[-1] + 1
+        else:
+            column = 0
 
         # 定位 QTextCursor
         doc = self.text_edit.document()
@@ -463,6 +508,52 @@ class RubyInterface(QWidget):
         self.text_edit.ensureCursorVisible()
         self.text_edit.setFocus()
 
+    def focus_line(self, line_idx: int, char_idx: int = 0):
+        """进入界面时聚焦某行：光标定位（触发整行高亮）+ 把该行滚到视口顶部。"""
+        if not self._project or not self._project.sentences:
+            return
+        line_idx = max(0, min(line_idx, len(self._project.sentences) - 1))
+        self.scroll_to_line(line_idx, char_idx)
+        # 尽量把目标行滚到视口顶部（而非跳到深处），便于从该行往下看
+        bar = self.text_edit.verticalScrollBar()
+        if bar is not None:
+            bar.setValue(min(line_idx, bar.maximum()))
+
+    def _highlight_current_line(self):
+        """实时高亮光标所在行（随光标移动刷新，extraSelection 不改文本）。"""
+        doc = self.text_edit.document()
+        if doc is None:
+            return
+        block = self.text_edit.textCursor().block()
+        if not block.isValid():
+            return
+        from strange_uta_game.frontend.theme import theme
+
+        sel = QTextEdit.ExtraSelection()
+        sel.format.setBackground(theme.editor_current_line)
+        sel.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
+        sel.cursor = QTextCursor(block)
+        self.text_edit.setExtraSelections([sel])
+
+    def _on_theme_changed(self):
+        """主题切换：重建着色配色、刷新行号栏与当前行高亮。"""
+        if hasattr(self, "_highlighter"):
+            self._highlighter.rehighlight_with_theme()
+        self.text_edit._line_number_area.update()
+        self._highlight_current_line()
+
+    def _apply_font_size(self, pt: int):
+        """设置编辑器字号（由字号 SpinBox 与 Alt+滚轮共同驱动）。"""
+        font = self.text_edit.font()
+        font.setPointSize(pt)
+        self.text_edit.setFont(font)
+        self.text_edit._update_width()
+        self.text_edit._line_number_area.update()
+
+    def _on_zoom_requested(self, delta: int):
+        """Alt+滚轮：调整字号 SpinBox（其 valueChanged 再驱动实际字号）。"""
+        self.spin_font.setValue(self.spin_font.value() + delta)
+
     # ==================== 内部方法 ====================
 
     def _refresh_display(self):
@@ -473,6 +564,7 @@ class RubyInterface(QWidget):
             self.btn_auto_all,
             self.btn_delete_by_type,
             self.btn_update_cp,
+            self.btn_apply,
             self.btn_revert,
         ):
             btn.setEnabled(has_project)
@@ -484,22 +576,63 @@ class RubyInterface(QWidget):
             self.text_edit.setPlainText("")
             self.lbl_stats.setText("共 0 行，0 个注音")
 
-    def _lines_to_text(self) -> str:
-        """将项目歌词转为带注音标注的文本（新格式，保留 RubyPart 切分）。
+    def _global_offset(self) -> int:
+        """全局偏移（项目优先，回退设置）——编解码时用它使显示与打轴一致。"""
+        if not self._project:
+            return 0
+        offset = self._project.global_offset_ms
+        if offset is None:
+            try:
+                from strange_uta_game.frontend.settings.settings_interface import (
+                    AppSettings,
+                )
+                offset = AppSettings().get("export.offset_ms", 0)
+            except Exception:
+                offset = 0
+        return offset or 0
 
-        序列化委托给后端
-        :func:`strange_uta_game.backend.infrastructure.parsers.annotated_text.sentence_to_annotated_line`。
+    def _singer_context(self):
+        """返回 (id→name, name→id, default_singer_id)，供带时间戳格式编解码用。"""
+        singers = list(getattr(self._project, "singers", []) or [])
+        id_to_name = {s.id: s.name for s in singers}
+        name_to_id = {s.name: s.id for s in singers}
+        default_id = ""
+        for s in singers:
+            if getattr(s, "is_default", False):
+                default_id = s.id
+                break
+        if not default_id and singers:
+            default_id = singers[0].id
+        return id_to_name, name_to_id, default_id
+
+    def _lines_to_text(self) -> str:
+        """将项目歌词转为带内联时间戳的全文本（无损往返格式）。
+
+        每行委托给后端
+        :func:`...annotated_text.sentence_to_timed_line`，并跨行延续演唱者
+        （与 Nicokara 导出 prev_singer 行为一致）。
         """
         if not self._project:
             return ""
         from strange_uta_game.backend.infrastructure.parsers.annotated_text import (
-            sentence_to_annotated_line,
+            sentence_to_timed_line,
         )
 
-        return "\n".join(
-            sentence_to_annotated_line(sentence.characters)
-            for sentence in self._project.sentences
-        )
+        id_to_name, _name_to_id, default_id = self._singer_context()
+        offset = self._global_offset()
+        inherited = default_id
+        lines: List[str] = []
+        for sentence in self._project.sentences:
+            line, inherited = sentence_to_timed_line(
+                sentence.characters,
+                singer_id_to_name=id_to_name,
+                line_singer_id=sentence.singer_id,
+                default_singer_id=default_id,
+                inherited_singer_id=inherited,
+                offset_ms=offset,
+            )
+            lines.append(line)
+        return "\n".join(lines)
 
     def _update_stats(self):
         """更新统计标签"""
@@ -541,6 +674,10 @@ class RubyInterface(QWidget):
         """
         if not self._project:
             return
+
+        # 先把文本框里的修改写回项目，避免按钮刷新后丢失用户编辑
+        if self.is_dirty():
+            self._on_apply_changes()
 
         from strange_uta_game.frontend.winrt_japanese_guide import (
             ensure_winrt_japanese,
@@ -619,6 +756,10 @@ class RubyInterface(QWidget):
         """打开对话框，按字符类型删除注音。"""
         if not self._project:
             return
+
+        # 先把文本框里的修改写回项目，避免删除操作刷新后丢失用户编辑
+        if self.is_dirty():
+            self._on_apply_changes()
 
         from strange_uta_game.frontend.settings.settings_interface import AppSettings
 
@@ -728,32 +869,53 @@ class RubyInterface(QWidget):
     # ==================== 应用/还原 ====================
 
     def _on_apply_changes(self):
-        """将文本编辑器内容应用回项目（支持增删行，保留打轴数据）。
+        """将文本编辑器内容应用回项目（逐行独立解码，自带完整时间轴）。
 
-        使用行级 SequenceMatcher 将旧行映射到新行，
-        匹配到的旧行保留 timestamps/配置 并做字符级 diff，
-        新插入行使用默认设置，删除行被丢弃。
+        采用带内联时间戳的全文本格式：每行用 ``parse_timed_line`` 独立解码成
+        一条 Sentence，时间戳/句尾/连词/演唱者全部来自文本本身。因此**不再做
+        任何跨行映射或 diff** —— 行的增删、重排、文本撞车都不会丢失或错配
+        时间戳；新增的无 token 字符自然得到空轴。
         """
         if not self._project:
             return
 
+        from strange_uta_game.backend.infrastructure.parsers.annotated_text import (
+            parse_timed_line,
+        )
+
         text = self.text_edit.toPlainText()
         new_line_strs = text.split("\n")
 
-        # 解析每行的带注音文本
-        parsed_new: List[Tuple[str, List[str], Dict[int, str]]] = []
+        _id_to_name, name_to_id, default_singer = self._singer_context()
+        if not default_singer:
+            default_singer = (
+                self._project.sentences[0].singer_id
+                if self._project.sentences
+                else "default"
+            )
+
+        offset = self._global_offset()
+        new_sentences: List[Sentence] = []
         parse_errors = []
+        inherited = default_singer
         for i, ls in enumerate(new_line_strs):
             try:
-                raw_text, raw_chars, ruby_map = _parse_annotated_line(ls)
-                if not raw_text:
-                    raw_text = " "
-                    raw_chars = [" "]
-                    ruby_map = {}
-                parsed_new.append((raw_text, raw_chars, ruby_map))
+                chars, inherited = parse_timed_line(
+                    ls,
+                    name_to_singer_id=name_to_id,
+                    default_singer_id=default_singer,
+                    inherited_singer_id=inherited,
+                    offset_ms=offset,
+                )
             except Exception as e:
                 parse_errors.append(f"第 {i + 1} 行: {e}")
-                parsed_new.append((" ", [" "], {}))
+                chars = []
+            # 行级 singer：取首字符 singer，空行沿用 inherited
+            if chars and chars[0].singer_id:
+                line_singer = chars[0].singer_id
+            else:
+                line_singer = inherited or default_singer
+            new_sentences.append(Sentence(singer_id=line_singer, characters=chars))
 
         if parse_errors:
             InfoBar.warning(
@@ -766,64 +928,10 @@ class RubyInterface(QWidget):
                 parent=self,
             )
 
-        old_sentences = list(self._project.sentences)
-        old_texts = [s.text for s in old_sentences]
-        new_texts = [p[0] for p in parsed_new]
+        self._project.sentences = new_sentences
 
-        # 行级 diff：将旧行映射到新行
-        line_sm = SequenceMatcher(None, old_texts, new_texts)
-
-        default_singer = old_sentences[0].singer_id if old_sentences else "default"
-        result_sentences: List[Optional[Sentence]] = [None] * len(parsed_new)
-
-        for tag, i1, i2, j1, j2 in line_sm.get_opcodes():
-            if tag == "equal":
-                # 旧行 i1..i2 完全匹配新行 j1..j2
-                for k in range(i2 - i1):
-                    old_s = old_sentences[i1 + k]
-                    raw_text, raw_chars, ruby_map = parsed_new[j1 + k]
-                    old_s.characters = _rebuild_characters(old_s, raw_chars, ruby_map)
-                    result_sentences[j1 + k] = old_s
-
-            elif tag == "replace":
-                # 尝试 1:1 映射
-                old_count = i2 - i1
-                new_count = j2 - j1
-                matched = min(old_count, new_count)
-                for k in range(matched):
-                    old_s = old_sentences[i1 + k]
-                    raw_text, raw_chars, ruby_map = parsed_new[j1 + k]
-                    old_s.characters = _rebuild_characters(old_s, raw_chars, ruby_map)
-                    result_sentences[j1 + k] = old_s
-                # 多出的新行 → 创建
-                for k in range(matched, new_count):
-                    raw_text, raw_chars, ruby_map = parsed_new[j1 + k]
-                    new_s = Sentence.from_text(raw_text, default_singer)
-                    _apply_ruby_map(new_s, ruby_map)
-                    result_sentences[j1 + k] = new_s
-                # 多出的旧行 → 丢弃
-
-            elif tag == "insert":
-                # 新插入行
-                for k in range(j2 - j1):
-                    raw_text, raw_chars, ruby_map = parsed_new[j1 + k]
-                    new_s = Sentence.from_text(raw_text, default_singer)
-                    _apply_ruby_map(new_s, ruby_map)
-                    result_sentences[j1 + k] = new_s
-
-            # tag == "delete": 旧行被删除，不出现在 result_sentences 中
-
-        # 过滤掉 None（不应该有，但安全处理）
-        self._project.sentences = [s for s in result_sentences if s is not None]
-
-        # 重新应用全局偏移到所有字符（新建字符的 _global_offset_ms 默认为 0）
-        offset = self._project.global_offset_ms
-        if offset is None:
-            try:
-                from strange_uta_game.frontend.settings.settings_interface import AppSettings
-                offset = AppSettings().get("export.offset_ms", 0)
-            except Exception:
-                offset = 0
+        # parse_timed_line 已减去 offset 还原为原始时间戳；这里再统一 set_offset
+        # 派生 global_*（含新建字符），与编码时加的 offset 对称。
         for sentence in self._project.sentences:
             for ch in sentence.characters:
                 ch.set_offset(offset)
@@ -856,3 +964,41 @@ class RubyInterface(QWidget):
             duration=2000,
             parent=self,
         )
+
+
+class FullTextEditDialog(QDialog):
+    """全文本编辑对话框。
+
+    从打轴界面以对话框形式打开 :class:`RubyInterface`，
+    通过共享的 ProjectStore 与打轴界面双向同步：在此处「应用更改」会
+    notify("lyrics"/"rubies")，打轴界面据此刷新。
+    """
+
+    def __init__(self, store, parent=None, current_line: int = 0, current_char: int = 0):
+        super().__init__(parent)
+        self.setWindowTitle("全文本编辑")
+        # 支持最大化/全屏（QDialog 默认无最大化按钮）
+        self.setWindowFlags(
+            self.windowFlags()
+            | Qt.WindowType.WindowMaximizeButtonHint
+            | Qt.WindowType.WindowMinimizeButtonHint
+        )
+        # 初始尺寸与主窗口一致
+        main_win = parent.window() if parent is not None else None
+        if main_win is not None:
+            self.resize(main_win.size())
+        else:
+            self.resize(1100, 720)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        self.interface = RubyInterface(self)
+        self.interface.set_store(store)
+        if getattr(store, "project", None) is not None:
+            self.interface.set_project(store.project)
+        layout.addWidget(self.interface, stretch=1)
+
+        # 进入时定位到当前行的当前字符（高亮该行、光标落在该字符），并滚到视口顶部
+        self.interface.focus_line(current_line, current_char)

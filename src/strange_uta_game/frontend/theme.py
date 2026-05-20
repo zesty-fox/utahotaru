@@ -181,6 +181,43 @@ class ThemeColors:
         """普通行号颜色"""
         return QColor("#666666" if self._is_dark else "#AAAAAA")
 
+    # ── 全文本编辑器专用色 ──
+
+    @property
+    def editor_gutter_bg(self) -> QColor:
+        """行号栏背景"""
+        return QColor("#2B2B2B" if self._is_dark else "#F0F0F0")
+
+    @property
+    def editor_gutter_fg(self) -> QColor:
+        """行号栏文字"""
+        return QColor("#9B9B9B" if self._is_dark else "#888888")
+
+    @property
+    def editor_current_line(self) -> QColor:
+        """当前光标行整行高亮背景"""
+        return QColor("#323539" if self._is_dark else "#FFF8C4")
+
+    @property
+    def syntax_separator(self) -> QColor:
+        """语法着色：花括号/分隔符 { } || | ,（偏绿的靛蓝/青蓝色，醒目）"""
+        return QColor("#4EC9B0" if self._is_dark else "#0E8C7A")
+
+    @property
+    def syntax_singer(self) -> QColor:
+        """语法着色：演唱者标签 【名】"""
+        return QColor("#C586C0" if self._is_dark else "#AF00DB")
+
+    @property
+    def syntax_timestamp(self) -> QColor:
+        """语法着色：起始时间戳 [..]"""
+        return QColor("#4FC1FF" if self._is_dark else "#0070C1")
+
+    @property
+    def syntax_timestamp_end(self) -> QColor:
+        """语法着色：句尾时间戳 [>..]"""
+        return QColor("#CE9178" if self._is_dark else "#A31515")
+
     # ── 进度状态色 ──
 
     @property
