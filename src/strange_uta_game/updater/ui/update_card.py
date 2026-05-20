@@ -264,7 +264,7 @@ def _trigger_manual_check(parent: "SettingsInterface", btn: PushButton) -> None:
                 isClosable=True,
                 position=InfoBarPosition.TOP,
                 duration=3000,
-                parent=parent,
+                parent=parent.window(),
             )
             return
 
@@ -320,7 +320,7 @@ def _show_update_dialog(parent: "SettingsInterface", result: CheckResult) -> Non
             isClosable=True,
             position=InfoBarPosition.TOP,
             duration=4000,
-            parent=parent,
+            parent=parent.window(),
         )
         return
 
@@ -336,7 +336,7 @@ def _show_update_dialog(parent: "SettingsInterface", result: CheckResult) -> Non
             isClosable=True,
             position=InfoBarPosition.TOP,
             duration=6000,
-            parent=parent,
+            parent=parent.window(),
         )
         return
 
@@ -368,7 +368,7 @@ def _show_update_dialog(parent: "SettingsInterface", result: CheckResult) -> Non
         isClosable=False,
         position=InfoBarPosition.TOP,
         duration=30000,  # 兜底超时，正常会被后续 InfoBar 覆盖
-        parent=parent,
+        parent=parent.window(),
     )
 
     # parent=None：不让 Qt 把 QThread 的生命周期绑到 SettingsInterface 上。
@@ -388,7 +388,7 @@ def _show_update_dialog(parent: "SettingsInterface", result: CheckResult) -> Non
                 isClosable=True,
                 position=InfoBarPosition.TOP,
                 duration=6000,
-                parent=parent,
+                parent=parent.window(),
             )
             return
 
@@ -399,7 +399,7 @@ def _show_update_dialog(parent: "SettingsInterface", result: CheckResult) -> Non
             isClosable=True,
             position=InfoBarPosition.TOP,
             duration=3500,
-            parent=parent,
+            parent=parent.window(),
         )
         # 延迟 1s 退出，让 InfoBar 来得及展示
         QTimer.singleShot(1000, _quit_app)

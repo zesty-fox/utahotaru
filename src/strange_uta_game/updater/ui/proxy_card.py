@@ -177,7 +177,7 @@ def attach_proxy_group(settings_interface: "SettingsInterface") -> None:
                 isClosable=True,
                 position=InfoBarPosition.TOP,
                 duration=3500,
-                parent=parent,
+                parent=parent.window(),
             )
         else:
             ports_hint = ", ".join(str(p) for p in COMMON_PROXY_PORTS[:6])
@@ -188,7 +188,7 @@ def attach_proxy_group(settings_interface: "SettingsInterface") -> None:
                 isClosable=True,
                 position=InfoBarPosition.TOP,
                 duration=4500,
-                parent=parent,
+                parent=parent.window(),
             )
 
     status_card.btn_detect.clicked.connect(_on_detect)
@@ -307,7 +307,7 @@ def _test_connectivity(parent: QWidget, card: _ProxyStatusCard) -> None:
             isClosable=True,
             position=InfoBarPosition.TOP,
             duration=3000,
-            parent=parent,
+            parent=parent.window(),
         )
     else:
         InfoBar.error(
@@ -317,5 +317,5 @@ def _test_connectivity(parent: QWidget, card: _ProxyStatusCard) -> None:
             isClosable=True,
             position=InfoBarPosition.TOP,
             duration=5000,
-            parent=parent,
+            parent=parent.window(),
         )
