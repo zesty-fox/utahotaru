@@ -52,7 +52,7 @@ from strange_uta_game.backend.application.auto_check_service import (
     get_kanji_linked_indices,
 )
 from strange_uta_game.backend.application.export_service import ExportService
-from strange_uta_game.backend.domain import Character, Project
+from strange_uta_game.backend.domain import Character, Project, Sentence
 from strange_uta_game.backend.infrastructure.audio import AudioLoadError
 from strange_uta_game.backend.infrastructure.exporters import get_exporter_by_name
 from strange_uta_game.backend.infrastructure.parsers.text_splitter import (
@@ -802,6 +802,8 @@ class EditorInterface(QWidget):
 
         富信息粘贴：剪贴板文本与上次 Ctrl+C 一致时插入字符深拷贝（保留注音/
         节奏点/时间戳/演唱者等）。纯文本：逐字构造为新歌词字符。
+        纯文本含换行时按行拆分，首段插入当前行，后续段依次新建行；
+        光标后的原有字符拼接至最后一段末尾。
         插入经 _execute_structural_edit 包装，纳入 undo/redo。
         """
         if not self._project:
@@ -839,25 +841,78 @@ class EditorInterface(QWidget):
         else:
             if not clipboard_text or not clipboard_text.strip():
                 return
-            new_chars = [
-                Character(char=c, singer_id=sentence.singer_id)
-                for c in clipboard_text
-                if c not in ("\r", "\n")
-            ]
+            # 按换行拆分，过滤空段（与 parse_lyric_content 纯文本行为一致）
+            lines = [seg.strip("\r") for seg in clipboard_text.split("\n")]
+            lines = [seg for seg in lines if seg.strip()]
+            if not lines:
+                return
 
-        if not new_chars:
-            return
+            if len(lines) == 1:
+                new_chars = [
+                    Character(char=c, singer_id=sentence.singer_id)
+                    for c in lines[0]
+                ]
+                if not new_chars:
+                    return
 
-        project = self._project
+                project = self._project
 
-        def _mutate():
-            s = project.sentences[line_idx]
-            pos = max(0, min(insert_at, len(s.characters)))
-            for off, ch in enumerate(new_chars):
-                s.insert_character(pos + off, ch)
-            return line_idx, pos + len(new_chars) - 1, 0, "lyrics"
+                def _mutate():
+                    s = project.sentences[line_idx]
+                    pos = max(0, min(insert_at, len(s.characters)))
+                    for off, ch in enumerate(new_chars):
+                        s.insert_character(pos + off, ch)
+                    return line_idx, pos + len(new_chars) - 1, 0, "lyrics"
 
-        self._execute_structural_edit("粘贴字符", _mutate)
+                self._execute_structural_edit("粘贴字符", _mutate)
+                return
+
+            # 多行：拆行粘贴
+            singer_id = sentence.singer_id
+            project = self._project
+
+            def _mutate_multi():
+                s = project.sentences[line_idx]
+                pos = max(0, min(insert_at, len(s.characters)))
+                after_chars = list(s.characters[pos:])
+                s.characters = s.characters[:pos]
+
+                # 第一段拼入当前行
+                for c in lines[0]:
+                    s.characters.append(Character(char=c, singer_id=singer_id))
+                for ch in s.characters:
+                    ch.is_line_end = False
+                if s.characters:
+                    s.characters[-1].is_line_end = True
+
+                # 后续段逐行插入
+                insert_after = line_idx
+                for i, seg_text in enumerate(lines[1:]):
+                    seg_chars = [
+                        Character(char=c, singer_id=singer_id) for c in seg_text
+                    ]
+
+                    # 最后一段拼接光标后原有字符
+                    if i == len(lines) - 2:
+                        seg_chars.extend(after_chars)
+
+                    for ch in seg_chars:
+                        ch.is_line_end = False
+                    if seg_chars:
+                        seg_chars[-1].is_line_end = True
+
+                    new_sentence = Sentence(
+                        singer_id=singer_id, characters=seg_chars
+                    )
+                    project.sentences.insert(insert_after + 1, new_sentence)
+                    insert_after += 1
+
+                last_line = insert_after
+                last_sentence = project.sentences[last_line]
+                last_char = max(0, len(last_sentence.characters) - 1)
+                return last_line, last_char, 0, "lyrics"
+
+            self._execute_structural_edit("粘贴字符", _mutate_multi)
 
     def _on_save(self):
         if not self._project:
