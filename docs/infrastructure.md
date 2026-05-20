@@ -20,14 +20,16 @@
     - `to_inline_text(sentence)`：将带时间标签的句子转换为带有 `[timestamp]` 标记的文本字符串。
     - `from_inline_text(text)`：解析内联格式文本并重建 Sentence 和时间标签。
 
-### SudachiAnalyzer (SudachiPy 分析器)
-提供高精度的日语分词与注音分析实现。
+### WinRTAnalyzer (WinRT IME 分析器)
+提供高精度的日语分词与注音分析实现，为日语注音主引擎。
 
 - **职责**：
-    - **SudachiPy Mode C 上下文感知**：长单位分词识别复合词；假名锚点分配采用两步策略（优先匹配 pykakasi 参考，失败则无约束分发）。
-    - **假名统一**：所有注音输出均转为平假名（含小写片假名如 ェ）。
-    - **回退链**：`create_analyzer()` 优先级 SudachiPy → pykakasi → DummyAnalyzer。
-    - **内置词典**：缺失 `dictionary.json` 时自动从内嵌的 1757 条 RL 词典初始化。
+    - **WinRT IME 上下文感知**：基于 `Windows.Globalization.JapanesePhoneticAnalyzer`，按整段输入做上下文消歧分词；分配逻辑由分词器无关基类 `KanaDistributingAnalyzer` 提供（假名锚点 + pykakasi 参考的两步策略）。
+    - **运行时依赖**：注音引擎来自系统日语功能 `Language.Basic~~~ja-JP`（日语 IME）。应用内 `winrt_japanese_status()` 探测、`install_winrt_japanese()`（UAC 提权）/`winrt_install_guidance()` 引导安装。
+    - **输入约束**：`GetWords` 单次上限 100 字符（按 ≤100 字切块）；surface 取原文切片（display_text 会半角→全角归一，不可信）。
+    - **假名统一**：所有注音输出均为平假名（`yomi_text`）。
+    - **回退链**：`create_analyzer()` 优先级 WinRT → pykakasi → DummyAnalyzer（**不回退 Sudachi**）。
+    - **内置词典**：缺失 `dictionary.json` 时自动从内嵌的 RL 词典初始化。
     - **`_is_kanji`**：判定范围含 CJK Unified Ideographs (U+4E00-U+9FFF)、CJK Extension A (U+3400-U+4DBF)、CJK Compatibility (U+F900-U+FAFF)、以及迭字记号 `々` (U+3005)。
 
 ### kanji_readings (单字音读字典)

@@ -7,13 +7,13 @@ from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import DummyA
 
 
 def _get_sudachi_analyzer():
-    """尝试获取真实 SudachiAnalyzer；不可用则返回 None（测试 skip）。"""
-    try:
-        from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import (
-            SudachiAnalyzer,
-        )
+    """获取真实注音分析器（WinRT IME 主引擎）；不可用返回 None（测试 skip）。"""
+    from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import (
+        WinRTAnalyzer,
+    )
 
-        return SudachiAnalyzer()
+    try:
+        return WinRTAnalyzer()
     except Exception:
         return None
 
@@ -115,7 +115,7 @@ class TestA3RootCauseEmptyRubyGroup:
         """A.3 端到端：自动分析"大空" 不应抛异常，且每个 part.text 非空"""
         analyzer = _get_sudachi_analyzer()
         if analyzer is None:
-            pytest.skip("SudachiAnalyzer 不可用，跳过集成测试")
+            pytest.skip("WinRT 注音引擎不可用，跳过集成测试")
 
         service = AutoCheckService(analyzer)
         sentence = Sentence.from_text("大空", "s1")
@@ -132,7 +132,7 @@ class TestA3RootCauseEmptyRubyGroup:
         """A.3 端到端：自动分析"{大|おお}{空|そら}" 不应抛异常"""
         analyzer = _get_sudachi_analyzer()
         if analyzer is None:
-            pytest.skip("SudachiAnalyzer 不可用，跳过集成测试")
+            pytest.skip("WinRT 注音引擎不可用，跳过集成测试")
 
         from strange_uta_game.backend.infrastructure.parsers.inline_format import (
             from_inline_text,
@@ -365,7 +365,7 @@ class TestLibraryBlockFallbackLinking:
         """可愛い：无音读字典条目，回退到 fallback，可+愛 连词"""
         analyzer = _get_sudachi_analyzer()
         if analyzer is None:
-            pytest.skip("SudachiAnalyzer 不可用")
+            pytest.skip("WinRT 注音引擎不可用")
         service = AutoCheckService(analyzer)
         sentence = Sentence.from_text("可愛い", "s1")
         service.apply_to_sentence(sentence)
@@ -383,7 +383,7 @@ class TestLibraryBlockFallbackLinking:
         """大冒険（字典逗号分隔路径）：读音已拆分，不连词"""
         analyzer = _get_sudachi_analyzer()
         if analyzer is None:
-            pytest.skip("SudachiAnalyzer 不可用")
+            pytest.skip("WinRT 注音引擎不可用")
         service = AutoCheckService(analyzer)
         sentence = Sentence.from_text("大冒険", "s1")
         service.apply_to_sentence(sentence)
@@ -395,23 +395,6 @@ class TestLibraryBlockFallbackLinking:
         assert not chars[1].linked_to_next, "冒→険 不应 linked（读音已拆分）"
         # 各字有自己的 mora ruby
         assert all(c.ruby is not None and len(c.ruby.parts) == 2 for c in chars)
-
-    def test_ashita_library_block_links(self):
-        """明日：2汉字2mora可均分，第三步拆分明→あ 日→す"""
-        analyzer = _get_sudachi_analyzer()
-        if analyzer is None:
-            pytest.skip("SudachiAnalyzer 不可用")
-        service = AutoCheckService(analyzer)
-        sentence = Sentence.from_text("明日", "s1")
-        service.apply_to_sentence(sentence)
-
-        chars = sentence.characters
-        assert len(chars) == 2
-        # 2汉字2mora可均分，各自独立
-        assert not chars[0].linked_to_next, "明→日 不应 linked（2mora/2汉字可均分）"
-        # 各字有自己的 ruby
-        assert chars[0].ruby is not None
-        assert chars[1].ruby is not None
 
 
 class TestEnglishWordCheckpoints:

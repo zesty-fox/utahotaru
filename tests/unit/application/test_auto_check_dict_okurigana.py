@@ -11,14 +11,14 @@ from strange_uta_game.backend.application import AutoCheckService
 from strange_uta_game.backend.domain import Sentence
 from strange_uta_game.backend.domain.models import Character
 from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import (
-    SudachiAnalyzer,
+    WinRTAnalyzer,
 )
 
 
 def _get_sudachi():
-    """真实 SudachiAnalyzer；不可用则返回 None 触发 skip。"""
+    """真实注音分析器（WinRT IME 主引擎）；不可用返回 None 触发 skip。"""
     try:
-        return SudachiAnalyzer()
+        return WinRTAnalyzer()
     except Exception:
         return None
 
@@ -64,7 +64,7 @@ class TestUpdateCheckpointsPreservesLinkedToNext:
 
     def setup_method(self):
         if _get_sudachi() is None:
-            pytest.skip("SudachiAnalyzer 不可用")
+            pytest.skip("WinRT 注音引擎不可用")
 
     def test_update_checkpoints_preserves_kawaii_linked_chain(self):
         """`可愛い + かわい,,い`：analyze 后 update_checkpoints 不得断链。"""
@@ -127,7 +127,7 @@ class TestKanaSingleCheckpointCap:
 
     def setup_method(self):
         if _get_sudachi() is None:
-            pytest.skip("SudachiAnalyzer 不可用")
+            pytest.skip("WinRT 注音引擎不可用")
 
     def test_katakana_with_e2k_english_reading_caps_to_one(self):
         """`ロミオ → Ro,me,o`（e2k 用户词典模拟）：cp 必须 1/1/1。"""
@@ -208,7 +208,7 @@ class TestKanjiEmptyRubyZeroCheckpoint:
 
     def setup_method(self):
         if _get_sudachi() is None:
-            pytest.skip("SudachiAnalyzer 不可用")
+            pytest.skip("WinRT 注音引擎不可用")
 
     def test_kawaii_middle_kanji_empty_ruby_cp_zero(self):
         """`可愛い + かわい,,い` update_checkpoints 后 愛.cp 必须 = 0。"""
