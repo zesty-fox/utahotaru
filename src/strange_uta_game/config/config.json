@@ -158,7 +158,10 @@
       "quick_export": "CTRL+E:short",
       "insert_space": "M:short",
       "clear_timestamp": "",
-      "merge_line_up": "Shift+Enter:short"
+      "merge_line_up": "Shift+Enter:short",
+      "open_fulltext": "CTRL+T:short",
+      "analyze_rubies_by_line": "CTRL+SHIFT+A:short",
+      "analyze_rubies_selected": "CTRL+A:short"
     },
     "edit_mode": {
       "play_pause": "D:short",
@@ -204,7 +207,10 @@
       "quick_export": "CTRL+E:short",
       "insert_space": "M:short",
       "clear_timestamp": "",
-      "merge_line_up": "Shift+Enter:short"
+      "merge_line_up": "Shift+Enter:short",
+      "open_fulltext": "CTRL+T:short",
+      "analyze_rubies_by_line": "CTRL+SHIFT+A:short",
+      "analyze_rubies_selected": "CTRL+A:short"
     },
     "play_pause": "D",
     "stop": "S",
