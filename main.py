@@ -110,6 +110,16 @@ def _force_taskbar_icon(window, icon_path: Path) -> None:
 
 def main():
     """应用入口"""
+    # Windows 日文 locale (cp932) 下 stdout 无法输出某些 Unicode 字符（如 U+29F8 ⧸、
+    # U+301C 〜），强制切到 UTF-8 与其他入口 (build.py / updater_app) 保持一致。
+    if sys.platform == "win32":
+        for stream in (sys.stdout, sys.stderr):
+            if stream is not None:
+                try:
+                    stream.reconfigure(encoding="utf-8", errors="replace")
+                except Exception:
+                    pass
+
     # 从命令行参数中提取 .sug 文件路径（双击关联打开时传入）
     initial_project = None
     for arg in sys.argv[1:]:
