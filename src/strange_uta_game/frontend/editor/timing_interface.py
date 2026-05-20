@@ -189,6 +189,9 @@ class EditorInterface(QWidget):
         self.toolbar.bulk_change_clicked.connect(self._on_bulk_change)
         self.toolbar.modify_line_clicked.connect(self._on_modify_line)
         self.toolbar.analyze_rubies_clicked.connect(self._on_analyze_rubies)
+        self.toolbar.analyze_rubies_by_line_clicked.connect(self._on_analyze_rubies_by_line)
+        self.toolbar.analyze_rubies_selected_clicked.connect(self._on_analyze_rubies_selected)
+        self.toolbar.open_fulltext_clicked.connect(self._on_open_fulltext)
         self.toolbar.delete_rubies_by_type_clicked.connect(self._on_delete_rubies_by_type)
         self.toolbar.set_singer_by_line_clicked.connect(self._on_set_singer_by_line)
         self.toolbar.apply_singer_clicked.connect(self._on_apply_singer)
@@ -389,6 +392,9 @@ class EditorInterface(QWidget):
             "insert_guide",
             "modify_line",
             "analyze_rubies",
+            "analyze_rubies_by_line",
+            "analyze_rubies_selected",
+            "open_fulltext",
             "delete_rubies_by_type",
             "set_singer_by_line",
             "apply_singer",
@@ -428,6 +434,9 @@ class EditorInterface(QWidget):
             "insert_guide": "",
             "modify_line": "",
             "analyze_rubies": "",
+            "analyze_rubies_by_line": "",
+            "analyze_rubies_selected": "",
+            "open_fulltext": "CTRL+T",
             "delete_rubies_by_type": "",
             "set_singer_by_line": "",
             "apply_singer": "",
@@ -841,9 +850,10 @@ class EditorInterface(QWidget):
         else:
             if not clipboard_text or not clipboard_text.strip():
                 return
-            # 按换行拆分，过滤空段（与 parse_lyric_content 纯文本行为一致）
+            # 按换行拆分，保留空行作为空行（维持用户排版）；仅丢弃末尾换行符产生的终止空段
             lines = [seg.strip("\r") for seg in clipboard_text.split("\n")]
-            lines = [seg for seg in lines if seg.strip()]
+            if len(lines) > 1 and lines[-1] == "" and clipboard_text.endswith("\n"):
+                lines.pop()
             if not lines:
                 return
 
@@ -3501,6 +3511,12 @@ class EditorInterface(QWidget):
             self._on_modify_line()
         elif action == "analyze_rubies":
             self._on_analyze_rubies()
+        elif action == "analyze_rubies_by_line":
+            self._on_analyze_rubies_by_line()
+        elif action == "analyze_rubies_selected":
+            self._on_analyze_rubies_selected()
+        elif action == "open_fulltext":
+            self._on_open_fulltext()
         elif action == "delete_rubies_by_type":
             self._on_delete_rubies_by_type()
         elif action == "set_singer_by_line":
@@ -4270,3 +4286,151 @@ class EditorInterface(QWidget):
     def _auto_analyze_all_rubies(self):
         """自动分析全部注音（用于歌词导入后重新注音，覆盖已有）"""
         self._auto_analyze_rubies(only_noruby=False)
+
+    def _analyze_rubies_subset(
+        self,
+        line_idx: int,
+        restrict_indices: Optional[set],
+        label: str,
+    ) -> None:
+        """对单行（restrict_indices=None）或行内选定字符执行注音分析。
+
+        与「注音分析」不同，仅作用于指定范围，其余字符的注音/节奏点保留，
+        用于「加部分歌词时只分析新增部分」的场景。经 _execute_structural_edit
+        包装，纳入 undo/redo。
+        """
+        if not self._project:
+            return
+        from strange_uta_game.frontend.winrt_japanese_guide import (
+            ensure_winrt_japanese,
+        )
+
+        if not ensure_winrt_japanese(self):
+            return
+        try:
+            from strange_uta_game.backend.application import AutoCheckService
+            from strange_uta_game.frontend.settings.settings_interface import (
+                AppSettings,
+            )
+
+            app_settings = AppSettings()
+            auto_check_flags = app_settings.get_all().get("auto_check", {})
+            user_dict = app_settings.load_effective_dictionary()
+            annotate_katakana_with_english = app_settings.get(
+                "ruby_dictionary.annotate_katakana_with_english", False
+            )
+            auto_check = AutoCheckService(
+                auto_check_flags=auto_check_flags,
+                user_dictionary=user_dict,
+                annotate_katakana_with_english=annotate_katakana_with_english,
+            )
+
+            def _mutate():
+                sentence = self._project.sentences[line_idx]
+                auto_check.apply_to_sentence(
+                    sentence,
+                    only_noruby=False,
+                    restrict_indices=restrict_indices,
+                )
+                auto_check.update_checkpoints_from_rubies(sentence)
+                return (line_idx, self.preview._current_char_idx, None, "rubies")
+
+            self._execute_structural_edit(label, _mutate)
+
+            InfoBar.success(
+                title=f"{label}完成",
+                content="已分析所选范围的注音",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2500,
+                parent=self,
+            )
+        except Exception as e:
+            InfoBar.warning(
+                title=f"{label}失败",
+                content=str(e),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+
+    def _on_analyze_rubies_by_line(self):
+        """工具栏「按行注音分析」— 仅分析当前行。"""
+        if not self._project:
+            return
+        line_idx = self._current_line_idx
+        if line_idx < 0 or line_idx >= len(self._project.sentences):
+            InfoBar.warning(
+                title="未选中行",
+                content="请先在歌词中选择要分析的行",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2500,
+                parent=self,
+            )
+            return
+        self._analyze_rubies_subset(line_idx, None, "按行注音分析")
+
+    def _on_analyze_rubies_selected(self):
+        """工具栏「注音分析所选字符」— 仅分析当前行的选中字符范围。"""
+        if not self._project:
+            return
+        line_idx = self._current_line_idx
+        char_idx = self.preview._current_char_idx
+        if line_idx < 0 or line_idx >= len(self._project.sentences):
+            return
+        sentence = self._project.sentences[line_idx]
+        if char_idx < 0 or char_idx >= len(sentence.characters):
+            InfoBar.warning(
+                title="未选中字符",
+                content="请先选择要分析的字符",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2500,
+                parent=self,
+            )
+            return
+
+        start_idx = char_idx
+        end_idx = char_idx
+        if (
+            self.preview._focus_line_idx == line_idx
+            and self.preview._focus_char_idx >= 0
+            and self.preview._focus_char_range_end >= 0
+        ):
+            start_idx = min(
+                self.preview._focus_char_idx, self.preview._focus_char_range_end
+            )
+            end_idx = max(
+                self.preview._focus_char_idx, self.preview._focus_char_range_end
+            )
+        self._analyze_rubies_subset(
+            line_idx, set(range(start_idx, end_idx + 1)), "注音分析所选字符"
+        )
+
+    def _on_open_fulltext(self):
+        """工具栏「全文本编辑」— 以对话框打开全文本注音编辑界面。"""
+        if not self._project:
+            InfoBar.warning(
+                title="无项目",
+                content="请先创建或打开项目",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2500,
+                parent=self,
+            )
+            return
+        from .fulltext_interface import FullTextEditDialog
+
+        line_idx = max(0, self._current_line_idx)
+        char_idx = max(0, self.preview._current_char_idx)
+        dlg = FullTextEditDialog(
+            self._store, self, current_line=line_idx, current_char=char_idx
+        )
+        dlg.exec()

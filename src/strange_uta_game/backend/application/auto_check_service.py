@@ -1256,6 +1256,7 @@ class AutoCheckService:
         keep_existing_timetags: bool = True,
         only_noruby: bool = False,
         apply_user_dict: bool = True,
+        restrict_indices: Optional[set] = None,
     ) -> None:
         """分析并应用自动检查结果到句子
 
@@ -1270,17 +1271,26 @@ class AutoCheckService:
             apply_user_dict: 是否在末尾执行 Phase 5 用户词典覆盖（默认 True）。
                 传 False 可推迟词典覆盖到删除注音之后，再手动调用
                 :meth:`apply_user_dict_to_project`。
+            restrict_indices: 仅对这些字符索引应用分析；其余字符的
+                Ruby/check_count/linked_to_next 原样保留。None 表示作用于整句。
+                与 only_noruby 取并集（任一要求保留即保留）。
         """
-        # only_noruby 模式：预先快照已注音字符的状态
+        # 预先快照需保留字符的状态：
+        #   - restrict_indices 给定时，范围外字符全部保留；
+        #   - only_noruby 时，已注音字符保留。
         preserved: Dict[int, Tuple[Optional[Ruby], int, bool]] = {}
-        if only_noruby:
-            for i in range(len(sentence.characters)):
-                if self._is_char_already_rubied(sentence, i):
-                    c = sentence.characters[i]
-                    preserved[i] = (c.ruby, c.check_count, c.linked_to_next)
-            # 全部已注音 → 无事可做
-            if len(preserved) == len(sentence.characters) and sentence.characters:
-                return
+        for i in range(len(sentence.characters)):
+            keep = False
+            if restrict_indices is not None and i not in restrict_indices:
+                keep = True
+            elif only_noruby and self._is_char_already_rubied(sentence, i):
+                keep = True
+            if keep:
+                c = sentence.characters[i]
+                preserved[i] = (c.ruby, c.check_count, c.linked_to_next)
+        # 全部字符都需保留 → 无事可做
+        if preserved and len(preserved) == len(sentence.characters) and sentence.characters:
+            return
 
         results = self.analyze_sentence(sentence, split_config)
 
@@ -1432,9 +1442,10 @@ class AutoCheckService:
 
         sentence.characters = new_characters
 
-        # only_noruby 模式：对已注音字符恢复原 Ruby/check_count/linked_to_next。
+        # 对需保留的字符恢复原 Ruby/check_count/linked_to_next
+        # （only_noruby 已注音字符 / restrict_indices 范围外字符）。
         # 注意：analyze 过程可能改变字符数量时（当前流程下不会），此覆盖按原位置对齐。
-        if only_noruby and preserved:
+        if preserved:
             for i, (old_ruby, old_cc, old_link) in preserved.items():
                 if i < len(sentence.characters):
                     sentence.characters[i].ruby = old_ruby

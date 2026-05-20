@@ -33,6 +33,9 @@ class EditorToolBar(QFrame):
     bulk_change_clicked = pyqtSignal()
     modify_line_clicked = pyqtSignal()
     analyze_rubies_clicked = pyqtSignal()
+    analyze_rubies_by_line_clicked = pyqtSignal()
+    analyze_rubies_selected_clicked = pyqtSignal()
+    open_fulltext_clicked = pyqtSignal()
     modify_char_clicked = pyqtSignal()
     insert_guide_clicked = pyqtSignal()
     delete_rubies_by_type_clicked = pyqtSignal()
@@ -94,6 +97,8 @@ class EditorToolBar(QFrame):
         self.btn_ruby.setFixedHeight(32)
         ruby_menu = RoundMenu(parent=self.btn_ruby)
         ruby_menu.addAction(Action(FIF.SYNC, "注音分析", self, triggered=self.analyze_rubies_clicked.emit))
+        ruby_menu.addAction(Action(FIF.SYNC, "按行注音分析", self, triggered=self.analyze_rubies_by_line_clicked.emit))
+        ruby_menu.addAction(Action(FIF.SYNC, "注音分析所选字符", self, triggered=self.analyze_rubies_selected_clicked.emit))
         ruby_menu.addAction(Action(FIF.DELETE, "按类型删除注音", self, triggered=self.delete_rubies_by_type_clicked.emit))
         self.btn_ruby.setMenu(ruby_menu)
         layout.addWidget(self.btn_ruby)
@@ -108,6 +113,13 @@ class EditorToolBar(QFrame):
         singer_menu.addAction(Action(FIF.PEOPLE, "按行设置演唱者", self, triggered=self.set_singer_by_line_clicked.emit))
         self.btn_singer.setMenu(singer_menu)
         layout.addWidget(self.btn_singer)
+
+        # 全文本编辑（独立按钮，位于演唱者相关与补全时间戳之间）
+        self.btn_fulltext = PushButton("全文本编辑", self)
+        self.btn_fulltext.setIcon(FIF.EDIT)
+        self.btn_fulltext.setFixedHeight(32)
+        self.btn_fulltext.clicked.connect(self.open_fulltext_clicked.emit)
+        layout.addWidget(self.btn_fulltext)
 
         self.btn_complete_timestamp = PushButton("补全时间戳", self)
         self.btn_complete_timestamp.setIcon(FIF.DATE_TIME)
