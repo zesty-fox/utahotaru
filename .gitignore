@@ -218,3 +218,8 @@ cache/
 
 # claude
 settings.local.json
+
+# UsersData
+config.json
+dictionary.json
+singers.json
