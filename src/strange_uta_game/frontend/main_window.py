@@ -23,7 +23,7 @@ from typing import Optional
 
 from strange_uta_game.backend.application import CommandManager, TimingService
 from strange_uta_game.backend.domain import Project
-from strange_uta_game.backend.infrastructure.audio import BassEngine
+from strange_uta_game.backend.infrastructure.audio import BassEngine, BassTsmEngine
 from strange_uta_game.frontend.project_store import ProjectStore
 from strange_uta_game.frontend.theme import theme
 
@@ -34,7 +34,9 @@ class MainWindow(MSFluentWindow):
     def __init__(self):
         super().__init__()
 
-        self._audio_engine = BassEngine()
+        # 变速不变调走离线 TSM 预渲染（30s/3s，pedalboard），绕开 BASS_FX 实时
+        # 变速的爆音。如需回退到 BASS_FX 实时变速，改用 BassEngine() 即可。
+        self._audio_engine = BassTsmEngine()
         self._command_manager = CommandManager()
         self._timing_service = TimingService(self._audio_engine, self._command_manager)
         self._store = ProjectStore(self)

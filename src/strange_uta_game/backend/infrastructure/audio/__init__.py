@@ -9,6 +9,7 @@ from .base import (
     AudioInfo,
 )
 from .bass_engine import BassEngine
+from .bass_tsm_engine import BassTsmEngine
 
 __all__ = [
     "IAudioEngine",
@@ -18,4 +19,5 @@ __all__ = [
     "PlaybackState",
     "AudioInfo",
     "BassEngine",
+    "BassTsmEngine",
 ]

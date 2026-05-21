@@ -1,0 +1,582 @@
+"""BASS engine with offline TSM time-stretch (variable speed, constant pitch).
+
+Why this exists
+---------------
+``BassEngine`` changes speed with BASS_FX (SoundTouch) in real time. That is
+convenient but, depending on the material, can crackle/pop ("爆音"). This engine
+instead reuses the project's proven offline time-stretcher (:class:`TSMRenderCache`
+— Pedalboard ``time_stretch``, 30s chunks with ~3s render overlap, hard-cut
+merge) to pre-render the whole track at the requested speed, then plays that
+rendered file with a **plain BASS file stream**. BASS handles play/pause/seek/
+position natively; speed change = swap the underlying source file + scale the
+reported position.
+
+Timeline mapping
+----------------
+A track rendered at ``speed=S`` has duration ``original/S`` (time-stretch is
+time-based, sample-rate independent). So:
+
+    original_ms = stream_ms * S          (position read-out)
+    stream_ms   = original_ms / S        (seek)
+
+``get_duration_ms`` always returns the *original* duration, and timing positions
+are always on the original timeline, exactly like the old SoundDevice engine.
+"""
+
+from __future__ import annotations
+
+import threading
+import time
+from pathlib import Path
+from typing import Callable, Optional
+
+import ctypes
+
+import numpy as np
+import soundfile as sf
+
+from .base import (
+    AudioInfo,
+    AudioLoadError,
+    AudioPlaybackError,
+    IAudioEngine,
+    PlaybackState,
+)
+
+# Reuse the ctypes bindings + constants already configured in bass_engine so we
+# don't redefine signatures (and so both engines share one loaded DLL).
+from .bass_engine import (
+    _bass,
+    BASS_ACTIVE_PAUSED_DEVICE,
+    BASS_ACTIVE_PLAYING,
+    BASS_ACTIVE_STALLED,
+    BASS_ACTIVE_STOPPED,
+    BASS_ATTRIB_VOL,
+    BASS_CHANNELINFO,
+    BASS_DATA_FLOAT,
+    BASS_DEVICE_LATENCY,
+    BASS_ERROR_ALREADY,
+    BASS_INFO,
+    BASS_POS_BYTE,
+    BASS_SAMPLE_FLOAT,
+    BASS_STREAM_DECODE,
+    BASS_STREAM_PRESCAN,
+    BASS_UNICODE,
+)
+from .tsm_cache import TSMRenderCache, _get_cache_path, _quantize
+
+
+class BassTsmEngine(IAudioEngine):
+    """Pitch-preserving variable-speed playback via offline TSM + BASS."""
+
+    def __init__(self) -> None:
+        self._state = PlaybackState.STOPPED
+        self._file_path: Optional[str] = None          # user's original file
+        self._source_1x_path: Optional[str] = None      # BASS-openable 1.0x source
+        self._current_source_path: Optional[str] = None  # file currently feeding stream
+        self._duration_ms: int = 0                       # ORIGINAL timeline duration
+        self._speed: float = 1.0                         # requested speed
+        self._speed_scale: float = 1.0                   # scale of the active stream
+        self._volume: float = 1.0
+        self._stream: int = 0                            # playable BASS stream
+
+        self._position_callback: Optional[Callable[[int], None]] = None
+        self._render_progress_cb: Optional[Callable[[float, float], None]] = None
+
+        # waveform data for visualisation (source PCM)
+        self._original_data: Optional[np.ndarray] = None
+        self._original_sample_rate: int = 44100
+        self._channels: int = 2
+
+        # offline time-stretch cache (the user's 30s/3s algorithm)
+        self._cache = TSMRenderCache()
+        # speed whose render we are waiting for; applied once ready
+        self._pending_speed: Optional[float] = None
+        self._ready_speed: Optional[float] = None  # set by render done_cb thread
+
+        self._output_latency_ms: int = 0
+        self._initialized = False
+        self._recovering = False
+        self._last_recovery_attempt = 0.0
+        self._last_reported_ms: int = 0
+
+        self._stream_lock = threading.RLock()
+
+        self._ensure_initialized()
+
+    # ════════════════════════════════════ init / latency
+
+    def _cache_output_latency(self) -> None:
+        info = BASS_INFO()
+        if _bass.BASS_GetInfo(ctypes.byref(info)):
+            self._output_latency_ms = max(0, int(info.latency))
+
+    def _ensure_initialized(self) -> bool:
+        if self._initialized:
+            return True
+        if _bass.BASS_Init(-1, 44100, BASS_DEVICE_LATENCY, None, None):
+            self._initialized = True
+            self._cache_output_latency()
+            return True
+        err = _bass.BASS_ErrorGetCode()
+        if err == BASS_ERROR_ALREADY:
+            self._initialized = True
+            self._cache_output_latency()
+            return True
+        print(f"[BassTsmEngine] BASS_Init failed (error {err}), will retry later")
+        self._initialized = False
+        return False
+
+    # ════════════════════════════════════ load / release
+
+    def load(self, file_path: str, progress_cb=None) -> None:
+        with self._stream_lock:
+            self.stop()
+            self._free_stream()
+
+            if not Path(file_path).is_file():
+                raise AudioLoadError(f"加载音频失败: 文件不存在: {file_path}")
+            if not self._ensure_initialized():
+                err = _bass.BASS_ErrorGetCode()
+                raise AudioLoadError(f"BASS 初始化失败 (error {err})")
+
+            if progress_cb:
+                progress_cb("读取音频...", 0.0)
+
+            # Resolve a path BASS can open (convert unsupported containers).
+            playback_path = self._resolve_source_path(file_path, progress_cb)
+
+            # Decode full source PCM (float32, (n, ch)) for both the waveform
+            # display and the TSM renderer.
+            pcm, sr, ch = self._decode_full_pcm(playback_path)
+            self._original_data = pcm
+            self._original_sample_rate = sr
+            self._channels = ch
+
+            # Original-timeline duration from the source PCM.
+            self._duration_ms = int(len(pcm) / sr * 1000) if sr else 0
+
+            # Feed the offline stretcher (clears its old cache internally).
+            if progress_cb:
+                progress_cb("准备变速缓存...", 0.6)
+            song_name = Path(file_path).stem
+            self._cache.set_source(song_name, pcm, sr)
+
+            # Active stream = 1.0x original.
+            self._source_1x_path = playback_path
+            self._speed = 1.0
+            self._speed_scale = 1.0
+            self._pending_speed = None
+            self._ready_speed = None
+            self._switch_source_locked(playback_path, 1.0, target_original_ms=0, resume=False)
+
+            self._file_path = file_path
+            self._state = PlaybackState.STOPPED
+            self._last_reported_ms = 0
+            self._cache_output_latency()
+
+            # Pre-render common speeds in the background (non-blocking).
+            self._prewarm_common_speeds()
+
+            if progress_cb:
+                progress_cb("就绪", 1.0)
+
+    def _resolve_source_path(self, file_path: str, progress_cb=None) -> str:
+        """Open directly if BASS can; else convert (video extract / wav)."""
+        test = _bass.BASS_StreamCreateFile(
+            0, ctypes.c_wchar_p(file_path), 0, 0,
+            BASS_STREAM_DECODE | BASS_UNICODE,
+        )
+        if test:
+            _bass.BASS_StreamFree(test)
+            return file_path
+
+        try:
+            from .video_converter import VIDEO_EXTENSIONS, extract_audio
+
+            if Path(file_path).suffix.lower() in VIDEO_EXTENSIONS:
+                return extract_audio(file_path, progress_cb=progress_cb)
+        except Exception as exc:
+            raise AudioLoadError(str(exc)) from exc
+
+        # soundfile fallback → wav in cache dir
+        try:
+            from .tsm_cache import _get_cache_dir
+
+            data, sr = sf.read(str(file_path), dtype="float32")
+            if data.ndim == 1:
+                data = data.reshape(-1, 1)
+            wav_path = _get_cache_dir() / f"{Path(file_path).stem}_bass_src.wav"
+            sf.write(str(wav_path), data, sr)
+            return str(wav_path)
+        except Exception as exc:
+            raise AudioLoadError(f"BASS 无法打开文件，且转换失败: {exc}") from exc
+
+    @staticmethod
+    def _decode_full_pcm(path: str) -> tuple[np.ndarray, int, int]:
+        """Decode the whole file to float32 (n, ch) via BASS."""
+        ds = _bass.BASS_StreamCreateFile(
+            0, ctypes.c_wchar_p(path), 0, 0,
+            BASS_STREAM_DECODE | BASS_STREAM_PRESCAN | BASS_SAMPLE_FLOAT | BASS_UNICODE,
+        )
+        if not ds:
+            # last-ditch soundfile
+            data, sr = sf.read(str(path), dtype="float32")
+            if data.ndim == 1:
+                data = data.reshape(-1, 1)
+            return np.ascontiguousarray(data, np.float32), int(sr), int(data.shape[1])
+        try:
+            info = BASS_CHANNELINFO()
+            _bass.BASS_ChannelGetInfo(ds, ctypes.byref(info))
+            byte_len = _bass.BASS_ChannelGetLength(ds, BASS_POS_BYTE)
+            total = int(byte_len // 4)
+            raw = np.empty(max(total, 0), dtype=np.float32)
+            off = 0
+            chunk = 262144
+            while off < total:
+                take = min(chunk, total - off)
+                ptr = ctypes.c_void_p(raw.ctypes.data + off * 4)
+                got = _bass.BASS_ChannelGetData(ds, ptr, (take * 4) | BASS_DATA_FLOAT)
+                if got <= 0:
+                    break
+                off += got // 4
+            raw = raw[:off]
+            ch = max(1, int(info.chans))
+            n = len(raw) // ch
+            pcm = np.ascontiguousarray(raw[: n * ch].reshape(n, ch), np.float32)
+            return pcm, int(info.freq) or 44100, ch
+        finally:
+            _bass.BASS_StreamFree(ds)
+
+    def _prewarm_common_speeds(self) -> None:
+        for speed, prio in ((0.75, 0), (0.5, 1), (0.9, 2), (1.5, 3), (1.25, 4), (2.0, 5)):
+            self._cache.ensure(
+                speed, priority=prio, done_cb=self._on_render_ready
+            )
+
+    def _free_stream(self) -> None:
+        if self._stream:
+            _bass.BASS_StreamFree(self._stream)
+            self._stream = 0
+
+    def release(self) -> None:
+        with self._stream_lock:
+            self.stop()
+            self._free_stream()
+            try:
+                self._cache.clear()
+            except Exception:
+                pass
+            self._cleanup_src_wav()
+            if self._initialized:
+                _bass.BASS_Free()
+                self._initialized = False
+            self._original_data = None
+            self._file_path = None
+            self._source_1x_path = None
+            self._current_source_path = None
+            self._duration_ms = 0
+            self._position_callback = None
+
+    def _cleanup_src_wav(self) -> None:
+        p = self._source_1x_path
+        if p and p.endswith("_bass_src.wav"):
+            try:
+                Path(p).unlink()
+            except Exception:
+                pass
+
+    # ════════════════════════════════════ source switching (= speed)
+
+    def _rendered_path(self, q: float) -> Optional[str]:
+        """Path of the rendered file for quantised speed q, if on disk."""
+        if abs(q - 1.0) < 1e-9:
+            return self._source_1x_path
+        path = _get_cache_path(self._cache._song_name, q)
+        return str(path) if path.exists() else None
+
+    def _switch_source_locked(
+        self, path: str, scale: float, target_original_ms: int, resume: bool
+    ) -> bool:
+        """Recreate the playable stream from ``path`` at ``scale``. Caller holds lock."""
+        new_stream = _bass.BASS_StreamCreateFile(
+            0, ctypes.c_wchar_p(path), 0, 0,
+            BASS_SAMPLE_FLOAT | BASS_STREAM_PRESCAN | BASS_UNICODE,
+        )
+        if not new_stream:
+            err = _bass.BASS_ErrorGetCode()
+            print(f"[BassTsmEngine] open source failed (error {err}): {path}")
+            return False
+
+        self._free_stream()
+        self._stream = new_stream
+        self._current_source_path = path
+        self._speed_scale = scale
+        self._apply_volume()
+        # seek to mapped position on the new stream
+        self._seek_stream(target_original_ms)
+        if resume:
+            _bass.BASS_ChannelPlay(self._stream, 0)
+        return True
+
+    def _seek_stream(self, original_ms: int) -> None:
+        if self._stream == 0:
+            return
+        stream_ms = max(0, original_ms) / max(self._speed_scale, 1e-6)
+        secs = stream_ms / 1000.0
+        byte_pos = _bass.BASS_ChannelSeconds2Bytes(self._stream, ctypes.c_double(secs))
+        _bass.BASS_ChannelSetPosition(self._stream, byte_pos, BASS_POS_BYTE)
+
+    def set_speed(self, speed: float) -> None:
+        if not 0.2 <= speed <= 2.0:
+            raise ValueError(f"速度 {speed} 超出范围 [0.2, 2.0]")
+        with self._stream_lock:
+            self._speed = float(speed)
+            q = _quantize(self._speed)
+            if abs(q - self._speed_scale) < 1e-9:
+                self._pending_speed = None
+                self._notify_render(q, 1.0)
+                return
+
+            ready = self._rendered_path(q)
+            if ready is not None:
+                self._apply_speed_now(q, ready)
+                self._pending_speed = None
+                self._notify_render(q, 1.0)
+            else:
+                # keep playing current speed; render in background
+                self._pending_speed = q
+                self._cache.ensure(
+                    self._speed,
+                    progress_cb=self._render_progress_cb,
+                    done_cb=self._on_render_ready,
+                )
+
+    def _apply_speed_now(self, q: float, path: str) -> None:
+        cur_ms = self._read_position_ms(apply_latency=False)
+        resume = self._state == PlaybackState.PLAYING
+        self._switch_source_locked(path, q, target_original_ms=cur_ms, resume=resume)
+
+    def _on_render_ready(self, speed: float) -> None:
+        """Render done_cb — runs on the TSM finalizer thread. Just flag it;
+        the actual stream swap happens on the UI thread during the next poll."""
+        self._ready_speed = _quantize(speed)
+
+    def _maybe_apply_ready_speed(self) -> None:
+        """Apply a finished background render if it matches the desired speed."""
+        ready = self._ready_speed
+        if ready is None:
+            return
+        self._ready_speed = None
+        if self._pending_speed is None or abs(ready - self._pending_speed) > 1e-9:
+            return  # user changed their mind; ignore stale render
+        path = self._rendered_path(ready)
+        if path is None:
+            return
+        self._apply_speed_now(ready, path)
+        self._pending_speed = None
+        self._notify_render(ready, 1.0)
+
+    def _notify_render(self, speed: float, progress: float) -> None:
+        if self._render_progress_cb is not None:
+            try:
+                self._render_progress_cb(speed, progress)
+            except Exception:
+                pass
+
+    def get_speed(self) -> float:
+        return self._speed
+
+    # ════════════════════════════════════ transport
+
+    def play(self) -> None:
+        with self._stream_lock:
+            if self._stream == 0:
+                if not self._rebuild_stream():
+                    raise AudioPlaybackError("没有加载音频文件")
+            if self._state == PlaybackState.PLAYING:
+                return
+            if not _bass.BASS_ChannelPlay(self._stream, 0):
+                if not self._recover_device("play failed"):
+                    err = _bass.BASS_ErrorGetCode()
+                    raise AudioPlaybackError(f"BASS 播放失败 (error {err})")
+                _bass.BASS_ChannelPlay(self._stream, 0)
+            self._state = PlaybackState.PLAYING
+
+    def pause(self) -> None:
+        with self._stream_lock:
+            if self._state == PlaybackState.PLAYING:
+                _bass.BASS_ChannelPause(self._stream)
+                self._state = PlaybackState.PAUSED
+
+    def stop(self) -> None:
+        with self._stream_lock:
+            if self._stream:
+                _bass.BASS_ChannelStop(self._stream)
+                _bass.BASS_ChannelSetPosition(self._stream, 0, BASS_POS_BYTE)
+            self._state = PlaybackState.STOPPED
+            self._last_reported_ms = 0
+
+    def _rebuild_stream(self) -> bool:
+        path = self._current_source_path or self._source_1x_path
+        if not path or not self._ensure_initialized():
+            return False
+        return self._switch_source_locked(
+            path, self._speed_scale, target_original_ms=self._last_reported_ms, resume=False
+        )
+
+    # ════════════════════════════════════ position
+
+    def get_position_ms(self) -> int:
+        if self._recovering:
+            return self._last_reported_ms
+        self._sync_state_from_bass()
+        return self._read_position_ms(apply_latency=self._state == PlaybackState.PLAYING)
+
+    def get_display_position_ms(self) -> int:
+        if self._recovering:
+            return self._last_reported_ms
+        self._sync_state_from_bass()
+        ms = self._read_position_ms(apply_latency=self._state == PlaybackState.PLAYING)
+        if self._state == PlaybackState.PLAYING and ms < self._last_reported_ms:
+            ms = self._last_reported_ms
+        self._last_reported_ms = ms
+        return ms
+
+    def _read_position_ms(self, apply_latency: bool) -> int:
+        if self._stream == 0:
+            return 0
+        pos = _bass.BASS_ChannelGetPosition(self._stream, BASS_POS_BYTE)
+        stream_ms = _bass.BASS_ChannelBytes2Seconds(self._stream, pos) * 1000
+        if apply_latency:
+            stream_ms = max(0.0, stream_ms - self._output_latency_ms)
+        # Map stream (rendered) timeline → original timeline.
+        original_ms = int(round(stream_ms * self._speed_scale))
+        if (
+            self._state != PlaybackState.PLAYING
+            and self._duration_ms > 0
+            and self._last_reported_ms >= self._duration_ms
+            and pos == 0
+        ):
+            original_ms = self._duration_ms
+        return min(max(original_ms, 0), self._duration_ms)
+
+    def set_position_ms(self, position_ms: int) -> None:
+        with self._stream_lock:
+            if self._stream == 0:
+                return
+            target = max(0, min(position_ms, self._duration_ms))
+            self._seek_stream(target)
+            self._last_reported_ms = target
+
+    def get_duration_ms(self) -> int:
+        return self._duration_ms
+
+    # ════════════════════════════════════ state / recovery
+
+    def get_playback_state(self) -> PlaybackState:
+        self._sync_state_from_bass()
+        return self._state
+
+    def is_playing(self) -> bool:
+        self._sync_state_from_bass()
+        return self._state == PlaybackState.PLAYING
+
+    def _sync_state_from_bass(self) -> None:
+        if self._stream == 0 or self._recovering:
+            return
+        # Opportunistically apply any finished background render.
+        self._maybe_apply_ready_speed()
+        if self._state != PlaybackState.PLAYING:
+            return
+        active = _bass.BASS_ChannelIsActive(self._stream)
+        if active in (BASS_ACTIVE_PLAYING, BASS_ACTIVE_STALLED):
+            return
+        if active == BASS_ACTIVE_PAUSED_DEVICE:
+            self._recover_device("device paused")
+            return
+        if active == BASS_ACTIVE_STOPPED:
+            pos = self._read_position_ms(apply_latency=False)
+            tol = max(200, self._output_latency_ms * 2)
+            if self._duration_ms > 0 and pos >= self._duration_ms - tol:
+                self._state = PlaybackState.PAUSED
+                self._last_reported_ms = self._duration_ms
+            elif self._device_is_lost():
+                self._recover_device("device lost")
+            else:
+                self._state = PlaybackState.PAUSED
+                self._last_reported_ms = max(self._last_reported_ms, pos)
+
+    def _device_is_lost(self) -> bool:
+        info = BASS_INFO()
+        return not _bass.BASS_GetInfo(ctypes.byref(info))
+
+    def _recover_device(self, reason: str) -> bool:
+        """Synchronous, throttled device recovery. Returns success."""
+        if self._recovering:
+            return self._stream != 0
+        now = time.monotonic()
+        if now - self._last_recovery_attempt < 1.0:
+            return False
+        self._last_recovery_attempt = now
+        self._recovering = True
+        pos = self._read_position_ms(apply_latency=False)
+        resume = self._state == PlaybackState.PLAYING
+        path = self._current_source_path or self._source_1x_path
+        try:
+            print(f"[BassTsmEngine] device recovery ({reason})...")
+            self._free_stream()
+            _bass.BASS_Free()
+            self._initialized = False
+            if not self._ensure_initialized() or not path:
+                self._state = PlaybackState.PAUSED
+                return False
+            ok = self._switch_source_locked(path, self._speed_scale, pos, resume)
+            self._state = PlaybackState.PLAYING if (ok and resume) else PlaybackState.PAUSED
+            self._cache_output_latency()
+            return ok
+        except Exception as exc:
+            print(f"[BassTsmEngine] recovery failed: {exc}")
+            self._state = PlaybackState.PAUSED
+            return False
+        finally:
+            self._recovering = False
+
+    # ════════════════════════════════════ volume / callbacks / info
+
+    def set_volume(self, volume: float) -> None:
+        self._volume = max(0.0, min(1.0, float(volume)))
+        self._apply_volume()
+
+    def _apply_volume(self) -> None:
+        if self._stream:
+            _bass.BASS_ChannelSetAttribute(
+                self._stream, BASS_ATTRIB_VOL, ctypes.c_float(self._volume)
+            )
+
+    def get_volume(self) -> float:
+        return self._volume
+
+    def set_position_callback(self, callback: Callable[[int], None]) -> None:
+        self._position_callback = callback
+
+    def clear_position_callback(self) -> None:
+        self._position_callback = None
+
+    def set_render_progress_callback(
+        self, callback: Optional[Callable[[float, float], None]] = None
+    ) -> None:
+        self._render_progress_cb = callback
+
+    def get_audio_info(self) -> Optional[AudioInfo]:
+        if self._file_path is None:
+            return None
+        return AudioInfo(
+            file_path=self._file_path,
+            duration_ms=self._duration_ms,
+            sample_rate=self._original_sample_rate,
+            channels=self._channels,
+        )
+
+    def get_original_samples(self) -> Optional[np.ndarray]:
+        return self._original_data
