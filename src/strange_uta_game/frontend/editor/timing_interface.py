@@ -3597,8 +3597,16 @@ class EditorInterface(QWidget):
             self._cycle_current_checkpoint(-1)
         elif action == "edit_ruby":
             if self._project:
-                line_idx = self._current_line_idx
-                char_idx = self.preview._current_char_idx
+                # 与「修改所选字符」等窗口统一：优先使用 focus 域（拖选/聚焦），
+                # 无 focus 选择时回退到 current 域。
+                sel_line = self.preview._focus_line_idx
+                sel_start = self.preview._focus_char_idx
+                if sel_line >= 0 and sel_start >= 0:
+                    line_idx = sel_line
+                    char_idx = sel_start
+                else:
+                    line_idx = self._current_line_idx
+                    char_idx = self.preview._current_char_idx
                 self._on_char_edit_requested(line_idx, char_idx)
         elif action == "add_checkpoint":
             if self._project:
