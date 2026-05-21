@@ -1617,10 +1617,17 @@ class KaraokePreview(QWidget):
                                     painter.setPen(_rh)
                                     painter.drawText(int(ruby_x), ruby_y, _merged)
                                     painter.restore()
-                        # 连词框：基于 ruby 墨水边界（ink bounds）绘制，避免
+                        # 连词框：基于字符组墨水边界（ink bounds）绘制，避免
                         # 字符级 horizontalAdvance 导致相邻 ruby 框互相重叠。
-                        _box_left = int(_r_ink_x)
-                        _box_right = int(_r_ink_x + _r_ink_w)
+                        _ink_left = float('inf')
+                        _ink_right = float('-inf')
+                        for _gci in _grp:
+                            _char_x = curr_x + _group_char_pixel_starts[char_pos][_gci]
+                            _char_ink_x = _char_x + _char_ink_offsets[_gci]
+                            _ink_left = min(_ink_left, _char_ink_x)
+                            _ink_right = max(_ink_right, _char_ink_x + _char_ink_widths[_gci])
+                        _box_left = int(_ink_left)
+                        _box_right = int(_ink_right)
                         painter.save()
                         _fc = QColor(base_color)
                         _fc.setAlpha(120)
