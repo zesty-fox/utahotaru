@@ -52,6 +52,12 @@ BASS_ACTIVE_PAUSED = 3
 BASS_ACTIVE_PAUSED_DEVICE = 4
 BASS_ATTRIB_VOL = 2
 BASS_ATTRIB_TEMPO = 0x10000
+# BASS_FX tempo (SoundTouch) tuning options
+BASS_ATTRIB_TEMPO_OPTION_USE_AA_FILTER = 0x10010
+BASS_ATTRIB_TEMPO_OPTION_SEQUENCE_MS = 0x10013
+BASS_ATTRIB_TEMPO_OPTION_SEEKWINDOW_MS = 0x10014
+BASS_ATTRIB_TEMPO_OPTION_OVERLAP_MS = 0x10015
+BASS_ATTRIB_TEMPO_OPTION_PREVENT_CLICK = 0x10016
 BASS_SAMPLE_FLOAT = 256
 BASS_DATA_FLOAT = 0x40000000
 BASS_STREAM_DECODE = 0x200000
@@ -344,12 +350,16 @@ class BassEngine(IAudioEngine):
         return True
 
     def _create_streams(self, playback_path: str) -> None:
+        # BASS_SAMPLE_FLOAT keeps the whole decode→tempo→output chain in 32-bit
+        # float. Without it the chain runs in 16-bit and SoundTouch's overlap-add
+        # can overshoot full scale, wrapping/clipping into audible crackle ("爆音"),
+        # especially at speeds != 1.0. Float gives SoundTouch headroom.
         self._decode_stream = _bass.BASS_StreamCreateFile(
             0,
             ctypes.c_wchar_p(playback_path),
             0,
             0,
-            BASS_STREAM_DECODE | BASS_STREAM_PRESCAN | BASS_UNICODE,
+            BASS_STREAM_DECODE | BASS_STREAM_PRESCAN | BASS_SAMPLE_FLOAT | BASS_UNICODE,
         )
         if not self._decode_stream:
             err = _bass.BASS_ErrorGetCode()
@@ -364,6 +374,24 @@ class BassEngine(IAudioEngine):
             self._decode_stream = 0
             raise AudioLoadError(f"BASS_FX_TempoCreate 失败 (error {err})")
         self._decode_stream = 0
+        self._apply_tempo_options()
+
+    def _apply_tempo_options(self) -> None:
+        """Configure SoundTouch to minimise tempo artifacts.
+
+        PREVENT_CLICK removes the click when speed crosses 1.0; the AA filter
+        plus slightly larger sequence/overlap windows smooth output at the
+        extreme 0.5x/2.0x ends. Applied once per stream creation.
+        """
+        if not self._tempo_stream:
+            return
+        for attrib, value in (
+            (BASS_ATTRIB_TEMPO_OPTION_PREVENT_CLICK, 1.0),
+            (BASS_ATTRIB_TEMPO_OPTION_USE_AA_FILTER, 1.0),
+        ):
+            _bass.BASS_ChannelSetAttribute(
+                self._tempo_stream, attrib, ctypes.c_float(value)
+            )
 
     def _load_waveform_data(self, file_path: str, playback_path: str) -> None:
         """Best-effort waveform decode; playback must not depend on it."""
