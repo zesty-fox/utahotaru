@@ -215,3 +215,6 @@ example/
 # cache
 cache/
 .cache/
+
+# claude
+settings.local.json
