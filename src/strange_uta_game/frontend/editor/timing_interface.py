@@ -1940,37 +1940,54 @@ class EditorInterface(QWidget):
                         # 整行都是待补全字符，前后都没有时间戳，跳过
                         continue
                     elif is_at_start:
-                        # 行首：只有后方时间戳，使用 head_offset_ms
+                        # 行首：只有后方时间戳，逐个递减
                         if next_ts is None:
                             continue
-                        start_ts = max(0, next_ts - head_offset_ms)
-                        if segment_len == 1:
-                            chars[segment_start].timestamps = [start_ts]
-                            chars[segment_start].check_count = 1
-                            chars[segment_start]._update_offset_timestamps()
-                            chars[segment_start].push_to_ruby()
+                        # 从后往前逐个递减
+                        for ci in range(segment_end - 1, segment_start - 1, -1):
+                            if ci == segment_end - 1:
+                                ts = max(0, next_ts - head_offset_ms)
+                            else:
+                                ts = max(0, chars[ci + 1].timestamps[0] - head_offset_ms)
+                            chars[ci].timestamps = [ts]
+                            chars[ci].check_count = 1
+                            chars[ci]._update_offset_timestamps()
+                            chars[ci].push_to_ruby()
                             total_count += 1
-                        else:
-                            time_diff = next_ts - start_ts
-                            for idx, ci in enumerate(range(segment_start, segment_end)):
-                                ts = start_ts + time_diff * (idx + 1) // (segment_len + 1)
-                                chars[ci].timestamps = [ts]
-                                chars[ci].check_count = 1
-                                chars[ci]._update_offset_timestamps()
-                                chars[ci].push_to_ruby()
-                                total_count += 1
                     elif is_at_end:
-                        # 行尾：只有前方时间戳，使用 tail_offset_ms
+                        # 行尾：只有前方时间戳
                         if prev_ts is None:
                             continue
-                        end_ts = prev_ts + tail_offset_ms
-                        if segment_len == 1:
-                            chars[segment_start].timestamps = [end_ts]
-                            chars[segment_start].check_count = 1
-                            chars[segment_start]._update_offset_timestamps()
-                            chars[segment_start].push_to_ruby()
+                        last_ci = segment_end - 1
+                        last_char = chars[last_ci]
+                        # 判断最后一个字符是否为符号且有句尾时间戳
+                        if (last_char.is_punctuation
+                                and last_char.is_sentence_end
+                                and last_char.sentence_end_ts is not None):
+                            # 符号特殊处理：原句尾转普通，新句尾 = 原句尾 + tail_offset
+                            original_end_ts = last_char.sentence_end_ts
+                            last_char.timestamps = [original_end_ts]
+                            last_char.check_count = 1
+                            last_char.sentence_end_ts = original_end_ts + tail_offset_ms
+                            last_char._update_offset_timestamps()
+                            last_char.push_to_ruby()
                             total_count += 1
+                            # 前面的字符均分(prev_ts, original_end_ts)
+                            if segment_len > 1:
+                                time_diff = original_end_ts - prev_ts
+                                for idx, ci in enumerate(range(segment_start, last_ci)):
+                                    ts = prev_ts + time_diff * (idx + 1) // segment_len
+                                    chars[ci].timestamps = [ts]
+                                    chars[ci].check_count = 1
+                                    chars[ci]._update_offset_timestamps()
+                                    chars[ci].push_to_ruby()
+                                    total_count += 1
                         else:
+                            # 非符号：均分(prev_ts, 句尾时间戳)
+                            end_ts = (last_char.sentence_end_ts
+                                      if last_char.is_sentence_end
+                                         and last_char.sentence_end_ts is not None
+                                      else prev_ts + tail_offset_ms)
                             time_diff = end_ts - prev_ts
                             for idx, ci in enumerate(range(segment_start, segment_end)):
                                 ts = prev_ts + time_diff * (idx + 1) // (segment_len + 1)
