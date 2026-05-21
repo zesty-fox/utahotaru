@@ -3158,6 +3158,32 @@ class EditorInterface(QWidget):
                     return (tags[-1], li, ci)
         return None
 
+    def _resolve_cp_idx_for_timestamp(
+        self, line_idx: int, char_idx: int, timestamp: int
+    ) -> int:
+        """根据时间戳值反查所属的 checkpoint 索引。
+
+        在字符的 all_global_timestamps 中找到与 timestamp 匹配的索引；
+        找不到时回退到最后一个 cp。
+        """
+        if not self._project or line_idx >= len(self._project.sentences):
+            return 0
+        sentence = self._project.sentences[line_idx]
+        if char_idx >= len(sentence.characters):
+            return 0
+        char = sentence.get_character(char_idx)
+        if not char:
+            return 0
+        tags = char.all_global_timestamps
+        if not tags:
+            return 0
+        # 精确匹配
+        for i, t in enumerate(tags):
+            if t == timestamp:
+                return i
+        # 找不到精确匹配，回退到最后一个 cp
+        return len(tags) - 1
+
     def _find_prev_char_with_cp(
         self, line_idx: int, char_idx: int
     ) -> Optional[Tuple[int, int, int]]:
@@ -3223,10 +3249,13 @@ class EditorInterface(QWidget):
             if result is not None:
                 prev_ts, ts_line_idx, ts_char_idx = result
                 self._on_seek(prev_ts)
-                # CP挪到时间戳所在的字符
+                # CP挪到时间戳所在的字符的对应 cp_idx（而非固定 0）
                 if self._timing_service:
+                    cp_idx = self._resolve_cp_idx_for_timestamp(
+                        ts_line_idx, ts_char_idx, prev_ts
+                    )
                     self._timing_service.move_to_checkpoint(
-                        ts_line_idx, ts_char_idx, 0
+                        ts_line_idx, ts_char_idx, cp_idx
                     )
             else:
                 # 完全没有时间戳：跳转到歌曲开头
@@ -3240,10 +3269,13 @@ class EditorInterface(QWidget):
             if result is not None:
                 prev_ts, ts_line_idx, ts_char_idx = result
                 self._on_seek(prev_ts)
-                # CP挪到时间戳所在的字符
+                # CP挪到时间戳所在的字符的对应 cp_idx（而非固定 0）
                 if self._timing_service:
+                    cp_idx = self._resolve_cp_idx_for_timestamp(
+                        ts_line_idx, ts_char_idx, prev_ts
+                    )
                     self._timing_service.move_to_checkpoint(
-                        ts_line_idx, ts_char_idx, 0
+                        ts_line_idx, ts_char_idx, cp_idx
                     )
             else:
                 # 完全没有时间戳：跳转到歌曲开头
