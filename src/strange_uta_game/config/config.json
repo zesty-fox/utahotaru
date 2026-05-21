@@ -2,10 +2,10 @@
   "audio": {
     "default_volume": 80,
     "default_speed": 1.0,
-    "speed_slider_min": 0.5,
+    "speed_slider_min": 0.2,
     "speed_slider_max": 1.0,
     "auto_play_on_load": false,
-    "hq_speed_change": false
+    "hq_speed_change": true
   },
   "timing": {
     "default_check_count": 1,
@@ -242,9 +242,9 @@
   "network_dictionary": {
     "enabled": true,
     "source_order": [
+      "fmpeach",
       "local",
-      "rl_official",
-      "fmpeach"
+      "rl_official"
     ],
     "sources": [
       {
