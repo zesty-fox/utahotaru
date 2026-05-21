@@ -58,6 +58,22 @@ def is_ffmpeg_available() -> bool:
     return shutil.which("ffmpeg") is not None
 
 
+def clear_extracted_cache() -> None:
+    """清空 .cache/extracted/ 下的所有提取文件。
+
+    加载新视频/音频时调用，避免多个视频的提取音频持续堆积。
+    TSM 的 clear_cache() 只会清理 .cache 根目录的 mp3，不会触及子目录。
+    """
+    cache_dir = _get_cache_dir()
+    if cache_dir.exists():
+        for f in cache_dir.glob("*"):
+            try:
+                if f.is_file():
+                    f.unlink()
+            except Exception:
+                pass
+
+
 def extract_audio(video_path: str, progress_cb: Optional[LoadProgressCallback] = None) -> str:
     """从视频文件中提取音频并压缩为 MP3 临时文件。
 
@@ -80,6 +96,8 @@ def extract_audio(video_path: str, progress_cb: Optional[LoadProgressCallback] =
         raise RuntimeError(
             "当前环境未检测到 FFmpeg，请安装 FFmpeg 并将其添加到系统环境变量后重试。"
         )
+
+    clear_extracted_cache()
 
     try:
         import av

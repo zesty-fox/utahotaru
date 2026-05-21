@@ -372,10 +372,13 @@ class BassEngine(IAudioEngine):
             raise AudioLoadError(str(exc)) from exc
 
         try:
+            from .video_converter import clear_extracted_cache
+
             data, sr = sf.read(str(file_path), dtype="float32")
             if data.ndim == 1:
                 data = data.reshape(-1, 1)
             cache_dir = self._fallback_cache_dir()
+            clear_extracted_cache()
             wav_path = cache_dir / f"{Path(file_path).stem}_bass_fallback.wav"
             sf.write(str(wav_path), data, sr)
             # Track only our own fallback product for later cleanup.
