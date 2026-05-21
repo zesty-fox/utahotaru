@@ -47,15 +47,20 @@ from .base import (
 # don't redefine signatures (and so both engines share one loaded DLL).
 from .bass_engine import (
     _bass,
+    _bass_fx,
     BASS_ACTIVE_PAUSED_DEVICE,
     BASS_ACTIVE_PLAYING,
     BASS_ACTIVE_STALLED,
     BASS_ACTIVE_STOPPED,
+    BASS_ATTRIB_TEMPO,
+    BASS_ATTRIB_TEMPO_OPTION_PREVENT_CLICK,
+    BASS_ATTRIB_TEMPO_OPTION_USE_AA_FILTER,
     BASS_ATTRIB_VOL,
     BASS_CHANNELINFO,
     BASS_DATA_FLOAT,
     BASS_DEVICE_LATENCY,
     BASS_ERROR_ALREADY,
+    BASS_FX_FREESOURCE,
     BASS_INFO,
     BASS_POS_BYTE,
     BASS_SAMPLE_FLOAT,
@@ -64,6 +69,10 @@ from .bass_engine import (
     BASS_UNICODE,
 )
 from .tsm_cache import TSMRenderCache, _get_cache_path, _quantize
+
+# SoundTouch anti-alias filter length (taps). Longer = less aliasing/metallic
+# artifact at the cost of a little CPU. Not exported by bass_engine.
+BASS_ATTRIB_TEMPO_OPTION_AA_FILTER_LENGTH = 0x10011
 
 
 class BassTsmEngine(IAudioEngine):
@@ -76,9 +85,15 @@ class BassTsmEngine(IAudioEngine):
         self._current_source_path: Optional[str] = None  # file currently feeding stream
         self._duration_ms: int = 0                       # ORIGINAL timeline duration
         self._speed: float = 1.0                         # requested speed
-        self._speed_scale: float = 1.0                   # scale of the active stream
+        self._speed_scale: float = 1.0                   # render scale of a FILE-mode stream
         self._volume: float = 1.0
-        self._stream: int = 0                            # playable BASS stream
+        self._stream: int = 0                            # active BASS stream
+        # When True the active stream is a real-time BASS_FX tempo stream
+        # (interim, may crackle) instead of a clean pre-rendered file stream.
+        # A tempo stream reports position on the ORIGINAL timeline directly,
+        # so its effective position scale is 1.0.
+        self._is_tempo: bool = False
+        self._tempo_speed: float = 1.0                   # speed of the tempo stream
 
         self._position_callback: Optional[Callable[[int], None]] = None
         self._render_progress_cb: Optional[Callable[[float, float], None]] = None
@@ -162,13 +177,16 @@ class BassTsmEngine(IAudioEngine):
             song_name = Path(file_path).stem
             self._cache.set_source(song_name, pcm, sr)
 
-            # Active stream = 1.0x original.
+            # Active stream = 1.0x original (clean file mode).
             self._source_1x_path = playback_path
+            self._current_source_path = playback_path
             self._speed = 1.0
             self._speed_scale = 1.0
+            self._is_tempo = False
+            self._tempo_speed = 1.0
             self._pending_speed = None
             self._ready_speed = None
-            self._switch_source_locked(playback_path, 1.0, target_original_ms=0, resume=False)
+            self._build_stream_locked(target_original_ms=0, resume=False)
 
             self._file_path = file_path
             self._state = PlaybackState.STOPPED
@@ -249,10 +267,12 @@ class BassTsmEngine(IAudioEngine):
             _bass.BASS_StreamFree(ds)
 
     def _prewarm_common_speeds(self) -> None:
-        for speed, prio in ((0.75, 0), (0.5, 1), (0.9, 2), (1.5, 3), (1.25, 4), (2.0, 5)):
-            self._cache.ensure(
-                speed, priority=prio, done_cb=self._on_render_ready
-            )
+        # Users almost always slow down for timing (0.9 → 0.2), so render the
+        # high-to-low slow-down speeds first, in descending order of likelihood.
+        # A couple of speed-ups trail at the end.
+        order = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 1.25, 1.5]
+        for prio, speed in enumerate(order):
+            self._cache.ensure(speed, priority=prio, done_cb=self._on_render_ready)
 
     def _free_stream(self) -> None:
         if self._stream:
@@ -295,34 +315,71 @@ class BassTsmEngine(IAudioEngine):
         path = _get_cache_path(self._cache._song_name, q)
         return str(path) if path.exists() else None
 
-    def _switch_source_locked(
-        self, path: str, scale: float, target_original_ms: int, resume: bool
-    ) -> bool:
-        """Recreate the playable stream from ``path`` at ``scale``. Caller holds lock."""
-        new_stream = _bass.BASS_StreamCreateFile(
-            0, ctypes.c_wchar_p(path), 0, 0,
-            BASS_SAMPLE_FLOAT | BASS_STREAM_PRESCAN | BASS_UNICODE,
-        )
+    def _effective_scale(self) -> float:
+        """Position scale of the active stream.
+
+        File-mode rendered stream: original_ms = stream_ms * render_scale.
+        Tempo-mode stream: BASS_FX reports SOURCE position already → scale 1.0.
+        """
+        return 1.0 if self._is_tempo else self._speed_scale
+
+    def _build_stream_locked(self, target_original_ms: int, resume: bool) -> bool:
+        """(Re)create the active stream for the current mode. Caller holds lock.
+
+        Mode is decided by ``_is_tempo``:
+          - tempo: real-time BASS_FX on the 1x source at ``_tempo_speed``;
+          - file:  plain playable stream of ``_current_source_path``.
+        """
+        if self._is_tempo:
+            new_stream = self._create_tempo_stream(self._source_1x_path, self._tempo_speed)
+        else:
+            new_stream = _bass.BASS_StreamCreateFile(
+                0, ctypes.c_wchar_p(self._current_source_path), 0, 0,
+                BASS_SAMPLE_FLOAT | BASS_STREAM_PRESCAN | BASS_UNICODE,
+            )
         if not new_stream:
             err = _bass.BASS_ErrorGetCode()
-            print(f"[BassTsmEngine] open source failed (error {err}): {path}")
+            print(f"[BassTsmEngine] open stream failed (error {err}, tempo={self._is_tempo})")
             return False
 
         self._free_stream()
         self._stream = new_stream
-        self._current_source_path = path
-        self._speed_scale = scale
         self._apply_volume()
-        # seek to mapped position on the new stream
         self._seek_stream(target_original_ms)
         if resume:
             _bass.BASS_ChannelPlay(self._stream, 0)
         return True
 
+    def _create_tempo_stream(self, source_path: Optional[str], speed: float) -> int:
+        """Build a real-time BASS_FX tempo stream on the 1x source."""
+        if not source_path:
+            return 0
+        decode = _bass.BASS_StreamCreateFile(
+            0, ctypes.c_wchar_p(source_path), 0, 0,
+            BASS_STREAM_DECODE | BASS_STREAM_PRESCAN | BASS_SAMPLE_FLOAT | BASS_UNICODE,
+        )
+        if not decode:
+            return 0
+        st = _bass_fx.BASS_FX_TempoCreate(decode, BASS_FX_FREESOURCE)
+        if not st:
+            _bass.BASS_StreamFree(decode)
+            return 0
+        _bass.BASS_ChannelSetAttribute(
+            st, BASS_ATTRIB_TEMPO, ctypes.c_float((speed - 1.0) * 100.0)
+        )
+        # Reduce the metallic/click artifacts of the interim real-time stretch.
+        for attrib, value in (
+            (BASS_ATTRIB_TEMPO_OPTION_PREVENT_CLICK, 1.0),
+            (BASS_ATTRIB_TEMPO_OPTION_USE_AA_FILTER, 1.0),
+            (BASS_ATTRIB_TEMPO_OPTION_AA_FILTER_LENGTH, 64.0),
+        ):
+            _bass.BASS_ChannelSetAttribute(st, attrib, ctypes.c_float(value))
+        return st
+
     def _seek_stream(self, original_ms: int) -> None:
         if self._stream == 0:
             return
-        stream_ms = max(0, original_ms) / max(self._speed_scale, 1e-6)
+        stream_ms = max(0, original_ms) / max(self._effective_scale(), 1e-6)
         secs = stream_ms / 1000.0
         byte_pos = _bass.BASS_ChannelSeconds2Bytes(self._stream, ctypes.c_double(secs))
         _bass.BASS_ChannelSetPosition(self._stream, byte_pos, BASS_POS_BYTE)
@@ -333,29 +390,48 @@ class BassTsmEngine(IAudioEngine):
         with self._stream_lock:
             self._speed = float(speed)
             q = _quantize(self._speed)
-            if abs(q - self._speed_scale) < 1e-9:
+
+            # Already playing the clean rendered file for this speed?
+            if not self._is_tempo and abs(q - self._speed_scale) < 1e-9:
                 self._pending_speed = None
                 self._notify_render(q, 1.0)
                 return
 
             ready = self._rendered_path(q)
             if ready is not None:
-                self._apply_speed_now(q, ready)
+                # Clean offline render available → play it immediately.
+                self._switch_to_file(q, ready)
                 self._pending_speed = None
                 self._notify_render(q, 1.0)
-            else:
-                # keep playing current speed; render in background
-                self._pending_speed = q
-                self._cache.ensure(
-                    self._speed,
-                    progress_cb=self._render_progress_cb,
-                    done_cb=self._on_render_ready,
-                )
+                return
 
-    def _apply_speed_now(self, q: float, path: str) -> None:
+            # Not rendered yet → play the requested speed RIGHT NOW via real-time
+            # BASS_FX tempo (may crackle), and kick off the offline render. When
+            # it finishes we swap to the clean file (see _maybe_apply_ready_speed).
+            if not (self._is_tempo and abs(_quantize(self._tempo_speed) - q) < 1e-9):
+                self._switch_to_tempo(self._speed)
+            self._pending_speed = q
+            self._cache.ensure(
+                self._speed,
+                progress_cb=self._render_progress_cb,
+                done_cb=self._on_render_ready,
+            )
+
+    def _switch_to_file(self, q: float, path: str) -> None:
         cur_ms = self._read_position_ms(apply_latency=False)
         resume = self._state == PlaybackState.PLAYING
-        self._switch_source_locked(path, q, target_original_ms=cur_ms, resume=resume)
+        self._is_tempo = False
+        self._speed_scale = q
+        self._current_source_path = path
+        self._build_stream_locked(target_original_ms=cur_ms, resume=resume)
+
+    def _switch_to_tempo(self, speed: float) -> None:
+        cur_ms = self._read_position_ms(apply_latency=False)
+        resume = self._state == PlaybackState.PLAYING
+        self._is_tempo = True
+        self._tempo_speed = speed
+        self._current_source_path = self._source_1x_path
+        self._build_stream_locked(target_original_ms=cur_ms, resume=resume)
 
     def _on_render_ready(self, speed: float) -> None:
         """Render done_cb — runs on the TSM finalizer thread. Just flag it;
@@ -373,7 +449,8 @@ class BassTsmEngine(IAudioEngine):
         path = self._rendered_path(ready)
         if path is None:
             return
-        self._apply_speed_now(ready, path)
+        # Swap the interim real-time tempo stream for the clean rendered file.
+        self._switch_to_file(ready, path)
         self._pending_speed = None
         self._notify_render(ready, 1.0)
 
@@ -418,11 +495,12 @@ class BassTsmEngine(IAudioEngine):
             self._last_reported_ms = 0
 
     def _rebuild_stream(self) -> bool:
-        path = self._current_source_path or self._source_1x_path
-        if not path or not self._ensure_initialized():
+        if not (self._current_source_path or self._source_1x_path):
             return False
-        return self._switch_source_locked(
-            path, self._speed_scale, target_original_ms=self._last_reported_ms, resume=False
+        if not self._ensure_initialized():
+            return False
+        return self._build_stream_locked(
+            target_original_ms=self._last_reported_ms, resume=False
         )
 
     # ════════════════════════════════════ position
@@ -450,8 +528,9 @@ class BassTsmEngine(IAudioEngine):
         stream_ms = _bass.BASS_ChannelBytes2Seconds(self._stream, pos) * 1000
         if apply_latency:
             stream_ms = max(0.0, stream_ms - self._output_latency_ms)
-        # Map stream (rendered) timeline → original timeline.
-        original_ms = int(round(stream_ms * self._speed_scale))
+        # Map stream timeline → original timeline (tempo stream already reports
+        # original time → scale 1.0; rendered file → multiply by render scale).
+        original_ms = int(round(stream_ms * self._effective_scale()))
         if (
             self._state != PlaybackState.PLAYING
             and self._duration_ms > 0
@@ -522,16 +601,16 @@ class BassTsmEngine(IAudioEngine):
         self._recovering = True
         pos = self._read_position_ms(apply_latency=False)
         resume = self._state == PlaybackState.PLAYING
-        path = self._current_source_path or self._source_1x_path
+        has_source = bool(self._current_source_path or self._source_1x_path)
         try:
             print(f"[BassTsmEngine] device recovery ({reason})...")
             self._free_stream()
             _bass.BASS_Free()
             self._initialized = False
-            if not self._ensure_initialized() or not path:
+            if not self._ensure_initialized() or not has_source:
                 self._state = PlaybackState.PAUSED
                 return False
-            ok = self._switch_source_locked(path, self._speed_scale, pos, resume)
+            ok = self._build_stream_locked(pos, resume)
             self._state = PlaybackState.PLAYING if (ok and resume) else PlaybackState.PAUSED
             self._cache_output_latency()
             return ok
