@@ -6,7 +6,7 @@
 from typing import Optional, List, Callable
 from dataclasses import dataclass
 
-from strange_uta_game.backend.domain import Project, Singer
+from strange_uta_game.backend.domain import Project, Singer, ValidationError
 
 
 @dataclass
@@ -30,12 +30,13 @@ class SingerService:
         self._project = project
         self._callbacks = callbacks or SingerCallbacks()
 
-    def add_singer(self, name: str = None, color: str = None) -> Singer:
+    def add_singer(self, name: str = None, color: str = None, group: str = "") -> Singer:
         """添加演唱者
 
         Args:
             name: 演唱者名称（如果为 None 则自动生成 "未命名N"）
             color: 颜色（如果为 None 则自动分配）
+            group: 分组名称（空字符串表示默认分组）
 
         Returns:
             新创建的演唱者
@@ -51,7 +52,12 @@ class SingerService:
         if name is None:
             name = f"未命名{next_number}"
 
-        singer = Singer(name=name, color=color, backend_number=next_number)
+        # 项目内名称唯一性校验
+        existing_names = {s.name for s in self._project.singers}
+        if name in existing_names:
+            raise ValidationError(f"演唱者名称「{name}」已存在，项目内不允许重名")
+
+        singer = Singer(name=name, color=color, backend_number=next_number, group=group)
         self._project.add_singer(singer)
 
         if self._callbacks.on_singer_added:
@@ -110,6 +116,11 @@ class SingerService:
         if not singer:
             return False
 
+        # 名称唯一性校验（排除自身）
+        existing_names = {s.name for s in self._project.singers if s.id != singer_id}
+        if new_name in existing_names:
+            raise ValidationError(f"演唱者名称「{new_name}」已存在，项目内不允许重名")
+
         singer.rename(new_name)
 
         if self._callbacks.on_singer_updated:
@@ -153,6 +164,27 @@ class SingerService:
             return False
 
         singer.set_enabled(enabled)
+
+        if self._callbacks.on_singer_updated:
+            self._callbacks.on_singer_updated(singer)
+
+        return True
+
+    def change_singer_group(self, singer_id: str, group: str) -> bool:
+        """修改演唱者分组
+
+        Args:
+            singer_id: 演唱者ID
+            group: 新分组名称（空字符串表示默认分组）
+
+        Returns:
+            是否成功
+        """
+        singer = self._project.get_singer(singer_id)
+        if not singer:
+            return False
+
+        singer.group = group
 
         if self._callbacks.on_singer_updated:
             self._callbacks.on_singer_updated(singer)

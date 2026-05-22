@@ -76,6 +76,7 @@ class Singer:
     is_default: bool = False
     display_priority: int = 0
     enabled: bool = True
+    group: str = ""
 
     def __post_init__(self) -> None:
         if not self.id:

@@ -343,6 +343,7 @@ class SugProjectParser:
                     "display_priority": s.display_priority,
                     "enabled": s.enabled,
                     "backend_number": s.backend_number,
+                    "group": s.group,
                 }
                 for s in project.singers
             ],
@@ -423,6 +424,7 @@ class SugProjectParser:
                 display_priority=int(singer_data.get("display_priority", 0)),
                 enabled=singer_data.get("enabled", True),
                 backend_number=int(singer_data.get("backend_number", 0)),
+                group=singer_data.get("group", ""),
             )
             singers.append(singer)
 

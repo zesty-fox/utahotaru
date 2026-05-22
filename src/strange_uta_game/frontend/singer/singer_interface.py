@@ -40,6 +40,9 @@ from qfluentwidgets import (
 
 from typing import Optional, List, Set
 
+# 分组过滤哨兵：表示「只显示无分组演唱者」，与「全部」("") 区分
+_FILTER_NO_GROUP = "\x00nogroup"
+
 from strange_uta_game.backend.domain import Project, Singer
 from strange_uta_game.backend.application import SingerService
 from strange_uta_game.backend.domain.entities import _compute_complement_color
@@ -48,18 +51,19 @@ from strange_uta_game.backend.domain.entities import _compute_complement_color
 class SingerEditDialog(QDialog):
     """演唱者编辑对话框"""
 
-    def __init__(self, singer: Singer = None, parent=None):
+    def __init__(self, singer: Singer = None, existing_groups: List[str] = None, parent=None):
         super().__init__(parent)
 
         self._singer = singer
         self._color = singer.color if singer else "#FF6B6B"
+        self._existing_groups = existing_groups or []
 
         if singer:
             self.setWindowTitle("编辑演唱者")
         else:
             self.setWindowTitle("添加演唱者")
 
-        self.resize(300, 200)
+        self.resize(300, 220)
 
         self._init_ui()
 
@@ -74,6 +78,14 @@ class SingerEditDialog(QDialog):
         else:
             self.line_name.setPlaceholderText("输入演唱者名称（留空自动编号）...")
         layout.addRow("显示名称:", self.line_name)
+
+        # 分组输入
+        self.line_group = LineEdit()
+        if self._singer and self._singer.group:
+            self.line_group.setText(self._singer.group)
+        hint = "、".join(self._existing_groups[:4]) if self._existing_groups else ""
+        self.line_group.setPlaceholderText(f"分组名称（留空为默认分组）{('，已有：' + hint) if hint else ''}")
+        layout.addRow("分组:", self.line_group)
 
         # 颜色选择
         color_layout = QHBoxLayout()
@@ -130,7 +142,40 @@ class SingerEditDialog(QDialog):
             "name": self.line_name.text().strip(),
             "color": self._color,
             "is_default": self.chk_default.isChecked(),
+            "group": self.line_group.text().strip(),
         }
+
+
+class BatchGroupDialog(QDialog):
+    """批量设置演唱者分组的对话框"""
+
+    def __init__(self, existing_groups: List[str], parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("批量设置分组")
+        self.resize(320, 130)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("选择或输入分组名称（留空则清除分组）："))
+
+        self.combo = QComboBox(self)
+        self.combo.setEditable(True)
+        self.combo.addItem("", "")
+        for g in existing_groups:
+            self.combo.addItem(g, g)
+        self.combo.setCurrentIndex(0)
+        layout.addWidget(self.combo)
+
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        button_box.button(QDialogButtonBox.StandardButton.Ok).setText("确定")
+        button_box.button(QDialogButtonBox.StandardButton.Cancel).setText("取消")
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
+    def get_group(self) -> str:
+        return self.combo.currentText().strip()
 
 
 class TransferTargetDialog(QDialog):
@@ -192,6 +237,7 @@ class SingerPresetLoadDialog(QDialog):
         self._populate_list()
 
         self.list_widget.itemChanged.connect(self._update_stats)
+        self._current_group_filter: str = ""
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
@@ -201,8 +247,21 @@ class SingerPresetLoadDialog(QDialog):
         filter_layout.addWidget(QLabel("过滤:"))
         self.line_filter = LineEdit()
         self.line_filter.setPlaceholderText("输入名称搜索...")
-        self.line_filter.textChanged.connect(self._on_filter_changed)
+        self.line_filter.textChanged.connect(self._apply_filter)
         filter_layout.addWidget(self.line_filter)
+
+        filter_layout.addWidget(QLabel("分组:"))
+        self.combo_group = QComboBox(self)
+        self.combo_group.addItem("全部分组", "")
+        # 从预设中收集所有分组
+        groups = sorted(set(p.get("group", "") for p in self._presets if p.get("group", "")))
+        if any(not p.get("group", "") for p in self._presets):
+            self.combo_group.addItem("（无分组）", _FILTER_NO_GROUP)
+        for g in groups:
+            self.combo_group.addItem(g, g)
+        self.combo_group.currentIndexChanged.connect(self._apply_filter)
+        filter_layout.addWidget(self.combo_group)
+
         layout.addLayout(filter_layout)
 
         # 演唱者列表（NoSelection，选中状态完全由 CheckState 驱动）
@@ -255,6 +314,21 @@ class SingerPresetLoadDialog(QDialog):
 
     def _populate_list(self):
         """填充列表"""
+        # 同步更新分组过滤下拉
+        self.combo_group.blockSignals(True)
+        saved_group = self.combo_group.currentData()
+        self.combo_group.clear()
+        self.combo_group.addItem("全部分组", "")
+        groups = sorted(set(p.get("group", "") for p in self._presets if p.get("group", "")))
+        has_no_group = any(not p.get("group", "") for p in self._presets)
+        if has_no_group:
+            self.combo_group.addItem("（无分组）", _FILTER_NO_GROUP)
+        for g in groups:
+            self.combo_group.addItem(g, g)
+        idx = self.combo_group.findData(saved_group)
+        self.combo_group.setCurrentIndex(idx if idx >= 0 else 0)
+        self.combo_group.blockSignals(False)
+
         self.list_widget.blockSignals(True)
         self.list_widget.clear()
         for preset in self._presets:
@@ -264,9 +338,11 @@ class SingerPresetLoadDialog(QDialog):
 
             is_existing = name in self._existing_names
             color = preset.get("color", "#FF6B6B")
+            group = preset.get("group", "")
 
             item = QListWidgetItem()
-            item.setText(f"{name}  (已存在)" if is_existing else name)
+            display_name = f"{name} [{group}]" if group else name
+            item.setText(f"{display_name}  (已存在)" if is_existing else display_name)
 
             # 演唱者颜色作为背景
             bg_color = QColor(color)
@@ -288,14 +364,23 @@ class SingerPresetLoadDialog(QDialog):
         self.list_widget.blockSignals(False)
         self._update_stats()
 
-    def _on_filter_changed(self, text: str):
-        """过滤列表，只控制显示/隐藏，不影响勾选状态"""
-        filter_text = text.strip().lower()
+    def _apply_filter(self):
+        """过滤列表（名称 + 分组），只控制显示/隐藏，不影响勾选状态"""
+        filter_text = self.line_filter.text().strip().lower()
+        group_filter = self.combo_group.currentData() or ""
         for i in range(self.list_widget.count()):
             item = self.list_widget.item(i)
             preset = item.data(Qt.ItemDataRole.UserRole)
             name = preset.get("name", "").lower()
-            item.setHidden(filter_text != "" and filter_text not in name)
+            group = preset.get("group", "")
+            name_match = not filter_text or filter_text in name
+            if group_filter == _FILTER_NO_GROUP:
+                group_match = not group
+            elif group_filter:
+                group_match = group == group_filter
+            else:
+                group_match = True
+            item.setHidden(not (name_match and group_match))
         self._update_stats()
 
     def _on_select_all(self):
@@ -317,6 +402,10 @@ class SingerPresetLoadDialog(QDialog):
                 item.setCheckState(Qt.CheckState.Unchecked)
         self.list_widget.blockSignals(False)
         self._update_stats()
+
+    # 旧名称兼容（不需要对外暴露，但防止万一有其他地方连接）
+    def _on_filter_changed(self, text: str = ""):
+        self._apply_filter()
 
     def _update_stats(self):
         """更新统计信息（总勾选数/总数）"""
@@ -371,11 +460,12 @@ class SingerPresetLoadDialog(QDialog):
             # 获取当前预设
             current_presets = self._app_settings.load_singer_presets()
             
-            # 构建要删除的名称集合
-            names_to_delete = {p.get("name", "") for p in selected_presets}
-            
-            # 过滤掉要删除的预设
-            updated_presets = [p for p in current_presets if p.get("name", "") not in names_to_delete]
+            # 按 (name, group) 精确匹配删除，避免误删同名不同分组的预设
+            keys_to_delete = {(p.get("name", ""), p.get("group", "")) for p in selected_presets}
+            updated_presets = [
+                p for p in current_presets
+                if (p.get("name", ""), p.get("group", "")) not in keys_to_delete
+            ]
             
             # 保存更新后的预设
             self._app_settings.save_singer_presets(updated_presets)
@@ -430,6 +520,8 @@ class SingerManagerInterface(QWidget):
         self._suppress_reorder_signal = False
         # 当前搜索关键词（用于禁用顺序按钮）
         self._filter_text: str = ""
+        # 当前分组过滤
+        self._group_filter: str = ""
         # 持久选中状态：跨搜索/刷新保留，以 singer.id 为键
         self._selected_ids: Set[str] = set()
 
@@ -452,13 +544,21 @@ class SingerManagerInterface(QWidget):
         )
         layout.addWidget(desc)
 
-        # 搜索框（常驻）
+        # 搜索框 + 分组过滤（常驻）
         search_row = QHBoxLayout()
         self.line_search = LineEdit()
         self.line_search.setPlaceholderText("搜索演唱者名称...")
         self.line_search.setClearButtonEnabled(True)
         self.line_search.textChanged.connect(self._on_search_changed)
         search_row.addWidget(self.line_search)
+
+        search_row.addWidget(QLabel("分组:"))
+        self.combo_group_filter = QComboBox(self)
+        self.combo_group_filter.addItem("全部", "")
+        self.combo_group_filter.setMinimumWidth(90)
+        self.combo_group_filter.currentIndexChanged.connect(self._on_group_filter_changed)
+        search_row.addWidget(self.combo_group_filter)
+
         layout.addLayout(search_row)
 
         # 演唱者列表
@@ -498,6 +598,14 @@ class SingerManagerInterface(QWidget):
         row1.addWidget(self.btn_delete)
 
         # 分隔
+        row1.addSpacing(10)
+
+        self.btn_set_group = PushButton("设置分组", self)
+        self.btn_set_group.setIcon(FIF.TAG)
+        self.btn_set_group.clicked.connect(self._on_set_group)
+        self.btn_set_group.setEnabled(False)
+        row1.addWidget(self.btn_set_group)
+
         row1.addSpacing(10)
 
         self.btn_enable = PushButton("启用", self)
@@ -602,6 +710,24 @@ class SingerManagerInterface(QWidget):
         # 抑制 rowsMoved 信号（清空/填充时不触发 reorder 回调）
         self._suppress_reorder_signal = True
         try:
+            # 动态更新分组过滤下拉（保留当前选中分组）
+            if self._project:
+                self.combo_group_filter.blockSignals(True)
+                all_groups = sorted(set(s.group for s in self._project.singers if s.group))
+                has_no_group = any(not s.group for s in self._project.singers)
+                current_group = self._group_filter
+                self.combo_group_filter.clear()
+                self.combo_group_filter.addItem("全部", "")
+                if has_no_group:
+                    self.combo_group_filter.addItem("（无分组）", _FILTER_NO_GROUP)
+                for g in all_groups:
+                    self.combo_group_filter.addItem(g, g)
+                idx = self.combo_group_filter.findData(current_group)
+                self.combo_group_filter.setCurrentIndex(idx if idx >= 0 else 0)
+                if idx < 0:
+                    self._group_filter = ""
+                self.combo_group_filter.blockSignals(False)
+
             self.list_singers.clear()
 
             if not self._project:
@@ -612,14 +738,22 @@ class SingerManagerInterface(QWidget):
             filter_lower = self._filter_text.strip().lower()
 
             for singer in self._project.singers:
-                # 过滤
+                # 名称过滤
                 if filter_lower and filter_lower not in singer.name.lower():
+                    continue
+                # 分组过滤
+                if self._group_filter == _FILTER_NO_GROUP:
+                    if singer.group:
+                        continue
+                elif self._group_filter and singer.group != self._group_filter:
                     continue
 
                 item = QListWidgetItem()
 
-                # 显示格式: [后台编号] 名称 [默认] (已禁用)
+                # 显示格式: [后台编号] 名称 (分组) [默认] (已禁用)
                 display_text = singer.name
+                if singer.group:
+                    display_text += f" ({singer.group})"
                 if singer.is_default:
                     display_text += " [默认]"
                 if not singer.enabled:
@@ -672,8 +806,9 @@ class SingerManagerInterface(QWidget):
             selected_count = len(self.list_singers.selectedItems())
             if selected_count > 0:
                 stats_text += f" — 已选中 {selected_count} 位"
-            if filter_lower:
-                stats_text += f"  [搜索中：{self.list_singers.count()} 项可见]"
+            visible = self.list_singers.count()
+            if filter_lower or self._group_filter:
+                stats_text += f"  [过滤中：{visible} 项可见]"
             self.lbl_stats.setText(stats_text)
         finally:
             self._suppress_reorder_signal = False
@@ -739,10 +874,8 @@ class SingerManagerInterface(QWidget):
             selected_count = len(self._selected_ids)
             if selected_count > 0:
                 stats_text += f" — 已选中 {selected_count} 位"
-            if self._filter_text.strip():
-                stats_text += (
-                    f"  [搜索中：{self.list_singers.count()} 项可见]"
-                )
+            if self._filter_text.strip() or self._group_filter:
+                stats_text += f"  [过滤中：{self.list_singers.count()} 项可见]"
             self.lbl_stats.setText(stats_text)
 
     def _update_button_state(self):
@@ -761,21 +894,28 @@ class SingerManagerInterface(QWidget):
             has_project and n_selected >= 1 and (total - n_selected) >= 1
         )
 
+        # 设置分组
+        self.btn_set_group.setEnabled(has_project and n_selected >= 1)
+
         # 启用/禁用
         self.btn_enable.setEnabled(has_project and n_selected >= 1)
         self.btn_disable.setEnabled(has_project and n_selected >= 1)
 
-        # 顺序：搜索过滤时禁用（看不到完整列表，操作会困惑）
-        order_ok = has_project and n_selected >= 1 and not is_filtering
+        # 顺序：过滤时禁用（看不到完整列表，操作会困惑）
+        order_ok = has_project and n_selected >= 1 and not is_filtering and not self._group_filter
         self.btn_top.setEnabled(order_ok)
         self.btn_up.setEnabled(order_ok)
         self.btn_down.setEnabled(order_ok)
         self.btn_bottom.setEnabled(order_ok)
 
-    # ==================== 搜索 ====================
+    # ==================== 搜索 / 分组过滤 ====================
 
     def _on_search_changed(self, text: str):
         self._filter_text = text or ""
+        self._refresh_list()
+
+    def _on_group_filter_changed(self):
+        self._group_filter = self.combo_group_filter.currentData() or ""
         self._refresh_list()
 
     # ==================== 拖放重排 ====================
@@ -811,12 +951,18 @@ class SingerManagerInterface(QWidget):
 
     # ==================== 添加 / 编辑 ====================
 
+    def _get_existing_groups(self) -> List[str]:
+        """获取当前项目中已存在的分组名称列表"""
+        if not self._project:
+            return []
+        return sorted(set(s.group for s in self._project.singers if s.group))
+
     def _on_add_singer(self):
         if not self._project:
             self._warn("未加载项目", "请先打开或创建一个项目")
             return
 
-        dialog = SingerEditDialog(parent=self)
+        dialog = SingerEditDialog(existing_groups=self._get_existing_groups(), parent=self)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
@@ -824,7 +970,7 @@ class SingerManagerInterface(QWidget):
         try:
             singer_name = data["name"] if data["name"] else None
             singer = self._singer_service.add_singer(
-                name=singer_name, color=data["color"]
+                name=singer_name, color=data["color"], group=data.get("group", "")
             )
             if data["is_default"]:
                 self._singer_service.set_default_singer(singer.id)
@@ -842,7 +988,7 @@ class SingerManagerInterface(QWidget):
         if not singer:
             return
 
-        dialog = SingerEditDialog(singer, self)
+        dialog = SingerEditDialog(singer, existing_groups=self._get_existing_groups(), parent=self)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
@@ -854,6 +1000,9 @@ class SingerManagerInterface(QWidget):
                 self._singer_service.change_singer_color(singer.id, data["color"])
             if data["is_default"] and not singer.is_default:
                 self._singer_service.set_default_singer(singer.id)
+            new_group = data.get("group", "")
+            if new_group != singer.group:
+                self._singer_service.change_singer_group(singer.id, new_group)
 
             self._notify_singers_changed()
             self._info("修改成功", f"已更新演唱者: {singer.name}")
@@ -944,6 +1093,30 @@ class SingerManagerInterface(QWidget):
             f"已{'启用' if enabled else '禁用'} {len(selected_ids)} 位演唱者",
         )
 
+    # ==================== 批量设置分组 ====================
+
+    def _on_set_group(self):
+        selected_ids = self._get_selected_singer_ids()
+        if not selected_ids:
+            return
+
+        dialog = BatchGroupDialog(self._get_existing_groups(), parent=self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        new_group = dialog.get_group()
+        ok = all(
+            self._singer_service.change_singer_group(sid, new_group)
+            for sid in selected_ids
+        )
+        if not ok:
+            self._error("操作失败", "部分演唱者分组未能更新")
+            return
+
+        self._notify_singers_changed()
+        label = f"「{new_group}」" if new_group else "（无分组）"
+        self._info("完成", f"已将 {len(selected_ids)} 位演唱者设为分组 {label}")
+
     # ==================== 顺序调整（按钮） ====================
 
     def _on_move(self, direction: str):
@@ -973,26 +1146,34 @@ class SingerManagerInterface(QWidget):
         app_settings = AppSettings()
         existing_presets = app_settings.load_singer_presets()
 
-        # 构建当前项目演唱者名称集合
-        current_names = {s.name for s in self._project.singers}
+        current_singers = self._project.singers
 
-        # 保留本次项目未使用的预设（名称不在当前项目中的）
-        kept_presets = [
-            p for p in existing_presets
-            if p.get("name", "") not in current_names
-        ]
+        # 合并规则：
+        # 旧预设被「替换」的条件（即不保留）：
+        #   同名 且（旧分组为空 或 旧分组 == 当前演唱者分组）
+        # 旧预设被「保留」：同名但旧分组非空且与任何当前同名演唱者分组均不同
+        kept_presets = []
+        for ep in existing_presets:
+            ep_name = ep.get("name", "")
+            ep_group = ep.get("group", "")
+            covered = any(
+                s.name == ep_name and (ep_group == "" or ep_group == s.group)
+                for s in current_singers
+            )
+            if not covered:
+                kept_presets.append(ep)
 
         # 当前项目演唱者转预设（放在顶部）
-        new_presets = []
-        for s in self._project.singers:
-            new_presets.append(
-                {
-                    "name": s.name,
-                    "color": s.color,
-                    "is_default": s.is_default,
-                    "backend_number": s.backend_number,
-                }
-            )
+        new_presets = [
+            {
+                "name": s.name,
+                "color": s.color,
+                "is_default": s.is_default,
+                "backend_number": s.backend_number,
+                "group": s.group,
+            }
+            for s in current_singers
+        ]
 
         # 合并：新预设在前，保留的旧预设在后
         merged = new_presets + kept_presets
@@ -1035,7 +1216,9 @@ class SingerManagerInterface(QWidget):
                 continue
             try:
                 singer = self._singer_service.add_singer(
-                    name=name, color=preset.get("color", "#FF6B6B")
+                    name=name,
+                    color=preset.get("color", "#FF6B6B"),
+                    group=preset.get("group", ""),
                 )
                 if preset.get("is_default", False):
                     self._singer_service.set_default_singer(singer.id)
