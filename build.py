@@ -51,7 +51,6 @@ try:
     import numpy
     import winrt.windows.globalization  # 日语注音主引擎（WinRT IME）
     import jaconv
-    import av
 
     print("✓ 所有依赖已安装")
     # 打印版本信息
@@ -62,7 +61,6 @@ try:
     print(f"  numpy: {numpy.__version__}")
     print(f"  pykakasi: {getattr(pykakasi, '__version__', 'unknown')}")
     print(f"  jaconv: {getattr(jaconv, '__version__', 'unknown')}")
-    print(f"  av: {av.__version__}")
 except ImportError as e:
     print(f"✗ 缺少依赖: {e}")
     print("请先运行: pip install -r requirements.txt")
@@ -96,24 +94,6 @@ args = [
     "--hidden-import=numpy.core",
     "--hidden-import=numpy.fft",
     "--hidden-import=numpy.lib",
-    # PyAV (视频音频提取)
-    "--hidden-import=av",
-    "--hidden-import=av.container",
-    "--hidden-import=av.stream",
-    "--hidden-import=av.frame",
-    "--hidden-import=av.packet",
-    "--hidden-import=av.audio",
-    "--hidden-import=av.audio.stream",
-    "--hidden-import=av.audio.frame",
-    "--hidden-import=av.audio.fifo",
-    "--hidden-import=av.video",
-    "--hidden-import=av.video.stream",
-    "--hidden-import=av.video.frame",
-    "--hidden-import=av.codec",
-    "--hidden-import=av.codec.context",
-    "--hidden-import=av.format",
-    "--hidden-import=av.option",
-    "--hidden-import=av.error",
     # 日语处理
     "--hidden-import=pykakasi",
     "--hidden-import=pykakasi.kakasi",
@@ -279,13 +259,6 @@ print("=" * 60)
 #   --hidden-import=numpy \
 #   --hidden-import=numpy.core \
 #   --hidden-import=numpy.fft \
-#   --hidden-import=av \
-#   --hidden-import=av.container \
-#   --hidden-import=av.stream \
-#   --hidden-import=av.frame \
-#   --hidden-import=av.audio \
-#   --hidden-import=av.video \
-#   --hidden-import=av.codec \
 #   --hidden-import=pykakasi \
 #   --hidden-import=pykakasi.kakasi \
 #   --hidden-import=sudachipy \
