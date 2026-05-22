@@ -2,10 +2,10 @@
   "audio": {
     "default_volume": 60,
     "default_speed": 1.0,
-    "speed_slider_min": 0.5,
+    "speed_slider_min": 0.2,
     "speed_slider_max": 1.0,
     "auto_play_on_load": false,
-    "hq_speed_change": false
+    "hq_speed_change": true
   },
   "timing": {
     "default_check_count": 1,
@@ -78,7 +78,7 @@
   "export": {
     "default_format": "Nicokara (带注音)",
     "auto_add_extension": true,
-    "last_export_dir": "C:\\Users\\FMPeach\\Downloads",
+    "last_export_dir": "E:\\ニコカラ\\049森羅万象 - カリスマ煉獄天神",
     "offset_ms": 0,
     "software_compensation_ms": 0,
     "nicokara_pause_char": "^"
@@ -264,7 +264,8 @@
       "enabled": false,
       "interval_value": 1,
       "interval_unit": "week"
-    }
+    },
+    "last_auto_update_at": 0
   },
   "updater": {
     "enabled": true,
@@ -282,7 +283,7 @@
     },
     "skipped_version": "0.3.18",
     "last_seen_version": "0.3.18",
-    "last_check_at": 1779368698
+    "last_check_at": 1779465895
   },
   "applied_dictionary_version": 6
 }
