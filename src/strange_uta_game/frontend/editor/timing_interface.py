@@ -733,10 +733,14 @@ class EditorInterface(QWidget):
 
     # ==================== 工具栏操作 ====================
 
-    # 判断文本是否为全文本编辑器的内联格式：
-    # 匹配句尾 token [>...] 或双竖线注音块 {原文||...}，两者均为我们格式独有，
-    # 标准 LRC / 纯文本歌词不含此特征，不会误判。
-    _INLINE_TS_DETECT_RE = re.compile(r"\[>[^\]]*\]|\{[^{}]+\|\|")
+    # 判断文本是否为全文本编辑器的内联格式。匹配以下任意一种特征：
+    # - [>...] 句尾 token（我们格式独有）
+    # - {原文||...} 双竖线注音块（我们格式独有）
+    # - [T] 占位符（我们格式独有）
+    # - [ts]X[ 连续逐字时间戳（LRC 每行只有一个起始 token，不会出现此模式）
+    _INLINE_TS_DETECT_RE = re.compile(
+        r"\[>[^\]]*\]|\{[^{}]+\|\||\[T\]|\[\d+:\d{2}\.\d{2}\].\["
+    )
 
     def _on_paste_lyrics(self):
         """从剪贴板粘贴（Ctrl+V）。
@@ -890,13 +894,15 @@ class EditorInterface(QWidget):
         self._execute_structural_edit("粘贴内联格式", _mutate_inline)
 
     def _on_copy_chars(self):
-        """复制选中字符的完整信息（Ctrl+C）。
+        """复制选中字符为内联时间戳格式（Ctrl+C）。
 
-        focus 拖选范围优先，否则取当前字符。深拷贝后存入内部缓冲区，
-        同时把字符文本写入系统剪贴板（便于跨应用粘贴，也用于 Ctrl+V 时
-        判别"富信息粘贴 vs 纯文本插入"）。
+        编码为内联格式字符串写入系统剪贴板，Ctrl+V 时可经
+        _INLINE_TS_DETECT_RE 识别并通过 _paste_inline_format 无损还原。
         """
         from PyQt6.QtWidgets import QApplication
+        from strange_uta_game.backend.infrastructure.parsers.annotated_text import (
+            sentence_to_timed_line,
+        )
 
         if not self._project:
             return
@@ -926,13 +932,19 @@ class EditorInterface(QWidget):
         if not chars:
             return
 
-        self._char_clipboard = chars
-        text = "".join(c.char for c in chars)
-        self._char_clipboard_text = text
+        id_to_name = {s.id: s.name for s in self._project.singers}
+        offset = getattr(self._project, "global_offset_ms", 0) or 0
+        inline_text, _ = sentence_to_timed_line(
+            chars,
+            singer_id_to_name=id_to_name,
+            line_singer_id=sentence.singer_id,
+            default_singer_id=sentence.singer_id,
+            offset_ms=offset,
+        )
 
         clipboard = QApplication.clipboard()
         if clipboard:
-            clipboard.setText(text)
+            clipboard.setText(inline_text)
 
         InfoBar.success(
             title="已复制",
