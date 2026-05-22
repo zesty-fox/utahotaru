@@ -64,18 +64,15 @@ def _ruby_is_all_hiragana(ruby_text: str) -> bool:
 
 # 剥离行内结构化标签的正则（按顺序应用）
 _STRIP_SINGER_RE = re.compile(r"【[^】]*】")
-_STRIP_RUBY_DOUBLE_BAR_RE = re.compile(r"\{([^}]*?)\|\|[^}]*\}")  # {原文||读音} → 原文
-_STRIP_RUBY_SINGLE_BAR_RE = re.compile(r"\{([^|}]*)\|[^}]*\}")    # {原文|读音} → 原文
-_STRIP_RUBY_PLAIN_RE = re.compile(r"\{([^}]*)\}")                  # {原文} → 原文
+# 仅剥合规注音块：原文非空 + 含 ||（不合规块保留原样参与字宽统计）
+_STRIP_RUBY_VALID_RE = re.compile(r"\{([^}]+?)\|\|[^}]*\}")
 _STRIP_TIMESTAMP_RE = re.compile(r"\[>?(?:T|\d+:\d{2}\.\d{2})\]")  # 仅剥合法 token：[T]/[>T]/[mm:ss.xx]
 
 
 def _strip_line_tags(line: str) -> str:
-    """去除行内所有结构化标签，返回原始文本（保留歌词字符、空格、符号）。"""
+    """去除行内合规结构化标签，返回视觉文本（非法块/token 保留原样参与字宽统计）。"""
     text = _STRIP_SINGER_RE.sub("", line)
-    text = _STRIP_RUBY_DOUBLE_BAR_RE.sub(r"\1", text)
-    text = _STRIP_RUBY_SINGLE_BAR_RE.sub(r"\1", text)
-    text = _STRIP_RUBY_PLAIN_RE.sub(r"\1", text)
+    text = _STRIP_RUBY_VALID_RE.sub(r"\1", text)
     text = _STRIP_TIMESTAMP_RE.sub("", text)
     return text
 
