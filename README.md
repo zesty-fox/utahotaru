@@ -45,7 +45,7 @@
   <a href="#-faq">FAQ</a>
 </p>
 
-<sub>🇨🇳 中文 · 🇬🇧 English &nbsp;|&nbsp; <code>Karaoke · ASS · 卡拉OK · 打轴</code></sub>
+<sub>🇨🇳 中文 · 🇬🇧 English &nbsp;|&nbsp; <code> Nicokara  · Karaoke · ASS · 卡拉OK · 打轴</code></sub>
 
 <br/><br/>
 
