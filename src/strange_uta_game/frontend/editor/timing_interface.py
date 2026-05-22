@@ -2286,8 +2286,10 @@ class EditorInterface(QWidget):
         if self._timing_service:
             try:
                 self._timing_service.play()
-                self.transport.set_playing(self._timing_service.is_playing())
-                self.preview.set_playing(self._timing_service.is_playing())
+                is_playing = self._timing_service.is_playing()
+                self.transport.set_playing(is_playing)
+                self.preview.set_playing(is_playing)
+                self.timeline.set_playing(is_playing)
                 self.lbl_status.setText("播放中")
                 self._update_mode_indicator()
                 self.preview._last_auto_scroll_line_idx = -1
@@ -2306,6 +2308,7 @@ class EditorInterface(QWidget):
             self._timing_service.pause()
             self.transport.set_playing(False)
             self.preview.set_playing(False)
+            self.timeline.set_playing(False)
             self.lbl_status.setText("已暂停")
             self._update_mode_indicator()
             # 重置自动滚动状态
@@ -2322,6 +2325,7 @@ class EditorInterface(QWidget):
             self._timing_service.stop()
             self.transport.set_playing(False)
             self.preview.set_playing(False)
+            self.timeline.set_playing(False)
             self.transport.set_position(0)
             self.timeline.set_position(0)
             self.lbl_status.setText("已停止")
@@ -4170,6 +4174,7 @@ class EditorInterface(QWidget):
         if not engine.is_playing():
             self.transport.set_playing(False)
             self.preview.set_playing(False)
+            self.timeline.set_playing(False)
             self.lbl_status.setText("播放完毕")
             self._update_mode_indicator()
             # 重置自动滚动状态

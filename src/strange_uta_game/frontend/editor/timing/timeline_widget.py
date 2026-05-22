@@ -6,10 +6,11 @@
 
 from __future__ import annotations
 
+import math
 from typing import List, Optional
 
 import numpy as np
-from PyQt6.QtCore import QPoint, Qt, pyqtSignal
+from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (
     QBrush,
     QColor,
@@ -64,25 +65,65 @@ class WaveformDisplay(QWidget):
         self._peaks_cache: Optional[List[tuple]] = None
         self._peaks_cache_key: Optional[tuple] = None  # (width, zoom, scroll, samples_id)
 
+        # 左键拖动平移状态
+        self._pan_start_x: Optional[float] = None
+        self._pan_start_scroll: float = 0.0
+        self._is_panning: bool = False
+
+        # 自动滚动挂起（用户手动操作后 6s 内不跟随播放头）
+        self._auto_scroll_suspended: bool = False
+        self._suspension_timer = QTimer(self)
+        self._suspension_timer.setSingleShot(True)
+        self._suspension_timer.setInterval(6000)
+        self._suspension_timer.timeout.connect(self._resume_auto_scroll)
+
         self.setMinimumHeight(80)
         self.setMouseTracking(True)
 
         # 监听主题变化，触发重绘
         theme.changed.connect(self.update)
 
+    def _max_scroll(self) -> float:
+        """当前缩放下允许的最大滚动位置，保证视窗末尾不超出音频范围。"""
+        if self._zoom_factor <= 1.0:
+            return 0.0
+        return max(0.0, 1.0 - 1.0 / self._zoom_factor)
+
+    def _clamp_scroll(self, position: float) -> float:
+        return max(0.0, min(self._max_scroll(), position))
+
     def set_duration(self, ms: int):
         self._duration_ms = ms
+        # 时长变化后重新 clamp，避免旧滚动位置超出新范围
+        self._scroll_position = self._clamp_scroll(self._scroll_position)
         self.update()
+
+    def _suspend_auto_scroll(self) -> None:
+        """用户手动操作后挂起自动滚动，重置 6s 倒计时。"""
+        self._auto_scroll_suspended = True
+        self._suspension_timer.start()
+
+    def _resume_auto_scroll(self) -> None:
+        """恢复自动跟随播放头。"""
+        self._auto_scroll_suspended = False
+        self._suspension_timer.stop()
+
+    def set_playing(self, playing: bool) -> None:
+        """播放状态变化：重新开始播放时取消自动滚动挂起。"""
+        if playing:
+            self._resume_auto_scroll()
 
     def set_position(self, ms: int):
         self._current_ms = ms
-        # 自动滚动保持播放头可见
-        if self._duration_ms > 0 and self._zoom_factor > 1.0:
+        # 自动滚动保持播放头可见（用户手动操作后挂起）
+        if self._duration_ms > 0 and self._zoom_factor > 1.0 and not self._auto_scroll_suspended:
             visible_start = self._scroll_position * self._duration_ms
             visible_end = visible_start + self._duration_ms / self._zoom_factor
             if ms < visible_start or ms > visible_end:
-                self._scroll_position = max(0.0, min(1.0,
-                    (ms - self._duration_ms / (2 * self._zoom_factor)) / self._duration_ms))
+                new_scroll = self._clamp_scroll(
+                    (ms - self._duration_ms / (2 * self._zoom_factor)) / self._duration_ms
+                )
+                self._scroll_position = new_scroll
                 self.scroll_position_changed.emit(self._scroll_position)
         self.update()
 
@@ -101,10 +142,12 @@ class WaveformDisplay(QWidget):
 
     def set_zoom(self, zoom: float):
         self._zoom_factor = max(1.0, min(100.0, zoom))
+        # 缩放变化后重新 clamp，避免当前滚动位置超出新的有效范围
+        self._scroll_position = self._clamp_scroll(self._scroll_position)
         self.update()
 
     def set_scroll_position(self, position: float):
-        self._scroll_position = max(0.0, min(1.0, position))
+        self._scroll_position = self._clamp_scroll(position)
         self.update()
 
     def _compute_waveform_peaks(self, width: int) -> Optional[List[tuple]]:
@@ -265,12 +308,46 @@ class WaveformDisplay(QWidget):
     def mousePressEvent(self, a0: Optional[QMouseEvent]):
         if a0 is None or self._duration_ms <= 0:
             return
+        if a0.button() == Qt.MouseButton.LeftButton:
+            self._pan_start_x = a0.position().x()
+            self._pan_start_scroll = self._scroll_position
+            self._is_panning = False
+            self.setCursor(Qt.CursorShape.OpenHandCursor)
 
-        visible_duration_ms = self._duration_ms / self._zoom_factor
-        visible_start_ms = self._scroll_position * self._duration_ms
-        ratio = max(0.0, min(1.0, a0.position().x() / self.width()))
-        target_ms = int(visible_start_ms + ratio * visible_duration_ms)
-        self.seek_requested.emit(target_ms)
+    def mouseMoveEvent(self, a0: Optional[QMouseEvent]):
+        if a0 is None or self._duration_ms <= 0 or self._pan_start_x is None:
+            return
+        if not (a0.buttons() & Qt.MouseButton.LeftButton):
+            return
+        delta_x = a0.position().x() - self._pan_start_x
+        if not self._is_panning and abs(delta_x) > 4:
+            self._is_panning = True
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+        if self._is_panning:
+            visible_duration_ms = self._duration_ms / self._zoom_factor
+            delta_ms = delta_x / self.width() * visible_duration_ms
+            new_scroll = self._clamp_scroll(
+                self._pan_start_scroll - delta_ms / self._duration_ms)
+            if new_scroll != self._scroll_position:
+                self._suspend_auto_scroll()
+                self._scroll_position = new_scroll
+                self.scroll_position_changed.emit(self._scroll_position)
+                self.update()
+
+    def mouseReleaseEvent(self, a0: Optional[QMouseEvent]):
+        if a0 is None or self._duration_ms <= 0:
+            return
+        if a0.button() == Qt.MouseButton.LeftButton:
+            if not self._is_panning and self._pan_start_x is not None:
+                # 未发生平移，视为点击 → seek
+                visible_duration_ms = self._duration_ms / self._zoom_factor
+                visible_start_ms = self._scroll_position * self._duration_ms
+                ratio = max(0.0, min(1.0, a0.position().x() / self.width()))
+                target_ms = int(visible_start_ms + ratio * visible_duration_ms)
+                self.seek_requested.emit(target_ms)
+            self._pan_start_x = None
+            self._is_panning = False
+            self.unsetCursor()
 
     def wheelEvent(self, a0: Optional[QWheelEvent]):
         if a0 is None:
@@ -288,8 +365,8 @@ class WaveformDisplay(QWidget):
 
             self._zoom_factor = new_zoom
             new_visible_duration = 1.0 / self._zoom_factor
-            self._scroll_position = max(0.0, min(1.0,
-                audio_position - mouse_ratio * new_visible_duration))
+            self._scroll_position = self._clamp_scroll(
+                audio_position - mouse_ratio * new_visible_duration)
 
             self.zoom_changed.emit(self._zoom_factor)
             self.scroll_position_changed.emit(self._scroll_position)
@@ -327,10 +404,10 @@ class TimelineWidget(QWidget):
         bottom_layout.setContentsMargins(4, 0, 4, 2)
         bottom_layout.setSpacing(8)
 
-        # 缩放控制
+        # 缩放控制（对数刻度：滑条 0-10000 线性对应 zoom 1x-100x 对数）
         self.zoom_slider = QSlider(Qt.Orientation.Horizontal, self)
-        self.zoom_slider.setRange(100, 10000)
-        self.zoom_slider.setValue(5000)  # 默认50x
+        self.zoom_slider.setRange(0, 10000)
+        self.zoom_slider.setValue(self._zoom_to_slider(50.0))  # 默认50x
         self.zoom_slider.setFixedWidth(120)
         self.zoom_slider.valueChanged.connect(self._on_zoom_slider_changed)
         bottom_layout.addWidget(self.zoom_slider)
@@ -371,9 +448,27 @@ class TimelineWidget(QWidget):
         """设置音频文件名称显示"""
         self.lbl_audio_name.setText(name)
 
+    def set_playing(self, playing: bool) -> None:
+        self.waveform_display.set_playing(playing)
+
+    # ---- 缩放对数刻度转换（zoom 范围 1x-100x，slider 范围 0-10000）----
+
+    @staticmethod
+    def _slider_to_zoom(value: int) -> float:
+        """滑条整数值 → 实际放大倍数（对数映射）。"""
+        return 100.0 ** (value / 10000.0)
+
+    @staticmethod
+    def _zoom_to_slider(zoom: float) -> int:
+        """实际放大倍数 → 滑条整数值（对数映射）。"""
+        zoom = max(1.0, min(100.0, zoom))
+        return int(round(math.log(zoom) / math.log(100.0) * 10000))
+
+    # ---- 回调 ----
+
     def _on_zoom_changed(self, zoom: float):
         self.zoom_slider.blockSignals(True)
-        self.zoom_slider.setValue(int(zoom * 100))
+        self.zoom_slider.setValue(self._zoom_to_slider(zoom))
         self.zoom_slider.blockSignals(False)
         self.zoom_label.setText(f"{zoom:.1f}x")
 
@@ -383,10 +478,12 @@ class TimelineWidget(QWidget):
         self.scroll_bar.blockSignals(False)
 
     def _on_zoom_slider_changed(self, value: int):
-        zoom = value / 100.0
+        self.waveform_display._suspend_auto_scroll()
+        zoom = self._slider_to_zoom(value)
         self.waveform_display.set_zoom(zoom)
         self.zoom_label.setText(f"{zoom:.1f}x")
 
     def _on_scroll_bar_changed(self, value: int):
+        self.waveform_display._suspend_auto_scroll()
         position = value / 1000.0
         self.waveform_display.set_scroll_position(position)
