@@ -224,6 +224,7 @@ class TransportBar(QFrame):
         self.slider_speed.setPageStep(5)
         self.slider_speed.setValue(clamped)
         self.slider_speed.blockSignals(False)
+        self.slider_speed._adjustHandlePos()
         self._set_speed_label(clamped)
 
         if emit_signal and clamped != current:
@@ -239,6 +240,7 @@ class TransportBar(QFrame):
             self.slider_speed.blockSignals(True)
             self.slider_speed.setValue(pct)
             self.slider_speed.blockSignals(False)
+            self.slider_speed._adjustHandlePos()
             self._set_speed_label(pct)
         return pct
 

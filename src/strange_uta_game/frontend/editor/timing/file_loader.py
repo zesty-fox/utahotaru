@@ -104,7 +104,7 @@ class FileLoader:
         )
         if path:
             self._save_last_dir(path)
-            self.load_project(path)
+            self.load_project(path, check_unsaved=False)
 
     def prompt_load_audio(self):
         """弹出文件选择框加载音频或视频"""
@@ -222,6 +222,31 @@ class FileLoader:
                         samples, info.sample_rate, info.channels
                     )
 
+        # 应用设置中的默认音量和速度
+        if self._timing_service:
+            main_window = self._editor.window()
+            setting_iface = getattr(main_window, "settingInterface", None)
+            if setting_iface is not None:
+                settings = setting_iface.get_settings()
+                default_volume = int(settings.get("audio.default_volume", 80))
+                self._editor.transport.slider_volume.setValue(default_volume)
+                speed_min = settings.get("audio.speed_slider_min", 0.5)
+                speed_max = settings.get("audio.speed_slider_max", 1.0)
+                self._editor.transport.set_speed_range(
+                    speed_min,
+                    speed_max,
+                    emit_signal=False,
+                )
+                default_speed = settings.get("audio.default_speed", 1.0)
+                speed_pct = self._editor.transport.set_speed_value(
+                    int(default_speed * 100), emit_signal=False
+                )
+                self._timing_service.set_speed(speed_pct / 100.0)
+                self._timing_service.prewarm_speeds(
+                    speed_min=speed_min,
+                    speed_max=speed_max,
+                )
+
         # 通知 store
         if self._store:
             self._store.set_audio_path(temp_path)
@@ -300,9 +325,9 @@ class FileLoader:
 
         return True
 
-    def load_project(self, file_path: str):
+    def load_project(self, file_path: str, check_unsaved: bool = True):
         """加载 .sug 项目文件（异步）"""
-        if not self.check_unsaved_changes():
+        if check_unsaved and not self.check_unsaved_changes():
             return
 
         from strange_uta_game.frontend.theme import theme
@@ -349,10 +374,8 @@ class FileLoader:
             self._state_tooltip = None
 
         if self._store:
-            self._store._project = project
-            self._store._save_path = file_path
+            self._store.load_project(project, save_path=file_path)
             self._store.set_working_dir(file_path)
-            self._store.notify("project")
         else:
             self._editor.set_project(project)
 
@@ -546,9 +569,7 @@ class FileLoader:
 
             # 加载项目（无文件路径，保存时需用户选择）
             if self._store:
-                self._store._project = project
-                self._store._save_path = None
-                self._store.notify("project")
+                self._store.load_project(project)
             else:
                 self._editor.set_project(project)
 
