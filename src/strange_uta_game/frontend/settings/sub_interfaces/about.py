@@ -47,7 +47,31 @@ class AboutSubInterface(SubSettingInterface):
         self._path_card.hBoxLayout.addWidget(btn_change, 0, Qt.AlignmentFlag.AlignRight)
         self._path_card.hBoxLayout.addSpacing(16)
         self.about_group.addSettingCard(self._path_card)
+
+        # FFmpeg 路径设置卡
+        self.tools_group = SettingCardGroup("工具配置", self.scrollWidget)
+        self._ffmpeg_card = SettingCard(
+            FIF.MOVIE, "FFmpeg 路径",
+            "用于加载视频文件时提取音频（留空则使用系统环境变量）",
+            self.tools_group,
+        )
+        self._ffmpeg_path_label = PushButton("（使用环境变量）", self._ffmpeg_card)
+        self._ffmpeg_path_label.setFont(QFont("Microsoft YaHei", 9))
+        self._ffmpeg_path_label.setEnabled(False)
+        self._ffmpeg_path_label.setMaximumWidth(260)
+        btn_browse_ffmpeg = PushButton("浏览", self._ffmpeg_card)
+        btn_browse_ffmpeg.setFont(QFont("Microsoft YaHei", 10))
+        btn_browse_ffmpeg.clicked.connect(self._browse_ffmpeg)
+        btn_clear_ffmpeg = PushButton("清除", self._ffmpeg_card)
+        btn_clear_ffmpeg.setFont(QFont("Microsoft YaHei", 10))
+        btn_clear_ffmpeg.clicked.connect(self._clear_ffmpeg_path)
+        self._ffmpeg_card.hBoxLayout.addWidget(self._ffmpeg_path_label, 0, Qt.AlignmentFlag.AlignRight)
+        self._ffmpeg_card.hBoxLayout.addWidget(btn_browse_ffmpeg, 0, Qt.AlignmentFlag.AlignRight)
+        self._ffmpeg_card.hBoxLayout.addWidget(btn_clear_ffmpeg, 0, Qt.AlignmentFlag.AlignRight)
+        self._ffmpeg_card.hBoxLayout.addSpacing(16)
+        self.tools_group.addSettingCard(self._ffmpeg_card)
         self.expandLayout.addWidget(self.about_group)
+        self.expandLayout.addWidget(self.tools_group)
 
         # 保存/重置按钮
         btn_widget = QWidget(self.scrollWidget)
@@ -71,9 +95,11 @@ class AboutSubInterface(SubSettingInterface):
     def load_settings(self, s):
         self._settings_ref = s
         self._path_card.setContent(str(s._config_path))
+        ffmpeg_path = s.get("tools.ffmpeg_path", "")
+        self._update_ffmpeg_label(ffmpeg_path)
 
     def collect_settings(self, s):
-        pass  # 关于页没有可编辑的设置项
+        pass  # 关于页的 FFmpeg 路径在浏览/清除时即时保存，无需在此收集
 
     def _open_config_dir(self):
         if self._settings_ref is None:
@@ -132,3 +158,43 @@ class AboutSubInterface(SubSettingInterface):
         InfoBar.success(title="配置位置已更改", content=f"配置文件将保存到: {new_path}",
             orient=Qt.Orientation.Horizontal, isClosable=True,
             position=InfoBarPosition.TOP, duration=5000, parent=self)
+
+    def _update_ffmpeg_label(self, path: str):
+        if path:
+            label = Path(path).name
+            self._ffmpeg_path_label.setText(label)
+            self._ffmpeg_path_label.setToolTip(path)
+        else:
+            self._ffmpeg_path_label.setText("（使用环境变量）")
+            self._ffmpeg_path_label.setToolTip("")
+
+    def _browse_ffmpeg(self):
+        current = ""
+        if self._settings_ref:
+            current = self._settings_ref.get("tools.ffmpeg_path", "") or ""
+        init_dir = str(Path(current).parent) if current else ""
+        path, _ = QFileDialog.getOpenFileName(
+            self, "选择 FFmpeg 可执行文件", init_dir,
+            "可执行文件 (ffmpeg.exe ffmpeg);;所有文件 (*.*)",
+        )
+        if not path:
+            return
+        self._save_ffmpeg_path(path)
+
+    def _clear_ffmpeg_path(self):
+        self._save_ffmpeg_path("")
+
+    def _save_ffmpeg_path(self, path: str):
+        if self._settings_ref is None:
+            return
+        self._settings_ref.set("tools.ffmpeg_path", path)
+        self._settings_ref.save()
+        self._update_ffmpeg_label(path)
+        if path:
+            InfoBar.success(title="FFmpeg 路径已保存", content=path,
+                orient=Qt.Orientation.Horizontal, isClosable=True,
+                position=InfoBarPosition.TOP, duration=4000, parent=self)
+        else:
+            InfoBar.success(title="FFmpeg 路径已清除", content="将使用系统环境变量中的 ffmpeg",
+                orient=Qt.Orientation.Horizontal, isClosable=True,
+                position=InfoBarPosition.TOP, duration=3000, parent=self)

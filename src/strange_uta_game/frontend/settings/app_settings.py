@@ -107,6 +107,9 @@ class AppSettings:
             "enabled": True,
             "interval_minutes": 5,
         },
+        "tools": {
+            "ffmpeg_path": "",
+        },
         "complete_timestamp": {
             "scope_types": [
                 "kanji",
