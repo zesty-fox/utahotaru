@@ -733,13 +733,15 @@ class EditorInterface(QWidget):
 
     # ==================== 工具栏操作 ====================
 
-    # 判断文本是否含内联时间戳格式（至少有一个合法起始 token）
-    _INLINE_TS_DETECT_RE = re.compile(r"\[\d+:\d{2}\.\d{2}\]")
+    # 判断文本是否为全文本编辑器的内联格式：
+    # 匹配句尾 token [>...] 或双竖线注音块 {原文||...}，两者均为我们格式独有，
+    # 标准 LRC / 纯文本歌词不含此特征，不会误判。
+    _INLINE_TS_DETECT_RE = re.compile(r"\[>[^\]]*\]|\{[^{}]+\|\|")
 
     def _on_paste_lyrics(self):
         """从剪贴板粘贴（Ctrl+V）。
 
-        - 内联格式（含合法 [mm:ss.xx] token）：调用 _paste_inline_format。
+        - 内联格式（含 [>...] 句尾 token 或 {原文||} 注音块）：调用 _paste_inline_format。
         - 空项目 / 无歌词行：整批加载歌词文本。
         - 已有歌词：在当前光标处插入（富信息 or 纯文本）。
         """
