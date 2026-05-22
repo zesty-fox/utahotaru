@@ -61,6 +61,40 @@ def _ruby_is_all_hiragana(ruby_text: str) -> bool:
     return bool(ruby_text) and all("぀" <= c <= "ゟ" for c in ruby_text)
 
 
+# 剥离行内结构化标签的正则（按顺序应用）
+_STRIP_SINGER_RE = re.compile(r"【[^】]*】")
+_STRIP_RUBY_DOUBLE_BAR_RE = re.compile(r"\{([^}]*?)\|\|[^}]*\}")  # {原文||读音} → 原文
+_STRIP_RUBY_SINGLE_BAR_RE = re.compile(r"\{([^|}]*)\|[^}]*\}")    # {原文|读音} → 原文
+_STRIP_RUBY_PLAIN_RE = re.compile(r"\{([^}]*)\}")                  # {原文} → 原文
+_STRIP_TIMESTAMP_RE = re.compile(r"\[>?[^\]]*\]")                  # [>...] / [...] 时间戳
+
+
+def _strip_line_tags(line: str) -> str:
+    """去除行内所有结构化标签，返回原始文本（保留歌词字符、空格、符号）。"""
+    text = _STRIP_SINGER_RE.sub("", line)
+    text = _STRIP_RUBY_DOUBLE_BAR_RE.sub(r"\1", text)
+    text = _STRIP_RUBY_SINGLE_BAR_RE.sub(r"\1", text)
+    text = _STRIP_RUBY_PLAIN_RE.sub(r"\1", text)
+    text = _STRIP_TIMESTAMP_RE.sub("", text)
+    return text
+
+
+def _calc_ch_width(text: str, fm) -> float:
+    """用字体度量计算文本视觉宽度（单位 ch）。
+
+    1ch = 一个全角字符（汉字/假名）宽度的一半，即 ``fm.horizontalAdvance('一') / 2``。
+    全角字符自然得到 2ch；拉丁字母按比例字体实际像素宽度折算，宽字母（如 W）
+    会比窄字母（如 i）得到更大的 ch 值。整行一次测量兼顾字距调整。
+    字体缺少 '一' 字形时退化为 'M' 宽度的两倍作为参考。
+    """
+    if not text:
+        return 0.0
+    ref = fm.horizontalAdvance("一")
+    if ref <= 0:
+        ref = fm.horizontalAdvance("M") * 2
+    return fm.horizontalAdvance(text) / (ref / 2)
+
+
 class _LineNumberArea(QWidget):
     """行号栏（绘制委托给 LineNumberPlainTextEdit）。"""
 
@@ -75,6 +109,20 @@ class _LineNumberArea(QWidget):
         self._editor.line_number_area_paint_event(event)
 
 
+class _LineInfoArea(QWidget):
+    """行字数栏（绘制委托给 LineNumberPlainTextEdit）。"""
+
+    def __init__(self, editor: "LineNumberPlainTextEdit"):
+        super().__init__(editor)
+        self._editor = editor
+
+    def sizeHint(self) -> QSize:
+        return QSize(self._editor.line_info_area_width(), 0)
+
+    def paintEvent(self, event):
+        self._editor.line_info_area_paint_event(event)
+
+
 class LineNumberPlainTextEdit(QPlainTextEdit):
     """带左侧行号栏的纯文本编辑器。
 
@@ -86,6 +134,7 @@ class LineNumberPlainTextEdit(QPlainTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._line_number_area = _LineNumberArea(self)
+        self._line_info_area = _LineInfoArea(self)
         self.blockCountChanged.connect(lambda _=0: self._update_width())
         self.updateRequest.connect(self._on_update_request)
         self._update_width()
@@ -94,15 +143,25 @@ class LineNumberPlainTextEdit(QPlainTextEdit):
         digits = max(2, len(str(max(1, self.blockCount()))))
         return 10 + self.fontMetrics().horizontalAdvance("9") * digits + 6
 
+    def line_info_area_width(self) -> int:
+        fm = self.fontMetrics()
+        return fm.horizontalAdvance("99.9ch") + 16
+
     def _update_width(self):
-        self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)
+        self.setViewportMargins(
+            self.line_number_area_width(), 0, self.line_info_area_width(), 0
+        )
 
     def _on_update_request(self, rect, dy):
         if dy:
             self._line_number_area.scroll(0, dy)
+            self._line_info_area.scroll(0, dy)
         else:
             self._line_number_area.update(
                 0, rect.y(), self._line_number_area.width(), rect.height()
+            )
+            self._line_info_area.update(
+                0, rect.y(), self._line_info_area.width(), rect.height()
             )
         if rect.contains(self.viewport().rect()):
             self._update_width()
@@ -112,6 +171,10 @@ class LineNumberPlainTextEdit(QPlainTextEdit):
         cr = self.contentsRect()
         self._line_number_area.setGeometry(
             QRect(cr.left(), cr.top(), self.line_number_area_width(), cr.height())
+        )
+        info_w = self.line_info_area_width()
+        self._line_info_area.setGeometry(
+            QRect(cr.right() - info_w, cr.top(), info_w, cr.height())
         )
 
     def line_number_area_paint_event(self, event):
@@ -140,6 +203,36 @@ class LineNumberPlainTextEdit(QPlainTextEdit):
             top = bottom
             bottom = top + round(self.blockBoundingRect(block).height())
             block_number += 1
+
+    def line_info_area_paint_event(self, event):
+        from strange_uta_game.frontend.theme import theme
+
+        painter = QPainter(self._line_info_area)
+        painter.fillRect(event.rect(), theme.editor_gutter_bg)
+        painter.setPen(theme.editor_gutter_fg)
+
+        block = self.firstVisibleBlock()
+        top = round(
+            self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
+        )
+        bottom = top + round(self.blockBoundingRect(block).height())
+        line_h = self.fontMetrics().height()
+        area_w = self._line_info_area.width()
+
+        fm = self.fontMetrics()
+        while block.isValid() and top <= event.rect().bottom():
+            if block.isVisible() and bottom >= event.rect().top():
+                stripped = _strip_line_tags(block.text())
+                ch = _calc_ch_width(stripped, fm)
+                ch_r = round(ch, 1)
+                label = f"{int(ch_r)}ch" if ch_r == int(ch_r) else f"{ch_r}ch"
+                painter.drawText(
+                    0, top, area_w - 6, line_h,
+                    Qt.AlignmentFlag.AlignRight, label,
+                )
+            block = block.next()
+            top = bottom
+            bottom = top + round(self.blockBoundingRect(block).height())
 
     def wheelEvent(self, event):
         """Alt+滚轮缩放字体（放大/缩小），其余情况维持默认滚动。
@@ -552,6 +645,7 @@ class RubyInterface(QWidget):
         if hasattr(self, "_highlighter"):
             self._highlighter.rehighlight_with_theme()
         self.text_edit._line_number_area.update()
+        self.text_edit._line_info_area.update()
         self._highlight_current_line()
 
     def _apply_font_size(self, pt: int):
@@ -561,6 +655,7 @@ class RubyInterface(QWidget):
         self.text_edit.setFont(font)
         self.text_edit._update_width()
         self.text_edit._line_number_area.update()
+        self.text_edit._line_info_area.update()
 
     def _on_zoom_requested(self, delta: int):
         """Alt+滚轮：调整字号 SpinBox（其 valueChanged 再驱动实际字号）。"""
