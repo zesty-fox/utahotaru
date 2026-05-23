@@ -147,6 +147,7 @@ def _copy_updater_to_temp(updater_exe: Path) -> Path:
 def _update_updater_from_remote(
     plan: LaunchPlan,
     proxies: Optional[dict] = None,
+    progress_cb=None,  # Optional[Callable[[str], None]]
 ) -> bool:
     """尝试从远端 app part zip 提取并替换本地 Updater.exe。
 
@@ -157,6 +158,8 @@ def _update_updater_from_remote(
 
     返回 ``True`` 表示成功更新了 Updater.exe（或已是最新），``False`` 表示
     失败但不影响后续流程（降级使用旧 updater）。
+
+    ``progress_cb`` 若提供，会在下载过程中以人类可读字符串回调（用于 UI 更新显示）。
     """
     import requests
 
@@ -215,10 +218,24 @@ def _update_updater_from_remote(
                             if attempt < _RETRY_COUNT:
                                 _time.sleep(_RETRY_INTERVAL)
                             continue
+                        total = int(resp.headers.get("Content-Length") or 0)
+                        done = 0
+                        last_pct = -1
                         with open(tmp_zip, "wb") as f:
                             for chunk in resp.iter_content(chunk_size=64 * 1024):
                                 if chunk:
                                     f.write(chunk)
+                                    done += len(chunk)
+                                    if total > 0 and progress_cb is not None:
+                                        pct = int(done * 100 / total)
+                                        if pct >= last_pct + 10:
+                                            last_pct = pct
+                                            progress_cb(
+                                                f"正在获取最新更新器… "
+                                                f"{pct}%  "
+                                                f"({done // 1024 // 1024:.1f} / "
+                                                f"{total // 1024 // 1024:.1f} MB)"
+                                            )
                     downloaded = True
                     break
                 except requests.RequestException as e:
@@ -288,10 +305,13 @@ def _update_updater_from_remote(
     return False
 
 
-def launch_updater(plan: LaunchPlan) -> LaunchResult:
+def launch_updater(plan: LaunchPlan, progress_cb=None) -> LaunchResult:
     """根据 ``plan`` 启动独立 Updater.exe；调用后调用方应立刻退出 Qt 应用。
 
     返回 :class:`LaunchResult`；``launched=False`` 时由调用方提示用户。
+
+    ``progress_cb`` 若提供（``Callable[[str], None]``），会在自更新 Updater 的
+    下载阶段以人类可读的进度字符串回调，调用方可据此刷新 UI 提示。
     """
     updater = find_updater_exe(plan.app_dir)
     if updater is None:
@@ -305,7 +325,7 @@ def launch_updater(plan: LaunchPlan) -> LaunchResult:
 
     # 先尝试从远端更新 Updater.exe 自身（解决旧 updater 无自更新逻辑的问题）
     try:
-        _update_updater_from_remote(plan)
+        _update_updater_from_remote(plan, progress_cb=progress_cb)
         # 重新定位（可能已被更新）
         updater = find_updater_exe(plan.app_dir) or updater
     except Exception as e:

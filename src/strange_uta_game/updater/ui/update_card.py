@@ -283,6 +283,8 @@ class _LaunchUpdaterWorker(QThread):
 
     # 发射 LaunchResult（用 object 类型传递 dataclass）
     done = pyqtSignal(object)
+    # 下载进度文本（供 UI 实时更新提示）
+    progress = pyqtSignal(str)
 
     def __init__(self, plan: "installer.LaunchPlan", parent=None):
         super().__init__(parent)
@@ -290,7 +292,7 @@ class _LaunchUpdaterWorker(QThread):
 
     def run(self) -> None:
         from .. import installer as _installer
-        result = _installer.launch_updater(self._plan)
+        result = _installer.launch_updater(self._plan, progress_cb=self.progress.emit)
         self.done.emit(result)
 
 
@@ -361,7 +363,7 @@ def _show_update_dialog(parent: "SettingsInterface", result: CheckResult) -> Non
 
     # 立即给用户反馈，然后在后台线程完成"自更新 Updater + 启动"
     # （_update_updater_from_remote 有网络请求，同步调用会冻结 UI 数秒）
-    InfoBar.success(
+    _prep_infobar = InfoBar.success(
         title="正在准备更新",
         content="正在获取最新更新器，请稍候…",
         orient=Qt.Orientation.Horizontal,
@@ -371,11 +373,21 @@ def _show_update_dialog(parent: "SettingsInterface", result: CheckResult) -> Non
         parent=parent.window(),
     )
 
+    def _update_prep_text(text: str) -> None:
+        """把 progress 信号的进度字符串实时写到 InfoBar 的内容标签上。"""
+        try:
+            # InfoBar 的 contentLabel 是 BodyLabel，直接设置文本
+            if _prep_infobar is not None:
+                _prep_infobar.contentLabel.setText(text)
+        except Exception:
+            pass
+
     # parent=None：不让 Qt 把 QThread 的生命周期绑到 SettingsInterface 上。
     # 若 parent 被销毁时线程还在运行，Qt 会 destroy 运行中的 QThread（崩溃）。
     # 用 Python 引用（_update_launch_worker）防 GC 即可，由 os._exit(0) 统一结束。
     worker = _LaunchUpdaterWorker(plan, parent=None)
     parent._update_launch_worker = worker  # type: ignore[attr-defined]
+    worker.progress.connect(_update_prep_text)
 
     def _on_done(launch_result: object) -> None:
         from .. import installer as _inst
