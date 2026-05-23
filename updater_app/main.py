@@ -1131,12 +1131,31 @@ def run(args: Args) -> int:
         log.error("未提供任何下载 URL")
         return _exit_with_pause(2)
 
-    # ───── 2a. 增量更新优先 ─────
+    # ───── 2a. 先比对哈希，决定走增量还是全量 ─────
     manifest = try_fetch_manifest(args, log)
     if manifest is not None:
+        local_manifest = read_local_manifest(args, log)
+        needed = _diff_parts(manifest, local_manifest)
+
+        if not needed:
+            # 所有 part sha256 与本地一致 → 已是最新，无需下载任何东西
+            log.info("所有 part sha256 均一致，本地已是最新版本，跳过更新")
+            write_local_manifest(args, manifest, log)
+            if args.launch_after:
+                launch_main_app(args.app_dir, args.app_exe, log)
+            log.info("更新完成 ✓（已是最新）")
+            if sys.platform == "win32":
+                try:
+                    print()
+                    print("已是最新版本。窗口将在 3 秒后关闭。")
+                    time.sleep(3)
+                except Exception:
+                    pass
+            return 0
+
+        log.info("需要更新的 part: %s，走增量更新", ", ".join(needed))
         rc = run_incremental(args, manifest, work_dir, log)
         if rc == 0:
-            # 启动新版本 + 清理 + 退出
             if args.launch_after:
                 launch_main_app(args.app_dir, args.app_exe, log)
             log.info("更新完成 ✓（增量路径）")
