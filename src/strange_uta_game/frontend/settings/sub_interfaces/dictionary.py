@@ -177,7 +177,7 @@ class DictionarySubInterface(SubSettingInterface):
 
         # 3. 网络词典管理
         net_card = SettingCard(FIF.CLOUD_DOWNLOAD, "网络词典管理",
-            "管理网络词典源（含 RL 官方 / 键盘office 预设），可添加自定义 URL、查看条目", g)
+            "管理网络词典源（含 RL 官方 )，可添加自定义 URL、查看条目", g)
         self.btn_open_net = PushButton("管理网络词典", net_card)
         self.btn_open_net.setFont(QFont("Microsoft YaHei", 10))
         self.btn_open_net.clicked.connect(self._on_open_network_dictionary)

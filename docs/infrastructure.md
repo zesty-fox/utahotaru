@@ -77,7 +77,7 @@
     - **meta**（用户设置）放在 `config.json["network_dictionary"]`：
         ```json
         {"enabled": false,
-         "source_order": ["local", "rl_official", "fmpeach", ...],
+         "source_order": ["local", "rl_official", ...],
          "sources": [{"id": "rl_official", "name": "...", "url": "...",
                       "builtin": true, "enabled": true}, ...]}
         ```
@@ -97,7 +97,6 @@
     - `split_meta_and_cache(doc)` / `merge_meta_and_cache(meta, cache)`：统一 doc ↔ 分离存储的双向转换。
 - **内置预设**（packaged `src/strange_uta_game/config/config.json` 即含）：
     - `rl_official` — `http://timetag.main.jp/RhythmicaLyrics/kakuteiyominet.php`
-    - `fmpeach` 键盘office — `https://rl.fmpeach.top/Rhythmicalyrics/kakuteiyominet.php`
     - 不可删除（仅可禁用 / 改 URL）。用户可任意添加自定义 URL 源。
 - **AppSettings 接口**：`load_network_dictionary()` / `save_network_dictionary()` 自动桥接 meta/cache 双文件；`load_effective_dictionary()` 是注音管线（`AutoCheckService` 各调用点）的统一入口；编辑场景用 `load_dictionary()` 仅取本地。
 - **UI**：设置页"读音词典"组中：

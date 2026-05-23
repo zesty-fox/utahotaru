@@ -52,14 +52,7 @@ BUILTIN_SOURCES: List[Dict[str, Any]] = [
         "url": "http://timetag.main.jp/RhythmicaLyrics/kakuteiyominet.php",
         "builtin": True,
         "enabled": True,
-    },
-    {
-        "id": "fmpeach",
-        "name": "键盘office",
-        "url": "https://rl.fmpeach.top/Rhythmicalyrics/kakuteiyominet.php",
-        "builtin": True,
-        "enabled": True,
-    },
+    }
 ]
 
 
