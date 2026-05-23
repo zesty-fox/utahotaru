@@ -79,7 +79,6 @@ def _force_taskbar_icon(window, icon_path: Path) -> None:
         from ctypes import wintypes
 
         user32 = ctypes.windll.user32
-        shell32 = ctypes.windll.shell32
 
         # 加载图标（大图标 32x32，小图标 16x16）
         LR_LOADFROMFILE = 0x0010
@@ -100,10 +99,6 @@ def _force_taskbar_icon(window, icon_path: Path) -> None:
         if hicon_small:
             user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, hicon_small)
 
-        # 通知 Shell 图标已更改，强制刷新任务栏
-        SHCNE_ASSOCCHANGED = 0x08000000
-        SHCNF_IDLIST = 0x0000
-        shell32.SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, None, None)
     except Exception:
         pass
 
