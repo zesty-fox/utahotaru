@@ -2842,7 +2842,7 @@ class EditorInterface(QWidget):
 
         if self._timing_service and sentence.characters:
             target_cp = checkpoint_idx if checkpoint_idx is not None else 0
-            self._timing_service.move_to_checkpoint(line_idx, char_idx, target_cp)
+            self._timing_service.move_to_checkpoint(line_idx, char_idx, target_cp, prefer_backward=True)
 
         self.refresh_lyric_display()
         self._update_time_tags_display()
@@ -3215,6 +3215,8 @@ class EditorInterface(QWidget):
         self._current_line_idx = new_line
         pos = self._timing_service.get_current_position()
         self.preview._current_char_idx = pos.char_idx
+        self.preview._current_line_idx = new_line
+        self.preview.scroll_current_line_to_center()
         self._update_line_info()
         self._update_time_tags_display()
         self._update_status()
@@ -3290,6 +3292,8 @@ class EditorInterface(QWidget):
         self._current_line_idx = new_line
         pos = self._timing_service.get_current_position()
         self.preview._current_char_idx = pos.char_idx
+        self.preview._current_line_idx = new_line
+        self.preview.scroll_current_line_to_center()
         self._update_line_info()
         self._update_time_tags_display()
         self._update_status()
@@ -3532,7 +3536,7 @@ class EditorInterface(QWidget):
             self._delete_timestamp(line_idx, char_idx)
             self._register_timestamp_undo(before_sentences, line_idx, char_idx, "删除时间戳")
             if self._timing_service:
-                self._timing_service.move_to_checkpoint(line_idx, char_idx, 0)
+                self._timing_service.move_to_checkpoint(line_idx, char_idx, 0, prefer_backward=True)
                 self._update_time_tags_display()
                 self._update_status()
             self._on_seek(seek_ms)

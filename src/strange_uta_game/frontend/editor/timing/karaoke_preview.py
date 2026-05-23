@@ -740,10 +740,19 @@ class KaraokePreview(QWidget):
 
         300ms 超时 → 确认是单击而非双击，兜底同步 current 域到 focus 位置，
         防止期间有状态漂移。
+
+        例外：当 focus 落在无 checkpoint 字符（cc=0 且非句尾）时跳过同步，
+        保持 _on_char_selected 中已正确设置的 current 域（指向最近有效 cp）。
         """
         self._click_snapshot = None
         self._click_timer.stop()
         if self._focus_line_idx >= 0 and self._focus_char_idx >= 0:
+            if self._project and self._focus_line_idx < len(self._project.sentences):
+                sentence = self._project.sentences[self._focus_line_idx]
+                if self._focus_char_idx < len(sentence.characters):
+                    ch = sentence.characters[self._focus_char_idx]
+                    if ch.check_count == 0 and not ch.is_sentence_end:
+                        return
             self.set_current_position(self._focus_line_idx, self._focus_char_idx)
 
     def _show_context_menu(self, global_pos, click_x: int, click_y: int):
