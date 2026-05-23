@@ -173,8 +173,8 @@
   <td align="center">🌐</td>
   <td>
     <b>联网读音词典 / Online reading dictionary</b><br/>
-    <sub>内置 <b>RhythmicaLyrics 官方源</b> 与 <b>键盘 office 镜像源</b>；可自定义源顺序、自定义源 URL、定时自动更新；查询结果合并本地词典，<code>{原文||读音}</code> 即写即用。<br/>
-    Ships with the <b>RhythmicaLyrics official source</b> and a community mirror; sources are user-orderable with custom URLs and scheduled auto-update.</sub>
+    <sub>内置 <b>RhythmicaLyrics 官方源</b>；可自定义源顺序、自定义源 URL、定时自动更新；查询结果合并本地词典，<code>{原文||读音}</code> 即写即用。<br/>
+    Ships with the <b>RhythmicaLyrics official source</b>; sources are user-orderable with custom URLs and scheduled auto-update.</sub>
   </td>
 </tr>
 <tr>
@@ -350,7 +350,7 @@ The packaged executable will appear in `dist/StrangeUtaGame/`.
 </tr>
 <tr>
   <td>打到句尾 · Mark up to line-end</td>
-  <td align="center"><kbd>J</kbd></td>
+  <td align="center"><kbd>P</kbd></td>
   <td>把剩余字符全部打上时间戳</td>
 </tr>
 <tr>
@@ -418,7 +418,7 @@ The packaged executable will appear in `dist/StrangeUtaGame/`.
 </tr>
 <tr>
   <td>修改字 / 行 · Modify char / line</td>
-  <td align="center"><kbd>Ctrl</kbd>+<kbd>J</kbd> &nbsp; <kbd>Ctrl</kbd>+<kbd>2</kbd></td>
+  <td align="center"><kbd>J</kbd> &nbsp; <kbd>Ctrl</kbd>+<kbd>2</kbd></td>
   <td>—</td>
 </tr>
 <tr>
@@ -703,7 +703,6 @@ Please run <code>ruff check .</code> and <code>pytest</code> before opening a PR
 - **[WinRT JapanesePhoneticAnalyzer](https://learn.microsoft.com/uwp/api/windows.globalization.japanesephoneticanalyzer)** — 系统 IME 注音 / System IME furigana
 - **[pykakasi](https://codeberg.org/miurahr/pykakasi)** · **[jaconv](https://github.com/ikegami-yukino/jaconv)** · **[pyphen](https://github.com/Kozea/Pyphen)** — 日语 / 英文音节处理
 - **[CMUdict](http://www.speech.cs.cmu.edu/cgi-bin/cmudict)** · **[e2k](https://github.com/Patchethium/e2k)** — 英文注音词典 / English pronunciation dicts
-- **「键盘 office」** ([rl.fmpeach.top](https://rl.fmpeach.top/)) — RhythmicaLyrics 读音词典镜像源 / Online reading-dict mirror
 - **所有提 issue / PR 的伙伴们** · *Everyone who filed an issue or PR* 💜
 
 <!-- ───────────────────────────── FAQ ───────────────────────────── -->
@@ -775,8 +774,8 @@ The primary engine is Windows' <b>WinRT JapanesePhoneticAnalyzer</b>, which need
 
 <br/>
 
-在 <b>设置 → 网络</b>可切换词典源（内置 <b>RhythmicaLyrics 官方</b> + <b>键盘 office 镜像</b>）、自定义 URL、调整源优先级。自动更新则内置 <b>ghproxy / gh-proxy / ghproxy-net</b> 三个 GitHub 镜像。  
-Under <b>Settings → Network</b> you can switch dictionary sources (<b>RhythmicaLyrics official</b> + a community mirror), add custom URLs, reorder priorities. The updater can route through <b>ghproxy / gh-proxy / ghproxy-net</b>.
+在 <b>设置 → 网络</b>可切换词典源（内置 <b>RhythmicaLyrics 官方</b>）、自定义 URL、调整源优先级。自动更新则内置 <b>ghproxy / gh-proxy / ghproxy-net</b> 三个 GitHub 镜像。  
+Under <b>Settings → Network</b> you can switch dictionary sources (<b>RhythmicaLyrics official</b>), add custom URLs, reorder priorities. The updater can route through <b>ghproxy / gh-proxy / ghproxy-net</b>.
 
 </details>
 

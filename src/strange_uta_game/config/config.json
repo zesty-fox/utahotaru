@@ -3,7 +3,7 @@
     "default_volume": 80,
     "default_speed": 1.0,
     "speed_slider_min": 0.2,
-    "speed_slider_max": 1.0,
+    "speed_slider_max": 2.0,
     "auto_play_on_load": false,
     "hq_speed_change": true
   },
@@ -149,7 +149,7 @@
       "delete_char": "Delete:short",
       "delete_timestamp": "Backspace:short",
       "bulk_change": "CTRL+H:short",
-      "modify_char": "CTRL+J:short",
+      "modify_char": "J:short",
       "insert_guide": "CTRL+1:short",
       "modify_line": "CTRL+2:short",
       "analyze_rubies": "CTRL+3:short",
@@ -161,7 +161,7 @@
       "save": "CTRL+S:short",
       "copy_chars": "CTRL+C:short",
       "paste_lyrics": "CTRL+V:short",
-      "timestamps_to_sentence_end": "J:short",
+      "timestamps_to_sentence_end": "P:short",
       "quick_export": "CTRL+E:short",
       "insert_space": "M:short",
       "clear_timestamp": "",
@@ -198,7 +198,7 @@
       "delete_char": "Delete:short",
       "delete_timestamp": "",
       "bulk_change": "CTRL+H:short",
-      "modify_char": "CTRL+J:short",
+      "modify_char": "J:short",
       "insert_guide": "CTRL+1:short",
       "modify_line": "CTRL+2:short",
       "analyze_rubies": "CTRL+3:short",
@@ -210,7 +210,7 @@
       "save": "CTRL+S:short",
       "copy_chars": "CTRL+C:short",
       "paste_lyrics": "CTRL+V:short",
-      "timestamps_to_sentence_end": "J:short",
+      "timestamps_to_sentence_end": "P:short",
       "quick_export": "CTRL+E:short",
       "insert_space": "M:short",
       "clear_timestamp": "",
@@ -247,21 +247,13 @@
     "enabled": true,
     "source_order": [
       "local",
-      "rl_official",
-      "fmpeach"
+      "rl_official"
     ],
     "sources": [
       {
         "id": "rl_official",
         "name": "RhythmicaLyrics 官方",
         "url": "http://timetag.main.jp/RhythmicaLyrics/kakuteiyominet.php",
-        "builtin": true,
-        "enabled": true
-      },
-      {
-        "id": "fmpeach",
-        "name": "键盘office",
-        "url": "https://rl.fmpeach.top/Rhythmicalyrics/kakuteiyominet.php",
         "builtin": true,
         "enabled": true
       }
