@@ -1677,14 +1677,13 @@ class EditorInterface(QWidget):
             for line_idx, singer_id in result_map.items():
                 if 0 <= line_idx < len(self._project.sentences):
                     sentence = self._project.sentences[line_idx]
-                    if sentence.singer_id != singer_id:
-                        sentence.singer_id = singer_id
-                        # 同步更新所有字符的 singer_id
-                        for ch in sentence.characters:
+                    sentence.singer_id = singer_id
+                    for ch in sentence.characters:
+                        if ch.singer_id != singer_id:
                             ch.singer_id = singer_id
                             if ch.ruby:
                                 ch.push_to_ruby()
-                        changed += 1
+                    changed += 1
             if changed == 0:
                 return None
             return (self._current_line_idx, self.preview._current_char_idx, None, "singers")
