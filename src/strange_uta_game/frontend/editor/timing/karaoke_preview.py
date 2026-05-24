@@ -926,15 +926,23 @@ class KaraokePreview(QWidget):
     def _find_prev_line_last_timestamp(self, current_line_idx: int) -> Optional[int]:
         """查找上一行的最后一个时间戳，用于行首无 leader 句子的 wipe 起始锚点。
 
+        早停条件：若上一行存在 is_sentence_end=True 但无 global_sentence_end_ts，
+        或存在 check_count>0 但无 global_timestamps，说明上一行未完整打轴，
+        返回 None（调用方应跳过 wipe，不做 fallback）。
+
         Returns:
-            上一行最后一个字符的 global_sentence_end_ts 或 global_timestamps[-1]，
-            若不存在返回 None。
+            上一行最后一个时间戳（global_sentence_end_ts 或 global_timestamps[-1]
+            中的最大值），或 None（上一行不存在 / 未完整打轴）。
         """
         if not self._project or not self._project.sentences or current_line_idx <= 0:
             return None
         prev_line = self._project.sentences[current_line_idx - 1]
         last_ts: Optional[int] = None
         for ch in prev_line.characters:
+            if ch.is_sentence_end and ch.global_sentence_end_ts is None:
+                return None  # 句尾无时间戳，上一行未完整打轴
+            if ch.check_count > 0 and not ch.global_timestamps:
+                return None  # 有 cp 标记但无时间戳，上一行未完整打轴
             if ch.is_sentence_end and ch.global_sentence_end_ts is not None:
                 t = int(ch.global_sentence_end_ts)
                 if last_ts is None or t > last_ts:
@@ -1101,8 +1109,17 @@ class KaraokePreview(QWidget):
             leaders = [ci for ci in range(sent_start, sent_end + 1) if ci in start_times]
             if not leaders:
                 # 整句无时间戳，仅发生在行首。
-                # 以上一行最后时间戳（或 00:00）为起点，以本行下一个时间戳
-                # （或 fallback_sentence_end_ts）为终点，按像素宽度加权分配。
+                # 只收集行首连续的 cc=0 字符；遇到第一个 cc>0 的字符立即停止，
+                # 剩余字符回到老算法（无 char_wipe_times，显示 base color）。
+                no_cc_end = sent_start
+                for ci in range(sent_start, sent_end + 1):
+                    if characters[ci].check_count == 0:
+                        no_cc_end = ci + 1
+                    else:
+                        break
+                if no_cc_end <= sent_start:
+                    continue  # 行首第一个字符就有 cc，无需处理
+                # 终点：本行后续第一个有时间戳字符的 ts，或 fallback
                 end_ts_nl: Optional[int] = None
                 for ci in range(sent_end + 1, n_chars):
                     if ci in start_times:
@@ -1114,12 +1131,14 @@ class KaraokePreview(QWidget):
                     continue
                 if _prev_line_last_ts is None:
                     _prev_line_last_ts = self._find_prev_line_last_timestamp(idx)
-                start_ts_nl = _prev_line_last_ts if _prev_line_last_ts is not None else 0
+                if _prev_line_last_ts is None:
+                    continue  # 上一行未完整打轴或不存在，无有效起点，不 wipe
+                start_ts_nl = _prev_line_last_ts
                 if end_ts_nl <= start_ts_nl:
                     continue
-                seg_total_w = sum(char_widths[ci] for ci in range(sent_start, sent_end + 1))
+                seg_total_w = sum(char_widths[ci] for ci in range(sent_start, no_cc_end))
                 cum_w = 0
-                for ci in range(sent_start, sent_end + 1):
+                for ci in range(sent_start, no_cc_end):
                     w = char_widths[ci]
                     ratio = cum_w / seg_total_w if seg_total_w > 0 else 0.0
                     next_ratio = (cum_w + w) / seg_total_w if seg_total_w > 0 else 1.0
@@ -1159,21 +1178,57 @@ class KaraokePreview(QWidget):
                     char_wipe_times[ci] = (char_start_ts, char_end_ts)
                     cum_w += w
 
-            # 句子内第一个 leader 之前的无 ts 字符：与第一个 leader 作为整体从左到右 wipe
+            # 句子内第一个 leader 之前的无 ts 字符
             first_leader = leaders[0]
             if first_leader > sent_start:
-                leader_start_ts, leader_end_ts = char_wipe_times[first_leader]
-                # 按像素宽度加权分配时间（含 first_leader 自身宽度用于保持比例一致）
-                pre_total_w = sum(char_widths[ci] for ci in range(sent_start, first_leader + 1))
-                cum_w = 0
-                for ci in range(sent_start, first_leader):
-                    w = char_widths[ci]
-                    ratio = cum_w / pre_total_w if pre_total_w > 0 else 0.0
-                    next_ratio = (cum_w + w) / pre_total_w if pre_total_w > 0 else 1.0
-                    char_start_ts = int(leader_start_ts + (leader_end_ts - leader_start_ts) * ratio)
-                    char_end_ts = int(leader_start_ts + (leader_end_ts - leader_start_ts) * next_ratio)
-                    char_wipe_times[ci] = (char_start_ts, char_end_ts)
-                    cum_w += w
+                # 行头（sent_start == 0）时：先处理行首连续 cc=0 字符，
+                # 以上一行最后时间戳为起点、first_leader 的 ts 为终点分配。
+                # 遇到第一个 cc>0 的字符立即停止，剩余字符走老算法。
+                old_algo_start = sent_start
+                if sent_start == 0:
+                    no_cc_end = sent_start
+                    for ci in range(sent_start, first_leader):
+                        if characters[ci].check_count == 0:
+                            no_cc_end = ci + 1
+                        else:
+                            break
+                    if no_cc_end > sent_start:
+                        if _prev_line_last_ts is None:
+                            _prev_line_last_ts = self._find_prev_line_last_timestamp(idx)
+                        if _prev_line_last_ts is None:
+                            no_cc_end = sent_start  # 无有效起点，不 wipe，回退至老算法
+                    if no_cc_end > sent_start:
+                        _start_nl = _prev_line_last_ts  # type: ignore[assignment]
+                        _end_nl = start_times[first_leader]
+                        if _end_nl > _start_nl:
+                            seg_w = sum(char_widths[ci] for ci in range(sent_start, no_cc_end))
+                            cum_w = 0
+                            for ci in range(sent_start, no_cc_end):
+                                w = char_widths[ci]
+                                ratio = cum_w / seg_w if seg_w > 0 else 0.0
+                                next_ratio = (cum_w + w) / seg_w if seg_w > 0 else 1.0
+                                char_wipe_times[ci] = (
+                                    int(_start_nl + (_end_nl - _start_nl) * ratio),
+                                    int(_start_nl + (_end_nl - _start_nl) * next_ratio),
+                                )
+                                cum_w += w
+                        old_algo_start = no_cc_end
+
+                # 剩余 pre-leader 字符（cc>0 未打轴，或非行头的 pre-leader 字符）：
+                # 老算法——按像素宽度加权分配到 first_leader 的 wipe 窗口内
+                if old_algo_start < first_leader:
+                    leader_start_ts, leader_end_ts = char_wipe_times[first_leader]
+                    pre_total_w = sum(char_widths[ci] for ci in range(old_algo_start, first_leader + 1))
+                    cum_w = 0
+                    for ci in range(old_algo_start, first_leader):
+                        w = char_widths[ci]
+                        ratio = cum_w / pre_total_w if pre_total_w > 0 else 0.0
+                        next_ratio = (cum_w + w) / pre_total_w if pre_total_w > 0 else 1.0
+                        char_wipe_times[ci] = (
+                            int(leader_start_ts + (leader_end_ts - leader_start_ts) * ratio),
+                            int(leader_start_ts + (leader_end_ts - leader_start_ts) * next_ratio),
+                        )
+                        cum_w += w
 
         # ---------- 每字符的 part 锚点序列（用于 check_count>=2 的多 checkpoint 字符） ----------
         # char_part_anchors[ci] = [ts_0, ts_1, ..., ts_N]，N = part 数
@@ -1590,30 +1645,29 @@ class KaraokePreview(QWidget):
                                     painter.setPen(_rh)
                                     painter.drawText(int(ruby_x), ruby_y, _merged)
                                     painter.restore()
-                        # 连词框：取 Ruby 拼接串墨水边界和字符组墨水边界中
-                        # 宽度更大的一方绘制，保证框不会因某一种画法偏窄。
+                        # 连词框：Ruby 拼接串墨水边界 vs 字符组实际宽度取更宽者。
+                        # 若 ruby 墨水宽度 < 字符组实际宽度 → 用字符墨水边界（方法2），
+                        # 否则 ruby 串已经超出字符范围 → 用 ruby 墨水边界（方法1）。
                         # --- 方法1：Ruby 拼接串墨水边界 ---
                         _ruby_box_left = _r_ink_x
                         _ruby_box_right = _r_ink_x + _r_ink_w
                         _ruby_box_w = _r_ink_w
                         # --- 方法2：字符组墨水边界并集 ---
-                        _char_ink_left = float('inf')
-                        _char_ink_right = float('-inf')
-                        _cum = 0
-                        for _gci in _grp:
-                            _char_x = curr_x + _cum
-                            _char_ink_x = _char_x + _char_ink_offsets[_gci]
-                            _char_ink_left = min(_char_ink_left, _char_ink_x)
-                            _char_ink_right = max(_char_ink_right, _char_ink_x + _char_ink_widths[_gci])
-                            _cum += char_widths[_gci]
-                        _char_box_w = _char_ink_right - _char_ink_left
-                        # --- 取宽度更大者 ---
-                        if _ruby_box_w >= _char_box_w:
-                            _box_left = int(_ruby_box_left)
-                            _box_right = int(_ruby_box_right)
-                        else:
+                        if _ruby_box_w < _grp_w:
+                            _char_ink_left = float('inf')
+                            _char_ink_right = float('-inf')
+                            _cum = 0
+                            for _gci in _grp:
+                                _char_x = curr_x + _cum
+                                _char_ink_x = _char_x + _char_ink_offsets[_gci]
+                                _char_ink_left = min(_char_ink_left, _char_ink_x)
+                                _char_ink_right = max(_char_ink_right, _char_ink_x + _char_ink_widths[_gci])
+                                _cum += char_widths[_gci]
                             _box_left = int(_char_ink_left)
                             _box_right = int(_char_ink_right)
+                        else:
+                            _box_left = int(_ruby_box_left)
+                            _box_right = int(_ruby_box_right)
                         painter.save()
                         _fc = QColor(base_color)
                         _fc.setAlpha(120)
