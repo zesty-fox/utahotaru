@@ -1,12 +1,12 @@
 """LRC 格式导出器。
 
 LRC 格式是通用歌词格式：
-[mm:ss.xx]歌词文本
+[mm:ss.xxx]歌词文本
 
 支持三种子格式：
-- LRC (逐行): [mm:ss.xx]一整行歌词
-- LRC (逐字): [mm:ss.xx]字[mm:ss.xx]字...
-- LRC (增强型): [mm:ss.xx]<mm:ss.xx>字<mm:ss.xx>字...
+- LRC (逐行): [mm:ss.xxx]一整行歌词
+- LRC (逐字): [mm:ss.xxx]字[mm:ss.xxx]字...
+- LRC (增强型): [mm:ss.xxx]<mm:ss.xxx>字<mm:ss.xxx>字...
 
 设计原则（参考 entities.py 重构后契约）：
 1. 时间永远从 char.global_timestamps / char.global_sentence_end_ts 取，
@@ -28,6 +28,8 @@ class LRCExporter(BaseExporter):
 
     导出增强型 LRC 歌词格式（逐字时间标签使用尖括号）。
     """
+
+    _precision_ms: bool = True
 
     @property
     def name(self) -> str:
@@ -104,7 +106,7 @@ class LRCExporter(BaseExporter):
         if line_start_ms is None:
             return sentence.text
 
-        result: List[str] = [self._format_timestamp(line_start_ms)]
+        result: List[str] = [self._format_timestamp(line_start_ms, precision_ms=self._precision_ms)]
 
         # 逐字符输出：每字最多一个时间标签 + 该字字符
         any_char_with_ts = False
@@ -112,9 +114,9 @@ class LRCExporter(BaseExporter):
             if ch.global_timestamps:
                 # 取第一个 checkpoint 作为该字时间
                 ts = ch.global_timestamps[0]
-                # 行首字符已经被行级 [mm:ss.xx] 覆盖，仍然再补一个 <mm:ss.xx>
+                # 行首字符已经被行级 [mm:ss.xxx] 覆盖，仍然再补一个 <mm:ss.xxx>
                 # 以便逐字播放器能精确高亮（增强型 LRC 标准）。
-                time_str = self._format_timestamp(ts).replace("[", "<").replace("]", ">")
+                time_str = self._format_timestamp(ts, precision_ms=self._precision_ms).replace("[", "<").replace("]", ">")
                 result.append(time_str)
                 result.append(ch.char)
                 any_char_with_ts = True
@@ -126,7 +128,7 @@ class LRCExporter(BaseExporter):
         # 行尾拖音：追加 sentence_end 时间戳（不带字符）
         end_ts = self._find_sentence_end_ts(sentence)
         if end_ts is not None and any_char_with_ts:
-            end_str = self._format_timestamp(end_ts).replace("[", "<").replace("]", ">")
+            end_str = self._format_timestamp(end_ts, precision_ms=self._precision_ms).replace("[", "<").replace("]", ">")
             result.append(end_str)
 
         return "".join(result)
@@ -136,7 +138,7 @@ class LRCLineExporter(LRCExporter):
     """LRC 逐行格式导出器
 
     每行只有一个行级时间标签，不含逐字标签。
-    格式: [mm:ss.xx]歌词文本
+    格式: [mm:ss.xxx]歌词文本
     """
 
     @property
@@ -156,7 +158,7 @@ class LRCLineExporter(LRCExporter):
         if first_ts is None:
             return sentence.text
 
-        timestamp = self._format_timestamp(first_ts)
+        timestamp = self._format_timestamp(first_ts, precision_ms=self._precision_ms)
         return f"{timestamp}{sentence.text}"
 
 
@@ -164,7 +166,7 @@ class LRCWordExporter(LRCExporter):
     """LRC 逐字格式导出器
 
     每个字符有独立的方括号时间标签。
-    格式: [mm:ss.xx]字[mm:ss.xx]字[mm:ss.xx]字...
+    格式: [mm:ss.xxx]字[mm:ss.xxx]字[mm:ss.xxx]字...
     """
 
     @property
@@ -189,7 +191,7 @@ class LRCWordExporter(LRCExporter):
         for ch in sentence.characters:
             if ch.global_timestamps:
                 ts = ch.global_timestamps[0]
-                result.append(self._format_timestamp(ts))
+                result.append(self._format_timestamp(ts, precision_ms=self._precision_ms))
                 result.append(ch.char)
                 any_char_with_ts = True
             else:
@@ -200,7 +202,7 @@ class LRCWordExporter(LRCExporter):
 
         end_ts = self._find_sentence_end_ts(sentence)
         if end_ts is not None:
-            result.append(self._format_timestamp(end_ts))
+            result.append(self._format_timestamp(end_ts, precision_ms=self._precision_ms))
 
         return "".join(result)
 
@@ -211,6 +213,8 @@ class KRAExporter(LRCExporter):
     KRA 格式与 LRC 完全相同，只是文件扩展名不同。
     通常用于卡拉 OK 软件。
     """
+
+    _precision_ms: bool = False
 
     @property
     def name(self) -> str:

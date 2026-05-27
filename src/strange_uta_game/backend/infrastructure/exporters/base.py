@@ -73,7 +73,8 @@ class BaseExporter(IExporter):
         if not project.sentences:
             raise ExportError("项目没有歌词行")
 
-    def _format_timestamp(self, timestamp_ms: int, format_type: str = "lrc") -> str:
+    def _format_timestamp(self, timestamp_ms: int, format_type: str = "lrc",
+                          precision_ms: bool = False) -> str:
         """格式化时间戳
 
         调用方传入的 timestamp_ms 应已是软件渲染所用的全局时间戳
@@ -83,6 +84,7 @@ class BaseExporter(IExporter):
         Args:
             timestamp_ms: 毫秒时间戳
             format_type: 格式类型 ('lrc', 'ass', 'nicokara')
+            precision_ms: 是否使用毫秒精度（3位）而非厘秒（2位），仅对 lrc 格式有效
 
         Returns:
             格式化后的时间字符串
@@ -93,9 +95,12 @@ class BaseExporter(IExporter):
         seconds = int(total_seconds % 60)
 
         if format_type == "lrc":
-            # [mm:ss.xx]
-            centis = int((timestamp_ms % 1000) / 10)
-            return f"[{minutes:02d}:{seconds:02d}.{centis:02d}]"
+            if precision_ms:
+                millis = timestamp_ms % 1000
+                return f"[{minutes:02d}:{seconds:02d}.{millis:03d}]"
+            else:
+                centis = int((timestamp_ms % 1000) / 10)
+                return f"[{minutes:02d}:{seconds:02d}.{centis:02d}]"
         elif format_type == "ass":
             # H:MM:SS.cc
             hours = minutes // 60
