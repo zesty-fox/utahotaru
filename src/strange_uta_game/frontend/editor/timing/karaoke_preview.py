@@ -489,12 +489,12 @@ class KaraokePreview(QWidget):
             line_height_factor: 行高系数（默认1.20）
             ruby_spacing: Ruby与主文字的垂直间距（默认4px）
         """
-        context_size = max(12, base_size)
-        current_size = max(12, current_line_size if current_line_size > 0 else base_size + 4)
-        ruby_size = max(6, ruby_size)
-        cp_size = max(6, cp_size)
-        line_height_factor = max(0.5, min(5.0, line_height_factor))
-        ruby_spacing = max(0, min(20, ruby_spacing))
+        context_size = max(1, min(99, base_size))
+        current_size = max(1, min(99, current_line_size if current_line_size > 0 else base_size + 4))
+        ruby_size = max(1, min(99, ruby_size))
+        cp_size = max(1, min(99, cp_size))
+        line_height_factor = max(-1.0, min(5.0, line_height_factor))
+        ruby_spacing = max(0, min(99, ruby_spacing))
 
         self._font_current = QFont("Microsoft YaHei", current_size, QFont.Weight.Bold)
         self._font_context = QFont("Microsoft YaHei", context_size)
@@ -1645,24 +1645,25 @@ class KaraokePreview(QWidget):
                                     painter.setPen(_rh)
                                     painter.drawText(int(ruby_x), ruby_y, _merged)
                                     painter.restore()
-                        # 连词框：Ruby 拼接串墨水边界 vs 字符组实际宽度取更宽者。
-                        # 若 ruby 墨水宽度 < 字符组实际宽度 → 用字符墨水边界（方法2），
-                        # 否则 ruby 串已经超出字符范围 → 用 ruby 墨水边界（方法1）。
+                        # 连词框：Ruby 拼接串实际总宽 vs 字符组墨水宽度取更宽者。
+                        # 若 ruby 实际总宽 < 字符组墨水宽度 → 用字符墨水边界（方法2），
+                        # 否则 ruby 串已经超出字符墨水范围 → 用 ruby 墨水边界（方法1）。
                         # --- 方法1：Ruby 拼接串墨水边界 ---
                         _ruby_box_left = _r_ink_x
                         _ruby_box_right = _r_ink_x + _r_ink_w
-                        _ruby_box_w = _r_ink_w
+                        _ruby_box_w = ruby_text_w
                         # --- 方法2：字符组墨水边界并集 ---
-                        if _ruby_box_w < _grp_w:
-                            _char_ink_left = float('inf')
-                            _char_ink_right = float('-inf')
-                            _cum = 0
-                            for _gci in _grp:
-                                _char_x = curr_x + _cum
-                                _char_ink_x = _char_x + _char_ink_offsets[_gci]
-                                _char_ink_left = min(_char_ink_left, _char_ink_x)
-                                _char_ink_right = max(_char_ink_right, _char_ink_x + _char_ink_widths[_gci])
-                                _cum += char_widths[_gci]
+                        _char_ink_left = float('inf')
+                        _char_ink_right = float('-inf')
+                        _cum = 0
+                        for _gci in _grp:
+                            _char_x = curr_x + _cum
+                            _char_ink_x = _char_x + _char_ink_offsets[_gci]
+                            _char_ink_left = min(_char_ink_left, _char_ink_x)
+                            _char_ink_right = max(_char_ink_right, _char_ink_x + _char_ink_widths[_gci])
+                            _cum += char_widths[_gci]
+                        _char_box_w = _char_ink_right - _char_ink_left
+                        if _ruby_box_w < _char_box_w:
                             _box_left = int(_char_ink_left)
                             _box_right = int(_char_ink_right)
                         else:

@@ -26,18 +26,18 @@ class UISubInterface(SubSettingInterface):
         self.card_theme = ComboSettingCard(FIF.BRUSH, "主题",
             "选择界面主题，或设为自动跟随系统切换", items=["自动", "浅色", "深色"], parent=g)
         self.card_font_size = SpinSettingCard(FIF.FONT_SIZE, "基础字体大小",
-            "非当前行的歌词字体像素大小", min_val=12, max_val=48, step=2, suffix=" px", parent=g)
+            "非当前行的歌词字体像素大小", min_val=1, max_val=99, step=2, suffix=" px", parent=g)
         self.card_current_line_font_size = SpinSettingCard(FIF.FONT_SIZE, "当前行字体大小",
-            "当前高亮行的字体像素大小（放大效果）", min_val=12, max_val=64, step=2, suffix=" px", parent=g)
+            "当前高亮行的字体像素大小（放大效果）", min_val=1, max_val=99, step=2, suffix=" px", parent=g)
         self.card_ruby_size = SpinSettingCard(FIF.FONT_SIZE, "注音字体大小",
-            "Ruby注音的字体像素大小", min_val=6, max_val=24, step=1, suffix=" px", parent=g)
+            "Ruby注音的字体像素大小", min_val=1, max_val=99, step=1, suffix=" px", parent=g)
         self.card_ruby_spacing = SpinSettingCard(FIF.FONT_SIZE, "注音与主文字间距",
-            "Ruby注音与主文字之间的垂直间距", min_val=0, max_val=20, step=1, suffix=" px", parent=g)
+            "Ruby注音与主文字之间的垂直间距", min_val=0, max_val=99, step=1, suffix=" px", parent=g)
         self.card_cp_size = SpinSettingCard(FIF.FONT_SIZE, "节奏点标记大小",
-            "Checkpoint节奏点标记的字体像素大小", min_val=6, max_val=20, step=1, suffix=" px", parent=g)
+            "Checkpoint节奏点标记的字体像素大小", min_val=1, max_val=99, step=1, suffix=" px", parent=g)
         self.card_line_height_factor = DoubleSpinSettingCard(FIF.FONT_SIZE, "行间距系数",
             "行高 = (当前行字体 + 注音 + 注音间距 + 节奏点)高度 × 系数",
-            min_val=0.50, max_val=5.00, step=0.05, decimals=2, suffix=" x", parent=g)
+            min_val=-1.00, max_val=5.00, step=0.05, decimals=2, suffix=" x", parent=g)
         self.card_alignment_margin = SpinSettingCard(FIF.FONT_SIZE, "左/右对齐时页边距",
             "左对齐或右对齐时歌词与窗口边缘的间距", min_val=0, max_val=500, step=4, suffix=" px", parent=g)
         self.card_lyrics_alignment = ComboSettingCard(FIF.ALIGNMENT, "歌词对齐方式",
