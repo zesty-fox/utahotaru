@@ -300,12 +300,12 @@ class ExportInterface(QWidget):
         if change_type == "project":
             self._project = self._store.project
             self._sync_default_filename()
-            self._sync_default_output_dir()
+            self._sync_default_output_dir(force=True)
             self._refresh_singer_checkboxes()
         elif change_type == "audio":
             # 音频变更即刻反映到默认文件名（无需等待"创建项目"）
             self._sync_default_filename()
-            self._sync_default_output_dir()
+            self._sync_default_output_dir(force=True)
         elif change_type == "singers":
             if self._store and self._store.project:
                 self._project = self._store.project
@@ -331,12 +331,16 @@ class ExportInterface(QWidget):
                 self._on_format_selected(item, None)
                 return
 
-    def _sync_default_output_dir(self):
-        """根据当前 store 的工作目录自动预填导出路径（用户可手动改）。"""
+    def _sync_default_output_dir(self, force: bool = False):
+        """根据当前 store 的工作目录自动预填导出路径（用户可手动改）。
+
+        Args:
+            force: 为 True 时无论字段是否已有内容都强制刷新（用于项目加载/音频加载场景）。
+        """
         if not self._store:
             return
-        # 用户已经手填过路径则不覆盖
-        if self.line_output.text().strip():
+        # 非强制模式下，用户已经手填过路径则不覆盖
+        if not force and self.line_output.text().strip():
             return
         working_dir = self._store.working_dir
         if working_dir:
