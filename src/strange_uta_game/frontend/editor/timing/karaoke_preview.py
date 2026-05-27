@@ -323,7 +323,10 @@ class KaraokePreview(QWidget):
             return
         self._current_line_idx = line_idx
         self._current_char_idx = char_idx
-        self.scroll_current_line_to_center()
+        # 播放中：视口居中受滚动模式/挂起状态管控（set_current_time_ms 统一负责视口）
+        # 非播放（手动导航）：始终居中
+        if not self._is_playing or (self._auto_scroll_enabled and not self._auto_scroll_suspended):
+            self.scroll_current_line_to_center()
         # 行切换时重新锚定预热中心（仅播放期间）
         if self._is_playing:
             self._warm_nearby_cache(budget=2)
@@ -379,7 +382,7 @@ class KaraokePreview(QWidget):
         # 播放期间按就近扩散顺序预热少量邻近行，降低视口内首帧卡顿
         if self._is_playing:
             self._warm_nearby_cache(budget=2)
-        # 自动滚动：始终检测播放行变化（用于 cooldown 判断），
+        # 自动滚动：检测播放行变化（用于 cooldown 判断），
         # 仅在未挂起时才移动视口（不改变编辑光标 _current_line_idx）
         if self._auto_scroll_enabled and self._is_playing:
             target_line_idx = self._find_line_for_time(time_ms)
@@ -387,8 +390,8 @@ class KaraokePreview(QWidget):
                 if target_line_idx != self._last_auto_scroll_line_idx:
                     self._last_auto_scroll_line_idx = target_line_idx
                     self.auto_scroll_line_changed.emit()
-                if not self._auto_scroll_suspended:
-                    self._scroll_to_line(target_line_idx)
+                    if not self._auto_scroll_suspended:
+                        self._scroll_to_line(target_line_idx)
         self.update()
 
     def _prewarm_all_sentences(self) -> None:
