@@ -2959,11 +2959,10 @@ class EditorInterface(QWidget):
     def _insert_line_break_at_current(self):
         if not self._project:
             return
-        line_idx = self._current_line_idx
+        line_idx, char_idx = self._resolve_target_char()
         if line_idx < 0 or line_idx >= len(self._project.sentences):
             return
         sentence = self._project.sentences[line_idx]
-        char_idx = self.preview._current_char_idx
         if char_idx < 0 or char_idx >= len(sentence.characters):
             return
 

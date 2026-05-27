@@ -354,7 +354,7 @@ class SingerPresetLoadDialog(QDialog):
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
                 item.setCheckState(Qt.CheckState.Unchecked)
             else:
-                item.setCheckState(Qt.CheckState.Checked)
+                item.setCheckState(Qt.CheckState.Unchecked)
 
             item.setData(Qt.ItemDataRole.UserRole, preset)
             item.setData(Qt.ItemDataRole.UserRole + 1, is_existing)

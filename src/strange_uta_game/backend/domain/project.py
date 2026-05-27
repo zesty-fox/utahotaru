@@ -383,6 +383,17 @@ class Project:
                     moved_char.singer_id = inherit_singer_id
         else:
             new_sentence.singer_id = sentence.characters[char_idx].singer_id or sentence.singer_id
+            new_sentence.characters = [
+                Character(
+                    char=" ",
+                    singer_id=new_sentence.singer_id,
+                    ruby=None,
+                    check_count=0,
+                    is_line_end=True,
+                    is_sentence_end=False,
+                    timestamps=[],
+                )
+            ]
 
         self.sentences.insert(line_idx + 1, new_sentence)
         self._update_timestamp()
