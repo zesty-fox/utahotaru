@@ -24,9 +24,11 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QAbstractItemView,
     QComboBox,
+    QRadioButton,
+    QButtonGroup,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QColor
+from PyQt6.QtCore import Qt, QRect, QSize, pyqtSignal
+from PyQt6.QtGui import QColor, QPixmap, QPainter
 from qfluentwidgets import (
     PushButton,
     PrimaryPushButton,
@@ -48,99 +50,267 @@ from strange_uta_game.backend.application import SingerService
 from strange_uta_game.backend.domain.entities import _compute_complement_color
 
 
+def _make_singer_icon(colors: List[str], w: int = 32, h: int = 18):
+    """生成演唱者分色预览图标（用于列表 item icon）"""
+    from PyQt6.QtGui import QIcon
+    pixmap = QPixmap(w, h)
+    p = QPainter(pixmap)
+    n = len(colors) if colors else 1
+    for i, c in enumerate(colors):
+        y0 = int(i * h / n)
+        y1 = int((i + 1) * h / n)
+        p.fillRect(QRect(0, y0, w, y1 - y0), QColor(c))
+    p.end()
+    return QIcon(pixmap)
+
+
 class SingerEditDialog(QDialog):
-    """演唱者编辑对话框"""
+    """演唱者编辑对话框，支持单色与分色（最多5色）模式"""
+
+    MAX_COLORS = 5
 
     def __init__(self, singer: Singer = None, existing_groups: List[str] = None, parent=None):
         super().__init__(parent)
-
         self._singer = singer
         self._color = singer.color if singer else "#FF6B6B"
+        self._color_mode = singer.color_mode if singer else "solid"
+        self._split_colors: List[str] = list(singer.split_colors) if singer else []
         self._existing_groups = existing_groups or []
 
-        if singer:
-            self.setWindowTitle("编辑演唱者")
-        else:
-            self.setWindowTitle("添加演唱者")
-
-        self.resize(300, 220)
-
+        self.setWindowTitle("编辑演唱者" if singer else "添加演唱者")
+        self.resize(340, 300)
         self._init_ui()
 
-    def _init_ui(self):
-        """初始化界面"""
-        layout = QFormLayout(self)
+    # ── 初始化 ────────────────────────────────────────────────────────────
 
-        # 名称输入（留空将自动生成"未命名N"）
+    def _init_ui(self):
+        outer = QVBoxLayout(self)
+        outer.setSpacing(8)
+
+        # 名称 / 分组
+        form = QFormLayout()
+        form.setSpacing(6)
+
         self.line_name = LineEdit()
         if self._singer:
             self.line_name.setText(self._singer.name)
         else:
             self.line_name.setPlaceholderText("输入演唱者名称（留空自动编号）...")
-        layout.addRow("显示名称:", self.line_name)
+        form.addRow("显示名称:", self.line_name)
 
-        # 分组输入
         self.line_group = LineEdit()
         if self._singer and self._singer.group:
             self.line_group.setText(self._singer.group)
         hint = "、".join(self._existing_groups[:4]) if self._existing_groups else ""
-        self.line_group.setPlaceholderText(f"分组名称（留空为默认分组）{('，已有：' + hint) if hint else ''}")
-        layout.addRow("分组:", self.line_group)
-
-        # 颜色选择
-        color_layout = QHBoxLayout()
-
-        self.lbl_color_preview = QLabel("    ")
-        self.lbl_color_preview.setStyleSheet(
-            f"background-color: {self._color}; border: 1px solid gray;"
+        self.line_group.setPlaceholderText(
+            f"分组名称（留空为默认分组）{('，已有：' + hint) if hint else ''}"
         )
-        self.lbl_color_preview.setFixedSize(40, 30)
-        color_layout.addWidget(self.lbl_color_preview)
+        form.addRow("分组:", self.line_group)
 
-        btn_color = PushButton("选择颜色...", self)
-        btn_color.clicked.connect(self._on_select_color)
-        color_layout.addWidget(btn_color)
+        # 颜色模式
+        mode_widget = QWidget()
+        mode_layout = QHBoxLayout(mode_widget)
+        mode_layout.setContentsMargins(0, 0, 0, 0)
+        self._rb_solid = QRadioButton("单色")
+        self._rb_split = QRadioButton("分色（最多5色）")
+        mode_grp = QButtonGroup(self)
+        mode_grp.addButton(self._rb_solid, 0)
+        mode_grp.addButton(self._rb_split, 1)
+        (self._rb_split if self._color_mode == "split" else self._rb_solid).setChecked(True)
+        self._rb_solid.toggled.connect(self._on_mode_changed)
+        mode_layout.addWidget(self._rb_solid)
+        mode_layout.addWidget(self._rb_split)
+        mode_layout.addStretch()
+        form.addRow("颜色模式:", mode_widget)
+        outer.addLayout(form)
 
-        color_layout.addStretch()
+        # ── 单色面板 ──
+        self._solid_panel = QWidget()
+        sp_layout = QHBoxLayout(self._solid_panel)
+        sp_layout.setContentsMargins(0, 0, 0, 0)
+        self._lbl_solid_preview = QLabel()
+        self._lbl_solid_preview.setFixedSize(40, 28)
+        self._refresh_solid_swatch()
+        btn_solid_pick = PushButton("选择颜色...")
+        btn_solid_pick.clicked.connect(self._on_pick_solid)
+        sp_layout.addWidget(self._lbl_solid_preview)
+        sp_layout.addWidget(btn_solid_pick)
+        sp_layout.addStretch()
+        outer.addWidget(self._solid_panel)
 
-        layout.addRow("颜色:", color_layout)
+        # ── 分色面板 ──
+        self._split_panel = QWidget()
+        split_layout = QVBoxLayout(self._split_panel)
+        split_layout.setContentsMargins(0, 0, 0, 0)
+        split_layout.setSpacing(4)
+
+        self._split_rows_widget = QWidget()
+        self._split_rows_layout = QVBoxLayout(self._split_rows_widget)
+        self._split_rows_layout.setContentsMargins(0, 0, 0, 0)
+        self._split_rows_layout.setSpacing(4)
+        split_layout.addWidget(self._split_rows_widget)
+
+        self._btn_add_split = PushButton("+ 添加颜色")
+        self._btn_add_split.clicked.connect(self._on_add_split_color)
+        split_layout.addWidget(self._btn_add_split)
+
+        # 分色预览条（水平条，从上到下展示各色带）
+        preview_label = QLabel("预览：")
+        split_layout.addWidget(preview_label)
+        self._lbl_split_preview = QLabel()
+        self._lbl_split_preview.setFixedHeight(36)
+        self._lbl_split_preview.setMinimumWidth(200)
+        split_layout.addWidget(self._lbl_split_preview)
+
+        outer.addWidget(self._split_panel)
+
+        # 初始化分色行
+        self._rebuild_split_rows()
 
         # 默认演唱者
         self.chk_default = QPushButton("设为默认演唱者")
         self.chk_default.setCheckable(True)
         if self._singer and self._singer.is_default:
             self.chk_default.setChecked(True)
-        layout.addRow("", self.chk_default)
+        outer.addWidget(self.chk_default)
 
-        # 按钮
+        # 确定 / 取消
         button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         button_box.button(QDialogButtonBox.StandardButton.Ok).setText("确定")
         button_box.button(QDialogButtonBox.StandardButton.Cancel).setText("取消")
-        button_box.accepted.connect(self._on_accept)
+        button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
-        layout.addRow("", button_box)
+        outer.addWidget(button_box)
 
-    def _on_select_color(self):
-        """选择颜色"""
+        self._update_panel_visibility()
+
+    # ── 模式切换 ──────────────────────────────────────────────────────────
+
+    def _update_panel_visibility(self):
+        is_split = self._rb_split.isChecked()
+        self._solid_panel.setVisible(not is_split)
+        self._split_panel.setVisible(is_split)
+        self.adjustSize()
+
+    def _on_mode_changed(self):
+        self._color_mode = "split" if self._rb_split.isChecked() else "solid"
+        if self._color_mode == "split" and not self._split_colors:
+            # 切换到分色时自动补一个对比色
+            from strange_uta_game.backend.domain.entities import _compute_complement_color
+            self._split_colors = [_compute_complement_color(self._color)]
+            self._rebuild_split_rows()
+        self._update_panel_visibility()
+
+    # ── 单色面板 ──────────────────────────────────────────────────────────
+
+    def _refresh_solid_swatch(self):
+        self._lbl_solid_preview.setStyleSheet(
+            f"background-color: {self._color}; border: 1px solid gray;"
+        )
+
+    def _on_pick_solid(self):
         color = QColorDialog.getColor(QColor(self._color), self, "选择演唱者颜色")
         if color.isValid():
             self._color = color.name()
-            self.lbl_color_preview.setStyleSheet(
-                f"background-color: {self._color}; border: 1px solid gray;"
-            )
+            self._refresh_solid_swatch()
 
-    def _on_accept(self):
-        """确认"""
-        # 允许空名称，将由后端自动生成 "未命名N"
-        self.accept()
+    # ── 分色面板 ──────────────────────────────────────────────────────────
+
+    def _all_split_colors(self) -> List[str]:
+        return [self._color] + self._split_colors
+
+    def _rebuild_split_rows(self):
+        while self._split_rows_layout.count():
+            item = self._split_rows_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        all_colors = self._all_split_colors()
+        n = len(all_colors)
+        for i, color in enumerate(all_colors):
+            self._split_rows_layout.addWidget(self._make_split_row(i, color, n))
+
+        self._btn_add_split.setEnabled(n < self.MAX_COLORS)
+        self._refresh_split_preview()
+
+    def _make_split_row(self, idx: int, color: str, total: int) -> QWidget:
+        row = QWidget()
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(6)
+
+        swatch = QLabel()
+        swatch.setFixedSize(40, 24)
+        swatch.setStyleSheet(f"background-color: {color}; border: 1px solid gray;")
+
+        btn_pick = PushButton(f"颜色 {idx + 1}")
+        btn_pick.setFixedWidth(80)
+        btn_pick.clicked.connect(lambda _checked, i=idx: self._on_pick_split_color(i))
+
+        row_layout.addWidget(swatch)
+        row_layout.addWidget(btn_pick)
+
+        if total > 2:
+            btn_del = QPushButton("✕")
+            btn_del.setFixedSize(24, 24)
+            btn_del.clicked.connect(lambda _checked, i=idx: self._on_remove_split_color(i))
+            row_layout.addWidget(btn_del)
+
+        row_layout.addStretch()
+        return row
+
+    def _on_pick_split_color(self, idx: int):
+        all_colors = self._all_split_colors()
+        current = all_colors[idx] if idx < len(all_colors) else "#FFFFFF"
+        color = QColorDialog.getColor(QColor(current), self, f"选择颜色 {idx + 1}")
+        if not color.isValid():
+            return
+        if idx == 0:
+            self._color = color.name()
+        else:
+            self._split_colors[idx - 1] = color.name()
+        self._rebuild_split_rows()
+
+    def _on_remove_split_color(self, idx: int):
+        if idx == 0:
+            if self._split_colors:
+                self._color = self._split_colors.pop(0)
+        else:
+            del self._split_colors[idx - 1]
+        self._rebuild_split_rows()
+
+    def _on_add_split_color(self):
+        if len(self._all_split_colors()) >= self.MAX_COLORS:
+            return
+        from strange_uta_game.backend.domain.entities import _compute_complement_color
+        new_color = _compute_complement_color(self._all_split_colors()[-1])
+        self._split_colors.append(new_color)
+        self._rebuild_split_rows()
+
+    def _refresh_split_preview(self):
+        all_colors = self._all_split_colors()
+        w = max(self._lbl_split_preview.width(), 200)
+        h = 36
+        pixmap = QPixmap(w, h)
+        p = QPainter(pixmap)
+        n = len(all_colors)
+        for i, hex_c in enumerate(all_colors):
+            y0 = int(i * h / n)
+            y1 = int((i + 1) * h / n)
+            p.fillRect(QRect(0, y0, w, y1 - y0), QColor(hex_c))
+        p.end()
+        self._lbl_split_preview.setPixmap(pixmap)
+
+    # ── 数据获取 ──────────────────────────────────────────────────────────
 
     def get_data(self) -> dict:
-        """获取编辑后的数据"""
         return {
             "name": self.line_name.text().strip(),
             "color": self._color,
+            "color_mode": self._color_mode,
+            "split_colors": list(self._split_colors),
             "is_default": self.chk_default.isChecked(),
             "group": self.line_group.text().strip(),
         }
@@ -266,6 +436,7 @@ class SingerPresetLoadDialog(QDialog):
 
         # 演唱者列表（NoSelection，选中状态完全由 CheckState 驱动）
         self.list_widget = ListWidget()
+        self.list_widget.setIconSize(QSize(32, 18))
         self.list_widget.setSelectionMode(
             QAbstractItemView.SelectionMode.NoSelection
         )
@@ -338,13 +509,20 @@ class SingerPresetLoadDialog(QDialog):
 
             is_existing = name in self._existing_names
             color = preset.get("color", "#FF6B6B")
+            color_mode = preset.get("color_mode", "solid")
+            split_colors = preset.get("split_colors", [])
             group = preset.get("group", "")
+
+            all_colors = ([color] + split_colors) if color_mode == "split" and split_colors else [color]
 
             item = QListWidgetItem()
             display_name = f"{name} [{group}]" if group else name
             item.setText(f"{display_name}  (已存在)" if is_existing else display_name)
 
-            # 演唱者颜色作为背景
+            # 颜色图标（支持分色预览）
+            item.setIcon(_make_singer_icon(all_colors, 32, 18))
+
+            # 演唱者主色作为半透明背景
             bg_color = QColor(color)
             bg_color.setAlpha(80)
             item.setBackground(bg_color)
@@ -507,6 +685,74 @@ class SingerPresetLoadDialog(QDialog):
         return result
 
 
+class SingerColorPreviewPanel(QWidget):
+    """独立的演唱者颜色预览面板，不受列表背景色影响"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedWidth(176)
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+
+        title = QLabel("颜色预览")
+        title.setStyleSheet("font-size: 13px; font-weight: bold; color: #888;")
+        layout.addWidget(title)
+
+        self._swatch = QLabel()
+        self._swatch.setMinimumSize(152, 96)
+        self._swatch.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self._swatch)
+
+        self._name_label = QLabel("未选中")
+        self._name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._name_label.setWordWrap(True)
+        self._name_label.setStyleSheet("color: #888; font-size: 12px;")
+        layout.addWidget(self._name_label)
+
+        layout.addStretch()
+        self._clear()
+
+    def set_preview(self, name: str, colors: list):
+        self._name_label.setText(name)
+        self._name_label.setStyleSheet("color: #CCC; font-size: 12px;")
+
+        w = max(self._swatch.width(), 152)
+        h = max(self._swatch.height(), 96)
+        pixmap = QPixmap(w, h)
+        pixmap.fill(QColor("#2B2B2B"))
+
+        if colors:
+            p = QPainter(pixmap)
+            n = len(colors)
+            pen_w = 2
+            for i, c in enumerate(colors):
+                t = int(i * (h - pen_w * 2) / n) + pen_w
+                b = int((i + 1) * (h - pen_w * 2) / n) + pen_w
+                p.fillRect(QRect(pen_w, t, w - pen_w * 2, b - t), QColor(c))
+            p.end()
+
+        self._swatch.setPixmap(pixmap)
+
+    def set_multiple(self, count: int):
+        self._name_label.setText(f"已选中 {count} 位")
+        self._name_label.setStyleSheet("color: #888; font-size: 12px;")
+        self._clear_swatch()
+
+    def _clear(self):
+        self._name_label.setText("未选中")
+        self._name_label.setStyleSheet("color: #888; font-size: 12px;")
+        self._clear_swatch()
+
+    def _clear_swatch(self):
+        pixmap = QPixmap(152, 96)
+        pixmap.fill(QColor("#2B2B2B"))
+        self._swatch.setPixmap(pixmap)
+
+
 class SingerManagerInterface(QWidget):
     """演唱者管理界面"""
 
@@ -562,7 +808,9 @@ class SingerManagerInterface(QWidget):
 
         layout.addLayout(search_row)
 
-        # 演唱者列表
+        # 演唱者列表 + 独立颜色预览面板
+        list_row = QHBoxLayout()
+
         self.list_singers = ListWidget()
         self.list_singers.setMinimumHeight(260)
         self.list_singers.setSelectionMode(
@@ -576,7 +824,12 @@ class SingerManagerInterface(QWidget):
         self.list_singers.itemSelectionChanged.connect(self._on_selection_changed)
         # 拖放完成后，rowsMoved 由内部模型发出
         self.list_singers.model().rowsMoved.connect(self._on_rows_moved)
-        layout.addWidget(self.list_singers, stretch=1)
+        list_row.addWidget(self.list_singers, stretch=1)
+
+        self._color_preview_panel = SingerColorPreviewPanel(self)
+        list_row.addWidget(self._color_preview_panel)
+
+        layout.addLayout(list_row, stretch=1)
 
         # ── 第一排按钮：常规操作 ──
         row1 = QHBoxLayout()
@@ -783,7 +1036,6 @@ class SingerManagerInterface(QWidget):
                 item.setForeground(
                     QColor("black") if luminance > 0.5 else QColor("white")
                 )
-
                 # 拖放控制：搜索过滤时禁止拖动（避免操作隐藏项造成混乱）
                 flags = item.flags()
                 if filter_lower:
@@ -867,6 +1119,7 @@ class SingerManagerInterface(QWidget):
             self._suppress_reorder_signal = False
 
         self._update_button_state()
+        self._update_color_preview()
         # 仅更新统计文字尾部"已选中 K 位"，避免完全重建列表
         if self._project:
             total = len(self._project.singers)
@@ -908,6 +1161,29 @@ class SingerManagerInterface(QWidget):
         self.btn_up.setEnabled(order_ok)
         self.btn_down.setEnabled(order_ok)
         self.btn_bottom.setEnabled(order_ok)
+
+    def _update_color_preview(self):
+        """更新右侧独立颜色预览面板"""
+        if not self._project:
+            self._color_preview_panel._clear()
+            return
+
+        selected_ids = self._get_selected_singer_ids()
+        if not selected_ids:
+            self._color_preview_panel._clear()
+            return
+
+        if len(selected_ids) > 1:
+            self._color_preview_panel.set_multiple(len(selected_ids))
+            return
+
+        singer = self._project.get_singer(selected_ids[0])
+        if not singer:
+            self._color_preview_panel._clear()
+            return
+
+        colors = singer.get_all_colors()
+        self._color_preview_panel.set_preview(singer.name, colors)
 
     # ==================== 搜索 / 分组过滤 ====================
 
@@ -997,8 +1273,18 @@ class SingerManagerInterface(QWidget):
         try:
             if data["name"] and data["name"] != singer.name:
                 self._singer_service.rename_singer(singer.id, data["name"])
-            if data["color"] != singer.color:
-                self._singer_service.change_singer_color(singer.id, data["color"])
+            color_changed = (
+                data["color"] != singer.color
+                or data["color_mode"] != singer.color_mode
+                or data["split_colors"] != list(singer.split_colors)
+            )
+            if color_changed:
+                self._singer_service.change_singer_color(
+                    singer.id,
+                    data["color"],
+                    color_mode=data["color_mode"],
+                    split_colors=data["split_colors"],
+                )
             if data["is_default"] and not singer.is_default:
                 self._singer_service.set_default_singer(singer.id)
             new_group = data.get("group", "")
@@ -1169,6 +1455,8 @@ class SingerManagerInterface(QWidget):
             {
                 "name": s.name,
                 "color": s.color,
+                "color_mode": s.color_mode,
+                "split_colors": s.split_colors,
                 "is_default": s.is_default,
                 "backend_number": s.backend_number,
                 "group": s.group,
@@ -1219,6 +1507,8 @@ class SingerManagerInterface(QWidget):
                 singer = self._singer_service.add_singer(
                     name=name,
                     color=preset.get("color", "#FF6B6B"),
+                    color_mode=preset.get("color_mode", "solid"),
+                    split_colors=preset.get("split_colors", []),
                     group=preset.get("group", ""),
                 )
                 if preset.get("is_default", False):

@@ -9,8 +9,8 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtCore import Qt, QRect, QSize, pyqtSignal
+from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import (
 
     QCheckBox,
@@ -21,6 +21,8 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QRadioButton,
     QScrollArea,
     QTableWidget,
@@ -29,6 +31,23 @@ from PyQt6.QtWidgets import (
     QWidget,
     QButtonGroup,
 )
+
+
+def _make_singer_color_pixmap(colors: list, w: int = 32, h: int = 18) -> QPixmap:
+    """生成演唱者颜色预览 pixmap（支持分色，从上到下均分色带）"""
+    pixmap = QPixmap(w, h)
+    p = QPainter(pixmap)
+    n = len(colors) if colors else 1
+    base = colors[0] if colors else "#CCCCCC"
+    if n == 1:
+        p.fillRect(QRect(0, 0, w, h), QColor(base))
+    else:
+        for i, c in enumerate(colors):
+            y0 = int(i * h / n)
+            y1 = int((i + 1) * h / n)
+            p.fillRect(QRect(0, y0, w, y1 - y0), QColor(c))
+    p.end()
+    return pixmap
 from qfluentwidgets import (
     InfoBar,
     InfoBarPosition,
@@ -1017,7 +1036,7 @@ class SetSingerByLineDialog(QDialog):
         self._singer_map = {s.id: s for s in singers}
 
         self.setWindowTitle("按行设置演唱者")
-        self.resize(900, 500)
+        self.resize(1200, 900)
         self.setFont(QFont("Microsoft YaHei", 10))
 
         layout = QVBoxLayout(self)
@@ -1086,16 +1105,48 @@ class SetSingerByLineDialog(QDialog):
         select_layout.addStretch()
         layout.addLayout(select_layout)
 
-        # 演唱者选择
-        singer_layout = QHBoxLayout()
-        singer_layout.addWidget(QLabel("设置演唱者为:"))
-        self.combo_singer = QComboBox(self)
+        # 演唱者选择区（名称过滤 + 分组过滤 + 列表预览）
+        singer_group = QGroupBox("设置演唱者为", self)
+        sg_layout = QVBoxLayout(singer_group)
+        sg_layout.setSpacing(4)
+
+        # 过滤行
+        sg_filter_row = QHBoxLayout()
+        sg_filter_row.addWidget(QLabel("名称:"))
+        self.singer_name_filter = QLineEdit(self)
+        self.singer_name_filter.setPlaceholderText("过滤名称...")
+        self.singer_name_filter.textChanged.connect(self._apply_singer_filter)
+        sg_filter_row.addWidget(self.singer_name_filter, stretch=1)
+
+        sg_filter_row.addWidget(QLabel("分组:"))
+        self.singer_group_filter = QComboBox(self)
+        self.singer_group_filter.addItem("全部", "")
+        _groups = sorted({s.group for s in singers if s.group})
+        if any(not s.group for s in singers):
+            self.singer_group_filter.addItem("（无分组）", "\x00nogroup")
+        for _g in _groups:
+            self.singer_group_filter.addItem(_g, _g)
+        self.singer_group_filter.currentIndexChanged.connect(self._apply_singer_filter)
+        sg_filter_row.addWidget(self.singer_group_filter)
+        sg_layout.addLayout(sg_filter_row)
+
+        # 演唱者列表（带颜色图标预览）
+        self.singer_list = QListWidget(self)
+        self.singer_list.setFixedHeight(160)
+        self.singer_list.setIconSize(QSize(36, 18))
         for singer in singers:
-            self.combo_singer.addItem(singer.name)
-            self.combo_singer.setItemData(self.combo_singer.count() - 1, QColor(singer.color), Qt.ItemDataRole.BackgroundRole)
-            self.combo_singer.setItemData(self.combo_singer.count() - 1, singer.id, Qt.ItemDataRole.UserRole)
-        singer_layout.addWidget(self.combo_singer, stretch=1)
-        layout.addLayout(singer_layout)
+            item = QListWidgetItem()
+            label = singer.name
+            if singer.group:
+                label += f"  [{singer.group}]"
+            item.setText(label)
+            item.setIcon(QIcon(_make_singer_color_pixmap(singer.get_all_colors(), 36, 18)))
+            item.setData(Qt.ItemDataRole.UserRole, singer.id)
+            item.setData(Qt.ItemDataRole.UserRole + 1, singer.group)
+            self.singer_list.addItem(item)
+        sg_layout.addWidget(self.singer_list)
+
+        layout.addWidget(singer_group)
 
         # 按钮
         btn_layout = QHBoxLayout()
@@ -1142,13 +1193,30 @@ class SetSingerByLineDialog(QDialog):
                 if chk:
                     chk.setChecked(False)
 
+    def _apply_singer_filter(self):
+        """按名称/分组过滤演唱者列表"""
+        name_text = self.singer_name_filter.text().strip().lower()
+        group_val = self.singer_group_filter.currentData() or ""
+        for i in range(self.singer_list.count()):
+            item = self.singer_list.item(i)
+            item_text = item.text().lower()
+            item_group = item.data(Qt.ItemDataRole.UserRole + 1) or ""
+            name_ok = not name_text or name_text in item_text
+            if group_val == "\x00nogroup":
+                group_ok = not item_group
+            elif group_val:
+                group_ok = item_group == group_val
+            else:
+                group_ok = True
+            item.setHidden(not (name_ok and group_ok))
+
     def _on_apply(self):
         """应用按钮点击处理 - 不关闭对话框"""
-        # 获取选中的演唱者ID
-        singer_idx = self.combo_singer.currentIndex()
-        if singer_idx < 0:
+        # 获取列表中当前选中的演唱者
+        sel_items = self.singer_list.selectedItems()
+        if not sel_items:
             return
-        singer_id = self.combo_singer.itemData(singer_idx, Qt.ItemDataRole.UserRole)
+        singer_id = sel_items[0].data(Qt.ItemDataRole.UserRole)
         if not singer_id:
             return
 
@@ -1243,12 +1311,14 @@ class ApplySingerDialog(QDialog):
 
         # 第四行：演唱者列表
         self.list_singers = QTableWidget(len(all_singers), 2, self)
-        self.list_singers.setHorizontalHeaderLabels(["演唱者", "颜色"])
+        self.list_singers.setHorizontalHeaderLabels(["演唱者", "颜色预览"])
         self.list_singers.horizontalHeader().setStretchLastSection(True)
+        self.list_singers.setColumnWidth(1, 64)
         self.list_singers.verticalHeader().setVisible(False)
         self.list_singers.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.list_singers.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.list_singers.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.list_singers.setIconSize(QSize(48, 20))
         self.list_singers.itemSelectionChanged.connect(self._on_selection_changed)
         self.list_singers.cellDoubleClicked.connect(self._on_double_click)
 
@@ -1258,8 +1328,9 @@ class ApplySingerDialog(QDialog):
             name_item.setData(Qt.ItemDataRole.UserRole, singer.id)
             self.list_singers.setItem(idx, 0, name_item)
 
-            color_item = QTableWidgetItem("")
-            color_item.setBackground(QColor(singer.color))
+            color_item = QTableWidgetItem()
+            color_item.setIcon(QIcon(_make_singer_color_pixmap(singer.get_all_colors(), 48, 20)))
+            color_item.setFlags(color_item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
             self.list_singers.setItem(idx, 1, color_item)
 
         layout.addWidget(self.list_singers, stretch=1)

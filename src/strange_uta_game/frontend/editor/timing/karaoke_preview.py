@@ -33,6 +33,45 @@ from strange_uta_game.frontend.theme import theme
 # ──────────────────────────────────────────────
 
 
+def _draw_split_text(
+    painter: "QPainter",
+    x: int,
+    baseline: int,
+    ch: str,
+    colors: "list[QColor]",
+    y_top: int,
+    y_bottom: int,
+) -> None:
+    """绘制文字，支持分色（split）模式。
+
+    单色时直接 setPen+drawText，无额外开销。
+    分色时对每个色带用 IntersectClip，可在已有 wipe clip 内正确工作。
+    y_top/y_bottom 为本行实际墨水上下边界（屏幕坐标），由调用方按行预计算传入，
+    保证同行所有字符的色带分界线位于同一视觉高度。
+    """
+    n = len(colors)
+    if n <= 1:
+        painter.setPen(colors[0] if colors else QColor("white"))
+        painter.drawText(x, baseline, ch)
+        return
+    total_h = y_bottom - y_top
+    if total_h <= 0:
+        painter.setPen(colors[0])
+        painter.drawText(x, baseline, ch)
+        return
+    for i, color in enumerate(colors):
+        y0 = y_top + int(i * total_h / n)
+        y1 = y_top + int((i + 1) * total_h / n) + 1  # +1 防止浮点精度产生空隙
+        painter.save()
+        painter.setClipRect(
+            QRect(-32768, y0, 65536, y1 - y0),
+            Qt.ClipOperation.IntersectClip,
+        )
+        painter.setPen(color)
+        painter.drawText(x, baseline, ch)
+        painter.restore()
+
+
 def _anchor_ratio(anchors: list[int], current_time: int) -> float:
     """根据锚点序列计算总 wipe 进度比例。
 
@@ -1178,9 +1217,10 @@ class KaraokePreview(QWidget):
                         if characters[ci].is_sentence_end and characters[ci].global_sentence_end_ts is not None:
                             end_ts = int(characters[ci].global_sentence_end_ts)
                             break
-                    if end_ts is None:
-                        # 使用预处理的 fallback（行尾非句尾时从下一行借的时间戳）
-                        end_ts = fallback_sentence_end_ts if fallback_sentence_end_ts is not None else start_times[leader]
+                if end_ts is None:
+                    end_ts = fallback_sentence_end_ts
+                if end_ts is None or end_ts <= start_times[leader]:
+                    continue
 
                 # 整体：leader + 它后面的无 ts 字符，按像素宽度加权从左到右分配时间
                 seg_total_w = sum(char_widths[ci] for ci in range(leader, seg_end + 1))
@@ -1232,7 +1272,7 @@ class KaraokePreview(QWidget):
 
                 # 剩余 pre-leader 字符（cc>0 未打轴，或非行头的 pre-leader 字符）：
                 # 老算法——按像素宽度加权分配到 first_leader 的 wipe 窗口内
-                if old_algo_start < first_leader:
+                if old_algo_start < first_leader and first_leader in char_wipe_times:
                     leader_start_ts, leader_end_ts = char_wipe_times[first_leader]
                     pre_total_w = sum(char_widths[ci] for ci in range(old_algo_start, first_leader + 1))
                     cum_w = 0
@@ -1501,18 +1541,20 @@ class KaraokePreview(QWidget):
             )
 
             # 预计算每个字符的 per-char singer 颜色（从 Character.singer_id 读取）
-            _char_singer_colors: dict = {}  # char_idx -> QColor (基色)
+            # 值为 List[QColor]：solid 模式长度为 1，split 模式长度 2-5
+            _char_singer_colors: dict = {}  # char_idx -> List[QColor] (基色列表)
             _char_complement_colors: dict = {}  # char_idx -> QColor (选中高亮色 = 演唱者补色)
             default_singer = self._project.get_default_singer()
             for ci, char in enumerate(line.characters):
                 singer_obj = self._project.get_singer(char.singer_id)
-                singer_color = singer_obj.color if singer_obj and singer_obj.color else default_singer.color
-                comp_color = (
-                    singer_obj.complement_color
-                    if singer_obj and singer_obj.complement_color
-                    else default_singer.complement_color or singer_color
-                )
-                _char_singer_colors[ci] = QColor(singer_color)
+                eff = singer_obj if (singer_obj and singer_obj.color) else default_singer
+                if eff:
+                    all_colors = [QColor(c) for c in eff.get_all_colors()]
+                    comp_color = eff.complement_color or eff.color
+                else:
+                    all_colors = [QColor("#FFFFFF")]
+                    comp_color = "#FFFFFF"
+                _char_singer_colors[ci] = all_colors
                 _char_complement_colors[ci] = QColor(comp_color)
 
             if is_current:
@@ -1559,6 +1601,22 @@ class KaraokePreview(QWidget):
                 start_x = text_area_left + (available_width - total_text_width) // 2
 
             curr_x = start_x
+
+            # 预计算本行所有非空白字符的实际墨水上下边界（屏幕坐标）。
+            # 用于分色渲染时统一色带分界线，使同行各字符的分色视觉位置一致。
+            _line_ink_top = y_center - main_fm.ascent()   # 默认 fallback
+            _line_ink_bottom = y_center + main_fm.descent()
+            _ink_top_min = float("inf")
+            _ink_bottom_max = float("-inf")
+            for _ch in line.chars:
+                if not _ch or not _ch.strip():
+                    continue
+                _br = main_fm.tightBoundingRect(_ch)
+                _ink_top_min = min(_ink_top_min, y_center + _br.top())
+                _ink_bottom_max = max(_ink_bottom_max, y_center + _br.bottom())
+            if _ink_top_min < float("inf"):
+                _line_ink_top = int(_ink_top_min)
+                _line_ink_bottom = int(_ink_bottom_max) + 1
 
             for char_pos, ch in enumerate(line.chars):
                 char_w = char_widths[char_pos]
@@ -1635,11 +1693,17 @@ class KaraokePreview(QWidget):
                         _lw = char_wipe_times.get(_grp[-1])
                         _rs = _fw[0] if _fw else None
                         _re = _lw[1] if _lw else None
-                        _rh = _char_singer_colors.get(_grp[0], highlight_color)
+                        _rh_colors = _char_singer_colors.get(_grp[0], [highlight_color])
+                        # Ruby 分色边界：基于该 ruby 串的实际墨水范围
+                        _rh_br = fm_ruby.tightBoundingRect(_merged)
+                        _rh_ink_top = ruby_y + _rh_br.top()
+                        _rh_ink_bottom = ruby_y + _rh_br.bottom() + 1
                         if _rs is not None and _re is not None:
                             if current_time >= _re:
-                                painter.setPen(_rh)
-                                painter.drawText(int(ruby_x), ruby_y, _merged)
+                                _draw_split_text(
+                                    painter, int(ruby_x), ruby_y, _merged,
+                                    _rh_colors, _rh_ink_top, _rh_ink_bottom,
+                                )
                             elif current_time >= _rs:
                                 _rd = _re - _rs
                                 _rr = (
@@ -1658,8 +1722,10 @@ class KaraokePreview(QWidget):
                                             fm_ruby.height() + 4,
                                         )
                                     )
-                                    painter.setPen(_rh)
-                                    painter.drawText(int(ruby_x), ruby_y, _merged)
+                                    _draw_split_text(
+                                        painter, int(ruby_x), ruby_y, _merged,
+                                        _rh_colors, _rh_ink_top, _rh_ink_bottom,
+                                    )
                                     painter.restore()
                         # 连词框：Ruby 拼接串实际总宽 vs 字符组墨水宽度取更宽者。
                         # 若 ruby 实际总宽 < 字符组墨水宽度 → 用字符墨水边界（方法2），
@@ -1716,9 +1782,13 @@ class KaraokePreview(QWidget):
                         painter.setPen(base_color)
                         painter.drawText(int(ruby_x), ruby_y, _ruby_disp)
                         # Wipe — 优先用 part 锚点轴分段；缺锚点回退旧整段线性
-                        ruby_highlight = _char_singer_colors.get(
-                            char_pos, highlight_color
+                        ruby_highlight_colors = _char_singer_colors.get(
+                            char_pos, [highlight_color]
                         )
+                        # Ruby 分色边界：基于该 ruby 串的实际墨水范围
+                        _ruby_br = fm_ruby.tightBoundingRect(_ruby_disp)
+                        _ruby_ink_top = ruby_y + _ruby_br.top()
+                        _ruby_ink_bottom = ruby_y + _ruby_br.bottom() + 1
                         _r_anchors = _char_part_anchors.get(char_pos)
                         if _r_anchors is not None and len(_r_anchors) >= 2:
                             _i, _sr, _n = _anchor_segment(_r_anchors, current_time)
@@ -1742,8 +1812,10 @@ class KaraokePreview(QWidget):
                                     _ratio = (_i + _sr) / _n
                                 r_wipe_w = int(_r_ink_w * _ratio) if _r_ink_w > 0 else 0
                                 if _ratio >= 1.0:
-                                    painter.setPen(ruby_highlight)
-                                    painter.drawText(int(ruby_x), ruby_y, _ruby_disp)
+                                    _draw_split_text(
+                                        painter, int(ruby_x), ruby_y, _ruby_disp,
+                                        ruby_highlight_colors, _ruby_ink_top, _ruby_ink_bottom,
+                                    )
                                 elif r_wipe_w > 0:
                                     painter.save()
                                     painter.setClipRect(
@@ -1754,8 +1826,10 @@ class KaraokePreview(QWidget):
                                             fm_ruby.height() + 4,
                                         )
                                     )
-                                    painter.setPen(ruby_highlight)
-                                    painter.drawText(int(ruby_x), ruby_y, _ruby_disp)
+                                    _draw_split_text(
+                                        painter, int(ruby_x), ruby_y, _ruby_disp,
+                                        ruby_highlight_colors, _ruby_ink_top, _ruby_ink_bottom,
+                                    )
                                     painter.restore()
                         else:
                             ruby_wipe_st = char_wipe_times.get(char_pos)
@@ -1764,8 +1838,10 @@ class KaraokePreview(QWidget):
                                 ruby_wipe_et = char_wipe_times.get(char_pos)
                                 ruby_et = ruby_wipe_et[1] if ruby_wipe_et else ruby_st + 300
                                 if current_time >= ruby_et:
-                                    painter.setPen(ruby_highlight)
-                                    painter.drawText(int(ruby_x), ruby_y, _ruby_disp)
+                                    _draw_split_text(
+                                        painter, int(ruby_x), ruby_y, _ruby_disp,
+                                        ruby_highlight_colors, _ruby_ink_top, _ruby_ink_bottom,
+                                    )
                                 elif current_time >= ruby_st:
                                     r_dur = ruby_et - ruby_st
                                     r_ratio = (
@@ -1784,14 +1860,16 @@ class KaraokePreview(QWidget):
                                                 fm_ruby.height() + 4,
                                             )
                                         )
-                                        painter.setPen(ruby_highlight)
-                                        painter.drawText(int(ruby_x), ruby_y, _ruby_disp)
+                                        _draw_split_text(
+                                            painter, int(ruby_x), ruby_y, _ruby_disp,
+                                            ruby_highlight_colors, _ruby_ink_top, _ruby_ink_bottom,
+                                        )
                                         painter.restore()
 
                 # 主文字 — 基于 checkpoint 的逐字 wipe
                 painter.setFont(main_font)
-                # 使用 per-char singer 颜色（如果该字符有不同的演唱者）
-                char_highlight = _char_singer_colors.get(char_pos, highlight_color)
+                # 使用 per-char singer 颜色（List[QColor]，支持分色）
+                char_colors = _char_singer_colors.get(char_pos, [highlight_color])
 
                 # 字符在 char_w 宽度内居中（与 ruby 对齐）
                 char_text_w = main_fm.horizontalAdvance(ch)
@@ -1810,22 +1888,24 @@ class KaraokePreview(QWidget):
                             _char_part_anchors[char_pos], current_time
                         )
                     else:
-                        if current_time >= next_time:
+                        if current_time >= next_time and next_time > char_time:
                             wipe_ratio = 1.0
                         elif current_time >= char_time:
                             duration = next_time - char_time
                             wipe_ratio = (
                                 min(1.0, (current_time - char_time) / duration)
                                 if duration > 0
-                                else 1.0
+                                else 0.0
                             )
                         else:
                             wipe_ratio = 0.0
 
                     if wipe_ratio >= 1.0:
-                        # 已唱完 → 全高亮
-                        painter.setPen(char_highlight)
-                        painter.drawText(int(char_draw_x), int(y_center), ch)
+                        # 已唱完 → 全高亮（支持分色）
+                        _draw_split_text(
+                            painter, int(char_draw_x), int(y_center),
+                            ch, char_colors, _line_ink_top, _line_ink_bottom,
+                        )
                     elif wipe_ratio > 0.0:
                         # 正在唱 → wipe 渐变
                         painter.setPen(base_color)
@@ -1848,8 +1928,11 @@ class KaraokePreview(QWidget):
                                 main_fm.height() + 10,
                             )
                             painter.setClipRect(clip_rect)
-                            painter.setPen(char_highlight)
-                            painter.drawText(int(char_draw_x), int(y_center), ch)
+                            # _draw_split_text 内部用 IntersectClip，与 wipe clip 正确叠加
+                            _draw_split_text(
+                                painter, int(char_draw_x), int(y_center),
+                                ch, char_colors, _line_ink_top, _line_ink_bottom,
+                            )
                             painter.restore()
                         # ink_w == 0（空格/全角空格/NBSP/Tab 等空白字符）：
                         # 没有可见墨水，跳过 clip 绘制，wipe 期间保持 base_color 即可。
@@ -1898,7 +1981,7 @@ class KaraokePreview(QWidget):
                             ch_obj.selected_checkpoint_idx == cp_idx
                         )
                         if is_selected:
-                            color = _char_singer_colors.get(char_pos, highlight_color)
+                            color = _char_singer_colors.get(char_pos, [highlight_color])[0]
                         elif not has_timed:
                             color = theme.karaoke_text_current
                         else:
@@ -1931,7 +2014,7 @@ class KaraokePreview(QWidget):
                             ch_obj.selected_checkpoint_idx == se_cp_idx
                         )
                         if is_selected:
-                            color = _char_singer_colors.get(char_pos, highlight_color)
+                            color = _char_singer_colors.get(char_pos, [highlight_color])[0]
                         elif not has_timed:
                             color = theme.karaoke_text_current
                         else:

@@ -30,12 +30,21 @@ class SingerService:
         self._project = project
         self._callbacks = callbacks or SingerCallbacks()
 
-    def add_singer(self, name: str = None, color: str = None, group: str = "") -> Singer:
+    def add_singer(
+        self,
+        name: str = None,
+        color: str = None,
+        color_mode: str = "solid",
+        split_colors: list = None,
+        group: str = "",
+    ) -> Singer:
         """添加演唱者
 
         Args:
             name: 演唱者名称（如果为 None 则自动生成 "未命名N"）
             color: 颜色（如果为 None 则自动分配）
+            color_mode: 颜色模式（"solid" 或 "split"）
+            split_colors: 分色模式的额外颜色列表
             group: 分组名称（空字符串表示默认分组）
 
         Returns:
@@ -57,7 +66,14 @@ class SingerService:
         if name in existing_names:
             raise ValidationError(f"演唱者名称「{name}」已存在，项目内不允许重名")
 
-        singer = Singer(name=name, color=color, backend_number=next_number, group=group)
+        singer = Singer(
+            name=name,
+            color=color,
+            color_mode=color_mode,
+            split_colors=split_colors or [],
+            backend_number=next_number,
+            group=group,
+        )
         self._project.add_singer(singer)
 
         if self._callbacks.on_singer_added:
@@ -128,12 +144,20 @@ class SingerService:
 
         return True
 
-    def change_singer_color(self, singer_id: str, new_color: str) -> bool:
+    def change_singer_color(
+        self,
+        singer_id: str,
+        new_color: str,
+        color_mode: str = None,
+        split_colors: list = None,
+    ) -> bool:
         """修改演唱者颜色
 
         Args:
             singer_id: 演唱者ID
-            new_color: 新颜色
+            new_color: 新主色
+            color_mode: 颜色模式（可选，None 表示不修改）
+            split_colors: 分色列表（可选，None 表示不修改）
 
         Returns:
             是否成功
@@ -142,7 +166,7 @@ class SingerService:
         if not singer:
             return False
 
-        singer.change_color(new_color)
+        singer.change_color(new_color, color_mode=color_mode, split_colors=split_colors)
 
         if self._callbacks.on_singer_updated:
             self._callbacks.on_singer_updated(singer)

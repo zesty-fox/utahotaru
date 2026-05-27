@@ -56,7 +56,10 @@ class Singer:
     Attributes:
         id: 唯一标识符（UUID）
         name: 演唱者名称（如 "初音ミク"、"合唱"、"和声"）
-        color: 显示颜色（用于区分不同演唱者，如 "#FF6B6B"）
+        color: 主显示颜色（#RRGGBB，始终有效）
+        complement_color: 自动计算的补色（选中高亮用）
+        color_mode: 颜色模式，"solid"（单色）或 "split"（分色）
+        split_colors: 分色模式下的额外颜色列表（colors[1..4]，最多4项使总数≤5）
         is_default: 是否为默认演唱者
         display_priority: 显示优先级（数字越小越优先显示）
         enabled: 是否启用（禁用的演唱者不参与全局序列）
@@ -72,6 +75,8 @@ class Singer:
     name: str = "未命名"
     color: str = "#FF6B6B"
     complement_color: str = ""
+    color_mode: str = "solid"
+    split_colors: List[str] = field(default_factory=list)
     backend_number: int = 0
     is_default: bool = False
     display_priority: int = 0
@@ -85,10 +90,27 @@ class Singer:
             raise ValidationError("演唱者名称不能为空")
         if not self.color.startswith("#") or len(self.color) != 7:
             raise ValidationError(f"颜色格式无效: {self.color} (应为 #RRGGBB)")
+        # 兼容旧数据：color_mode 缺失或非法时默认 solid
+        if self.color_mode not in ("solid", "split"):
+            self.color_mode = "solid"
+        # 过滤非法的 split_colors 条目，最多保留 4 个（总颜色数 ≤ 5）
+        self.split_colors = [
+            c for c in self.split_colors
+            if c and c.startswith("#") and len(c) == 7
+        ][:4]
         # 自动补算补色：持久化但不强制用户可见。
         # 仅在字段为空或与当前 color 不兼容时重算，保证 .sug 旧文件向后兼容。
         if not self.complement_color or not self.complement_color.startswith("#") or len(self.complement_color) != 7:
             self.complement_color = _compute_complement_color(self.color)
+
+    def get_all_colors(self) -> List[str]:
+        """返回所有颜色列表。
+
+        solid 模式返回 [color]，split 模式返回 [color] + split_colors。
+        """
+        if self.color_mode == "split" and self.split_colors:
+            return [self.color] + list(self.split_colors)
+        return [self.color]
 
     def rename(self, new_name: str) -> None:
         """重命名演唱者"""
@@ -96,12 +118,26 @@ class Singer:
             raise ValidationError("演唱者名称不能为空")
         self.name = new_name
 
-    def change_color(self, new_color: str) -> None:
-        """修改显示颜色（同步更新补色）"""
+    def change_color(
+        self,
+        new_color: str,
+        color_mode: str = None,
+        split_colors: List[str] = None,
+    ) -> None:
+        """修改颜色设置（同步更新补色）"""
         if not new_color.startswith("#") or len(new_color) != 7:
             raise ValidationError(f"颜色格式无效: {new_color}")
         self.color = new_color
         self.complement_color = _compute_complement_color(new_color)
+        if color_mode is not None:
+            if color_mode not in ("solid", "split"):
+                raise ValidationError(f"颜色模式无效: {color_mode}")
+            self.color_mode = color_mode
+        if split_colors is not None:
+            self.split_colors = [
+                c for c in split_colors
+                if c and c.startswith("#") and len(c) == 7
+            ][:4]
 
     def set_enabled(self, enabled: bool) -> None:
         """设置启用状态"""
