@@ -790,7 +790,7 @@ class EditInterface(QWidget):
         sentences = self.project.sentences
         meaningful_lines = [
             s for s in sentences
-            if sum(c.total_timing_points for c in s.characters) > 0
+            if any(c.check_count > 0 for c in s.characters)
         ]
         total_lines = len(meaningful_lines)
         completed_lines = sum(1 for s in meaningful_lines if s.is_fully_timed())

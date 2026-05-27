@@ -498,11 +498,11 @@ class Project:
     def get_timing_statistics(self) -> Dict[str, Any]:
         """获取打轴统计信息
 
-        只统计有实际打轴工作的行（总打轴点数 > 0），空白行和纯占位行不计入。
+        只统计有实际打轴工作的行（check_count > 0），CC=0 的空白行和纯占位行不计入。
         """
         meaningful_lines = [
             s for s in self.sentences
-            if sum(c.total_timing_points for c in s.characters) > 0
+            if any(c.check_count > 0 for c in s.characters)
         ]
 
         total_chars = sum(len(s.characters) for s in meaningful_lines)

@@ -17,7 +17,6 @@ from .models import (
     Ruby,
     Character,
     Word,
-    DistributeRubyCharsEvenly,
 )
 
 from .entities import (
@@ -43,8 +42,6 @@ __all__ = [
     "Ruby",
     "Character",
     "Word",
-    # 工具函数
-    "DistributeRubyCharsEvenly",
     # 实体
     "Singer",
     "Sentence",

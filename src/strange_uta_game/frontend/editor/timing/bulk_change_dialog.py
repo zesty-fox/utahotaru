@@ -32,7 +32,10 @@ from typing import Optional, List, Tuple
 from copy import deepcopy
 
 from strange_uta_game.backend.domain import Project
-from strange_uta_game.backend.domain.models import Character, Ruby, RubyPart, DistributeRubyCharsEvenly
+from strange_uta_game.backend.domain.models import Character, Ruby, RubyPart
+from strange_uta_game.backend.infrastructure.parsers.inline_format import (
+    distribute_ruby_chars_evenly,
+)
 
 
 class BulkChangeDialog(QDialog):
@@ -266,7 +269,7 @@ class BulkChangeDialog(QDialog):
                     parts = [p.strip() for p in ruby_text.split(",") if p.strip()]
                 elif mode == "char":
                     clean_text = ruby_text.replace(",", "")
-                    parts = DistributeRubyCharsEvenly(list(clean_text), check_count)
+                    parts = distribute_ruby_chars_evenly(list(clean_text), check_count)
                 else:
                     # 按 mora 均分（始终按 mora 拆分，忽略逗号）
                     from strange_uta_game.backend.infrastructure.parsers.inline_format import (

@@ -126,7 +126,7 @@ class TestMoraSplit:
         assert split_into_moras("しゃてい") == ["しゃ", "て", "い"]
 
 
-class TestSplitRubyForCheckpoints:
+class Testsplit_ruby_for_checkpoints:
     def test_single_cp(self):
         assert split_ruby_for_checkpoints("やわ", 1) == ["やわ"]
 

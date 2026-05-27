@@ -45,7 +45,9 @@ from strange_uta_game.backend.domain import (
     RubyPart,
     Sentence,
     Singer,
-    DistributeRubyCharsEvenly,
+)
+from strange_uta_game.backend.infrastructure.parsers.inline_format import (
+    distribute_ruby_chars_evenly,
 )
 
 
@@ -144,7 +146,7 @@ def parse_ruby_text(raw: str, check_count: int = 1) -> Optional[Ruby]:
             return None
         if check_count <= 1:
             return Ruby(parts=[RubyPart(text=clean_text)])
-        parts = DistributeRubyCharsEvenly(list(clean_text), check_count)
+        parts = distribute_ruby_chars_evenly(list(clean_text), check_count)
         return Ruby(parts=[RubyPart(text=p) for p in parts if p])
     else:
         # 按 mora 均分（始终按 mora 拆分，忽略逗号）
@@ -362,7 +364,7 @@ class ModifyCharacterDialog(QDialog):
                     parts = [p.strip() for p in ruby_text.split(",") if p.strip()]
                 elif mode == "char":
                     clean_text = ruby_text.replace(",", "")
-                    parts = DistributeRubyCharsEvenly(list(clean_text), check_count)
+                    parts = distribute_ruby_chars_evenly(list(clean_text), check_count)
                 else:
                     # 按 mora 均分（始终按 mora 拆分，忽略逗号）
                     from strange_uta_game.backend.infrastructure.parsers.inline_format import (
@@ -887,7 +889,7 @@ class CharEditDialog(QDialog):
                     parts = [p.strip() for p in ruby_text.split(",") if p.strip()]
                 elif mode == "char":
                     clean_text = ruby_text.replace(",", "")
-                    parts = DistributeRubyCharsEvenly(list(clean_text), check_count)
+                    parts = distribute_ruby_chars_evenly(list(clean_text), check_count)
                 else:
                     # 按 mora 均分（始终按 mora 拆分，忽略逗号）
                     from strange_uta_game.backend.infrastructure.parsers.inline_format import (

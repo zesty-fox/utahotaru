@@ -219,3 +219,105 @@ class ExportService:
         )
         exporter = NicokaraWithRubyExporter()
         return exporter.validate_ruby_parts(project)
+
+    def get_ruby_mismatch_detail(
+        self, project: Project, max_display: int = 10
+    ) -> dict:
+        """获取注音分段不匹配详情及按字符/mora 均分预览。
+
+        Args:
+            project: 项目数据
+            max_display: 预览最多显示的条目数
+
+        Returns:
+            {
+                "mismatches": [dict, ...],
+                "mismatch_lines": [str, ...],
+                "char_preview_lines": [str, ...],
+                "mora_preview_lines": [str, ...],
+                "total": int,
+            }
+        """
+        from strange_uta_game.backend.infrastructure.parsers.inline_format import (
+            split_ruby_for_checkpoints,
+            distribute_ruby_chars_evenly,
+        )
+
+        mismatches = self.validate_ruby_parts(project)
+
+        mismatch_lines = []
+        for m in mismatches[:max_display]:
+            parts_str = ",".join(m["ruby_parts"])
+            mismatch_lines.append(
+                f"行 {m['sentence_idx'] + 1} 字符 '{m['char']}': "
+                f"check_count={m['check_count']} "
+                f"ruby_parts={m['ruby_parts_count']} "
+                f"注音='{''.join(m['ruby_parts'])}' "
+                f"拆分=[{parts_str}]"
+            )
+        if len(mismatches) > max_display:
+            mismatch_lines.append(f"...还有 {len(mismatches) - max_display} 个不匹配")
+
+        limited = mismatches[:max_display]
+        char_lines = []
+        mora_lines = []
+        for m in limited:
+            full_text = "".join(m["ruby_parts"])
+            cc = m["check_count"]
+            label = f"行 {m['sentence_idx'] + 1} 字符 '{m['char']}': check_count={cc}"
+
+            clean_chars = list(full_text.replace(",", ""))
+            if clean_chars and cc > 0:
+                char_split = distribute_ruby_chars_evenly(clean_chars, cc)
+                mora_split = split_ruby_for_checkpoints(full_text, cc)
+            else:
+                char_split = [full_text] if full_text else [""]
+                mora_split = [full_text] if full_text else [""]
+
+            char_lines.append(f"{label} 拆分=[{','.join(char_split)}]")
+            mora_lines.append(f"{label} 拆分=[{','.join(mora_split)}]")
+
+        if len(mismatches) > max_display:
+            char_lines.append(f"...还有 {len(mismatches) - max_display} 个")
+            mora_lines.append(f"...还有 {len(mismatches) - max_display} 个")
+
+        return {
+            "mismatches": mismatches,
+            "mismatch_lines": mismatch_lines,
+            "char_preview_lines": char_lines,
+            "mora_preview_lines": mora_lines,
+            "total": len(mismatches),
+        }
+
+    def apply_ruby_parts_split(self, project: Project, mode: str) -> None:
+        """对所有不匹配字符按指定模式重新拆分注音分段。
+
+        Args:
+            project: 项目数据（原地修改）
+            mode: "char" 或 "mora"
+        """
+        from strange_uta_game.backend.infrastructure.parsers.inline_format import (
+            split_ruby_for_checkpoints,
+            distribute_ruby_chars_evenly,
+        )
+        from strange_uta_game.backend.domain.models import RubyPart
+
+        mismatches = self.validate_ruby_parts(project)
+        for m in mismatches:
+            sent = project.sentences[m["sentence_idx"]]
+            ch = sent.characters[m["char_idx"]]
+            if ch.ruby is None or ch.check_count <= 0:
+                continue
+            full_text = "".join(p.text for p in ch.ruby.parts)
+            cc = ch.check_count
+            if mode == "char":
+                clean = list(full_text.replace(",", ""))
+                parts = (
+                    distribute_ruby_chars_evenly(clean, cc)
+                    if clean
+                    else [""] * max(1, cc)
+                )
+            else:
+                parts = split_ruby_for_checkpoints(full_text, cc)
+            ch.ruby.parts = [RubyPart(text=t) for t in parts]
+            ch.push_to_ruby()
