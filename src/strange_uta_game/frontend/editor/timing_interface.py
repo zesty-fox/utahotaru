@@ -2456,11 +2456,23 @@ class EditorInterface(QWidget):
     def _on_play(self):
         if self._timing_service:
             try:
+                # 播放完毕后再次点击播放：检测 EOF（PAUSED 且位置恰好在末尾）。
+                # 此时 _last_reported_ms == _duration_ms，get_position_ms 也返回 duration。
+                # 需要先 seek(0) 重置 _last_reported_ms 和 BASS 位置，再 play()；
+                # 否则 get_display_position_ms 的单调性保护会让位置卡在 duration，
+                # 导致所有控件一直显示末尾、不滚动，直到用户手动 seek 才解除。
+                if not self._timing_service.is_playing():
+                    dur = self._timing_service.get_duration_ms()
+                    pos = self._timing_service.get_position_ms()
+                    if dur > 0 and pos >= dur:
+                        self._timing_service.seek(0)
+                        self.transport.set_position(0)
+                        self.timeline.set_position(0)
+                        self.preview.set_current_time_ms(0)
                 self._timing_service.play()
-                is_playing = self._timing_service.is_playing()
-                self.transport.set_playing(is_playing)
-                self.preview.set_playing(is_playing)
-                self.timeline.set_playing(is_playing)
+                self.transport.set_playing(True)
+                self.preview.set_playing(True)
+                self.timeline.set_playing(True)
                 self.lbl_status.setText("播放中")
                 self._update_mode_indicator()
                 self.preview._last_auto_scroll_line_idx = -1

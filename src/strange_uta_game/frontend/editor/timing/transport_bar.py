@@ -125,7 +125,8 @@ class TransportBar(QFrame):
         self._is_dragging = True
 
     def _on_slider_clicked(self, value: int):
-        self._is_dragging = True
+        # 注意：点击轨道是瞬时操作，不经过 sliderPressed/sliderReleased，
+        # 不能设 _is_dragging = True，否则后续 set_position() 将永远被屏蔽。
         if self._duration_ms > 0:
             ms = int((value / 10000) * self._duration_ms)
             self._update_label_with_time(ms)
