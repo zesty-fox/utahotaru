@@ -300,6 +300,7 @@ class EditorInterface(QWidget):
         )
         self.btn_scroll_mode.clicked.connect(self._on_cycle_scroll_mode)
         theme.changed.connect(self._update_scroll_mode_btn_style)
+        self._update_scroll_mode_btn_style()
         bottom.addWidget(self.btn_scroll_mode)
 
         bottom.addStretch()
