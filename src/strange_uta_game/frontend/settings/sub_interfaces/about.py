@@ -86,6 +86,7 @@ class AboutSubInterface(SubSettingInterface):
         self.btn_save = PrimaryPushButton("保存设置", btn_widget)
         self.btn_save.setIcon(FIF.SAVE)
         self.btn_save.setMinimumHeight(36)
+        self.btn_save.hide()
         self.btn_reset = PushButton("重置为默认设置", btn_widget)
         self.btn_reset.setIcon(FIF.DELETE)
         self.btn_reset.setMinimumHeight(36)
