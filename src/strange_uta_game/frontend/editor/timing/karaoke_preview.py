@@ -1174,12 +1174,17 @@ class KaraokePreview(QWidget):
                         break
                 if no_cc_end <= sent_start:
                     continue  # 行首第一个字符就有 cc，无需处理
-                # 终点：本行后续第一个有时间戳字符的 ts，或 fallback
+                # 终点：优先取本句句尾字符自身的 sentence_end_ts（cc=0 + is_sentence_end 场景），
+                # 其次找本行后续第一个有时间戳字符的 ts，最后回落到 fallback
                 end_ts_nl: Optional[int] = None
-                for ci in range(sent_end + 1, n_chars):
-                    if ci in start_times:
-                        end_ts_nl = start_times[ci]
-                        break
+                sent_end_char = characters[sent_end]
+                if sent_end_char.is_sentence_end and sent_end_char.global_sentence_end_ts is not None:
+                    end_ts_nl = int(sent_end_char.global_sentence_end_ts)
+                if end_ts_nl is None:
+                    for ci in range(sent_end + 1, n_chars):
+                        if ci in start_times:
+                            end_ts_nl = start_times[ci]
+                            break
                 if end_ts_nl is None:
                     end_ts_nl = fallback_sentence_end_ts
                 if end_ts_nl is None:
