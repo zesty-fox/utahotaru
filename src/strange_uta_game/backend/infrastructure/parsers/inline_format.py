@@ -480,6 +480,19 @@ def _linked_group_to_ruby_node(group: List[Character]) -> str:
 
             # 直接拼接，不用逗号
             ruby_portions.append("".join(portion_parts))
+        elif c.check_count > 0:
+            _ts_list = _export_timestamps(c)
+            portion_parts: List[str] = []
+            for cp_idx in range(min(c.check_count, 9)):
+                if cp_idx < len(_ts_list):
+                    ts = _ts_list[cp_idx]
+                    if cp_idx == 0:
+                        portion_parts.append(f"[{c.check_count}|{format_timestamp(ts)}]")
+                    else:
+                        portion_parts.append(f"[{format_timestamp(ts)}]")
+                elif cp_idx == 0:
+                    portion_parts.append(f"[{c.check_count}]")
+            ruby_portions.append("".join(portion_parts))
         else:
             # 无注音的字符，输出空的分隔符
             ruby_portions.append("")

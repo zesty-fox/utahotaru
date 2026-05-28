@@ -304,6 +304,12 @@ def sentence_to_timed_line(
                         for k, part in enumerate(c.ruby.parts)
                     ]
                     seg = "|".join(pieces)
+                elif c.check_count > 0:
+                    pieces = [
+                        _start_token(_add_off(_char_start_ts(c, k), offset_ms))
+                        for k in range(c.check_count)
+                    ]
+                    seg = "|".join(pieces)
                 else:
                     seg = ""
                 if c.is_sentence_end:
@@ -376,6 +382,11 @@ def timed_line_columns(
                     seg = "|".join(
                         _start_token(_add_off(_char_start_ts(c, k), offset_ms)) + part.text
                         for k, part in enumerate(c.ruby.parts)
+                    )
+                elif c.check_count > 0:
+                    seg = "|".join(
+                        _start_token(_add_off(_char_start_ts(c, k), offset_ms))
+                        for k in range(c.check_count)
                     )
                 else:
                     seg = ""
@@ -479,7 +490,7 @@ def _parse_block(content: str, singer_id: str, offset_ms: int = 0):
             is_sentence_end=is_end,
             sentence_end_ts=end_ms,
         )
-        if parts:
+        if parts and any(p.text for p in parts):
             ch.set_ruby(Ruby(parts=parts))
         ch.push_to_ruby()
         chars.append(ch)
