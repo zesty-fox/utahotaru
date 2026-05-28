@@ -21,7 +21,7 @@ from PyQt6.QtGui import (
     QPaintEvent,
     QPen,
 )
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtWidgets import QScrollBar, QWidget
 from qfluentwidgets import Action, RoundMenu
 
 from strange_uta_game.backend.domain import Character, Project, Ruby
@@ -262,6 +262,15 @@ class KaraokePreview(QWidget):
         self._last_auto_scroll_line_idx: int = -1  # 上次自动滚动到的行（与 _current_line_idx 独立）
         self._line_switch_points: list[tuple[int, int]] = []  # [(switch_ms, line_idx)]
         self._current_switch_idx: int = 0  # 当前快照位置
+        self._SCROLL_SCALE = 1000  # 滚动条精度缩放因子（1行=1000单位）
+
+        # 右侧纵向滚动条，用于快速浏览整个歌词预览
+        self._scrollbar = QScrollBar(Qt.Orientation.Vertical, self)
+        self._scrollbar.setVisible(False)
+        self._scrollbar.valueChanged.connect(self._on_scrollbar_changed)
+        self._scrollbar.setSingleStep(self._SCROLL_SCALE)      # 点击箭头 = 1行
+        self._scrollbar.setPageStep(self._SCROLL_SCALE * 5)     # 点击轨道 = 5行
+        self._SCROLLBAR_WIDTH = 14
 
         # 监听主题变化，触发重绘
         theme.changed.connect(self.update)
@@ -337,6 +346,8 @@ class KaraokePreview(QWidget):
                     break
             # 预渲染所有句子到缓存
             self._prewarm_all_sentences()
+        self._update_scrollbar_range()
+        self._sync_scrollbar_to_scroll_center()
         self._update_display()
 
     def set_focus_position(self, line_idx:int = 0,char_idx: int = 0):
@@ -381,6 +392,7 @@ class KaraokePreview(QWidget):
         if new_line == self._scroll_center_line:
             return
         self._scroll_center_line = new_line
+        self._sync_scrollbar_to_scroll_center()
         self._update_display()
 
     def _scroll_to_line(self, line_idx: int):
@@ -394,6 +406,7 @@ class KaraokePreview(QWidget):
         if new_line == self._scroll_center_line:
             return
         self._scroll_center_line = new_line
+        self._sync_scrollbar_to_scroll_center()
         self._update_display()
 
     def _find_line_for_time(self, time_ms: int) -> Optional[int]:
@@ -572,6 +585,7 @@ class KaraokePreview(QWidget):
         self._sentence_cache.clear()
         self._line_versions.clear()
         self._global_version += 1
+        self._update_scrollbar_range()
         self.update()
 
     def set_checkpoint_markers(self, markers: dict[str, str]):
@@ -611,7 +625,11 @@ class KaraokePreview(QWidget):
             line_h = total_height * getattr(self, '_line_height_factor', 1.20)
             h = self.height() if self.height() > 0 else 600
             self._visible_lines = max(3, min(15, int(h / line_h)))
+            self._update_scrollbar_range()
             self.update()
+        # 滚动条靠右放置，占满高度
+        scroll_w = getattr(self, '_SCROLLBAR_WIDTH', 14)
+        self._scrollbar.setGeometry(self.width() - scroll_w, 0, scroll_w, self.height())
 
     # ---- 滚动 ----
 
@@ -627,7 +645,41 @@ class KaraokePreview(QWidget):
         self._scroll_center_line = max(
             0.0, min(float(total - 1), self._scroll_center_line)
         )
+        self._sync_scrollbar_to_scroll_center()
         self.update()
+
+    def _on_scrollbar_changed(self, value: int):
+        """滚动条拖动 → 更新视口中央行索引"""
+        if not self._project or not self._project.sentences:
+            return
+        self._suspend_auto_scroll()
+        self._scroll_center_line = value / self._SCROLL_SCALE
+        self.update()
+
+    def _update_scrollbar_range(self):
+        """根据当前句子总数刷新滚动条的 range 和 pageStep"""
+        self._scrollbar.blockSignals(True)
+        if not self._project or not self._project.sentences:
+            self._scrollbar.setVisible(False)
+            self._scrollbar.blockSignals(False)
+            return
+        total = len(self._project.sentences)
+        self._scrollbar.setVisible(True)
+        # range: [0, (total-1) * SCALE]，视口占 visible_lines 行
+        max_val = max(0, (total - 1) * self._SCROLL_SCALE)
+        self._scrollbar.setRange(0, max_val)
+        self._scrollbar.setPageStep(self._SCROLL_SCALE * self._visible_lines)
+        self._scrollbar.blockSignals(False)
+
+    def _sync_scrollbar_to_scroll_center(self):
+        """将 _scroll_center_line 同步到滚动条 value（阻断信号防循环）"""
+        if not self._project or not self._project.sentences:
+            return
+        val = int(round(self._scroll_center_line * self._SCROLL_SCALE))
+        val = max(self._scrollbar.minimum(), min(self._scrollbar.maximum(), val))
+        self._scrollbar.blockSignals(True)
+        self._scrollbar.setValue(val)
+        self._scrollbar.blockSignals(False)
 
     # ---- 点击 ----
 
@@ -1593,7 +1645,8 @@ class KaraokePreview(QWidget):
 
             # 根据对齐方式计算起始 x 坐标
             text_area_left = self._line_number_margin + 5  # 行号区域右侧留 5px 间距
-            text_area_right = w  # 文本区域右边界
+            sb_w = self._SCROLLBAR_WIDTH if self._scrollbar.isVisible() else 0
+            text_area_right = w - sb_w  # 文本区域右边界，为滚动条留出空间
             available_width = text_area_right - text_area_left
 
             if self._alignment == "left":
