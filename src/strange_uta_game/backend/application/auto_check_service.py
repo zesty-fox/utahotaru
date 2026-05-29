@@ -272,19 +272,25 @@ class AutoCheckService:
                                    CharType.SOKUON, CharType.LONG_VOWEL):
                     part_idx += 1
                     continue
+                # 前一字符是汉字/片假名 → 词边界信号强，直接判定为助词（无需看后字）。
+                # 例：「私は」「学校へ」「ロボットは」
+                if prev_ct in (CharType.KANJI, CharType.KATAKANA):
+                    particle_indices.add(part_idx)
+                    part_idx += 1
+                    continue
+                # 前一字符是假名（平假名/促音/长音）：使用后一字符辅助双向判断。
+                # 「假名+は/へ+假名」三方全假名时无法可靠区分词内は与助词は
+                # （例：「おはなし」的は vs「わたしはやさしい」的は），
+                # 保守处理：只有后一字符非假名（汉字、标点、英文、句末等）时才判定为助词。
                 if char_idx + 1 >= len(sentence.characters):
+                    # 句末の は/へ，前有日文字符 → 判定为助词
                     particle_indices.add(part_idx)
                     part_idx += 1
                     continue
                 next_ch = sentence.characters[char_idx + 1]
                 next_ct = get_char_type(next_ch.char) if len(next_ch.char) == 1 else CharType.OTHER
-                if next_ct == CharType.KANJI:
-                    particle_indices.add(part_idx)
-                elif next_ct not in (CharType.HIRAGANA, CharType.KATAKANA,
-                                     CharType.SOKUON, CharType.LONG_VOWEL):
-                    particle_indices.add(part_idx)
-                elif prev_ct == CharType.KANJI:
-                    # 汉字+は/へ+假名：「君はとても」等常见句式，仍判定为助词
+                if next_ct not in (CharType.HIRAGANA, CharType.KATAKANA,
+                                   CharType.SOKUON, CharType.LONG_VOWEL):
                     particle_indices.add(part_idx)
                 part_idx += 1
         return particle_indices

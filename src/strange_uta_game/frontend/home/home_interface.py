@@ -508,6 +508,10 @@ class HomeInterface(QWidget):
                         )
 
                         delete_rubies_by_type_names(project, delete_types)
+                        # delete 后重新应用用户词典，补回被删除类型覆盖的词典条目
+                        # （与 RubyAnalyzeWorker 路径行为一致）
+                        if auto_check is not None:
+                            auto_check.apply_user_dict_to_project(project, skip_romanize=True)
 
                     # 罗马音转换（在 delete 之后，只转换剩余的假名注音）
                     if auto_check is not None:
