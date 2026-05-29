@@ -66,10 +66,6 @@ class MainWindow(MSFluentWindow):
         # 初始化自动保存配置
         self._apply_auto_save_settings()
 
-        # 异步加载相关
-        self._loading_thread: Optional[QThread] = None
-        self._loading_worker = None
-        self._state_tooltip = None
 
         # 延迟检查闪退恢复（等 UI 显示完毕后再弹窗）
         QTimer.singleShot(500, self._check_crash_recovery)
@@ -690,7 +686,11 @@ class MainWindow(MSFluentWindow):
     # ==================== 启动时打开项目 ====================
 
     def open_initial_project(self, file_path: str) -> None:
-        """启动时通过命令行参数打开 .sug 项目文件（异步）。"""
+        """启动时通过命令行参数打开 .sug 项目文件（异步）。
+
+        委托给 editorInterface._file_loader.load_project，与其他加载路径使用同一函数。
+        若 file_loader 尚未就绪（timing_service 未初始化），延迟 100ms 重试。
+        """
         from pathlib import Path
 
         if not Path(file_path).is_file():
@@ -705,76 +705,24 @@ class MainWindow(MSFluentWindow):
             )
             return
 
-        from strange_uta_game.frontend.theme import theme
-        from strange_uta_game.frontend.workers import ProjectLoadWorker
+        file_loader = getattr(self.editorInterface, "_file_loader", None)
+        if file_loader is None or file_loader._timing_service is None:
+            QTimer.singleShot(100, lambda: self.open_initial_project(file_path))
+            return
 
-        # 创建状态提示
-        self._state_tooltip = StateToolTip("正在加载项目", "正在解析项目数据...", self)
-        green = theme.status_complete.name()
-        self._state_tooltip.setStyleSheet(f"""
-            StateToolTip {{
-                background-color: {green};
-                border: 1px solid {green};
-                border-radius: 8px;
-            }}
-            StateToolTip QLabel {{
-                color: white;
-            }}
-        """)
-        self._state_tooltip.move(self._state_tooltip.getSuitablePos())
-        self._state_tooltip.show()
+        def _on_success(project: Project, loaded_path: str) -> None:
+            self.switchTo(self.editorInterface)
+            InfoBar.success(
+                title="项目打开成功",
+                content=f"共 {len(project.sentences)} 行歌词",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
 
-        # 创建后台线程
-        self._loading_thread = QThread(self)
-        self._loading_worker = ProjectLoadWorker(file_path)
-        self._loading_worker.moveToThread(self._loading_thread)
-
-        # 连接信号
-        self._loading_thread.started.connect(self._loading_worker.run)
-        self._loading_worker.finished.connect(self._on_initial_project_loaded)
-        self._loading_worker.error.connect(self._on_initial_project_load_error)
-        self._loading_worker.finished.connect(self._cleanup_loading_thread)
-        self._loading_worker.error.connect(self._cleanup_loading_thread)
-
-        # 启动线程
-        self._loading_thread.start()
-
-    def _on_initial_project_loaded(self, project: Project, file_path: str) -> None:
-        """启动时项目加载成功回调"""
-        if self._state_tooltip:
-            self._state_tooltip.setState(True)
-            self._state_tooltip = None
-
-        # 登记工作目录到 config（命令行打开的项目也算加载入口）
-        self._store.set_working_dir(file_path)
-
-        self._on_project_opened(project, file_path)
-
-    def _on_initial_project_load_error(self, error_msg: str) -> None:
-        """启动时项目加载失败回调"""
-        if self._state_tooltip:
-            self._state_tooltip.setState(True)
-            self._state_tooltip = None
-
-        InfoBar.error(
-            title="打开项目失败",
-            content=error_msg,
-            orient=Qt.Orientation.Horizontal,
-            isClosable=True,
-            position=InfoBarPosition.TOP,
-            duration=5000,
-            parent=self,
-        )
-
-    def _cleanup_loading_thread(self) -> None:
-        """清理加载线程"""
-        if self._loading_thread:
-            self._loading_thread.quit()
-            self._loading_thread.wait()
-            self._loading_thread = None
-        if self._loading_worker:
-            self._loading_worker.deleteLater()
-            self._loading_worker = None
+        file_loader.load_project(file_path, check_unsaved=False, on_success=_on_success)
 
     # ==================== 窗口事件 ====================
 

@@ -44,6 +44,7 @@ class FileLoader:
         self._loading_thread: QThread | None = None
         self._loading_worker = None
         self._state_tooltip = None
+        self._project_on_success = None  # 可选的加载成功额外回调 (project, file_path)
 
     @property
     def _project(self):
@@ -326,7 +327,7 @@ class FileLoader:
 
         return True
 
-    def load_project(self, file_path: str, check_unsaved: bool = True):
+    def load_project(self, file_path: str, check_unsaved: bool = True, on_success=None):
         """加载 .sug 项目文件（异步）"""
         if check_unsaved and not self.check_unsaved_changes():
             return
@@ -348,6 +349,8 @@ class FileLoader:
         """)
         self._state_tooltip.move(self._state_tooltip.getSuitablePos())
         self._state_tooltip.show()
+
+        self._project_on_success = on_success
 
         # 创建后台线程
         from strange_uta_game.frontend.workers import ProjectLoadWorker
@@ -381,6 +384,11 @@ class FileLoader:
             self._editor.set_project(project)
 
         self._apply_project_extras(file_path)
+
+        if self._project_on_success:
+            cb = self._project_on_success
+            self._project_on_success = None
+            cb(project, file_path)
 
     def _apply_project_extras(self, file_path: str) -> None:
         """读取并应用 .sug 的附加字段（nicokara_tags、media_path）。"""
