@@ -1067,8 +1067,6 @@ class SingerManagerInterface(QWidget):
                     display_text += " [默认]"
                 if not singer.enabled:
                     display_text += " (已禁用)"
-                if singer.backend_number > 0:
-                    display_text = f"[{singer.backend_number}] {display_text}"
 
                 item.setText(display_text)
 
