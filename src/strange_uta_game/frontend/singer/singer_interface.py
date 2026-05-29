@@ -69,13 +69,24 @@ class SingerEditDialog(QDialog):
 
     MAX_COLORS = 5
 
-    def __init__(self, singer: Singer = None, existing_groups: List[str] = None, parent=None):
+    def __init__(
+        self,
+        singer: Singer = None,
+        existing_groups: List[str] = None,
+        existing_singers: List[Singer] = None,
+        parent=None,
+    ):
         super().__init__(parent)
         self._singer = singer
         self._color = singer.color if singer else "#FF6B6B"
         self._color_mode = singer.color_mode if singer else "solid"
         self._split_colors: List[str] = list(singer.split_colors) if singer else []
         self._existing_groups = existing_groups or []
+        # 可用于"加载颜色"的演唱者列表（排除自身）
+        self._existing_singers: List[Singer] = [
+            s for s in (existing_singers or [])
+            if not singer or s.id != singer.id
+        ]
 
         self.setWindowTitle("编辑演唱者" if singer else "添加演唱者")
         self.resize(340, 300)
@@ -98,14 +109,22 @@ class SingerEditDialog(QDialog):
             self.line_name.setPlaceholderText("输入演唱者名称（留空自动编号）...")
         form.addRow("显示名称:", self.line_name)
 
-        self.line_group = LineEdit()
-        if self._singer and self._singer.group:
-            self.line_group.setText(self._singer.group)
-        hint = "、".join(self._existing_groups[:4]) if self._existing_groups else ""
-        self.line_group.setPlaceholderText(
-            f"分组名称（留空为默认分组）{('，已有：' + hint) if hint else ''}"
-        )
-        form.addRow("分组:", self.line_group)
+        # 分组：可编辑下拉，选项来自项目已有分组
+        self.combo_group = QComboBox()
+        self.combo_group.setEditable(True)
+        self.combo_group.addItem("")          # 空 = 无分组
+        for g in self._existing_groups:
+            self.combo_group.addItem(g)
+        current_group = self._singer.group if self._singer else ""
+        self.combo_group.setCurrentText(current_group)
+        self.combo_group.lineEdit().setPlaceholderText("留空为默认分组")
+        form.addRow("分组:", self.combo_group)
+
+        # 从已有演唱者加载颜色（仅在有其他演唱者时显示）
+        if self._existing_singers:
+            self._btn_load_color = PushButton("从已有演唱者加载颜色…")
+            self._btn_load_color.clicked.connect(self._on_load_from_singer)
+            form.addRow("颜色来源:", self._btn_load_color)
 
         # 颜色模式
         mode_widget = QWidget()
@@ -303,6 +322,42 @@ class SingerEditDialog(QDialog):
         p.end()
         self._lbl_split_preview.setPixmap(pixmap)
 
+    # ── 从已有演唱者加载颜色 ─────────────────────────────────────────────
+
+    def _on_load_from_singer(self):
+        """弹出菜单，从已有演唱者中选择颜色配置复制过来"""
+        from PyQt6.QtWidgets import QMenu
+        from PyQt6.QtGui import QIcon
+
+        menu = QMenu(self)
+        for s in self._existing_singers:
+            icon = QIcon(_make_singer_icon(s.get_all_colors(), 32, 18))
+            label = s.name
+            if s.group:
+                label += f"  [{s.group}]"
+            action = menu.addAction(icon, label)
+            action.setData(s)
+
+        chosen = menu.exec(self._btn_load_color.mapToGlobal(
+            self._btn_load_color.rect().bottomLeft()
+        ))
+        if not chosen:
+            return
+
+        src: Singer = chosen.data()
+        self._color = src.color
+        self._color_mode = src.color_mode
+        self._split_colors = list(src.split_colors)
+
+        # 同步 UI
+        if self._color_mode == "split":
+            self._rb_split.setChecked(True)
+        else:
+            self._rb_solid.setChecked(True)
+        self._refresh_solid_swatch()
+        self._rebuild_split_rows()
+        self._update_panel_visibility()
+
     # ── 数据获取 ──────────────────────────────────────────────────────────
 
     def get_data(self) -> dict:
@@ -312,7 +367,7 @@ class SingerEditDialog(QDialog):
             "color_mode": self._color_mode,
             "split_colors": list(self._split_colors),
             "is_default": self.chk_default.isChecked(),
-            "group": self.line_group.text().strip(),
+            "group": self.combo_group.currentText().strip(),
         }
 
 
@@ -1239,7 +1294,11 @@ class SingerManagerInterface(QWidget):
             self._warn("未加载项目", "请先打开或创建一个项目")
             return
 
-        dialog = SingerEditDialog(existing_groups=self._get_existing_groups(), parent=self)
+        dialog = SingerEditDialog(
+            existing_groups=self._get_existing_groups(),
+            existing_singers=list(self._project.singers),
+            parent=self,
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
@@ -1269,7 +1328,12 @@ class SingerManagerInterface(QWidget):
         if not singer:
             return
 
-        dialog = SingerEditDialog(singer, existing_groups=self._get_existing_groups(), parent=self)
+        dialog = SingerEditDialog(
+            singer,
+            existing_groups=self._get_existing_groups(),
+            existing_singers=list(self._project.singers),
+            parent=self,
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
