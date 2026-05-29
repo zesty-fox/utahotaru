@@ -129,7 +129,7 @@ class EditorToolBar(QFrame):
         layout.addWidget(self.btn_complete_timestamp)
 
         self.btn_adjust_raw_timestamp = PushButton("调整原始时间戳", self)
-        self.btn_adjust_raw_timestamp.setIcon(FIF.EDIT)
+        self.btn_adjust_raw_timestamp.setIcon(FIF.DATE_TIME)
         self.btn_adjust_raw_timestamp.setFixedHeight(32)
         self.btn_adjust_raw_timestamp.clicked.connect(self.adjust_raw_timestamp_clicked.emit)
         layout.addWidget(self.btn_adjust_raw_timestamp)
