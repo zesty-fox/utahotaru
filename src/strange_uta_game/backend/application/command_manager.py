@@ -117,7 +117,6 @@ class CommandManager:
         """清空所有历史记录"""
         self._undo_stack.clear()
         self._redo_stack.clear()
-        self._notify_state_changed()
 
     def clear_redo_stack(self) -> None:
         """清空重做栈

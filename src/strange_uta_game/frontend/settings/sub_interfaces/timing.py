@@ -7,7 +7,7 @@ from PyQt6.QtGui import QFont
 from qfluentwidgets import FluentIcon as FIF, PushButton, SettingCard, SettingCardGroup
 
 from ..calibration_dialog import CalibrationDialog
-from ..cards import SpinSettingCard, SwitchSettingCard
+from ..cards import ComboSettingCard, SpinSettingCard, SwitchSettingCard
 from .base import SubSettingInterface
 
 
@@ -33,8 +33,17 @@ class TimingSubInterface(SubSettingInterface):
             min_val=1, max_val=500, step=1, suffix=" ms", parent=g)
         self.card_disable_click_jump = SwitchSettingCard(FIF.CLOSE, "禁用单击跳转",
             "关闭单击字符/节奏点延迟后跳转到目标行的功能（双击跳转不受影响）", parent=g)
+        self.card_keysound = SwitchSettingCard(FIF.MUSIC, "按键音",
+            "打轴时按下按键播放按下音、抬起句尾按键播放抬起音", parent=g)
+        self.card_keysound_volume = SpinSettingCard(FIF.VOLUME, "按键音音量",
+            "按键音的播放音量（100 = 原始音量）",
+            min_val=0, max_val=200, step=5, suffix=" %", parent=g)
+        self.card_keysound_style = ComboSettingCard(FIF.PALETTE, "按键音风格",
+            "选择按键音音效风格",
+            items=["默认", "osu", "街机风", "金属感"], parent=g)
         for c in [self.card_offset, self.card_speed_correction, self.card_export_offset,
-                  self.card_timing_step, self.card_disable_click_jump]:
+                  self.card_timing_step, self.card_disable_click_jump, self.card_keysound,
+                  self.card_keysound_volume, self.card_keysound_style]:
             g.addSettingCard(c)
         self.expandLayout.addWidget(g)
 
@@ -68,6 +77,11 @@ class TimingSubInterface(SubSettingInterface):
         self.card_export_offset.value_changed.connect(self._notify_changed)
         self.card_timing_step.value_changed.connect(self._notify_changed)
         self.card_disable_click_jump.checked_changed.connect(self._notify_changed)
+        self.card_keysound.checked_changed.connect(self._notify_changed)
+        self.card_keysound_volume.value_changed.connect(self._notify_changed)
+        self.card_keysound_style.index_changed.connect(self._notify_changed)
+
+    _STYLE_KEYS = ["default", "osu", "arcade", "sci"]
 
     def load_settings(self, s):
         self.card_offset.setValue(s.get("timing.tag_offset_ms", -230))
@@ -75,6 +89,11 @@ class TimingSubInterface(SubSettingInterface):
         self.card_export_offset.setValue(s.get("export.offset_ms", 0))
         self.card_timing_step.setValue(s.get("timing.timing_adjust_step_ms", 10))
         self.card_disable_click_jump.setChecked(s.get("timing.disable_click_jump", False))
+        self.card_keysound.setChecked(s.get("timing.keysound_enabled", True))
+        self.card_keysound_volume.setValue(s.get("timing.keysound_volume", 100))
+        style = s.get("timing.keysound_style", "default")
+        idx = self._STYLE_KEYS.index(style) if style in self._STYLE_KEYS else 0
+        self.card_keysound_style.setCurrentIndex(idx)
 
     def collect_settings(self, s):
         s.set("timing.tag_offset_ms", self.card_offset.value())
@@ -82,3 +101,7 @@ class TimingSubInterface(SubSettingInterface):
         s.set("export.offset_ms", self.card_export_offset.value())
         s.set("timing.timing_adjust_step_ms", self.card_timing_step.value())
         s.set("timing.disable_click_jump", self.card_disable_click_jump.isChecked())
+        s.set("timing.keysound_enabled", self.card_keysound.isChecked())
+        s.set("timing.keysound_volume", self.card_keysound_volume.value())
+        idx = self.card_keysound_style.currentIndex()
+        s.set("timing.keysound_style", self._STYLE_KEYS[idx] if idx < len(self._STYLE_KEYS) else "default")

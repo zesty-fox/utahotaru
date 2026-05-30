@@ -39,6 +39,7 @@ class MainWindow(MSFluentWindow):
         #   关        → BassEngine：原版 BASS 实时变速，零缓存但可能爆音。
         self._audio_engine = self._make_audio_engine()
         self._command_manager = CommandManager()
+        self._command_manager.set_on_state_changed(self._on_command_state_changed)
         self._timing_service = TimingService(self._audio_engine, self._command_manager)
         self._store = ProjectStore(self)
 
@@ -382,6 +383,10 @@ class MainWindow(MSFluentWindow):
             if audio_path and getattr(self.editorInterface, "_audio_file_path", None) != audio_path:
                 self.editorInterface.load_audio(audio_path)
         self._update_title()
+
+    def _on_command_state_changed(self) -> None:
+        if self._store:
+            self._store.mark_dirty()
 
     # ==================== 音频引擎选择 ====================
 

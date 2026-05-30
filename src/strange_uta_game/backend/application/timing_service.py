@@ -468,6 +468,18 @@ class TimingService:
         """
         return (self._global_checkpoint_idx, len(self._global_checkpoints))
 
+    def is_current_cp_sentence_end_tail(self) -> bool:
+        """当前待打轴的 checkpoint 是否为句尾末尾 cp（release 语义触发）。
+
+        供前端在按键事件中立即判断，用于按键音路由。
+        """
+        if not self._project:
+            return False
+        _, char = self._get_current_checkpoint_info()
+        if char is None:
+            return False
+        return char.is_sentence_end_tail_cp(self._current_position.checkpoint_idx)
+
     # ==================== 打轴功能 ====================
 
     def on_key_changed(

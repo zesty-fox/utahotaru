@@ -18,6 +18,9 @@
     "jump_before_ms": 2000,
     "timing_adjust_step_ms": 10,
     "disable_click_jump": false,
+    "keysound_enabled": false,
+    "keysound_volume": 100,
+    "keysound_style": "default",
     "guide_symbol": "●",
     "guide_count": 1,
     "guide_duration_ms": 1000

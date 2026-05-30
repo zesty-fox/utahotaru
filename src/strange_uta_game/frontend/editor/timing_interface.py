@@ -166,6 +166,42 @@ class EditorInterface(QWidget):
         # eventFilter 中鼠标拖拽检测
         self._auto_scroll_mouse_press_pos = None
 
+        # 按键音播放器（低延迟，基于 BASS Sample API）
+        self._keysound_player = None
+        self._keysound_enabled: bool = True
+        # None 表示"尚未加载过任何风格"，确保 _apply_settings 首次调用时强制加载
+        self._keysound_style = None
+        self._init_keysound()
+
+    def _init_keysound(self) -> None:
+        """创建播放器并预加载默认风格样本（失败时静默跳过，不影响主功能）。"""
+        try:
+            from ...backend.infrastructure.audio.keysound_player import KeySoundPlayer
+            self._keysound_player = KeySoundPlayer()
+            self._reload_keysound("default")  # 预热：先加载默认风格
+        except Exception as e:
+            print(f"[KeySound] 初始化失败: {e}")
+
+    _KEYSOUND_STYLE_FILES = {
+        "osu":    ("osu_press.wav",    "osu_release.wav"),
+        "arcade": ("arcade_press.wav", "arcade_release.wav"),
+        "sci":    ("sci_press.wav",    "sci_release.wav"),
+    }
+
+    def _reload_keysound(self, style: str) -> None:
+        """按指定风格重新加载按键音样本。"""
+        if self._keysound_player is None:
+            return
+        from pathlib import Path as _Path
+        sounds_dir = _Path(__file__).resolve().parent.parent.parent / "resource" / "sounds"
+        press_name, release_name = self._KEYSOUND_STYLE_FILES.get(
+            style, ("press.wav", "release.wav")
+        )
+        try:
+            self._keysound_player.load(sounds_dir / press_name, sounds_dir / release_name)
+        except Exception as e:
+            print(f"[KeySound] 样本加载失败: {e}")
+
     def _bind_callback_signals(self):
         self._position_changed_signal.connect(self._handle_position_changed)
         self._checkpoint_moved_signal.connect(self._handle_checkpoint_moved)
@@ -607,6 +643,20 @@ class EditorInterface(QWidget):
         if scroll_mode != self._scroll_mode:
             self._scroll_mode = scroll_mode
             self._sync_scroll_mode()
+        # 按键音开关、音量、风格
+        self._keysound_enabled = bool(settings.get("timing.keysound_enabled", True))
+        if self._keysound_player is not None:
+            self._keysound_player.set_enabled(self._keysound_enabled)
+        keysound_volume = int(settings.get("timing.keysound_volume", 100))
+        if self._keysound_player is not None:
+            self._keysound_player.set_volume(keysound_volume)
+        keysound_style = str(settings.get("timing.keysound_style", "default"))
+        samples_invalid = (
+            self._keysound_player is not None and not self._keysound_player.is_loaded()
+        )
+        if keysound_style != self._keysound_style or samples_invalid:
+            self._keysound_style = keysound_style
+            self._reload_keysound(keysound_style)
         self._settings_loaded = True
 
     def _update_shortcut_hint(
@@ -737,6 +787,11 @@ class EditorInterface(QWidget):
         """释放音频资源"""
         if self._timing_service:
             self._timing_service.release()
+        # timing_service.release() 会调用 BASS_Free，使 keysound sample handle 失效。
+        # 在此归零 handle（避免野指针），并重置风格标记，确保下次 _apply_settings 强制重新加载。
+        if self._keysound_player is not None:
+            self._keysound_player.invalidate()
+        self._keysound_style = None
 
     # ==================== 拖拽加载 ====================
 
@@ -4215,6 +4270,10 @@ class EditorInterface(QWidget):
                 a0.ignore()
                 return
             if self._timing_service and key_name not in self._pressed_keys:
+                # 按键音：普通 cp → 按下时播放 press；句尾 cp → 忽略（等 release）
+                if self._keysound_player is not None:
+                    if not self._timing_service.is_current_cp_sentence_end_tail():
+                        self._keysound_player.play_press()
                 try:
                     self._pressed_keys.add(key_name)
                     # handler 入口到此刻的同步处理耗时（非 Qt 队列等待时间）
@@ -4285,6 +4344,10 @@ class EditorInterface(QWidget):
                 a0.ignore()
                 return
             if self._timing_service and key_name in self._pressed_keys:
+                # 按键音：句尾 cp → 抬起时播放 release；普通 cp → 忽略
+                if self._keysound_player is not None:
+                    if self._timing_service.is_current_cp_sentence_end_tail():
+                        self._keysound_player.play_release()
                 try:
                     # handler 入口到此刻的同步处理耗时（非 Qt 队列等待时间）
                     queue_delay_ms = max(0, int((time.monotonic() - handler_entry_s) * 1000))

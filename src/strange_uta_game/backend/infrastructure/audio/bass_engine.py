@@ -125,6 +125,23 @@ _bass.BASS_ErrorGetCode.argtypes = []
 _bass.BASS_PluginLoad.restype = ctypes.c_uint
 _bass.BASS_PluginLoad.argtypes = [ctypes.c_void_p, ctypes.c_uint]
 
+# BASS Sample API（用于低延迟按键音）
+_bass.BASS_SampleLoad.restype = ctypes.c_uint
+_bass.BASS_SampleLoad.argtypes = [
+    ctypes.c_int,       # mem
+    ctypes.c_void_p,    # file (wchar_t* 时需搭配 BASS_UNICODE flag)
+    ctypes.c_uint64,    # offset
+    ctypes.c_uint,      # length
+    ctypes.c_uint,      # max concurrent channels
+    ctypes.c_uint,      # flags
+]
+
+_bass.BASS_SampleGetChannel.restype = ctypes.c_uint
+_bass.BASS_SampleGetChannel.argtypes = [ctypes.c_uint, ctypes.c_int]
+
+_bass.BASS_SampleFree.restype = ctypes.c_int
+_bass.BASS_SampleFree.argtypes = [ctypes.c_uint]
+
 # BASS_INFO struct — for reading output buffer latency
 class BASS_INFO(ctypes.Structure):
     _fields_ = [
