@@ -1413,6 +1413,7 @@ class EditorInterface(QWidget):
                     change_type="lyrics",
                     focus_line_idx=cmd.undo_position[0],
                     focus_char_idx=cmd.undo_position[1],
+                    move_cp=getattr(cmd, "move_cp", True),
                 )
             else:
                 self._update_time_tags_display()
@@ -1429,6 +1430,7 @@ class EditorInterface(QWidget):
                     change_type="lyrics",
                     focus_line_idx=cmd.redo_position[0],
                     focus_char_idx=cmd.redo_position[1],
+                    move_cp=getattr(cmd, "move_cp", True),
                 )
             else:
                 self._update_time_tags_display()
@@ -2986,6 +2988,7 @@ class EditorInterface(QWidget):
         focus_line_idx: Optional[int] = None,
         focus_char_idx: Optional[int] = None,
         checkpoint_idx: Optional[int] = None,
+        move_cp: bool = True,
     ):
         if not self._project:
             return
@@ -3019,7 +3022,7 @@ class EditorInterface(QWidget):
         self.preview.set_focus_position(line_idx, char_idx)
         self._current_line_idx = line_idx
 
-        if self._timing_service and sentence.characters:
+        if move_cp and self._timing_service and sentence.characters:
             target_cp = checkpoint_idx if checkpoint_idx is not None else 0
             self._timing_service.move_to_checkpoint(line_idx, char_idx, target_cp, prefer_backward=True)
 
@@ -3033,6 +3036,7 @@ class EditorInterface(QWidget):
         self,
         description: str,
         mutator: Callable[[], Optional[tuple[int, int, Optional[int], str]]],
+        move_cp: bool = True,
     ) -> bool:
         if not self._project:
             return False
@@ -3058,6 +3062,7 @@ class EditorInterface(QWidget):
             command.undo_position = undo_pos
             focus_line_idx, focus_char_idx, checkpoint_idx, change_type = result
             command.redo_position = (focus_line_idx, focus_char_idx)
+            command.move_cp = move_cp
             command_manager.execute(command)
 
         focus_line_idx, focus_char_idx, checkpoint_idx, change_type = result
@@ -3066,6 +3071,7 @@ class EditorInterface(QWidget):
             focus_line_idx=focus_line_idx,
             focus_char_idx=focus_char_idx,
             checkpoint_idx=checkpoint_idx,
+            move_cp=move_cp,
         )
         return True
 
@@ -3154,6 +3160,7 @@ class EditorInterface(QWidget):
                 project.insert_line_break(line_idx, char_idx)
                 or (line_idx + 1, 0, 0, "lyrics")
             ),
+            move_cp=False,
         )
 
     def _delete_current_selection_or_char(self):
@@ -3338,6 +3345,7 @@ class EditorInterface(QWidget):
         self._execute_structural_edit(
             "连词" if new_linked else "取消连词",
             _mutate,
+            move_cp=False,
         )
 
         InfoBar.success(
@@ -3719,6 +3727,7 @@ class EditorInterface(QWidget):
         self._execute_structural_edit(
             "删除字符",
             lambda: self._delete_char_range(line_idx, start, end),
+            move_cp=False,
         )
     
     def _on_delete_timestamp_requested(self, line_idx: int, char_idx: int):
@@ -3786,7 +3795,7 @@ class EditorInterface(QWidget):
             sentence.insert_character(char_idx, new_char)
             return line_idx, char_idx, 0, "lyrics"
 
-        self._execute_structural_edit("在前插入空格", _mutate)
+        self._execute_structural_edit("在前插入空格", _mutate, move_cp=False)
 
     def _on_insert_space_after_requested(self, line_idx: int, char_idx: int):
         if not self._project or line_idx < 0 or line_idx >= len(self._project.sentences):
@@ -3811,7 +3820,7 @@ class EditorInterface(QWidget):
             sentence.insert_character(char_idx + 1, new_char)
             return line_idx, char_idx + 1, 0, "lyrics"
 
-        self._execute_structural_edit("插入空格", _mutate)
+        self._execute_structural_edit("插入空格", _mutate, move_cp=False)
 
     def _insert_space_at_current(self):
         """在当前字符后插入空格（快捷键入口）。"""
@@ -3839,7 +3848,7 @@ class EditorInterface(QWidget):
             sentence.insert_character(char_idx + 1, new_char)
             return line_idx, char_idx + 1, 0, "lyrics"
 
-        self._execute_structural_edit("插入空格", _mutate)
+        self._execute_structural_edit("插入空格", _mutate, move_cp=False)
 
     def _merge_line_up_at_current(self):
         """将当前行合并到上一行（快捷键触发）。"""
@@ -3866,6 +3875,7 @@ class EditorInterface(QWidget):
                 if project.merge_line_into_previous(line_idx)
                 else None
             ),
+            move_cp=False,
         )
 
     def _on_delete_line_requested(self, line_idx: int):
@@ -3880,7 +3890,7 @@ class EditorInterface(QWidget):
             new_line_idx = max(0, min(line_idx, len(project.sentences) - 1))
             return new_line_idx, 0, 0, "lyrics"
 
-        self._execute_structural_edit("删除本行", _mutate)
+        self._execute_structural_edit("删除本行", _mutate, move_cp=False)
 
     def _on_insert_blank_line_before_requested(self, line_idx: int):
         if not self._project:
@@ -3896,6 +3906,7 @@ class EditorInterface(QWidget):
         self._execute_structural_edit(
             "在前插入空行",
             lambda: ((project.insert_blank_line(line_idx - 1, singer_id=singer_id), 0, None, "lyrics")),
+            move_cp=False,
         )
 
     def _on_insert_blank_line_requested(self, line_idx: int):
@@ -3912,6 +3923,7 @@ class EditorInterface(QWidget):
         self._execute_structural_edit(
             "插入空行",
             lambda: ((project.insert_blank_line(line_idx, singer_id=singer_id), 0, None, "lyrics")),
+            move_cp=False,
         )
 
     def _on_add_checkpoint_requested(self, line_idx: int, char_idx: int):
@@ -4920,6 +4932,7 @@ class EditorInterface(QWidget):
                 focus_line_idx=focus_line_idx,
                 focus_char_idx=focus_char_idx,
                 checkpoint_idx=None,
+                move_cp=False,
             )
 
             if deleted_count > 0:
@@ -5100,6 +5113,7 @@ class EditorInterface(QWidget):
                 focus_line_idx=focus_line_idx,
                 focus_char_idx=focus_char_idx,
                 checkpoint_idx=None,
+                move_cp=False,
             )
             InfoBar.success(
                 title=f"{label}完成",

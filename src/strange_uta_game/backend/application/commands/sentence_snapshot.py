@@ -35,6 +35,8 @@ class SentenceSnapshotCommand(Command):
         """撤销后应恢复的光标位置 ``(line_idx, char_idx)``。"""
         self.redo_position: Optional[Tuple[int, int]] = None
         """重做后应恢复的光标位置 ``(line_idx, char_idx)``。"""
+        self.move_cp: bool = True
+        """撤销/重做后是否需要调用 timing_service.move_to_checkpoint 同步打轴位置。"""
 
     def execute(self) -> None:
         self._project.sentences = deepcopy(self._after_sentences)
