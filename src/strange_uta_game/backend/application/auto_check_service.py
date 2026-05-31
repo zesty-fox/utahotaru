@@ -741,25 +741,13 @@ class AutoCheckService:
             remaining = remaining[len(match) :]
             left += 1
 
-        # Step 4: 处理头尾相遇的单字符情况
+        # Step 4: 头尾剥离后只剩一个中间字符 → 把剩余读音全部给它，
+        # 保留两侧已成功剥离的读音，不再把整串读音倒灌首字。
+        # 即便 remaining 不在该字的单字候选读音中也照分：复合词的促音便/连浊
+        # 会让某字的读音偏离字典单字读音（如「逆光（ぎゃっこう）」里 逆=ぎゃっ
+        # 而字典只有 ぎゃく），此时仍应得到 逆=ぎゃっ・光=こう，而不是 逆=ぎゃっこう。
+        # 这类单字读音仅在复合词里成立，连词状态由 apply_to_sentence 维持。
         if left == right:
-            ch = word[left]
-            ct = get_char_type(ch) if len(ch) == 1 else CharType.OTHER
-            if ct == CharType.KANJI and self._kanji_dict and remaining:
-                # 汉字且有剩余读音：校验 remaining 是否在该字的候选读音中
-                entry = self._kanji_dict.get(ch)
-                if entry:
-                    on = [self._kata_to_hira(r) for r in entry.get("on", [])]
-                    kun = []
-                    for r in entry.get("kun", []):
-                        hira = self._kata_to_hira(r).split(".")[0].lstrip("-")
-                        if hira:
-                            kun.append(hira)
-                    all_readings = set(on + kun)
-                    if remaining not in all_readings:
-                        # 读音不在候选中 → 不可拆分，首字全吃
-                        # 恢复已剥离的部分
-                        return [reading if i == 0 else "" for i in range(n)]
             split_parts[left] = remaining
             return split_parts
 
@@ -1457,7 +1445,11 @@ class AutoCheckService:
 
         规则：
         - char.ruby 非 None 视为已注音。
-        - 若前一个字符 linked_to_next=True 且前一个字符已注音，则视为已注音（连词传递）。
+        - 字符属于某个「连词组」且组内任一字符带 ruby（即整组参与过复合词注音）时，
+          即便该字符自身无 ruby（读音由组内首字/他字承载，如 今日 的「日」、
+          逆光 拆分后的承载关系），也视为已注音 —— 这类连词成员不应被独立再注音，
+          否则会因「单字分配不到读音→回退自注音」而拿到错误的单字训读
+          （如「光」被单独注成 ひかり），破坏复合词读音。
 
         Args:
             sentence: 句子
@@ -1466,16 +1458,20 @@ class AutoCheckService:
         Returns:
             是否已注音
         """
-        if idx < 0 or idx >= len(sentence.characters):
+        chars = sentence.characters
+        if idx < 0 or idx >= len(chars):
             return False
-        char = sentence.characters[idx]
-        if char.ruby is not None:
+        if chars[idx].ruby is not None:
             return True
-        if idx > 0:
-            prev = sentence.characters[idx - 1]
-            if prev.linked_to_next and self._is_char_already_rubied(sentence, idx - 1):
-                return True
-        return False
+        # 定位 idx 所在的连词组 [start, end]（沿 linked_to_next 链双向扩展）。
+        start = idx
+        while start > 0 and chars[start - 1].linked_to_next:
+            start -= 1
+        end = idx
+        while end < len(chars) - 1 and chars[end].linked_to_next:
+            end += 1
+        # 组内任一字符已注音 → 整组视为参与过注音，连词成员一并算已注音。
+        return any(chars[k].ruby is not None for k in range(start, end + 1))
 
     def apply_to_sentence(
         self,
@@ -1650,7 +1646,13 @@ class AutoCheckService:
             next_ct = get_char_type(next_ch.char) if len(next_ch.char) == 1 else CharType.OTHER
             if next_ct in (CharType.HIRAGANA, CharType.KATAKANA):
                 continue
-            # 汉字连词：后字无 ruby 才连词（无法拆分的情况）
+            # fallback 复合词：整词读音被 _fallback_split_peel_kana 拆到各汉字，
+            # 但这些单字读音仅在复合时成立（如 逆光=ぎゃっ+こう、促音便使 逆≠字典 ぎゃく），
+            # 故各字虽都带 ruby 仍需保持连词，避免被当成可独立复用的单字读音。
+            if cur_src == "fallback":
+                new_characters[i].linked_to_next = True
+                continue
+            # 其他来源（library 等）：后字无 ruby 才连词（无法拆分的情况）
             next_has_ruby = (
                 next_ch.ruby is not None
                 and (
