@@ -76,6 +76,10 @@ class AppSettings:
         "ui": {
             "theme": "auto",
             "language": "zh_CN",
+            # 窗口习惯：启动时读取以恢复上次的窗口大小与最大化状态；
+            # 用户改变窗口大小或最大化时实时写回（见 MainWindow）。
+            "window_size": [1400, 900],
+            "window_maximized": False,
             "font_size": 24,
             "main_font": "Microsoft YaHei",
             "ruby_font": "Microsoft YaHei",
