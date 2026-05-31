@@ -499,6 +499,61 @@ class TestLibraryBlockFallbackLinking:
         assert chars[0].linked_to_next, "逆→光 应连词（复合词读音）"
 
 
+class TestLinkedMemberNotReAnnotated:
+    """连词组成员（参与过复合词注音）不应被 only_noruby 独立再注音。
+
+    场景：分析器把整词读音压在首字（如 今日→今=きょう、日=空、连词承载）。
+    「日」自身无 ruby，但属于已注音的连词组，必须视为已注音 —— 否则
+    only_noruby 会把它当未注音字符独立再注音，拿到错误单字训读（如 光→ひかり），
+    破坏复合词读音。
+    """
+
+    class _CompoundAnalyzer(RubyAnalyzer):
+        """把「今日」整词返回 きょう（其余字符自注音）。"""
+
+        def analyze(self, text):
+            if text == "今日":
+                return [RubyResult(text="今日", reading="きょう", start_idx=0, end_idx=2)]
+            return [
+                RubyResult(text=c, reading=c, start_idx=i, end_idx=i + 1)
+                for i, c in enumerate(text)
+            ]
+
+        def get_reading(self, text):
+            return "".join(r.reading for r in self.analyze(text))
+
+    def _kyou_sentence(self):
+        # 今日→きょう 整词：きょう 2 拍无法均分到 2 字 → 压在首字「今」、「日」空 ruby、连词
+        service = AutoCheckService(self._CompoundAnalyzer())
+        sentence = Sentence.from_text("今日", "s1")
+        service.apply_to_sentence(sentence)
+        return service, sentence
+
+    def test_empty_linked_member_counts_as_rubied(self):
+        service, sentence = self._kyou_sentence()
+        chars = sentence.characters
+        # 前置条件：今 有 ruby 且连词，日 无自身 ruby
+        assert chars[0].ruby is not None and chars[0].linked_to_next
+        assert chars[1].ruby is None
+        # 连词组成员「日」应被判定为已注音
+        assert service._is_char_already_rubied(sentence, 1) is True
+
+    def test_only_noruby_preserves_linked_member(self):
+        service, sentence = self._kyou_sentence()
+        before = [
+            (c.char, None if c.ruby is None else [p.text for p in c.ruby.parts],
+             c.linked_to_next)
+            for c in sentence.characters
+        ]
+        service.apply_to_sentence(sentence, only_noruby=True)
+        after = [
+            (c.char, None if c.ruby is None else [p.text for p in c.ruby.parts],
+             c.linked_to_next)
+            for c in sentence.characters
+        ]
+        assert after == before, f"only_noruby 不应改动连词组：{before} -> {after}"
+
+
 class TestEnglishWordCheckpoints:
     """批 18 #9：英文词组节奏点规则
     - 多字母英文词：首字 cp=1，中间字母 cp=0，末字母自动标 is_sentence_end
