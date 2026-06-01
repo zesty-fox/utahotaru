@@ -2254,7 +2254,14 @@ class EditorInterface(QWidget):
 
                     # 判断段的位置
                     is_at_start = (segment_start == 0)  # 行首
-                    is_at_end = (segment_end == total_chars)  # 行尾
+                    # 行尾：段之后若仅剩“多余空格占位符”（句尾 token 贴轴后被解析
+                    # 出来的裸空格），也视为行尾。必须校验 check_count==0，避免误吞
+                    # 真正带轴的空格字符。
+                    is_at_end = all(
+                        chars[ci].check_count == 0
+                        and get_char_type(chars[ci].char) == CharType.SPACE
+                        for ci in range(segment_end, total_chars)
+                    )
 
                     # 查找前后时间戳
                     prev_ts = _find_prev_timestamp(line_idx, segment_start)
