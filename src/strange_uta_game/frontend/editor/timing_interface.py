@@ -641,6 +641,9 @@ class EditorInterface(QWidget):
         # 应用禁用单击跳转设置
         disable_click_jump = settings.get("timing.disable_click_jump", False)
         self.preview.set_disable_click_jump(disable_click_jump)
+        # 应用走字预览指引开关
+        preview_guide = settings.get("timing.preview_guide_enabled", False)
+        self.preview.set_preview_guide_enabled(preview_guide)
         # 应用滚动模式（设置页修改后同步到按钮和 preview）
         scroll_mode = settings.get("timing.scroll_mode", "auto")
         if scroll_mode != self._scroll_mode:
