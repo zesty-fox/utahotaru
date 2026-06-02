@@ -2046,7 +2046,7 @@ class EditorInterface(QWidget):
             )
 
     def _on_adjust_raw_timestamp(self):
-        """调整原始时间戳功能入口 — 弹出输入框，将所有原始时间戳整体偏移指定毫秒数"""
+        """调整原始时间戳功能入口 — 打开非模态调整窗口，允许边测试边调整"""
         if not self._project:
             InfoBar.warning(
                 title="无项目",
@@ -2059,30 +2059,19 @@ class EditorInterface(QWidget):
             )
             return
 
-        from PyQt6.QtWidgets import QInputDialog
+        from .timing.dialogs import AdjustRawTimestampDialog
 
-        delta_ms, ok = QInputDialog.getInt(
-            self,
-            "调整原始时间戳",
-            "请输入偏移量（毫秒，范围 -9999 ~ +9999）：\n"
-            "正数：所有原始时间戳向后移；负数：向前移。",
-            value=0,
-            min=-9999,
-            max=9999,
-            step=1,
-        )
-        if not ok:
-            return
-        if delta_ms == 0:
-            InfoBar.info(
-                title="无需调整",
-                content="偏移量为 0，未做任何修改",
-                orient=Qt.Orientation.Horizontal,
-                isClosable=True,
-                position=InfoBarPosition.TOP,
-                duration=2000,
-                parent=self,
-            )
+        if not hasattr(self, "_adjust_ts_dlg") or self._adjust_ts_dlg is None or not self._adjust_ts_dlg.isVisible():
+            self._adjust_ts_dlg = AdjustRawTimestampDialog(self)
+            self._adjust_ts_dlg.apply_requested.connect(self._on_apply_adjust_raw_timestamp)
+
+        self._adjust_ts_dlg.show()
+        self._adjust_ts_dlg.raise_()
+        self._adjust_ts_dlg.activateWindow()
+
+    def _on_apply_adjust_raw_timestamp(self, delta_ms: int):
+        """处理调整原始时间戳对话框的应用请求"""
+        if not self._project:
             return
 
         project = self._project
@@ -2106,8 +2095,10 @@ class EditorInterface(QWidget):
                 return None
             return (self._current_line_idx, self.preview._current_char_idx, None, "timetags")
 
-        ok2 = self._execute_structural_edit("调整原始时间戳", _mutate)
-        if ok2:
+        ok = self._execute_structural_edit("调整原始时间戳", _mutate)
+        if ok:
+            if hasattr(self, "_adjust_ts_dlg") and self._adjust_ts_dlg is not None:
+                self._adjust_ts_dlg.set_status(f"已成功偏移 {delta_ms:+d} ms")
             InfoBar.success(
                 title="调整完成",
                 content=f"所有原始时间戳已整体偏移 {delta_ms:+d} ms",
@@ -2117,6 +2108,9 @@ class EditorInterface(QWidget):
                 duration=3000,
                 parent=self,
             )
+        else:
+            if hasattr(self, "_adjust_ts_dlg") and self._adjust_ts_dlg is not None:
+                self._adjust_ts_dlg.set_status("无可调整的时间戳", success=False)
 
     def _execute_complete_timestamp(self, scope_types: set[str], exclude_rules: list[str], head_offset_ms: int = 150, tail_offset_ms: int = 150) -> int:
         """执行补全时间戳的核心逻辑

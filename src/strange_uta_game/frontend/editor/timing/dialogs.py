@@ -59,6 +59,7 @@ from qfluentwidgets import (
     LineEdit,
     CheckBox,
     ScrollArea,
+    SpinBox,
     setCustomStyleSheet,
 )
 
@@ -1737,3 +1738,65 @@ class CompleteTimestampDialog(QDialog):
             return int(self._edit_tail_offset.text())
         except ValueError:
             return 150
+
+
+class AdjustRawTimestampDialog(QDialog):
+    """调整原始时间戳对话框 — 非模态，应用后不关闭，允许边测试边调整。
+
+    每次点击「应用」即执行一次整体偏移，结果可叠加。
+    窗口与主界面并存，用户可切换回主界面试听后继续调整。
+    """
+
+    apply_requested = pyqtSignal(int)  # delta_ms
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("调整原始时间戳")
+        self.setWindowModality(Qt.WindowModality.NonModal)
+        self.resize(340, 200)
+        self.setFont(QFont("Microsoft YaHei", 10))
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+
+        desc = QLabel(
+            "正数：所有原始时间戳向后移；负数：向前移。\n"
+            "每次点击「应用」立即执行偏移，可叠加多次操作。"
+        )
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+
+        form = QFormLayout()
+        self.spin_delta = SpinBox(self)
+        self.spin_delta.setRange(-9999, 9999)
+        self.spin_delta.setValue(0)
+        self.spin_delta.setSuffix(" ms")
+        form.addRow("偏移量:", self.spin_delta)
+        layout.addLayout(form)
+
+        self.lbl_status = QLabel("")
+        self.lbl_status.setWordWrap(True)
+        layout.addWidget(self.lbl_status)
+
+        layout.addStretch()
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        self.btn_apply = PrimaryPushButton("应用", self)
+        self.btn_apply.clicked.connect(self._on_apply)
+        btn_layout.addWidget(self.btn_apply)
+        btn_close = PushButton("关闭", self)
+        btn_close.clicked.connect(self.close)
+        btn_layout.addWidget(btn_close)
+        layout.addLayout(btn_layout)
+
+    def _on_apply(self):
+        delta = self.spin_delta.value()
+        if delta == 0:
+            self.lbl_status.setText("偏移量为 0，未做任何修改")
+            return
+        self.apply_requested.emit(delta)
+
+    def set_status(self, text: str, success: bool = True):
+        color = "#2d7d46" if success else "#c0392b"
+        self.lbl_status.setText(f'<span style="color:{color}">{text}</span>')
