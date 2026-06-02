@@ -86,6 +86,9 @@ _VARIANT_CONFIGS = {
             "--exclude-module=winrt",
             "--exclude-module=winrt.windows.globalization",
             "--exclude-module=winrt.windows.foundation",
+            # 只使用 sudachidict_small，排除大字典以减小包体积
+            "--exclude-module=sudachidict_core",
+            "--exclude-module=sudachidict_full",
         ],
         "required_deps": [],
     },
@@ -102,6 +105,9 @@ _VARIANT_CONFIGS = {
             "--exclude-module=winrt",
             "--exclude-module=winrt.windows.globalization",
             "--exclude-module=winrt.windows.foundation",
+            # 只使用 sudachidict_small，排除大字典以减小包体积
+            "--exclude-module=sudachidict_core",
+            "--exclude-module=sudachidict_full",
         ],
         "required_deps": [],
     },

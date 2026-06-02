@@ -458,8 +458,8 @@ class WinRTAnalyzer(KanaDistributingAnalyzer):
 class SudachiAnalyzer(KanaDistributingAnalyzer):
     """基于 sudachipy 的注音分析器，供不含 WinRT 的变体使用。
 
-    字典优先级：sudachidict_small（打包体积小）→ sudachidict_core → 默认。
-    用户可通过安装 sudachidict_small 切换到小字典；未安装时自动回退到 core。
+    字典优先级：sudachidict_small（打包体积最小）→ 默认。
+    打包时只包含 sudachidict_small 以控制体积。
     分词粒度采用 Mode A（最短形态素，与 WinRT 默认粒度相近）。
 
     reading_form() 返回表层形读音（非字典形），可直接用于假名注音。
@@ -470,11 +470,11 @@ class SudachiAnalyzer(KanaDistributingAnalyzer):
             import sudachipy  # type: ignore[import-untyped]
         except ImportError:
             raise ImportError(
-                "sudachipy is required. Install with: pip install sudachipy sudachidict_core"
+                "sudachipy is required. Install with: pip install sudachipy sudachidict_small"
             )
-        # 字典优先级：small（体积小）→ core → 默认（首个已安装字典）
+        # 字典优先级：small（体积小）→ 默认（首个已安装字典）
         _dict_obj = None
-        for _dict_name in ("small", "core", None):
+        for _dict_name in ("small", None):
             try:
                 _dict_obj = (
                     sudachipy.Dictionary(dict=_dict_name).create()
@@ -487,7 +487,7 @@ class SudachiAnalyzer(KanaDistributingAnalyzer):
         if _dict_obj is None:
             raise ImportError(
                 "sudachi dictionary unavailable. "
-                "Install with: pip install sudachidict_core"
+                "Install with: pip install sudachidict_small"
             )
         self._tokenizer = _dict_obj
         self._split_mode = sudachipy.SplitMode.A
