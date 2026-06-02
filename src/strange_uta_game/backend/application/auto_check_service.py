@@ -1824,6 +1824,36 @@ class AutoCheckService:
                     # 与已锁定区间重叠 → 整段丢弃，继续找下一处
                     search_from = idx + 1
                     continue
+                # ----------------------------------------------------------
+                # 防止词典条目部分覆盖已注音的连词组（linked compound）。
+                # 例如 "逆光" 被形态素分析拆为 逆=ぎゃっ、光=こう 并保持连词，
+                # 此时单字词典条目 "光→ひかり" 不应覆盖 "光" 的读音，因为
+                # "光" 此处作为复合词成员，其读音仅在复合词上下文中成立。
+                # 仅当词典条目恰好覆盖了连词组的完整范围时才允许覆盖。
+                # ----------------------------------------------------------
+                def _linked_group_range(pos: int) -> tuple:
+                    """返回 pos 所在连词组的 [start, end] 闭区间。"""
+                    s = pos
+                    while s > 0 and chars[s - 1].linked_to_next:
+                        s -= 1
+                    e = pos
+                    while e < len(chars) - 1 and chars[e].linked_to_next:
+                        e += 1
+                    return (s, e)
+
+                partial_overlap = False
+                for i_pos in span:
+                    grp_start, grp_end = _linked_group_range(i_pos)
+                    grp_len = grp_end - grp_start + 1
+                    if grp_len > 1:
+                        # 该字符属于一个多字符连词组
+                        # 词典条目必须完整覆盖该连词组，否则视为部分覆盖
+                        if idx > grp_start or idx + wlen - 1 < grp_end:
+                            partial_overlap = True
+                            break
+                if partial_overlap:
+                    search_from = idx + 1
+                    continue
                 # 命中：覆盖 chars[idx..idx+wlen]
                 for k in range(wlen):
                     ch = chars[idx + k]

@@ -499,6 +499,87 @@ class TestLibraryBlockFallbackLinking:
         assert chars[0].linked_to_next, "逆→光 应连词（复合词读音）"
 
 
+class TestPhase5CompoundProtection:
+    """Phase 5 用户词典不应部分覆盖已注音的连词组（linked compound）。
+
+    场景：「逆光」被形态素分析拆为 逆=ぎゃっ、光=こう 并保持连词。
+    默认词典包含 "光→ひかり" 单字条目，Phase 5 不应用该条目覆盖
+    复合词中的「光」（因为它只是连词组的部分子串）。
+    """
+
+    class _GyakkouAnalyzer(RubyAnalyzer):
+        """把「逆光」整词返回 ぎゃっこう（其余字符自注音）。"""
+
+        def analyze(self, text):
+            idx = text.find("逆光")
+            if idx >= 0:
+                results = []
+                for i, c in enumerate(text[:idx]):
+                    results.append(RubyResult(text=c, reading=c, start_idx=i, end_idx=i + 1))
+                results.append(RubyResult(text="逆光", reading="ぎゃっこう", start_idx=idx, end_idx=idx + 2))
+                for i, c in enumerate(text[idx + 2:], start=idx + 2):
+                    results.append(RubyResult(text=c, reading=c, start_idx=i, end_idx=i + 1))
+                return results
+            return [
+                RubyResult(text=c, reading=c, start_idx=i, end_idx=i + 1)
+                for i, c in enumerate(text)
+            ]
+
+        def get_reading(self, text):
+            return "".join(r.reading for r in self.analyze(text))
+
+    def test_single_char_dict_entry_does_not_override_compound(self):
+        """词典 "光→ひかり" 不应覆盖复合词 逆光 中的 光=こう。"""
+        user_dict = [
+            {"enabled": True, "word": "光", "reading": "{光||ひ|か|り}"},
+        ]
+        service = AutoCheckService(self._GyakkouAnalyzer(), user_dictionary=user_dict)
+        sentence = Sentence.from_text("逆光", "s1")
+        service.apply_to_sentence(sentence)
+
+        chars = sentence.characters
+        assert len(chars) == 2
+        assert chars[0].ruby is not None, "逆 应有 ruby"
+        # 光 应保持复合词读音 こう，而非被词典覆盖为 ひかり
+        assert chars[1].ruby is not None, "光 应有 ruby"
+        ruby_text = "".join(p.text for p in chars[1].ruby.parts)
+        assert ruby_text == "こう", (
+            f"光 应保持复合词读音 こう，实际为 {ruby_text}（被词典覆盖为 ひかり）"
+        )
+        assert chars[0].linked_to_next, "逆→光 应保持连词"
+
+    def test_full_compound_dict_entry_does_override(self):
+        """词典 "逆光→ぎゃっこう" 覆盖整个连词组时应允许。"""
+        user_dict = [
+            {"enabled": True, "word": "逆光", "reading": "{逆光||ぎゃっ,こ|う}"},
+        ]
+        service = AutoCheckService(self._GyakkouAnalyzer(), user_dictionary=user_dict)
+        sentence = Sentence.from_text("逆光", "s1")
+        service.apply_to_sentence(sentence)
+
+        chars = sentence.characters
+        assert len(chars) == 2
+        assert chars[0].ruby is not None, "逆 应有 ruby"
+        assert chars[1].ruby is not None, "光 应有 ruby"
+        ruby_text_1 = "".join(p.text for p in chars[1].ruby.parts)
+        assert ruby_text_1 == "こう", f"光 应为 こう，实际为 {ruby_text_1}"
+
+    def test_standalone_char_still_gets_dict_reading(self):
+        """独立出现的「光」（不在连词组中）仍应被词典 "光→ひかり" 覆盖。"""
+        user_dict = [
+            {"enabled": True, "word": "光", "reading": "{光||ひ|か|り}"},
+        ]
+        service = AutoCheckService(DummyAnalyzer(), user_dictionary=user_dict)
+        sentence = Sentence.from_text("光", "s1")
+        service.apply_to_sentence(sentence)
+
+        chars = sentence.characters
+        assert len(chars) == 1
+        assert chars[0].ruby is not None, "光 应有 ruby"
+        ruby_text = "".join(p.text for p in chars[0].ruby.parts)
+        assert ruby_text == "ひかり", f"独立的光应被词典注为 ひかり，实际为 {ruby_text}"
+
+
 class TestLinkedMemberNotReAnnotated:
     """连词组成员（参与过复合词注音）不应被 only_noruby 独立再注音。
 
