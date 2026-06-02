@@ -105,7 +105,7 @@
     "base_url": "",
     "api_key": "",
     "model": "",
-    "apply_user_dict": true,
+    "apply_user_dict": false,
     "timeout_sec": 60
   },
   "dictionary_version": 9,
