@@ -99,6 +99,15 @@
     "enabled": true,
     "annotate_katakana_with_english": false
   },
+  "llm_ruby": {
+    "enabled": false,
+    "provider": "openai",
+    "base_url": "",
+    "api_key": "",
+    "model": "",
+    "apply_user_dict": true,
+    "timeout_sec": 60
+  },
   "dictionary_version": 9,
   "nicokara_tags": {
     "title": "",

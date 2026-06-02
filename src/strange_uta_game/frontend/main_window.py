@@ -944,6 +944,7 @@ class MainWindow(MSFluentWindow):
                     self.editorInterface.release_resources()
                 except Exception:
                     pass
+            self._clear_llm_logs()
             QApplication.quit()
             e.accept()
             return
@@ -977,8 +978,20 @@ class MainWindow(MSFluentWindow):
         # 释放编辑器资源
         if hasattr(self, "editorInterface"):
             self.editorInterface.release_resources()
+        self._clear_llm_logs()
         QApplication.quit()
         e.accept()
+
+    @staticmethod
+    def _clear_llm_logs() -> None:
+        """退出时清除会话级 LLM 请求日志。"""
+        try:
+            from strange_uta_game.backend.infrastructure.parsers.llm_ruby import (
+                clear_llm_logs,
+            )
+            clear_llm_logs()
+        except Exception:
+            pass
 
     def request_force_quit(self) -> None:
         """立即退出主程序（由 updater 流程调用）。

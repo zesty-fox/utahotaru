@@ -5118,17 +5118,21 @@ class EditorInterface(QWidget):
         if getattr(self, "_ruby_analyzing", False):
             return
 
-        from strange_uta_game.frontend.winrt_japanese_guide import (
-            ensure_winrt_japanese,
-        )
-        if not ensure_winrt_japanese(self):
-            return
-
         from strange_uta_game.backend.application import AutoCheckService
         from strange_uta_game.frontend.settings.settings_interface import AppSettings
         from strange_uta_game.frontend.workers import RubyAnalyzeWorker
 
         app_settings = AppSettings()
+        llm_active = app_settings.llm_ruby_active()
+
+        # LLM 注音激活时不需要本地日语 IME，跳过 WinRT 安装引导。
+        if not llm_active:
+            from strange_uta_game.frontend.winrt_japanese_guide import (
+                ensure_winrt_japanese,
+            )
+            if not ensure_winrt_japanese(self):
+                return
+
         auto_check_flags = app_settings.get_all().get("auto_check", {})
         user_dict = app_settings.load_effective_dictionary()
         annotate_katakana_with_english = app_settings.get(
@@ -5136,8 +5140,13 @@ class EditorInterface(QWidget):
         )
         delete_types = auto_check_flags.get("delete_ruby_types", [])
 
-        # AutoCheckService（含 WinRTAnalyzer）在主线程创建，确保 WinRT STA apartment 正确。
+        # AutoCheckService（含 WinRTAnalyzer / LLMRubyAnalyzer）在主线程创建，
+        # 确保 WinRT STA apartment 正确；LLM 整首一次发送需传入全部行文本。
+        lines = [s.text for s in self._project.sentences]
+        analyzer = app_settings.build_ruby_analyzer(lines)
+        llm_apply_user_dict = app_settings.llm_apply_user_dict() if llm_active else True
         auto_check = AutoCheckService(
+            ruby_analyzer=analyzer,
             auto_check_flags=auto_check_flags,
             user_dictionary=user_dict,
             annotate_katakana_with_english=annotate_katakana_with_english,
@@ -5167,7 +5176,10 @@ class EditorInterface(QWidget):
         state_tooltip.show()
         self._ruby_analyzing = True
 
-        worker = RubyAnalyzeWorker(project_copy, auto_check, only_noruby, delete_types)
+        worker = RubyAnalyzeWorker(
+            project_copy, auto_check, only_noruby, delete_types,
+            llm_apply_user_dict=llm_apply_user_dict,
+        )
         thread = QThread(self)
         worker.moveToThread(thread)
 
@@ -5186,6 +5198,18 @@ class EditorInterface(QWidget):
         def _on_finished(analyzed_project, deleted_count: int) -> None:
             state_tooltip.setState(True)
             _cleanup()
+
+            # LLM 注音失败时已回退本地引擎，提示用户。
+            if getattr(analyzer, "llm_failed", False):
+                InfoBar.warning(
+                    title="LLM 注音失败，已回退本地引擎",
+                    content=str(getattr(analyzer, "last_error", "") or ""),
+                    orient=Qt.Orientation.Horizontal,
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=5000,
+                    parent=self,
+                )
 
             after_sentences = analyzed_project.sentences
             command_manager = (
@@ -5246,7 +5270,11 @@ class EditorInterface(QWidget):
                 parent=self,
             )
 
+        def _on_llm_waiting() -> None:
+            state_tooltip.setContent("正在等待 LLM 返回…（整首歌词一次性发送，请稍候）")
+
         thread.started.connect(worker.run)
+        worker.llm_waiting.connect(_on_llm_waiting)
         worker.progress.connect(_on_progress)
         worker.finished.connect(_on_finished)
         worker.error.connect(_on_error)
@@ -5320,30 +5348,41 @@ class EditorInterface(QWidget):
         if getattr(self, "_ruby_subset_analyzing", False):
             return
 
-        from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import (
-            winrt_japanese_status,
-        )
-        from strange_uta_game.frontend.winrt_japanese_guide import ensure_winrt_japanese
-
-        if show_winrt_dialog:
-            if not ensure_winrt_japanese(self):
-                return
-        else:
-            available, _ = winrt_japanese_status()
-            if not available:
-                return
-
         from strange_uta_game.backend.application import AutoCheckService
         from strange_uta_game.frontend.settings.settings_interface import AppSettings
         from strange_uta_game.frontend.workers import RubySubsetAnalyzeWorker
 
         app_settings = AppSettings()
+        llm_active = app_settings.llm_ruby_active()
+
+        # LLM 注音激活时不依赖本地日语 IME，跳过 WinRT 检查/引导。
+        if not llm_active:
+            from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import (
+                winrt_japanese_status,
+            )
+            from strange_uta_game.frontend.winrt_japanese_guide import (
+                ensure_winrt_japanese,
+            )
+
+            if show_winrt_dialog:
+                if not ensure_winrt_japanese(self):
+                    return
+            else:
+                available, _ = winrt_japanese_status()
+                if not available:
+                    return
+
         auto_check_flags = app_settings.get_all().get("auto_check", {})
         user_dict = app_settings.load_effective_dictionary()
         annotate_katakana_with_english = app_settings.get(
             "ruby_dictionary.annotate_katakana_with_english", False
         )
+        # LLM 整首一次发送：传入全部行文本以保留上下文（按行命中缓存）。
+        lines = [s.text for s in self._project.sentences]
+        analyzer = app_settings.build_ruby_analyzer(lines)
+        llm_apply_user_dict = app_settings.llm_apply_user_dict() if llm_active else True
         auto_check = AutoCheckService(
+            ruby_analyzer=analyzer,
             auto_check_flags=auto_check_flags,
             user_dictionary=user_dict,
             annotate_katakana_with_english=annotate_katakana_with_english,
@@ -5357,7 +5396,27 @@ class EditorInterface(QWidget):
         project_copy = deepcopy(self._project)
         self._ruby_subset_analyzing = True
 
-        worker = RubySubsetAnalyzeWorker(project_copy, auto_check, specs)
+        # LLM 注音整首一次发送、可能较慢：显示忙碌指示器（本地引擎很快，无需）。
+        subset_tooltip = None
+        if llm_active:
+            green = theme.status_complete.name()
+            subset_tooltip = StateToolTip("正在分析注音", "正在等待 LLM 返回…", self)
+            subset_tooltip.setStyleSheet(f"""
+                StateToolTip {{
+                    background-color: {green};
+                    border: 1px solid {green};
+                    border-radius: 8px;
+                }}
+                StateToolTip QLabel {{
+                    color: white;
+                }}
+            """)
+            subset_tooltip.move(subset_tooltip.getSuitablePos())
+            subset_tooltip.show()
+
+        worker = RubySubsetAnalyzeWorker(
+            project_copy, auto_check, specs, apply_user_dict=llm_apply_user_dict
+        )
         thread = QThread(self)
         worker.moveToThread(thread)
 
@@ -5369,8 +5428,23 @@ class EditorInterface(QWidget):
             self._ruby_subset_analyze_thread = None
             self._ruby_subset_analyzing = False
 
+        def _close_tooltip() -> None:
+            if subset_tooltip is not None:
+                subset_tooltip.setState(True)
+
         def _on_finished(analyzed_project) -> None:
             _cleanup()
+            _close_tooltip()
+            if getattr(analyzer, "llm_failed", False):
+                InfoBar.warning(
+                    title="LLM 注音失败，已回退本地引擎",
+                    content=str(getattr(analyzer, "last_error", "") or ""),
+                    orient=Qt.Orientation.Horizontal,
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=5000,
+                    parent=self,
+                )
             after_sentences = analyzed_project.sentences
             command_manager = (
                 self._timing_service.command_manager if self._timing_service else None
@@ -5404,6 +5478,7 @@ class EditorInterface(QWidget):
 
         def _on_error(err: str) -> None:
             _cleanup()
+            _close_tooltip()
             InfoBar.warning(
                 title=f"{label}失败",
                 content=err,
@@ -5414,7 +5489,12 @@ class EditorInterface(QWidget):
                 parent=self,
             )
 
+        def _on_llm_waiting() -> None:
+            if subset_tooltip is not None:
+                subset_tooltip.setContent("正在等待 LLM 返回…（整首歌词一次性发送，请稍候）")
+
         thread.started.connect(worker.run)
+        worker.llm_waiting.connect(_on_llm_waiting)
         worker.finished.connect(_on_finished)
         worker.error.connect(_on_error)
         worker.finished.connect(thread.quit)
