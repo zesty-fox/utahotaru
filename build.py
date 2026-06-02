@@ -90,6 +90,8 @@ _VARIANT_CONFIGS = {
             "--exclude-module=sudachidict_core",
             "--exclude-module=sudachidict_full",
         ],
+        # 自定义 hook 覆盖系统 hook-sudachipy.py，阻止自动收集 core/full 字典
+        "hooks_dir": str(PROJECT_ROOT / "pyinstaller_hooks"),
         "required_deps": [],
     },
     "mac": {
@@ -109,6 +111,8 @@ _VARIANT_CONFIGS = {
             "--exclude-module=sudachidict_core",
             "--exclude-module=sudachidict_full",
         ],
+        # 自定义 hook 覆盖系统 hook-sudachipy.py，阻止自动收集 core/full 字典
+        "hooks_dir": str(PROJECT_ROOT / "pyinstaller_hooks"),
         "required_deps": [],
     },
 }
@@ -252,6 +256,8 @@ args = [
 args.extend(_cfg["hidden_imports"])
 args.extend(_cfg["collect_all"])
 args.extend(_cfg["exclude_modules"])
+if _cfg.get("hooks_dir"):
+    args.append(f"--additional-hooks-dir={_cfg['hooks_dir']}")
 
 if _cli_args.clean:
     args.append("--clean")
