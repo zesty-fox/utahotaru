@@ -25,6 +25,8 @@ from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import (
     RubyAnalyzer,
     RubyResult,
     _group_reading_for_character,
+    is_all_katakana,
+    is_english_reading,
 )
 from strange_uta_game.backend.infrastructure.parsers.inline_format import (
     split_ruby_for_checkpoints,
@@ -1115,11 +1117,32 @@ class AutoCheckService:
             else:
                 block_source[block_id] = "library"
 
+        # 片假名外来语 → 英文标注（仅 LLM 注音会产出「片假名 surface + 英文 reading」）。
+        # 整词作为单块：首字承载英文读音、整词连词、节奏点首字=1 其余=0；
+        # 须豁免后续的「首尾假名剥离 / 中间假名清理 / 第三步均分」逻辑。
+        katakana_english_covered: set = set()
+        if self._annotate_katakana_with_english:
+            for block_id, result in enumerate(ruby_results):
+                if is_all_katakana(result.text) and is_english_reading(result.reading):
+                    block_source[block_id] = "katakana_english"
+                    katakana_english_covered |= set(
+                        range(result.start_idx, result.end_idx)
+                    )
+
         # 创建字符到注音的映射（按 mora 分割到每个字符）
         char_to_ruby_raw: Dict[int, str] = {}
         char_to_block: Dict[int, int] = {}
         for block_id, result in enumerate(ruby_results):
             block_len = result.end_idx - result.start_idx
+            # 片假名外来语块：整词连词，首字承载英文读音，其余字符无 ruby 但同块连词。
+            if block_source.get(block_id) == "katakana_english":
+                for idx in range(result.start_idx, result.end_idx):
+                    if idx >= len(chars):
+                        break
+                    if idx == result.start_idx:
+                        char_to_ruby_raw[idx] = result.reading.strip()
+                    char_to_block[idx] = block_id
+                continue
             # "干净拆分"标记：用户词典 reading 用逗号干净拆成每字独立读音时
             # （每段非空 + 段数 == 字符数），不应强制连词，让每字能被独立使用。
             # 例：`大空 → おお,そら` → 大[おお] 空[そら] 各自独立。
@@ -1206,6 +1229,9 @@ class AutoCheckService:
             block_len = result.end_idx - result.start_idx
             if block_len < 2:
                 continue
+            # 片假名外来语块：整词连词由首字承载英文，不剥离尾部片假名
+            if block_source.get(block_id) == "katakana_english":
+                continue
             # 从末尾向前剥离
             for pos in range(block_len - 1, 0, -1):
                 idx = result.start_idx + pos
@@ -1245,6 +1271,8 @@ class AutoCheckService:
         for idx in list(char_to_block.keys()):
             if idx in char_to_ruby_raw:
                 continue  # 有 ruby，保留
+            if idx in katakana_english_covered:
+                continue  # 片假名外来语块的尾随片假名：保持连词，不自注音
             ch = chars[idx] if idx < len(chars) else ""
             ct = get_char_type(ch) if len(ch) == 1 else CharType.OTHER
             if ct in (CharType.HIRAGANA, CharType.KATAKANA):
@@ -1261,8 +1289,8 @@ class AutoCheckService:
             block_len = result.end_idx - result.start_idx
             if block_len < 2:
                 continue
-            # 跳过英文来源
-            if block_source.get(block_id) in ("e2k", "english_fallback"):
+            # 跳过英文来源（含片假名外来语英文标注）
+            if block_source.get(block_id) in ("e2k", "english_fallback", "katakana_english"):
                 continue
             # 只收集仍在 char_to_block 中的汉字字符（未被首尾假名剥离的）
             # 假名字符不参与均分，保持自注音
@@ -1329,7 +1357,8 @@ class AutoCheckService:
             # 批 17 #1: 英文词组 fallback 块——首字母=1 cp、其他字母=0 cp
             # 必须在 `result.text == result.reading` 短路之前处理
             # （fallback 的 text 与 reading 完全相同，否则会被跳过保留默认每字母=1）
-            if block_source.get(block_id) == "english_fallback":
+            if block_source.get(block_id) in ("english_fallback", "katakana_english"):
+                # 整词首字 = 1 cp，其余字符 = 0（与英文词组一致）
                 for idx in range(result.start_idx, result.end_idx):
                     if idx < len(check_counts):
                         check_counts[idx] = 1 if idx == result.start_idx else 0
@@ -1617,7 +1646,9 @@ class AutoCheckService:
         # - 干净拆分（origin_block_id == -1，字典逗号分段每段非空）→ 不连词
         # - 非干净拆分（origin_block_id >= 0，字典有空读音/fallback）→ 后字无 ruby 才连词
         # - 空格字符不参与连词
-        _LINKABLE_SOURCES = {"dict", "e2k", "english_fallback", "fallback", "library"}
+        _LINKABLE_SOURCES = {
+            "dict", "e2k", "english_fallback", "katakana_english", "fallback", "library",
+        }
         for i in range(len(new_characters) - 1):
             next_ch = new_characters[i + 1]
             if next_ch.char and next_ch.char.isspace():
@@ -1638,8 +1669,8 @@ class AutoCheckService:
                 == results[i + 1].origin_block_id
             ):
                 continue
-            # 英文词组始终连词（e2k/english_fallback 来源）
-            if cur_src in ("e2k", "english_fallback"):
+            # 英文词组 / 片假名外来语始终整词连词
+            if cur_src in ("e2k", "english_fallback", "katakana_english"):
                 new_characters[i].linked_to_next = True
                 continue
             # 假名不参与汉字连词（送り仮名/接头假名应独立）

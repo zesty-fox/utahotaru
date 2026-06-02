@@ -505,7 +505,10 @@ class HomeInterface(QWidget):
                         if _proceed:
                             # LLM 整首一次发送：传入全部行文本以保留上下文。
                             lines = [s.text for s in project.sentences]
-                            analyzer = app_settings.build_ruby_analyzer(lines)
+                            analyzer = app_settings.build_ruby_analyzer(
+                                lines,
+                                annotate_katakana_with_english=annotate_katakana_with_english,
+                            )
                             auto_check = AutoCheckService(
                                 ruby_analyzer=analyzer,
                                 auto_check_flags=auto_check_flags,

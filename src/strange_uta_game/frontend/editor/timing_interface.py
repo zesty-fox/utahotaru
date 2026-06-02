@@ -5145,7 +5145,9 @@ class EditorInterface(QWidget):
         # AutoCheckService（含 WinRTAnalyzer / LLMRubyAnalyzer）在主线程创建，
         # 确保 WinRT STA apartment 正确；LLM 整首一次发送需传入全部行文本。
         lines = [s.text for s in self._project.sentences]
-        analyzer = app_settings.build_ruby_analyzer(lines)
+        analyzer = app_settings.build_ruby_analyzer(
+            lines, annotate_katakana_with_english=annotate_katakana_with_english
+        )
         llm_apply_user_dict = app_settings.llm_apply_user_dict() if llm_active else True
         auto_check = AutoCheckService(
             ruby_analyzer=analyzer,
@@ -5381,7 +5383,9 @@ class EditorInterface(QWidget):
         )
         # LLM 整首一次发送：传入全部行文本以保留上下文（按行命中缓存）。
         lines = [s.text for s in self._project.sentences]
-        analyzer = app_settings.build_ruby_analyzer(lines)
+        analyzer = app_settings.build_ruby_analyzer(
+            lines, annotate_katakana_with_english=annotate_katakana_with_english
+        )
         llm_apply_user_dict = app_settings.llm_apply_user_dict() if llm_active else True
         auto_check = AutoCheckService(
             ruby_analyzer=analyzer,

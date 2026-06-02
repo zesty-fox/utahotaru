@@ -859,7 +859,9 @@ class RubyInterface(QWidget):
         )
         # LLM 整首一次发送：传入全部行文本以保留上下文（LLM 未激活时忽略）。
         lines = [s.text for s in self._project.sentences] if self._project else []
-        analyzer = app_settings.build_ruby_analyzer(lines)
+        analyzer = app_settings.build_ruby_analyzer(
+            lines, annotate_katakana_with_english=annotate_katakana_with_english
+        )
         return AutoCheckService(
             ruby_analyzer=analyzer,
             auto_check_flags=auto_check_flags,

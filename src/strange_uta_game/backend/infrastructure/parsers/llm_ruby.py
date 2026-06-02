@@ -28,6 +28,8 @@ from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import (
     KanaDistributingAnalyzer,
     RubyAnalyzer,
     RubyResult,
+    is_all_katakana,
+    is_english_reading,
 )
 
 # 平假名读音类型别名：每行是 (surface, reading) 序列
@@ -83,6 +85,14 @@ _OUTPUT_SCHEMA_HINT = (
     '出力フォーマット（JSON のみ）：\n'
     '{"lines":[{"i":0,"tokens":[{"s":"今日","r":"きょう"},{"s":"は","r":"は"}]}]}\n'
     "i は行番号、tokens はその行の分かち書き、s は原文の断片、r は平仮名の読み。"
+)
+
+# 片假名外来语 → 英文标注规则（仅在 annotate_katakana_with_english 开启时追加）
+_ENGLISH_KATAKANA_RULE = (
+    "(5) 英語由来の外来語のカタカナ語（例：ギター→guitar、コンピューター→computer、"
+    "メロディー→melody）は、読み r に元の英単語の綴り（小文字）を入れる。"
+    "英語に対応しないカタカナ（擬音語・和製語・人名など、例：ドキドキ・コタツ）は"
+    "通常どおりカタカナ/平仮名の読みを返し、英語にしないこと。"
 )
 
 
@@ -155,9 +165,16 @@ class LLMRubyError(Exception):
 class LLMRubyClient:
     """LLM 注音 HTTP 客户端（OpenAI 兼容 / Anthropic 原生）。"""
 
-    def __init__(self, config: LLMRubyConfig, proxies: Optional[Dict[str, str]] = None):
+    def __init__(
+        self,
+        config: LLMRubyConfig,
+        proxies: Optional[Dict[str, str]] = None,
+        annotate_english: bool = False,
+    ):
         self._cfg = config
         self._proxies = proxies
+        # 是否要求 LLM 为英语外来语片假名返回英文读音
+        self._annotate_english = annotate_english
 
     # ── 公共 API ──
 
@@ -227,9 +244,11 @@ class LLMRubyClient:
 
     def _build_user_prompt(self, lines: List[str]) -> str:
         numbered = "\n".join(f"{i}: {line}" for i, line in enumerate(lines))
+        english_rule = ("\n" + _ENGLISH_KATAKANA_RULE) if self._annotate_english else ""
         return (
             "次の日本語の歌詞（1曲全体、文脈を保持すること）を行ごとに注音してください。\n"
-            f"{_OUTPUT_SCHEMA_HINT}\n"
+            f"{_OUTPUT_SCHEMA_HINT}"
+            f"{english_rule}\n"
             "歌詞：\n"
             f"{numbered}"
         )
@@ -519,11 +538,15 @@ class LLMRubyAnalyzer(KanaDistributingAnalyzer):
         lines: List[str],
         fallback: RubyAnalyzer,
         proxies: Optional[Dict[str, str]] = None,
+        annotate_katakana_with_english: bool = False,
     ):
         self._cfg = config
         self._lines = list(lines)
         self._fallback = fallback
-        self._client = LLMRubyClient(config, proxies=proxies)
+        self._annotate_katakana_with_english = annotate_katakana_with_english
+        self._client = LLMRubyClient(
+            config, proxies=proxies, annotate_english=annotate_katakana_with_english
+        )
         self._cache: Dict[str, Pairs] = {}
         self._prewarmed = False
         self.llm_failed = False
@@ -564,9 +587,46 @@ class LLMRubyAnalyzer(KanaDistributingAnalyzer):
         self._ensure_prewarmed()
         pairs = self._cache.get(text)
         if pairs is not None:
-            return self._results_from_pairs(pairs)
+            return self._build_results(pairs)
         # 未命中（失败 / 该行被校验丢弃 / 不在原始行集合）→ 回退本地引擎
         return self._fallback.analyze(text)
+
+    def _build_results(self, pairs: Pairs) -> List[RubyResult]:
+        """把 LLM 的 (surface, reading) 序列转为 RubyResult。
+
+        片假名外来语 + 英文读音（且开关开启）→ 整词作为单块 RubyResult（保留英文读音，
+        下游 ``AutoCheckService`` 识别为 ``katakana_english`` 来源，首字承载英文、整词连词）；
+        其余 pair 复用基类 :meth:`_results_from_pairs` 的逐字/逐块假名分配。
+        """
+        results: List[RubyResult] = []
+        pos = 0
+        for surface, reading in pairs:
+            start = pos
+            end = pos + len(surface)
+            if (
+                self._annotate_katakana_with_english
+                and is_all_katakana(surface)
+                and is_english_reading(reading)
+            ):
+                # 片假名外来语：整词单块，保留英文读音（不经过假名分配，避免被丢弃）
+                results.append(
+                    RubyResult(
+                        text=surface, reading=reading.strip(),
+                        start_idx=start, end_idx=end,
+                    )
+                )
+            else:
+                # 复用基类逐 pair 分配，再平移索引到本行内的绝对位置
+                for r in self._results_from_pairs([(surface, reading)]):
+                    results.append(
+                        RubyResult(
+                            text=r.text, reading=r.reading,
+                            start_idx=r.start_idx + start,
+                            end_idx=r.end_idx + start,
+                        )
+                    )
+            pos = end
+        return results
 
     def get_reading(self, text: str) -> str:
         if not text:

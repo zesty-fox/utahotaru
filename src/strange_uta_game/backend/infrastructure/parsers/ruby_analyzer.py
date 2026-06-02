@@ -24,6 +24,26 @@ class RubyResult:
     end_idx: int  # 结束索引
 
 
+def is_all_katakana(text: str) -> bool:
+    """text 非空且全部为片假名（含长音 ー / 中点 ・ / 促音 ッ，码位 0x30A0–0x30FF）。"""
+    if not text:
+        return False
+    return all(0x30A0 <= ord(c) <= 0x30FF for c in text)
+
+
+def is_english_reading(reading: str) -> bool:
+    """reading 是英文读音（ASCII 字母，可含空格 / ' / -），且至少含一个字母。
+
+    用于识别「片假名外来语 → 英文标注」场景（如 ギター→guitar）。
+    """
+    r = (reading or "").strip()
+    if not r:
+        return False
+    if not all(c.isascii() and (c.isalpha() or c in " '-") for c in r):
+        return False
+    return any(c.isalpha() for c in r)
+
+
 class RubyAnalyzer(ABC):
     """注音分析器抽象基类"""
 

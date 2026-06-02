@@ -307,6 +307,99 @@ def test_log_write_and_clear(tmp_path, monkeypatch):
     assert not (tmp_path / "llm_ruby").exists()
 
 
+def test_katakana_english_helpers():
+    from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import (
+        is_all_katakana,
+        is_english_reading,
+    )
+    assert is_all_katakana("ギター")
+    assert is_all_katakana("コンピューター")
+    assert not is_all_katakana("ギターは")  # 含平假名
+    assert not is_all_katakana("")
+    assert is_english_reading("guitar")
+    assert is_english_reading("ice cream")
+    assert not is_english_reading("ぎたー")
+    assert not is_english_reading("")
+
+
+def test_analyzer_emits_katakana_english_block_when_enabled(monkeypatch):
+    """开关开启：片假名外来语 + 英文读音 → 单块保留英文读音。"""
+    cfg = LLMRubyConfig(enabled=True, base_url="http://x", api_key="k", model="m")
+    analyzer = LLMRubyAnalyzer(
+        cfg, lines=["ギター"], fallback=_SelfAnalyzer(),
+        annotate_katakana_with_english=True,
+    )
+    monkeypatch.setattr(
+        analyzer._client, "annotate_lines",
+        lambda lines: ({0: [("ギター", "guitar")]}, None),
+    )
+    results = analyzer.analyze("ギター")
+    assert len(results) == 1
+    assert results[0].text == "ギター"
+    assert results[0].reading == "guitar"
+    assert (results[0].start_idx, results[0].end_idx) == (0, 3)
+
+
+def test_analyzer_ignores_english_when_disabled(monkeypatch):
+    """开关关闭：即便返回英文读音，片假名也按假名逐字处理（英文被丢弃）。"""
+    cfg = LLMRubyConfig(enabled=True, base_url="http://x", api_key="k", model="m")
+    analyzer = LLMRubyAnalyzer(
+        cfg, lines=["ギター"], fallback=_SelfAnalyzer(),
+        annotate_katakana_with_english=False,
+    )
+    monkeypatch.setattr(
+        analyzer._client, "annotate_lines",
+        lambda lines: ({0: [("ギター", "guitar")]}, None),
+    )
+    results = analyzer.analyze("ギター")
+    # 逐字片假名→平假名，reading 中无英文
+    assert "".join(r.reading for r in results) == "ぎたー"
+
+
+def test_prompt_includes_english_rule_only_when_enabled():
+    from strange_uta_game.backend.infrastructure.parsers.llm_ruby import LLMRubyClient
+
+    cfg = LLMRubyConfig(base_url="x", api_key="k", model="m")
+    on = LLMRubyClient(cfg, annotate_english=True)._build_user_prompt(["ギター"])
+    off = LLMRubyClient(cfg, annotate_english=False)._build_user_prompt(["ギター"])
+    assert "guitar" in on  # 规则示例
+    assert "guitar" not in off
+
+
+def test_autocheck_renders_katakana_english_block():
+    """端到端：AutoCheckService 把 ギター/guitar 渲染为首字带英文、整词连词。"""
+    from strange_uta_game.backend.application import AutoCheckService
+    from strange_uta_game.backend.domain import Sentence
+    from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import RubyResult
+
+    class _KataEngAnalyzer:
+        def analyze(self, text):
+            if text == "ギター":
+                return [RubyResult(text="ギター", reading="guitar", start_idx=0, end_idx=3)]
+            return [RubyResult(text=c, reading=c, start_idx=i, end_idx=i + 1)
+                    for i, c in enumerate(text)]
+
+        def get_reading(self, text):
+            return text
+
+    svc = AutoCheckService(
+        _KataEngAnalyzer(),
+        auto_check_flags={"katakana": True},
+        annotate_katakana_with_english=True,
+    )
+    s = Sentence.from_text("ギター", "s1")
+    svc.apply_to_sentence(s)
+    chars = s.characters
+    assert len(chars) == 3
+    # 首字承载英文 ruby，整词连词，后两字无 ruby
+    assert chars[0].ruby is not None
+    assert chars[0].ruby.parts[0].text == "guitar"
+    assert chars[0].check_count == 1
+    assert chars[0].linked_to_next and chars[1].linked_to_next
+    assert chars[1].ruby is None and chars[2].ruby is None
+    assert chars[1].check_count == 0 and chars[2].check_count == 0
+
+
 def test_config_is_complete():
     assert LLMRubyConfig(base_url="a", api_key="b", model="c").is_complete()
     assert not LLMRubyConfig(base_url="", api_key="b", model="c").is_complete()

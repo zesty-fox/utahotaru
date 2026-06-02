@@ -762,11 +762,15 @@ class AppSettings:
         """LLM 注音时是否仍应用用户词典（默认 True）。"""
         return bool(self.get("llm_ruby.apply_user_dict", True))
 
-    def build_ruby_analyzer(self, lines: Optional[list] = None):
+    def build_ruby_analyzer(
+        self, lines: Optional[list] = None, annotate_katakana_with_english: bool = False
+    ):
         """构建注音分析器：LLM 激活时返回 LLMRubyAnalyzer，否则走本地回退链。
 
         Args:
             lines: 整首歌词的行文本列表（LLM 整首一次发送所需）。LLM 未激活时忽略。
+            annotate_katakana_with_english: 开启时让 LLM 为英语外来语片假名返回英文读音
+                （无法对应英文的片假名放弃标注）。LLM 未激活时忽略。
         """
         from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import (
             create_analyzer,
@@ -787,6 +791,7 @@ class AppSettings:
             list(lines or []),
             fallback=create_analyzer(),
             proxies=_resolve_proxies(self),
+            annotate_katakana_with_english=annotate_katakana_with_english,
         )
 
     def load_singer_presets(self) -> list:
