@@ -5112,7 +5112,7 @@ class EditorInterface(QWidget):
     def refresh_lyric_display(self):
         self.preview._update_display()
 
-    def _auto_analyze_rubies(self, only_noruby: bool = False):
+    def _auto_analyze_rubies(self, only_noruby: bool = False, auto_detect_chinese: bool = False):
         """执行注音分析（核心逻辑，供多处复用）。
 
         分析在后台 QThread 中进行，不阻塞 UI。分析结果通过信号回调到主线程，
@@ -5120,27 +5120,21 @@ class EditorInterface(QWidget):
 
         Args:
             only_noruby: True=仅分析未注音字符，False=全部重新分析
+            auto_detect_chinese: True=自动检测纯中文歌词并走中文模式（跳过注音）。
+                仅导入歌词后的自动触发应传 True；用户手动按"注音分析"按钮明确表达了
+                注音意图，应传 False，避免纯汉字日文行被误判为中文。
         """
         if not self._project:
             return
         if getattr(self, "_ruby_analyzing", False):
             return
 
-        from strange_uta_game.backend.application import AutoCheckService
+        from strange_uta_game.backend.application import AutoCheckService, is_chinese_lyrics
         from strange_uta_game.frontend.settings.settings_interface import AppSettings
         from strange_uta_game.frontend.workers import RubyAnalyzeWorker
 
         app_settings = AppSettings()
         llm_active = app_settings.llm_ruby_active()
-
-        # LLM 注音激活时不需要本地日语 IME，跳过 WinRT 安装引导。
-        if not llm_active:
-            from strange_uta_game.frontend.winrt_japanese_guide import (
-                ensure_winrt_japanese,
-            )
-            if not ensure_winrt_japanese(self):
-                return
-
         auto_check_flags = app_settings.get_all().get("auto_check", {})
         user_dict = app_settings.load_effective_dictionary()
         annotate_katakana_with_english = app_settings.get(
@@ -5148,19 +5142,45 @@ class EditorInterface(QWidget):
         )
         delete_types = auto_check_flags.get("delete_ruby_types", [])
 
+        # 中文歌词检测：仅导入歌词的自动触发阶段启用；用户主动触发注音分析时
+        # 视为明确需要注音，不再检测中文（避免纯汉字日文行被误判）。
+        chinese_mode = (
+            auto_detect_chinese
+            and auto_check_flags.get("chinese_lyrics_detection", True)
+            and is_chinese_lyrics("".join(s.text for s in self._project.sentences))
+        )
+
+        # LLM 注音激活时不需要本地日语 IME，跳过 WinRT 安装引导。中文模式同样跳过。
+        if not chinese_mode and not llm_active:
+            from strange_uta_game.frontend.winrt_japanese_guide import (
+                ensure_winrt_japanese,
+            )
+            if not ensure_winrt_japanese(self):
+                return
+
         # AutoCheckService（含 WinRTAnalyzer / LLMRubyAnalyzer）在主线程创建，
         # 确保 WinRT STA apartment 正确；LLM 整首一次发送需传入全部行文本。
-        lines = [s.text for s in self._project.sentences]
-        analyzer = app_settings.build_ruby_analyzer(
-            lines, annotate_katakana_with_english=annotate_katakana_with_english
-        )
-        llm_apply_user_dict = app_settings.llm_apply_user_dict() if llm_active else True
-        auto_check = AutoCheckService(
-            ruby_analyzer=analyzer,
-            auto_check_flags=auto_check_flags,
-            user_dictionary=user_dict,
-            annotate_katakana_with_english=annotate_katakana_with_english,
-        )
+        if chinese_mode:
+            analyzer = None
+            llm_apply_user_dict = True
+            auto_check = AutoCheckService(
+                auto_check_flags=auto_check_flags,
+                user_dictionary=user_dict,
+                annotate_katakana_with_english=annotate_katakana_with_english,
+                chinese_mode=True,
+            )
+        else:
+            lines = [s.text for s in self._project.sentences]
+            analyzer = app_settings.build_ruby_analyzer(
+                lines, annotate_katakana_with_english=annotate_katakana_with_english
+            )
+            llm_apply_user_dict = app_settings.llm_apply_user_dict() if llm_active else True
+            auto_check = AutoCheckService(
+                ruby_analyzer=analyzer,
+                auto_check_flags=auto_check_flags,
+                user_dictionary=user_dict,
+                annotate_katakana_with_english=annotate_katakana_with_english,
+            )
 
         # 在主线程提前快照 before 状态和光标位置（worker 运行期间不能读 self._project）
         before_sentences = deepcopy(self._project.sentences)
@@ -5366,6 +5386,8 @@ class EditorInterface(QWidget):
         llm_active = app_settings.llm_ruby_active()
 
         # LLM 注音激活时不依赖本地日语 IME，跳过 WinRT 检查/引导。
+        # 用户主动触发的按行/按选定字符分析：不做中文检测——按下"注音分析"按钮
+        # 即表示需要注音，避免纯汉字日文行被误判为中文跳过。
         if not llm_active:
             from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import (
                 winrt_japanese_status,

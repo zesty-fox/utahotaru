@@ -577,7 +577,7 @@ class FileLoader:
             if is_nicokara:
                 self._prompt_nicokara_ruby_choice()
             else:
-                self._editor._auto_analyze_rubies(only_noruby=True)
+                self._editor._auto_analyze_rubies(only_noruby=True, auto_detect_chinese=True)
 
         except ValueError as e:
             # SUG 项目文件：直接加载为项目
@@ -663,9 +663,9 @@ class FileLoader:
 
         clicked = msg.clickedButton()
         if clicked is btn_all:
-            self._editor._auto_analyze_rubies(only_noruby=False)
+            self._editor._auto_analyze_rubies(only_noruby=False, auto_detect_chinese=True)
         elif clicked is btn_only_noruby:
-            self._editor._auto_analyze_rubies(only_noruby=True)
+            self._editor._auto_analyze_rubies(only_noruby=True, auto_detect_chinese=True)
         elif clicked is btn_keep:
             self._keep_nicokara_as_imported()
 
