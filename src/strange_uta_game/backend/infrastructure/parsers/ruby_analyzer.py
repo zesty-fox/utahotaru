@@ -22,6 +22,11 @@ class RubyResult:
     reading: str  # 注音（假名）
     start_idx: int  # 起始索引
     end_idx: int  # 结束索引
+    # 所在 morpheme 的全局 span（start, end）—— 分析器一次返回的同一 (surface, reading)
+    # 对里出来的所有 RubyResult 共享同一 morpheme_span。专供下游 Phase 5 用户词典
+    # 「连词组保护」判定，避免单字词条把多字 morpheme 打散（如 日→にち 污染 ある日）。
+    # 单字 morpheme（surface 长度 1）该字段为 (start_idx, end_idx)。
+    morpheme_span: Optional[Tuple[int, int]] = None
 
 
 def is_all_katakana(text: str) -> bool:
@@ -89,6 +94,11 @@ class KanaDistributingAnalyzer(RubyAnalyzer):
         for surface, reading in pairs:
             start = pos
             end = pos + len(surface)
+            # 同一 pair 派生出的所有 RubyResult 共享同一 morpheme_span；
+            # 即便 distribute 拆成多个 block 也保留 pair 边界，下游 Phase 5 用此判定
+            # 连词组完整性（如 ある日 整词读音 あるひ 被拆成 あ/る/日 三段，但 morpheme
+            # 仍是 (0,3)，使单字词条 日→にち 不能覆盖其中的 日）。
+            morpheme_span = (start, end) if end - start > 1 else None
 
             has_kanji = any(self._is_kanji(c) for c in surface)
 
@@ -101,6 +111,7 @@ class KanaDistributingAnalyzer(RubyAnalyzer):
                             reading=self._kata_to_hira(c),
                             start_idx=start + i,
                             end_idx=start + i + 1,
+                            morpheme_span=morpheme_span,
                         )
                     )
             else:
@@ -116,6 +127,7 @@ class KanaDistributingAnalyzer(RubyAnalyzer):
                             reading=block_reading,
                             start_idx=block_start,
                             end_idx=block_end,
+                            morpheme_span=morpheme_span,
                         )
                     )
                     char_offset += len(block_text)

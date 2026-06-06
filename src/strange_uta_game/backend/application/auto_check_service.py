@@ -217,6 +217,12 @@ class AutoCheckResult:
     origin_block_id: int = -1
     # 注音来源："dict"=用户词典, "e2k"=英语词典, "library"=库函数, "self"=原字符, "none"=无注音
     origin_source: str = "none"
+    # 所在 morpheme 的 id（分析器/英文回退给出的语义边界，独立于 block_id）。
+    # 与 origin_block_id 的差别：origin_block_id 在 Step 3 mora 均分后会被清空（-1）；
+    # origin_morpheme_id 永远保留分析器原始 morpheme 边界，专供 Phase 5 用户词典
+    # 「连词组保护」判定，避免单字词条把多字 morpheme 切成两半（如 日→にち 不应
+    # 污染 一日/日々/毎日 等复合词）。单字 morpheme 该字段为 -1。
+    origin_morpheme_id: int = -1
 
 
 class AutoCheckService:
@@ -404,7 +410,8 @@ class AutoCheckService:
                 continue
             overrides.append(
                 RubyResult(
-                    text=word, reading=reading, start_idx=start, end_idx=end
+                    text=word, reading=reading, start_idx=start, end_idx=end,
+                    morpheme_span=(start, end) if end - start > 1 else None,
                 )
             )
             e2k_covered |= span
@@ -458,7 +465,8 @@ class AutoCheckService:
             # 整词 fallback：text == reading，下游 check_counts 覆写完成 cp 分配
             overrides.append(
                 RubyResult(
-                    text=word, reading=word, start_idx=start, end_idx=end
+                    text=word, reading=word, start_idx=start, end_idx=end,
+                    morpheme_span=(start, end) if end - start > 1 else None,
                 )
             )
             covered |= span
@@ -1206,6 +1214,38 @@ class AutoCheckService:
             else:
                 block_source[block_id] = "library"
 
+        # 永久 morpheme 边界（独立于 char_to_block 和 Step 3 mora 均分）：
+        # 用 RubyResult.morpheme_span 登记每个 char 所在的 morpheme 区间 id。
+        # 同一 morpheme 派生出的多个 RubyResult（如 ある日→[(あ,あ),(る,る),(日,ひ)]
+        # 共享 span=(0,3)）会得到同一 morpheme id；单字 morpheme（surface 长度=1，
+        # span=None）不登记，不享受 Phase 5 连词组保护。
+        #
+        # 这与 char_to_block 的差别：char_to_block 只服务渲染连词（会被 Step 3 mora
+        # 均分抹掉、被 clean per-char split 跳过）；char_to_morpheme 始终反映
+        # 分析器/英文回退给出的原始 morpheme 边界，专供 Phase 5 单字词典保护用。
+        char_to_morpheme: Dict[int, int] = {}
+        span_to_id: Dict[Tuple[int, int], int] = {}
+        for result in ruby_results:
+            # 优先用分析器显式给的 morpheme_span（同一 pair 派生出的多 block 共享同一 span）；
+            # 老旧/自定义 analyzer 未设 morpheme_span 时退回 result 自身 span，
+            # 仅对覆盖 > 1 字的 RubyResult 起保护作用。
+            span = result.morpheme_span
+            if span is None:
+                if result.end_idx - result.start_idx > 1:
+                    span = (result.start_idx, result.end_idx)
+                else:
+                    continue
+            mid = span_to_id.get(span)
+            if mid is None:
+                mid = len(span_to_id)
+                span_to_id[span] = mid
+            for idx in range(result.start_idx, result.end_idx):
+                if idx < len(chars):
+                    char_to_morpheme[idx] = mid
+        # 英文 morpheme 边界对齐：e2k/english_fallback 单词整词作为一个 morpheme，
+        # 这里通过 ruby_results 的 start/end 已经覆盖正确。
+        # 多字非汉字 morpheme（罕见，如 katakana_english）也通过 morpheme_span 自然命中。
+
         # 片假名外来语 → 英文标注（仅 LLM 注音会产出「片假名 surface + 英文 reading」）。
         # 整词作为单块：首字承载英文读音、整词连词、节奏点首字=1 其余=0；
         # 须豁免后续的「首尾假名剥离 / 中间假名清理 / 第三步均分」逻辑。
@@ -1551,6 +1591,7 @@ class AutoCheckService:
                     ruby=ruby_list,
                     origin_block_id=block_id,
                     origin_source=source,
+                    origin_morpheme_id=char_to_morpheme.get(i, -1),
                 )
             )
 
@@ -1811,7 +1852,28 @@ class AutoCheckService:
         # 子串严格匹配 sentence 字面文本，不跨 Sentence。
         # apply_user_dict=False 时跳过，由调用方在删除注音后手动调用。
         if apply_user_dict and self._dict:
-            self._apply_user_dictionary_to_sentence(sentence)
+            # 把分析器给出的 morpheme 边界传给 Phase 5，做「连词组保护」判断：
+            # 单字词条（如 日→にち）不应把多字 morpheme（如 一日/日々/毎日）打成两半。
+            morpheme_groups: Dict[int, Tuple[int, int]] = {}
+            for r in results:
+                if r.origin_morpheme_id < 0:
+                    continue
+                idx = r.char_idx
+                grp = morpheme_groups.get(r.origin_morpheme_id)
+                if grp is None:
+                    morpheme_groups[r.origin_morpheme_id] = (idx, idx)
+                else:
+                    morpheme_groups[r.origin_morpheme_id] = (
+                        min(grp[0], idx), max(grp[1], idx),
+                    )
+            # 翻成「char_idx → (group_start, group_end)」便于 Phase 5 O(1) 查
+            char_morpheme_range: Dict[int, Tuple[int, int]] = {}
+            for grp_start, grp_end in morpheme_groups.values():
+                for k in range(grp_start, grp_end + 1):
+                    char_morpheme_range[k] = (grp_start, grp_end)
+            self._apply_user_dictionary_to_sentence(
+                sentence, morpheme_ranges=char_morpheme_range
+            )
 
         if not skip_romanize:
             self._romanize_sentence_ruby(sentence)
@@ -1831,7 +1893,11 @@ class AutoCheckService:
                 changed += 1
         return changed
 
-    def _apply_user_dictionary_to_sentence(self, sentence: Sentence) -> None:
+    def _apply_user_dictionary_to_sentence(
+        self,
+        sentence: Sentence,
+        morpheme_ranges: Optional[Dict[int, Tuple[int, int]]] = None,
+    ) -> None:
         """Phase 5：把用户词典以子串严格匹配方式覆盖到 sentence.characters 上。
 
         语义：
@@ -1845,6 +1911,14 @@ class AutoCheckService:
             sentence_end_ts / is_rest`` 等字段全部保留；
           - 同一 annotated block 内相邻字符设 ``linked_to_next=True``，
             block 末字符 / 块外字符（无 ruby 段）设 ``linked_to_next=False``。
+
+        Args:
+            sentence: 目标句子。
+            morpheme_ranges: 可选「char_idx → (group_start, group_end)」映射，
+                给出分析器/英文回退原始 morpheme 边界。给定时 Phase 5 用它判定
+                「单字词条切碎多字 morpheme」并跳过该命中（如 日→にち 不污染
+                一日/日々/毎日）。未给时退回旧逻辑（用 linked_to_next 推断
+                连词组，对 Step 3 之后的 fallback 块/clean per-char split 失灵）。
         """
         chars = sentence.characters
         if not chars:
@@ -1921,9 +1995,20 @@ class AutoCheckService:
                 # 此时单字词典条目 "光→ひかり" 不应覆盖 "光" 的读音，因为
                 # "光" 此处作为复合词成员，其读音仅在复合词上下文中成立。
                 # 仅当词典条目恰好覆盖了连词组的完整范围时才允许覆盖。
+                #
+                # 优先用 morpheme_ranges（分析器原始 morpheme 边界，独立于 Step 3
+                # mora 均分和 char_to_block）；未给时退回 linked_to_next 推断
+                # （旧逻辑，对 Step 3 抹掉 block_id 后的 fallback 块、以及
+                # clean per-char split 失灵 —— 参见 一日/日々 与 日→にち 的冲突案例）。
                 # ----------------------------------------------------------
                 def _linked_group_range(pos: int) -> tuple:
                     """返回 pos 所在连词组的 [start, end] 闭区间。"""
+                    if morpheme_ranges is not None:
+                        rng = morpheme_ranges.get(pos)
+                        if rng is not None:
+                            return rng
+                        # 不在任何多字 morpheme 里 → 单字组（自身一格）
+                        return (pos, pos)
                     s = pos
                     while s > 0 and chars[s - 1].linked_to_next:
                         s -= 1
