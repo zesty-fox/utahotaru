@@ -142,7 +142,7 @@ git push origin main --tags
 
 ### 4. 在 GitHub Web 创建 Release
 
-打开 <https://github.com/Xuan-cc/StrangeUtaGame/releases/new>：
+打开 <https://github.com/karaoke-studio/StrangeUtaGame/releases/new>：
 
 * **Tag** 选择 `SUGv0.3.3`（刚刚推上去的）
 * **Release title** 写 `v0.3.3`
@@ -368,7 +368,7 @@ Updater.exe (独立控制台进程, 标准库 + requests, 12 MB)
 | `ghproxy`  | `https://mirror.ghproxy.com/https://github.com/{O}/{R}/releases/download/{tag}/{file}` |
 | `fastgit`  | `https://download.fastgit.org/{O}/{R}/releases/download/{tag}/{file}`   |
 
-（`{O}` = `Xuan-cc`，`{R}` = `StrangeUtaGame`）
+（`{O}` = `karaoke-studio`，`{R}` = `StrangeUtaGame`）
 
 镜像 API（`api.github.com` 的代理）也走同一排序：
 

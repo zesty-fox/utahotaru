@@ -29,7 +29,7 @@ DOWNLOAD_RETRY_COUNT = 3
 DOWNLOAD_RETRY_INTERVAL = 2.0
 
 UA = (
-    "StrangeUtaGame-Updater/{ver} (+https://github.com/Xuan-cc/StrangeUtaGame)"
+    "StrangeUtaGame-Updater/{ver} (+https://github.com/karaoke-studio/StrangeUtaGame)"
 )
 
 

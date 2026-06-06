@@ -30,7 +30,7 @@ VARIANT = ""  # "" | "noWinIME" | "mac"
 TAG_PREFIX = "SUGv"
 
 # 仓库标识：用于构造 GitHub / 镜像下载 URL。
-REPO_OWNER = "Xuan-cc"
+REPO_OWNER = "karaoke-studio"
 REPO_NAME = "StrangeUtaGame"
 
 

@@ -125,7 +125,7 @@ StrangeUtaGame/
 
 ```bash
 # 克隆仓库
-git clone https://github.com/Xuan-cc/StrangeUtaGame.git
+git clone https://github.com/karaoke-studio/StrangeUtaGame.git
 cd StrangeUtaGame
 
 # 创建虚拟环境（推荐）
@@ -468,7 +468,7 @@ pyinstaller --noconfirm --onedir --windowed \
 
 | 项目 | 信息 |
 |------|------|
-| **GitHub** | https://github.com/Xuan-cc/StrangeUtaGame |
+| **GitHub** | https://github.com/karaoke-studio/StrangeUtaGame |
 | **许可证** | GPL-3.0 License |
 | **作者** | Xuan-cc |
 | **版本** | v0.3.0 |

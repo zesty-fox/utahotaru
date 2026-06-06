@@ -22,14 +22,14 @@
 </p>
 
 <p>
-  <a href="https://github.com/Xuan-cc/StrangeUtaGame/releases">
-    <img src="https://img.shields.io/github/v/release/Xuan-cc/StrangeUtaGame?style=for-the-badge&logo=github&color=B388FF&labelColor=2D1B4E&label=Release" alt="Release" />
+  <a href="https://github.com/karaoke-studio/StrangeUtaGame/releases">
+    <img src="https://img.shields.io/github/v/release/karaoke-studio/StrangeUtaGame?style=for-the-badge&logo=github&color=B388FF&labelColor=2D1B4E&label=Release" alt="Release" />
   </a>
-  <a href="https://github.com/Xuan-cc/StrangeUtaGame/stargazers">
-    <img src="https://img.shields.io/github/stars/Xuan-cc/StrangeUtaGame?style=for-the-badge&logo=starship&color=F48FB1&labelColor=2D1B4E&label=Stars" alt="Stars" />
+  <a href="https://github.com/karaoke-studio/StrangeUtaGame/stargazers">
+    <img src="https://img.shields.io/github/stars/karaoke-studio/StrangeUtaGame?style=for-the-badge&logo=starship&color=F48FB1&labelColor=2D1B4E&label=Stars" alt="Stars" />
   </a>
-  <a href="https://github.com/Xuan-cc/StrangeUtaGame/issues">
-    <img src="https://img.shields.io/github/issues/Xuan-cc/StrangeUtaGame?style=for-the-badge&logo=githubactions&logoColor=white&color=9575CD&labelColor=2D1B4E&label=Issues" alt="Issues" />
+  <a href="https://github.com/karaoke-studio/StrangeUtaGame/issues">
+    <img src="https://img.shields.io/github/issues/karaoke-studio/StrangeUtaGame?style=for-the-badge&logo=githubactions&logoColor=white&color=9575CD&labelColor=2D1B4E&label=Issues" alt="Issues" />
   </a>
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-7E57C2?style=for-the-badge&logo=windows&labelColor=2D1B4E" alt="Platform" />
   <img src="https://img.shields.io/badge/Python-3.13+-B388FF?style=for-the-badge&logo=python&logoColor=white&labelColor=2D1B4E" alt="Python" />
@@ -49,7 +49,7 @@
 
 <br/><br/>
 
-<a href="https://github.com/Xuan-cc/StrangeUtaGame">
+<a href="https://github.com/karaoke-studio/StrangeUtaGame">
   <img src="assets/click-star.gif" alt="点个 Star ⭐ / Give it a Star" height="48" />
 </a>
 
@@ -251,8 +251,8 @@
 
 ### 🚀 方式一 · 直接运行（推荐） / Pre-built release (recommended)
 
-从 [Releases](https://github.com/Xuan-cc/StrangeUtaGame/releases) 页面下载最新版本，解压后双击 `StrangeUtaGame.exe` 即可。  
-Download the latest archive from the [Releases](https://github.com/Xuan-cc/StrangeUtaGame/releases) page, unzip, then run `StrangeUtaGame.exe`.
+从 [Releases](https://github.com/karaoke-studio/StrangeUtaGame/releases) 页面下载最新版本，解压后双击 `StrangeUtaGame.exe` 即可。  
+Download the latest archive from the [Releases](https://github.com/karaoke-studio/StrangeUtaGame/releases) page, unzip, then run `StrangeUtaGame.exe`.
 
 <sub>📦 体积参考 / Approx. size: <b>~250 MB</b></sub>
 
@@ -262,7 +262,7 @@ Download the latest archive from the [Releases](https://github.com/Xuan-cc/Stran
 
 ```bash
 # 克隆仓库 / Clone
-git clone https://github.com/Xuan-cc/StrangeUtaGame.git
+git clone https://github.com/karaoke-studio/StrangeUtaGame.git
 cd StrangeUtaGame
 
 # 创建虚拟环境（推荐） / Create a virtualenv (recommended)
@@ -651,7 +651,7 @@ We welcome contributions of all kinds.
 
 1. 复现步骤、日志、系统版本  
 2. 附带 `logs/latest.log`（如有）  
-3. 在 [Issues](https://github.com/Xuan-cc/StrangeUtaGame/issues) 提交
+3. 在 [Issues](https://github.com/karaoke-studio/StrangeUtaGame/issues) 提交
 
 </td>
 <td width="50%" valign="top">
@@ -787,7 +787,7 @@ Under <b>Settings → Network</b> you can switch dictionary sources (<b>Rhythmic
 Released under the [**GNU General Public License v3.0**](LICENSE).
 
 ```
-Copyright (C) 2026 Xuan-cc and contributors
+Copyright (C) 2026 karaoke-studio and contributors
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -810,14 +810,14 @@ General Public License for more details.
 
 <br/>
 
-<a href="https://github.com/Xuan-cc/StrangeUtaGame">
+<a href="https://github.com/karaoke-studio/StrangeUtaGame">
   <img src="assets/click-star.gif" alt="点个 Star ⭐ / Give it a Star" height="42" />
 </a>
 
 <br/>
 
 <sub>
-  Made with 💜 by <b>Xuan-cc</b> &nbsp;·&nbsp;
+  Made with 💜 by <b>karaoke-studio</b> &nbsp;·&nbsp;
   Powered by <code>Python</code> + <code>PyQt6</code> + <code>BASS</code>
 </sub>
 

@@ -15,7 +15,7 @@ def _fake_payload():
         "tag_name": "SUGv0.3.3",
         "name": "v0.3.3",
         "body": "## What's new\n- A\n- B",
-        "html_url": "https://github.com/Xuan-cc/StrangeUtaGame/releases/tag/SUGv0.3.3",
+        "html_url": "https://github.com/karaoke-studio/StrangeUtaGame/releases/tag/SUGv0.3.3",
         "prerelease": False,
         "published_at": "2026-05-16T12:00:00Z",
         "assets": [

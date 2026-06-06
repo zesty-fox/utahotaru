@@ -33,7 +33,7 @@ class AboutSubInterface(SubSettingInterface):
         self.about_group.addSettingCard(about_card)
 
         link_card = SettingCard(FIF.GITHUB, "GitHub",
-            "https://github.com/Xuan-cc/StrangeUtaGame", self.about_group)
+            "https://github.com/karaoke-studio/StrangeUtaGame", self.about_group)
         self.about_group.addSettingCard(link_card)
 
         self._path_card = SettingCard(FIF.FOLDER, "配置文件位置", "（未加载）", self.about_group)

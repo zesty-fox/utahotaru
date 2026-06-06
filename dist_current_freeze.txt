@@ -141,7 +141,7 @@ soupsieve==2.8.3
 SpeechRecognition==3.16.0
 standard-aifc==3.13.0
 standard-chunk==3.13.0
--e git+https://github.com/Xuan-cc/StrangeUtaGame.git@e0f3846a50c71b7c8a79778d4866ae0ad2c381af#egg=strange_uta_game
+-e git+https://github.com/karaoke-studio/StrangeUtaGame.git@e0f3846a50c71b7c8a79778d4866ae0ad2c381af#egg=strange_uta_game
 SudachiDict-core==20260116
 SudachiPy==0.6.11
 sympy==1.14.0
