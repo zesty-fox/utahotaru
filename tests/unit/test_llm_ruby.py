@@ -9,6 +9,7 @@ import pytest
 from strange_uta_game.backend.infrastructure.parsers.llm_ruby import (
     LLMRubyAnalyzer,
     LLMRubyConfig,
+    _annotated_to_pairs,
     _coerce_json,
     _extract_content,
     _parse_payload,
@@ -90,6 +91,89 @@ def test_parse_payload_array_length_mismatch_degrades_to_string():
         '[{"s":"毎日","r":["まいにち"]}]}]}'
     )
     assert _parse_payload(text, ["毎日"]) == {0: [("毎日", "まいにち")]}
+
+
+# ── annotated 形式（PR4 主路径） ──
+
+
+def test_annotated_to_pairs_mixed_block_and_bare():
+    """`{今日||きょう,}は{毎日||まい,にち}` → 块用 Pairs，块外裸字符逐字。"""
+    pairs, raw = _annotated_to_pairs("{今日||きょう,}は{毎日||まい,にち}")
+    assert raw == "今日は毎日"
+    assert pairs == [
+        ("今日", "きょう"),       # 尾随空读音 → 拼成字符串走整块分配
+        ("は", "は"),
+        ("毎日", ["まい", "にち"]),  # 全非空 → 数组形
+    ]
+
+
+def test_annotated_to_pairs_mora_within_char_concatenates():
+    """字内 mora `|` 仅作为分隔提示，下游按字读音处理 → 拼成单串。"""
+    pairs, raw = _annotated_to_pairs("{大冒険||だ|い,ぼ|う,け|ん}")
+    assert raw == "大冒険"
+    assert pairs == [("大冒険", ["だい", "ぼう", "けん"])]
+
+
+def test_annotated_to_pairs_short_form():
+    """短形：`{赤|あか}` / `{愛|あ|い}`。"""
+    pairs, _ = _annotated_to_pairs("{赤|あか}")
+    assert pairs == [("赤", "あか")]
+    pairs, _ = _annotated_to_pairs("{愛|あ|い}")
+    assert pairs == [("愛", "あい")]
+
+
+def test_annotated_to_pairs_empty_block_no_ruby():
+    """`{text}` 无 ruby → 每字自注音。"""
+    pairs, raw = _annotated_to_pairs("{abc}")
+    assert raw == "abc"
+    assert pairs == [("a", "a"), ("b", "b"), ("c", "c")]
+
+
+def test_annotated_to_pairs_unclosed_brace_falls_through():
+    """未闭合 `{` → 当普通字符，不抛异常。"""
+    pairs, raw = _annotated_to_pairs("ab{cd")
+    assert raw == "ab{cd"
+
+
+def test_parse_payload_annotated_form():
+    """LLM 主路径：`text` 字段含 annotated 文本。"""
+    payload = (
+        '{"lines":[{"i":0,"text":"{今日||きょう,}は{毎日||まい,にち}"}]}'
+    )
+    assert _parse_payload(payload, ["今日は毎日"]) == {
+        0: [
+            ("今日", "きょう"),
+            ("は", "は"),
+            ("毎日", ["まい", "にち"]),
+        ]
+    }
+
+
+def test_parse_payload_annotated_mismatch_dropped():
+    """剥离 `{...}` 后 ≠ 原行 → 整行丢弃，由调用方按行回退。"""
+    payload = '{"lines":[{"i":0,"text":"{今日||きょう,}"}]}'  # raw=今日 != 今日は
+    assert _parse_payload(payload, ["今日は"]) == {}
+
+
+def test_parse_payload_prefers_text_over_tokens():
+    """同时给 text 和 tokens → 优先 text（推荐路径）。"""
+    payload = (
+        '{"lines":[{"i":0,'
+        '"text":"{毎日||まい,にち}",'
+        '"tokens":[{"s":"毎日","r":"まいひ"}]}]}'  # 错误读音的旧字段
+    )
+    result = _parse_payload(payload, ["毎日"])
+    assert result == {0: [("毎日", ["まい", "にち"])]}
+
+
+def test_parse_payload_falls_back_to_tokens_when_no_text():
+    """缺 text 时回退旧 tokens 格式（兼容历史 LLM 客户端）。"""
+    payload = (
+        '{"lines":[{"i":0,"tokens":[{"s":"今日","r":"きょう"},{"s":"は","r":"は"}]}]}'
+    )
+    assert _parse_payload(payload, ["今日は"]) == {
+        0: [("今日", "きょう"), ("は", "は")]
+    }
 
 
 def test_parse_payload_array_non_string_element_degrades():

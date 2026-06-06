@@ -76,10 +76,12 @@ def clear_llm_logs() -> None:
 
 _SYSTEM_PROMPT = (
     "あなたは日本語の注音（ふりがな）エンジンです。"
-    "与えられた歌詞を行ごとに分かち書きし、各トークンに平仮名の読みを付けます。"
-    "規則：(1) 漢字を含むトークンの読みは平仮名で。"
-    "(2) 仮名・記号・英数字のトークンの読みは原文そのまま。"
-    "(3) 各行のトークンの surface を連結すると元の行と完全に一致すること。"
+    "与えられた歌詞を行ごとに、漢字を含むまとまりに ``{原文||読み}`` の形式で"
+    "ふりがなを付け、注音済みの行テキストを返します。"
+    "規則："
+    "(1) 漢字を含む語/形態素を ``{原文||読み}`` で囲む。読みは平仮名のみ。"
+    "(2) 仮名・記号・英数字（ふりがな不要なもの）は ``{}`` で囲まず原文そのまま。"
+    "(3) ``{}`` を取り除いた行テキストは元の行と完全に一致すること（文字を増減しない）。"
     "(4) JSON のみを出力し、説明文を一切付けないこと。"
     "(5) 入力は日本語の歌詞である。標準的・一般的な複合語読みを優先し、"
     "一字一字を独立した訓読みで切ってはいけない。例：「毎日」→ まいにち（×まいひ）、"
@@ -88,15 +90,19 @@ _SYSTEM_PROMPT = (
 
 _OUTPUT_SCHEMA_HINT = (
     '出力フォーマット（JSON のみ）：\n'
-    '{"lines":[{"i":0,"tokens":[{"s":"今日","r":"きょう"},{"s":"は","r":"は"},'
-    '{"s":"毎日","r":["まい","にち"]}]}]}\n'
-    "i は行番号、tokens はその行の分かち書き、s は原文の断片、r は読み。\n"
-    "r は次の二形式を許容：\n"
-    "- 文字列：トークン全体の読み（複合語読みなど、文字単位の分割は下流に任せる）。\n"
-    "- 文字列配列：s の各文字に対応する読みを順番通り。配列長は len(s) と完全一致。"
-    "空文字列 \"\" は「その文字に独立した読みなく、前の文字と連結（送り仮名/長母音/促音等）」を表す。\n"
-    "確信のある単字単位の読みは配列で返すと、下流が文字単位の節奏点配置を尊重する。"
-    "確信できない場合は文字列で返し、下流の分配に任せる。"
+    '{"lines":[{"i":0,"text":"{今日||きょう,}は{毎日||まい,にち}"}]}\n'
+    "i は行番号、text はその行の注音済み inline annotated 形式。\n"
+    "annotated 文法（プロジェクト共通の内部形式）：\n"
+    "- ``{原文||読み区}`` —— 漢字を含むまとまり一つを一ブロックで表す。\n"
+    "- 読み区は ``,`` で字ごとの読みを区切る（原文の文字数と一致させる）。\n"
+    "- 末尾 ``,`` ＋空読み = その字は前字と連結（送り仮名/連声/長音）。\n"
+    "  例：「今日（きょう、2 字）」→ ``{今日||きょう,}``。\n"
+    "- 字ごとに独立した読みが分かれば配列風に並べる。\n"
+    "  例：「毎日」→ ``{毎日||まい,にち}``、「逆光」→ ``{逆光||ぎゃっ,こう}``。\n"
+    "- ブロック外は ``{}`` を付けず原文のまま（仮名/記号/英数字）。\n"
+    "  例：「今日は毎日」→ ``{今日||きょう,}は{毎日||まい,にち}``。\n"
+    "- 連続する漢字でも複合語が確信できなければ字単位に分けず一ブロックで囲んでよい。\n"
+    "確信できる字単位の読みを ``,`` で並べると、下流が節奏点を正しく配置する。"
 )
 
 # 片假名外来语 → 英文标注规则（仅在 annotate_katakana_with_english 开启时追加）
@@ -498,14 +504,124 @@ def _coerce_json(text: str) -> dict:
     return json.loads(s)
 
 
+def _annotated_to_pairs(text: str) -> Tuple[Pairs, str]:
+    """把 inline annotated 形式（``{原文||读音区}は{...}``）解析为 ``(pairs, raw_text)``。
+
+    ``raw_text`` 是剥离所有 ``{...}`` 标注后的纯原文，供调用方校验是否等于行文本。
+
+    annotated 文法（与 ``annotated_text.parse_annotated_line`` 兼容子集）：
+    - ``{原文||读音1,读音2,...}`` —— 多字块；读音以 ``,`` 分字，``|`` 分 mora。
+    - ``{原文|读音}`` —— 单字简短形（缺省 ``||``）。
+    - ``{原文}`` —— 无 ruby 块（等价于纯文本）。
+    - 块外字符按原样输出。
+
+    Pairs 编码：
+    - 多字块：所有字读音非空 → ``(原文, [r1, r2, ...])`` 数组形；
+      含尾随空读音 → ``(原文, "".join(读音))`` 字符串形（首字承载、其余连词）。
+    - 单字块：``(原文, 读音)`` 字符串形。
+    - 块外字符：每字 ``(c, c)`` 自注音。
+
+    解析失败（未闭合 ``{``、读音段数不符等）会原样吃掉异常 token 并尽量恢复；
+    最终 ``raw_text`` 与原行不符时调用方应丢弃该行。
+    """
+    pairs: Pairs = []
+    raw_chars: List[str] = []
+    i = 0
+    n = len(text)
+    while i < n:
+        if text[i] == "{":
+            close = text.find("}", i)
+            if close == -1:
+                # 未闭合 → 当普通字符
+                raw_chars.append(text[i])
+                pairs.append((text[i], text[i]))
+                i += 1
+                continue
+            content = text[i + 1 : close]
+            if "||" in content:
+                text_part, readings_part = content.split("||", 1)
+                if not text_part:
+                    # 空原文 → 跳过
+                    i = close + 1
+                    continue
+                per_char_raw = readings_part.split(",")
+                # 字内 mora 分隔 "|" → 拼成单串（mora 边界下游处理）
+                per_char_clean = [
+                    "".join(seg for seg in r.split("|") if seg) for r in per_char_raw
+                ]
+                raw_chars.extend(text_part)
+                if len(per_char_clean) == len(text_part) and all(per_char_clean):
+                    # 干净逐字 → 数组形
+                    pairs.append((text_part, list(per_char_clean)))
+                elif len(text_part) == 1:
+                    pairs.append((text_part, per_char_clean[0] if per_char_clean else text_part))
+                else:
+                    # 含尾随空 / 段数不符 → 拼成字符串走整块分配
+                    pairs.append((text_part, "".join(per_char_clean) or text_part))
+            elif "|" in content:
+                # 兼容短形：{原文|读音}
+                text_part, _, reading_part = content.partition("|")
+                if not text_part:
+                    i = close + 1
+                    continue
+                reading = "".join(seg for seg in reading_part.split("|") if seg)
+                raw_chars.extend(text_part)
+                if len(text_part) == 1:
+                    pairs.append((text_part, reading or text_part))
+                else:
+                    pairs.append((text_part, reading or text_part))
+            else:
+                # {原文} 无读音 → 每字自注音
+                for c in content:
+                    raw_chars.append(c)
+                    pairs.append((c, c))
+            i = close + 1
+        else:
+            raw_chars.append(text[i])
+            pairs.append((text[i], text[i]))
+            i += 1
+    return pairs, "".join(raw_chars)
+
+
+def _legacy_tokens_to_pairs(tokens: list, line: str) -> Optional[Pairs]:
+    """旧 ``tokens: [{s, r}]`` 格式 → Pairs。返回 None 表示 surface 拼接 ≠ 原行。"""
+    pairs: Pairs = []
+    for tok in tokens:
+        if not isinstance(tok, dict):
+            continue
+        s = tok.get("s", "")
+        r = tok.get("r", "")
+        if not isinstance(s, str) or not s:
+            continue
+        reading: Reading
+        if isinstance(r, list):
+            if len(r) == len(s) and all(isinstance(x, str) for x in r):
+                reading = list(r)
+            else:
+                joined = "".join(x for x in r if isinstance(x, str))
+                reading = joined or s
+        elif isinstance(r, str):
+            reading = r or s
+        else:
+            continue
+        pairs.append((s, reading))
+    if "".join(s for s, _ in pairs) != line:
+        return None
+    return pairs
+
+
 def _parse_payload(text: str, lines: List[str]) -> Dict[int, Pairs]:
     """把模型输出解析为 ``{line_idx: pairs}``。
 
-    校验：
-    - 每行 tokens 的 surface 连接需与原行完全一致，否则丢弃该行（调用方回退）；
-    - r 可为字符串或字符串数组；数组形态要求 ``len(r) == len(s)``，
-      非字符串元素 / 长度不符 → 该 token 的 r 退化为字符串拼接（空串组合时
-      退到 surface 自注音）。
+    支持两种 line 内容字段（优先 ``text``，缺失时回退 ``tokens``）：
+
+    1. ``text`` —— 项目 inline annotated 形式（推荐）。例：
+       ``{今日||きょう,}は{毎日||まい,にち}``。
+       校验：剥离 ``{...}`` 标注后等于原行；否则该行丢弃，由调用方回退本地引擎。
+
+    2. ``tokens`` —— 旧分词形式（兼容历史 LLM 客户端）。
+       ``[{"s":"今日","r":"きょう"},...]``，r 可为字符串或与 s 等长的字符串数组。
+       校验：所有 s 拼接等于原行；否则丢弃。
     """
     obj = _coerce_json(text)
     raw_lines = obj.get("lines")
@@ -519,38 +635,21 @@ def _parse_payload(text: str, lines: List[str]) -> Dict[int, Pairs]:
         idx = entry.get("i")
         if not isinstance(idx, int) or not (0 <= idx < len(lines)):
             continue
-        tokens = entry.get("tokens")
-        if not isinstance(tokens, list):
+        line = lines[idx]
+        # 优先 annotated text 形式
+        text_field = entry.get("text")
+        if isinstance(text_field, str) and text_field:
+            pairs, raw_text = _annotated_to_pairs(text_field)
+            if raw_text == line:
+                mapping[idx] = pairs
+            # 不一致 → 丢弃该行，调用方按行回退
             continue
-        pairs: Pairs = []
-        for tok in tokens:
-            if not isinstance(tok, dict):
-                continue
-            s = tok.get("s", "")
-            r = tok.get("r", "")
-            if not isinstance(s, str) or not s:
-                continue
-            # r 校验：字符串 → 原样接受；数组 → 长度匹配且元素皆为字符串才采纳，
-            # 否则降级为字符串拼接（数组中夹杂非串/长度不符时丢弃数组形态）。
-            reading: Reading
-            if isinstance(r, list):
-                if (
-                    len(r) == len(s)
-                    and all(isinstance(x, str) for x in r)
-                ):
-                    reading = list(r)
-                else:
-                    joined = "".join(x for x in r if isinstance(x, str))
-                    reading = joined or s
-            elif isinstance(r, str):
-                reading = r or s
-            else:
-                continue
-            pairs.append((s, reading))
-        # 校验：surface 连接 == 原行
-        if "".join(s for s, _ in pairs) != lines[idx]:
-            continue  # 该行丢弃，由调用方回退
-        mapping[idx] = pairs
+        # 回退旧 tokens 形式
+        tokens = entry.get("tokens")
+        if isinstance(tokens, list):
+            pairs_opt = _legacy_tokens_to_pairs(tokens, line)
+            if pairs_opt is not None:
+                mapping[idx] = pairs_opt
     return mapping
 
 
