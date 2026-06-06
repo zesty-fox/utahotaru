@@ -484,17 +484,19 @@ class MainWindow(MSFluentWindow):
         from strange_uta_game.frontend.settings.app_settings import AppSettings
 
         extras = SugProjectParser.load_extras(file_path)
-        if not extras:
-            return
+        # extras 可能为空（旧版 sug 无 extras 字段），但仍需重置 nicokara_tags，
+        # 否则上一个项目残留的 tags 会在保存时回写到当前 sug，造成跨项目污染。
 
+        # nicokara_tags：始终覆盖到 AppSettings；sug 内缺失则 reset 为默认值
         nicokara_tags = extras.get("nicokara_tags")
-        if nicokara_tags:
-            try:
-                settings = AppSettings()
-                settings.set("nicokara_tags", nicokara_tags)
-                settings.save()
-            except Exception:
-                pass
+        if nicokara_tags is None:
+            nicokara_tags = AppSettings.DEFAULT_SETTINGS.get("nicokara_tags", {})
+        try:
+            settings = AppSettings()
+            settings.set("nicokara_tags", nicokara_tags)
+            settings.save()
+        except Exception:
+            pass
 
         media_path = extras.get("media_path", "")
         if not media_path:
@@ -665,9 +667,13 @@ class MainWindow(MSFluentWindow):
         msg.exec()
         clicked = msg.clickedButton()
         if clicked is btn_yes:
-            project = ProjectStore.load_crash_recovery()
-            if project:
+            recovered = ProjectStore.load_crash_recovery()
+            if recovered:
+                project, temp_path = recovered
                 self._store.load_project(project)
+                # 从 .sug.temp 回灌 nicokara_tags / media_path 到 AppSettings 与 store。
+                # 不把 temp_path 当 save_path，以免用户误存到 .cache。
+                self._apply_project_extras(temp_path)
                 self.switchTo(self.editorInterface)
                 InfoBar.success(
                     title="恢复成功",

@@ -396,18 +396,19 @@ class FileLoader:
         )
 
         extras = SugProjectParser.load_extras(file_path)
-        if not extras:
-            return
+        # extras 可能为空（旧版 sug 无 extras 字段），但仍需重置 nicokara_tags，
+        # 否则上一个项目残留的 tags 会在保存时回写到当前 sug，造成跨项目污染。
 
-        # 应用 nicokara_tags 到 AppSettings
+        # nicokara_tags：始终覆盖到 AppSettings；sug 内缺失则 reset 为默认值
         nicokara_tags = extras.get("nicokara_tags")
-        if nicokara_tags:
-            try:
-                settings = AppSettings()
-                settings.set("nicokara_tags", nicokara_tags)
-                settings.save()
-            except Exception:
-                pass
+        if nicokara_tags is None:
+            nicokara_tags = AppSettings.DEFAULT_SETTINGS.get("nicokara_tags", {})
+        try:
+            settings = AppSettings()
+            settings.set("nicokara_tags", nicokara_tags)
+            settings.save()
+        except Exception:
+            pass
 
         # 加载媒体文件
         media_path = extras.get("media_path", "")
@@ -435,6 +436,22 @@ class FileLoader:
             self._load_video_as_audio(media_path)
         else:
             self._editor.load_audio(media_path)
+
+    def _apply_nicokara_tags_from_data(self, data: dict) -> None:
+        """从已解析的 SUG dict 同步 nicokara_tags 到 AppSettings。
+
+        与 _apply_project_extras 中的应用逻辑保持一致：缺失字段时 reset 为默认值，
+        避免上一个项目残留的 tags 污染当前 sug。剪贴板粘贴等无文件路径的入口使用。
+        """
+        nicokara_tags = data.get("nicokara_tags")
+        if nicokara_tags is None:
+            nicokara_tags = AppSettings.DEFAULT_SETTINGS.get("nicokara_tags", {})
+        try:
+            settings = AppSettings()
+            settings.set("nicokara_tags", nicokara_tags)
+            settings.save()
+        except Exception:
+            pass
 
     def _on_project_load_error(self, error_msg: str) -> None:
         """项目加载失败的回调"""
@@ -629,6 +646,10 @@ class FileLoader:
                 self._store.load_project(project)
             else:
                 self._editor.set_project(project)
+
+            # 同步 SUG 中的 nicokara_tags 到 AppSettings（无字段则重置为默认）。
+            # 与磁盘加载路径 _apply_project_extras 行为一致，避免跨项目污染。
+            self._apply_nicokara_tags_from_data(data)
 
             InfoBar.success(
                 title="项目已加载", content="从剪贴板加载了 SUG 项目（保存时需选择路径）",

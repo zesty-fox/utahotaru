@@ -515,20 +515,25 @@ class ProjectStore(QObject):
         return _untitled_temp_path().exists() or any(cache_dir.glob(".*.sug.temp"))
 
     @staticmethod
-    def load_crash_recovery() -> Optional[Project]:
-        """加载闪退恢复文件（优先加载未命名项目的恢复文件）。"""
+    def load_crash_recovery() -> Optional[tuple[Project, str]]:
+        """加载闪退恢复文件（优先加载未命名项目的恢复文件）。
+
+        Returns:
+            (project, temp_file_path) — temp_file_path 是 .sug.temp 实际文件路径，
+            调用方可借此读取 nicokara_tags / media_path 等 extras。失败时返回 None。
+        """
         # 优先检查未命名项目的恢复文件
         untitled_temp = _untitled_temp_path()
         if untitled_temp.exists():
             try:
-                return SugProjectParser.load(str(untitled_temp))
+                return SugProjectParser.load(str(untitled_temp)), str(untitled_temp)
             except Exception:
                 pass
-        
+
         # 检查其他项目的恢复文件
         for temp_file in _cache_dir().glob(".*.sug.temp"):
             try:
-                return SugProjectParser.load(str(temp_file))
+                return SugProjectParser.load(str(temp_file)), str(temp_file)
             except Exception:
                 continue
         return None
