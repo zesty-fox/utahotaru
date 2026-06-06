@@ -18,6 +18,7 @@ from PyQt6.QtGui import (
     QFontMetrics,
     QMouseEvent,
     QPainter,
+    QPainterPath,
     QPaintEvent,
     QPen,
 )
@@ -266,7 +267,7 @@ class KaraokePreview(QWidget):
         self._font_current = QFont("Microsoft YaHei", 22, QFont.Weight.Bold)
         self._font_context = QFont("Microsoft YaHei", 18)
         self._font_ruby = QFont("Microsoft YaHei", 10)
-        self._font_checkpoint = QFont("Microsoft YaHei", 8)
+        self._font_checkpoint = self._build_checkpoint_font(8)
         self._font_line_number = QFont("Microsoft YaHei", 10)
         self._fm_current = QFontMetrics(self._font_current)
         self._fm_context = QFontMetrics(self._font_context)
@@ -275,6 +276,13 @@ class KaraokePreview(QWidget):
         self._fm_line_number = QFontMetrics(self._font_line_number)
         self._line_number_margin = 45  # 行号左侧区域宽度
         self._ruby_spacing = 4  # Ruby与主文字的垂直间距
+        self._cp_spacing = 4  # 节奏点标记顶端与整行 ink 底部的垂直间距
+        # 节奏点字形墨水顶端/底端相对 baseline 的 y（top 通常为负，bottom 通常 ≥0）。
+        # 用于把所有 marker 的视觉顶端统一锚定到 (_line_ink_bottom + cp_spacing)，
+        # 与 fm 的 ascent 解耦，避免 cp_spacing=0 时仍残留 fm.ascent 与字形顶之间的"空白冠"。
+        # bottom 用于高亮/选中矩形扩展到最大 marker ink 底端。
+        self._marker_glyph_top = 0
+        self._marker_glyph_bottom = 0
 
         # 歌词对齐方式："left" / "center" / "right"
         self._alignment: str = "center"
@@ -315,6 +323,74 @@ class KaraokePreview(QWidget):
 
         # 监听主题变化，触发重绘
         theme.changed.connect(self.update)
+
+        # 初始化 marker 字形顶端缓存
+        self._recompute_marker_glyph_top()
+
+    @staticmethod
+    def _build_checkpoint_font(cp_size: int) -> QFont:
+        """构造节奏点标记字体（微软雅黑，整数点字号）。
+
+        节奏点符号 ``▶▷▮▯⬟⬠`` 微软雅黑不含，Qt 逐字 fallback 到 MS UI Gothic /
+        Segoe UI Symbol。这些老式 fallback 字体在小字号带内嵌点阵（embedded
+        bitmap），``drawText`` 走点阵 strike 时顶端一行像素会残缺（实测 12px 犯、
+        13px 好）。本类对 marker 一律改用 ``QPainterPath`` 矢量轮廓填充绘制
+        （见 _marker_path / paintEvent），从构造上绕开点阵，无需在字号上做手脚。
+        """
+        return QFont("Microsoft YaHei", cp_size)
+
+    def _marker_path(self, ch: str, x: float, baseline_y: float) -> QPainterPath:
+        """返回 marker 字符在 (x, baseline_y) 处的矢量轮廓路径。
+
+        ``addText`` 经字体合并取到 fallback 字体（MS UI Gothic/Segoe UI Symbol）的
+        **轮廓**而非点阵 strike，``fillPath`` 填充必然得到完整字形——根治"marker
+        自身画不全（顶端残缺）"。
+        """
+        path = QPainterPath()
+        path.addText(x, baseline_y, self._font_checkpoint, ch)
+        return path
+
+    def _recompute_marker_glyph_top(self):
+        """计算所有 marker 字形相对 baseline 的统一墨水上下边界（矢量精确）。
+
+        直接取 ``QPainterPath.addText`` 的 ``boundingRect``：矢量包围盒与 DPR、
+        点阵 strike 完全无关，且与实际 ``fillPath`` 绘制同源，positioning 与渲染
+        天然一致。取所有 marker 字符的 top 最小（最高）、bottom 最大（最低）。
+
+        绘制时用：
+
+            marker_y(baseline) = _line_ink_bottom + cp_spacing - _marker_glyph_top
+            marker 视觉顶端     = _line_ink_bottom + cp_spacing
+
+        只在字体/marker 字符变化时重算一次，paint 路径零额外开销。
+        """
+        import math
+
+        top_min = 0.0
+        bottom_max = 0.0
+        any_char = False
+        for char_str in set(self._checkpoint_markers.values()):
+            if not char_str:
+                continue
+            br = self._marker_path(char_str, 0.0, 0.0).boundingRect()
+            if br.isEmpty():
+                continue
+            top = br.top()       # 相对 baseline，负=上方
+            bottom = br.bottom()
+            if not any_char:
+                top_min, bottom_max, any_char = top, bottom, True
+            else:
+                top_min = min(top_min, top)
+                bottom_max = max(bottom_max, bottom)
+
+        if any_char:
+            # 顶端向下取整（更靠上、不切顶），底端向上取整放大包络
+            self._marker_glyph_top = math.floor(top_min)
+            self._marker_glyph_bottom = math.ceil(bottom_max)
+        else:
+            fm = self._fm_checkpoint
+            self._marker_glyph_top = -fm.ascent()
+            self._marker_glyph_bottom = fm.descent()
 
     def set_playing(self, playing: bool):
         """由外部同步播放状态，用于决定 paintEvent 是否旁路缓存。"""
@@ -592,7 +668,7 @@ class KaraokePreview(QWidget):
             self._alignment_margin = margin
             self.update()
 
-    def set_font_sizes(self, base_size: int, current_line_size: int = 0, ruby_size: int = 10, cp_size: int = 8, line_height_factor: float = 1.20, ruby_spacing: int = 4, main_font: str = "Microsoft YaHei", ruby_font: str = "Microsoft YaHei"):
+    def set_font_sizes(self, base_size: int, current_line_size: int = 0, ruby_size: int = 10, cp_size: int = 8, line_height_factor: float = 1.20, ruby_spacing: int = 4, main_font: str = "Microsoft YaHei", ruby_font: str = "Microsoft YaHei", cp_spacing: int = 4):
         """设置字体大小/字体族并自动适配预览行数。
 
         Args:
@@ -605,6 +681,8 @@ class KaraokePreview(QWidget):
             main_font: 主文字（当前行/上下文行）字体族，缺失时回退微软雅黑
             ruby_font: Ruby 注音字体族，缺失时回退微软雅黑。
                 节奏点标记字体固定为微软雅黑，不随设置变化。
+            cp_spacing: 节奏点标记顶端与主文字底部（descent）之间的垂直间距（默认4px）。
+                Marker 顶端按此 gap 对齐，避免大 cp_size 时被主文字遮盖上半。
         """
         from strange_uta_game.frontend.font_utils import resolve_font_family
 
@@ -614,27 +692,32 @@ class KaraokePreview(QWidget):
         cp_size = max(1, min(99, cp_size))
         line_height_factor = max(-1.0, min(5.0, line_height_factor))
         ruby_spacing = max(0, min(99, ruby_spacing))
+        cp_spacing = max(0, min(99, cp_spacing))
         main_family = resolve_font_family(main_font)
         ruby_family = resolve_font_family(ruby_font)
 
         self._font_current = QFont(main_family, current_size, QFont.Weight.Bold)
         self._font_context = QFont(main_family, context_size)
         self._font_ruby = QFont(ruby_family, ruby_size)
-        self._font_checkpoint = QFont("Microsoft YaHei", cp_size)
+        self._font_checkpoint = self._build_checkpoint_font(cp_size)
         self._fm_current = QFontMetrics(self._font_current)
         self._fm_context = QFontMetrics(self._font_context)
         self._fm_ruby = QFontMetrics(self._font_ruby)
         self._fm_checkpoint = QFontMetrics(self._font_checkpoint)
         self._ruby_spacing = ruby_spacing
+        self._cp_spacing = cp_spacing
         self._line_height_factor = line_height_factor
 
-        # 行高以当前行（放大后）字体大小为准，需容纳 ruby + ruby_spacing + cp
-        total_height = self._fm_current.height() + self._fm_ruby.height() + ruby_spacing + self._fm_checkpoint.height()
+        # 行高以当前行（放大后）字体大小为准，需容纳 ruby + ruby_spacing + cp + cp_spacing
+        total_height = self._fm_current.height() + self._fm_ruby.height() + ruby_spacing + cp_spacing + self._fm_checkpoint.height()
         # factor<=0 时视为极紧凑（显示最多行），避免除以零
         safe_factor = max(0.05, line_height_factor)
         line_h = total_height * safe_factor
         h = self.height() if self.height() > 0 else 600
         self._visible_lines = max(3, min(15, int(h / line_h)))
+
+        # 字体/marker 字符变化后刷新 marker 字形顶端缓存
+        self._recompute_marker_glyph_top()
 
         # 清除缓存并重绘
         self._sentence_cache.clear()
@@ -646,6 +729,7 @@ class KaraokePreview(QWidget):
     def set_checkpoint_markers(self, markers: dict[str, str]):
         """设置 checkpoint 标记字符并刷新缓存。"""
         self._checkpoint_markers.update(markers)
+        self._recompute_marker_glyph_top()
         self._sentence_cache.clear()
         self._line_versions.clear()
         self._global_version += 1
@@ -676,7 +760,8 @@ class KaraokePreview(QWidget):
         super().resizeEvent(event)
         if hasattr(self, '_fm_current') and hasattr(self, '_fm_ruby'):
             total_height = (self._fm_current.height() + self._fm_ruby.height()
-                           + self._ruby_spacing + self._fm_checkpoint.height())
+                           + self._ruby_spacing + self._cp_spacing
+                           + self._fm_checkpoint.height())
             safe_factor = max(0.05, getattr(self, '_line_height_factor', 1.20))
             line_h = total_height * safe_factor
             h = self.height() if self.height() > 0 else 600
@@ -1210,11 +1295,13 @@ class KaraokePreview(QWidget):
 
         linked_leader_groups: dict = {}
         linked_non_leader: set = set()
+        non_leader_to_leader: dict = {}
         for group in char_groups:
             if len(group) > 1:
                 linked_leader_groups[group[0]] = group
                 for _ci in group[1:]:
                     linked_non_leader.add(_ci)
+                    non_leader_to_leader[_ci] = group[0]
 
         # 连词组：将合并后的 ruby 宽度平均分配到组内每个字符
         for leader_ci, group in linked_leader_groups.items():
@@ -1560,6 +1647,7 @@ class KaraokePreview(QWidget):
             "char_wipe_times": char_wipe_times,
             "linked_leader_groups": linked_leader_groups,
             "linked_non_leader": linked_non_leader,
+            "non_leader_to_leader": non_leader_to_leader,
             "char_part_anchors": char_part_anchors,
             "char_ruby_ink": char_ruby_ink,
             "group_ruby_ink": group_ruby_ink,
@@ -1867,7 +1955,12 @@ class KaraokePreview(QWidget):
             char_wipe_times = _rd["char_wipe_times"]
             _linked_leader_groups = _rd["linked_leader_groups"]
             _linked_non_leader = _rd["linked_non_leader"]
+            _non_leader_to_leader = _rd["non_leader_to_leader"]
             _char_part_anchors = _rd["char_part_anchors"]
+            # 连词组 ruby 框几何缓存：leader 那一轮画完框后存 (x, y, w, h, color)，
+            # 后续 non-leader 字符的 fillRect 会盖住框的右半段 outline，需要从这里
+            # 查表重绘以恢复框。
+            _linked_frame_data: dict = {}
             _char_ruby_ink = _rd["char_ruby_ink"]
             _group_ruby_ink = _rd["group_ruby_ink"]
             _group_ruby_wipe = _rd["group_ruby_wipe"]
@@ -1905,16 +1998,25 @@ class KaraokePreview(QWidget):
                 _line_ink_top = int(_ink_top_min)
                 _line_ink_bottom = int(_ink_bottom_max) + 1
 
+            # 高亮/选中/hitbox 矩形几何：覆盖从主文字 ink 顶到最大 marker ink 底，
+            # per-line 统一。
+            # - 顶端 _line_ink_top - 2px 留呼吸 padding；ruby 框被 non-leader fillRect
+            #   覆盖的问题由下面的 non-leader 框重绘逻辑兜底，不依赖几何缝。
+            # - 底端用 fm_checkpoint.height() 作为 marker 包络（而非 tightBoundingRect
+            #   高度），抗 hinting/AA 边缘像素，避免 rect 切到 ▯/▮ 顶端外缘。
+            _LINE_RECT_PAD = 2
+            _marker_extent_h = fm_checkpoint.height()
+            _line_marker_ink_bottom = _line_ink_bottom + self._cp_spacing + _marker_extent_h
+            _rect_top = _line_ink_top - _LINE_RECT_PAD
+            _rect_bottom = _line_marker_ink_bottom + _LINE_RECT_PAD
+            _rect_height = max(1, _rect_bottom - _rect_top)
+            # 行高 clamp（极紧凑布局时不溢出本行）
+            if _rect_height > int(line_height):
+                _rect_height = int(line_height)
+                _rect_top = int(round(y_center_f - _rect_height / 2))
+
             for char_pos, ch in enumerate(line.chars):
                 char_w = char_widths[char_pos]
-
-                # 统一高亮/hitbox 矩形：以行逻辑中心 y_center_f 为唯一锚点、
-                # 高度 clamp 到 int(line_height)。此前 _rect_top 在「行框顶」
-                # 与「字体 ascent 顶」之间取 max()，在当前行字体放大（22pt）
-                # 相邻行字体缩小（18pt）时两套锚点不一致，会让选中行下方出现
-                # 大块空白（issue #9）。现统一以行中心垂直居中矩形，消除跳变。
-                _rect_height = min(main_fm.height() + 4, int(line_height))
-                _rect_top = int(round(y_center_f - _rect_height / 2))
 
                 # 当前打轴位置高亮背景
                 if is_current and char_pos == self._current_char_idx:
@@ -1940,6 +2042,22 @@ class KaraokePreview(QWidget):
                             _rect_height,
                         )
                         painter.fillRect(sel_rect, sel_bg)
+
+                # 连词组 non-leader：fillRect 可能覆盖 leader 那一轮画的 ruby 框的
+                # 右半段 outline，这里查表重绘恢复。leader 自己不需要重绘（它本轮的
+                # 框绘制在 fillRect 之后已经在上方完成）。
+                if char_pos in _linked_non_leader:
+                    _ldr = _non_leader_to_leader.get(char_pos)
+                    _fd = _linked_frame_data.get(_ldr) if _ldr is not None else None
+                    if _fd is not None:
+                        _fx, _fy, _fw, _fh, _fcolor = _fd
+                        painter.save()
+                        _fp = QPen(_fcolor, 1.0)
+                        _fp.setStyle(Qt.PenStyle.SolidLine)
+                        painter.setPen(_fp)
+                        painter.setBrush(Qt.BrushStyle.NoBrush)
+                        painter.drawRoundedRect(_fx, _fy, _fw, _fh, 2, 2)
+                        painter.restore()
 
                 # 存储字符 hitbox 用于点击检测（与高亮矩形对齐）
                 char_rect = QRect(
@@ -2074,22 +2192,25 @@ class KaraokePreview(QWidget):
                         else:
                             _box_left = int(_ruby_box_left)
                             _box_right = int(_ruby_box_right)
+                        _frame_x = _box_left - 2
+                        _frame_y = ruby_y - fm_ruby.ascent() - 1
+                        _frame_w = (_box_right - _box_left) + 4
+                        _frame_h = fm_ruby.height() + 2
+                        _frame_color = QColor(base_color)
+                        _frame_color.setAlpha(120)
                         painter.save()
-                        _fc = QColor(base_color)
-                        _fc.setAlpha(120)
-                        _fp = QPen(_fc, 1.0)
+                        _fp = QPen(_frame_color, 1.0)
                         _fp.setStyle(Qt.PenStyle.SolidLine)
                         painter.setPen(_fp)
                         painter.setBrush(Qt.BrushStyle.NoBrush)
                         painter.drawRoundedRect(
-                            _box_left - 2,
-                            ruby_y - fm_ruby.ascent() - 1,
-                            (_box_right - _box_left) + 4,
-                            fm_ruby.height() + 2,
-                            2,
-                            2,
+                            _frame_x, _frame_y, _frame_w, _frame_h, 2, 2,
                         )
                         painter.restore()
+                        # 缓存框几何，供同组 non-leader 字符的 fillRect 后重绘
+                        _linked_frame_data[char_pos] = (
+                            _frame_x, _frame_y, _frame_w, _frame_h, _frame_color,
+                        )
                 else:
                     ruby = line.characters[char_pos].ruby
                     if ruby:
@@ -2304,15 +2425,23 @@ class KaraokePreview(QWidget):
                         painter.setPen(base_color)
                         painter.drawText(int(char_draw_x), int(y_center), ch)
 
-                # 当前打轴位置指示线
+                # 当前打轴位置指示线：锚定到整行实际 ink 底部（_line_ink_bottom），
+                # 与字符的 fm.descent() 解耦——所有字符共用同一 y，
+                # 避免短字符（无 descender）下方留大块空白。
+                # y 偏移随主字号 descent 比例缩放，但与 marker 视觉顶端保持至少
+                # 2 px 间距（cp_spacing - 2），避免大字号下 AA 让指示线色彩
+                # 渗入 marker 顶端 stroke（典型现象：▯/▮ 顶端横划被指示线高亮色淹没）。
                 if is_current and char_pos == self._current_char_idx:
                     _esw = _end_sentence_w.get(char_pos, 0)
+                    _ind_off_natural = max(2, main_fm.descent() // 3)
+                    _ind_off = min(_ind_off_natural, max(2, self._cp_spacing - 2))
+                    _ind_y = int(_line_ink_bottom + _ind_off)
                     painter.setPen(highlight_color)
                     painter.drawLine(
                         int(curr_x),
-                        int(y_center + main_fm.descent() + 2),
+                        _ind_y,
                         int(curr_x + char_w + _esw),
-                        int(y_center + main_fm.descent() + 2),
+                        _ind_y,
                     )
 
                 # Checkpoint 标记（逐 checkpoint 绘制）
@@ -2332,8 +2461,14 @@ class KaraokePreview(QWidget):
                         regular_markers.append((cp_idx, marker_char, has_timed))
 
                     # 左对齐排列普通marker（在原始字符宽度内）
+                    # marker 视觉顶端对齐到 (整行 ink 底部 + cp_spacing)：
+                    #   - 锚点 = _line_ink_bottom（该行所有字符的实际墨水最低 y）
+                    #   - cp_spacing=0 时 marker 顶端紧贴主文字 ink 底部
+                    #   - 用 marker 字形矢量 boundingRect.top() 反推 baseline（_marker_glyph_top），
+                    #     消除 fm.ascent 与字形顶之间的"空白冠"
                     mx = curr_x
-                    marker_y = int(y_center + main_fm.descent() + 14)
+                    marker_visible_top = _line_ink_bottom + self._cp_spacing
+                    marker_y = int(marker_visible_top - self._marker_glyph_top)
 
                     for cp_idx, marker_char, has_timed in regular_markers:
                         is_selected = (
@@ -2348,12 +2483,16 @@ class KaraokePreview(QWidget):
 
                         mw = fm_checkpoint.horizontalAdvance(marker_char)
 
-                        painter.setPen(color)
-                        painter.drawText(int(mx), marker_y, marker_char)
+                        # 矢量轮廓填充（非 drawText 点阵）——保证字形完整，不被点阵 strike 切顶
+                        painter.fillPath(
+                            self._marker_path(marker_char, float(int(mx)), float(marker_y)),
+                            color,
+                        )
 
+                        # hitbox 从可视顶端起算，避免上沿越过主文字 ink 区与字符 hitbox 重叠
                         marker_rect = QRect(
                             int(mx),
-                            marker_y - fm_checkpoint.ascent(),
+                            int(marker_visible_top),
                             int(mw),
                             fm_checkpoint.height(),
                         )
@@ -2383,8 +2522,11 @@ class KaraokePreview(QWidget):
                         se_area_x = curr_x + char_w
                         se_area_w = _end_sentence_w.get(char_pos, 0)
 
-                        painter.setPen(color)
-                        painter.drawText(int(se_area_x), marker_y, marker_char)
+                        # 矢量轮廓填充（同上，保证句尾 marker 完整）
+                        painter.fillPath(
+                            self._marker_path(marker_char, float(int(se_area_x)), float(marker_y)),
+                            color,
+                        )
 
                         # hitbox覆盖整个扩展区域（高度与字符区域一致）
                         se_rect = QRect(

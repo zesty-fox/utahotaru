@@ -39,6 +39,9 @@ class UISubInterface(SubSettingInterface):
             "Ruby注音与主文字之间的垂直间距", min_val=0, max_val=99, step=1, suffix=" px", parent=g)
         self.card_cp_size = SpinSettingCard(FIF.FONT_SIZE, "节奏点标记大小",
             "Checkpoint节奏点标记的字体像素大小", min_val=1, max_val=99, step=1, suffix=" px", parent=g)
+        self.card_cp_spacing = SpinSettingCard(FIF.FONT_SIZE, "节奏点与主文字间距",
+            "节奏点标记顶端与主文字底部的垂直间距（增大避免大字号时被文字遮挡）",
+            min_val=0, max_val=99, step=1, suffix=" px", parent=g)
         self.card_line_height_factor = DoubleSpinSettingCard(FIF.FONT_SIZE, "行间距系数",
             "行高 = (当前行字体 + 注音 + 注音间距 + 节奏点)高度 × 系数",
             min_val=-1.00, max_val=5.00, step=0.05, decimals=2, suffix=" x", parent=g)
@@ -58,6 +61,7 @@ class UISubInterface(SubSettingInterface):
         for c in [self.card_theme, self.card_main_font, self.card_ruby_font,
                   self.card_font_size, self.card_current_line_font_size,
                   self.card_ruby_size, self.card_ruby_spacing, self.card_cp_size,
+                  self.card_cp_spacing,
                   self.card_line_height_factor, self.card_alignment_margin,
                   self.card_lyrics_alignment, self.card_checkpoint_markers]:
             g.addSettingCard(c)
@@ -84,6 +88,7 @@ class UISubInterface(SubSettingInterface):
         self.card_ruby_size.value_changed.connect(self._notify_changed)
         self.card_ruby_spacing.value_changed.connect(self._notify_changed)
         self.card_cp_size.value_changed.connect(self._notify_changed)
+        self.card_cp_spacing.value_changed.connect(self._notify_changed)
         self.card_line_height_factor.value_changed.connect(self._notify_changed)
         self.card_alignment_margin.value_changed.connect(self._notify_changed)
         self.card_lyrics_alignment.index_changed.connect(self._notify_changed)
@@ -103,6 +108,7 @@ class UISubInterface(SubSettingInterface):
         self.card_ruby_size.setValue(s.get("ui.ruby_size", 10))
         self.card_ruby_spacing.setValue(s.get("ui.ruby_spacing", 4))
         self.card_cp_size.setValue(s.get("ui.cp_size", 8))
+        self.card_cp_spacing.setValue(s.get("ui.cp_spacing", 4))
         self.card_line_height_factor.setValue(s.get("ui.line_height_factor", 1.20))
         self.card_alignment_margin.setValue(s.get("ui.alignment_margin", 168))
         alignment_idx = {"left": 0, "center": 1, "right": 2}.get(s.get("ui.lyrics_alignment", "center"), 1)
@@ -117,6 +123,7 @@ class UISubInterface(SubSettingInterface):
         s.set("ui.ruby_size", self.card_ruby_size.value())
         s.set("ui.ruby_spacing", self.card_ruby_spacing.value())
         s.set("ui.cp_size", self.card_cp_size.value())
+        s.set("ui.cp_spacing", self.card_cp_spacing.value())
         s.set("ui.line_height_factor", self.card_line_height_factor.value())
         s.set("ui.alignment_margin", self.card_alignment_margin.value())
         s.set("ui.lyrics_alignment",
