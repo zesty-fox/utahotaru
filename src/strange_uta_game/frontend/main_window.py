@@ -206,6 +206,10 @@ class MainWindow(MSFluentWindow):
     def _remove_embedded_title_bar(self) -> None:
         """Remove MSFluentWindow's top title-bar space for embedded mode."""
         try:
+            self.setResizeEnabled(False)
+        except Exception:
+            pass
+        try:
             self.hBoxLayout.setContentsMargins(0, 0, 0, 0)
         except Exception:
             pass
@@ -227,6 +231,10 @@ class MainWindow(MSFluentWindow):
         """Apply host-owned UI behavior that only exists in embedded mode."""
         if not self._embedded:
             return
+        navigation = getattr(self, "navigationInterface", None)
+        if navigation is not None:
+            width = max(72, navigation.minimumSizeHint().width())
+            navigation.setFixedWidth(width)
         timeline = getattr(getattr(self, "editorInterface", None), "timeline", None)
         if timeline is not None and hasattr(timeline, "set_zoom_enabled"):
             timeline.set_zoom_enabled(False)
