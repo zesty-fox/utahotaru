@@ -22,7 +22,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import (
     KanaDistributingAnalyzer,
@@ -32,8 +32,10 @@ from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import (
     is_english_reading,
 )
 
-# 平假名读音类型别名：每行是 (surface, reading) 序列
-Pairs = List[Tuple[str, str]]
+# 读音可为字符串（整段读音，由本地分配器拆到字）或字符串数组（LLM 已自分到字，
+# 与 surface 等长，空串表示该字与前字连词）。
+Reading = Union[str, List[str]]
+Pairs = List[Tuple[str, Reading]]
 
 _ANTHROPIC_VERSION = "2023-06-01"
 
@@ -79,12 +81,22 @@ _SYSTEM_PROMPT = (
     "(2) 仮名・記号・英数字のトークンの読みは原文そのまま。"
     "(3) 各行のトークンの surface を連結すると元の行と完全に一致すること。"
     "(4) JSON のみを出力し、説明文を一切付けないこと。"
+    "(5) 入力は日本語の歌詞である。標準的・一般的な複合語読みを優先し、"
+    "一字一字を独立した訓読みで切ってはいけない。例：「毎日」→ まいにち（×まいひ）、"
+    "「日々」→ ひび（×にちひ）、「一日」→ ついたち または いちにち（文脈で選択、×にちひ）。"
 )
 
 _OUTPUT_SCHEMA_HINT = (
     '出力フォーマット（JSON のみ）：\n'
-    '{"lines":[{"i":0,"tokens":[{"s":"今日","r":"きょう"},{"s":"は","r":"は"}]}]}\n'
-    "i は行番号、tokens はその行の分かち書き、s は原文の断片、r は平仮名の読み。"
+    '{"lines":[{"i":0,"tokens":[{"s":"今日","r":"きょう"},{"s":"は","r":"は"},'
+    '{"s":"毎日","r":["まい","にち"]}]}]}\n'
+    "i は行番号、tokens はその行の分かち書き、s は原文の断片、r は読み。\n"
+    "r は次の二形式を許容：\n"
+    "- 文字列：トークン全体の読み（複合語読みなど、文字単位の分割は下流に任せる）。\n"
+    "- 文字列配列：s の各文字に対応する読みを順番通り。配列長は len(s) と完全一致。"
+    "空文字列 \"\" は「その文字に独立した読みなく、前の文字と連結（送り仮名/長母音/促音等）」を表す。\n"
+    "確信のある単字単位の読みは配列で返すと、下流が文字単位の節奏点配置を尊重する。"
+    "確信できない場合は文字列で返し、下流の分配に任せる。"
 )
 
 # 片假名外来语 → 英文标注规则（仅在 annotate_katakana_with_english 开启时追加）
@@ -203,7 +215,9 @@ class LLMRubyClient:
                 "请求成功，但返回内容未能解析为该行的有效注音"
                 "（surface 与原文不匹配或行缺失）",
             )
-        readings = "".join(r for _, r in result[0])
+        readings = "".join(
+            "".join(r) if isinstance(r, list) else r for _, r in result[0]
+        )
         return (True, f"连接成功（{elapsed:.1f}s，模型 {self._cfg.model}）：{sample} → {readings}")
 
     def annotate_lines(
@@ -487,7 +501,11 @@ def _coerce_json(text: str) -> dict:
 def _parse_payload(text: str, lines: List[str]) -> Dict[int, Pairs]:
     """把模型输出解析为 ``{line_idx: pairs}``。
 
-    校验：每行 tokens 的 surface 连接需与原行完全一致，否则丢弃该行（调用方回退）。
+    校验：
+    - 每行 tokens 的 surface 连接需与原行完全一致，否则丢弃该行（调用方回退）；
+    - r 可为字符串或字符串数组；数组形态要求 ``len(r) == len(s)``，
+      非字符串元素 / 长度不符 → 该 token 的 r 退化为字符串拼接（空串组合时
+      退到 surface 自注音）。
     """
     obj = _coerce_json(text)
     raw_lines = obj.get("lines")
@@ -510,9 +528,25 @@ def _parse_payload(text: str, lines: List[str]) -> Dict[int, Pairs]:
                 continue
             s = tok.get("s", "")
             r = tok.get("r", "")
-            if not isinstance(s, str) or not isinstance(r, str) or not s:
+            if not isinstance(s, str) or not s:
                 continue
-            pairs.append((s, r or s))
+            # r 校验：字符串 → 原样接受；数组 → 长度匹配且元素皆为字符串才采纳，
+            # 否则降级为字符串拼接（数组中夹杂非串/长度不符时丢弃数组形态）。
+            reading: Reading
+            if isinstance(r, list):
+                if (
+                    len(r) == len(s)
+                    and all(isinstance(x, str) for x in r)
+                ):
+                    reading = list(r)
+                else:
+                    joined = "".join(x for x in r if isinstance(x, str))
+                    reading = joined or s
+            elif isinstance(r, str):
+                reading = r or s
+            else:
+                continue
+            pairs.append((s, reading))
         # 校验：surface 连接 == 原行
         if "".join(s for s, _ in pairs) != lines[idx]:
             continue  # 该行丢弃，由调用方回退
@@ -594,35 +628,73 @@ class LLMRubyAnalyzer(KanaDistributingAnalyzer):
     def _build_results(self, pairs: Pairs) -> List[RubyResult]:
         """把 LLM 的 (surface, reading) 序列转为 RubyResult。
 
-        片假名外来语 + 英文读音（且开关开启）→ 整词作为单块 RubyResult（保留英文读音，
-        下游 ``AutoCheckService`` 识别为 ``katakana_english`` 来源，首字承载英文、整词连词）；
-        其余 pair 复用基类 :meth:`_results_from_pairs` 的逐字/逐块假名分配。
+        三条路径：
+        1. 片假名外来语 + 英文读音（且开关开启）→ 整词作为单块 RubyResult
+           （保留英文读音，下游 ``AutoCheckService`` 识别为 ``katakana_english`` 来源，
+           首字承载英文、整词连词）。
+        2. reading 是数组且每元素非空 → LLM 已自分到字，直接逐字 emit RubyResult
+           （绕过本地 ``_distribute_morpheme_reading`` 与 ``_split_by_kanji_dict`` 启发式），
+           同时为多字 surface 标 ``morpheme_span`` 让 Phase 5 享有连词组保护。
+        3. 其余（reading 为字符串、或数组含空元素表示连词）→ 拼成字符串复用
+           基类 :meth:`_results_from_pairs` 的逐字/逐块假名分配。
         """
         results: List[RubyResult] = []
         pos = 0
         for surface, reading in pairs:
             start = pos
             end = pos + len(surface)
+            mspan: Optional[Tuple[int, int]] = (
+                (start, end) if end - start > 1 else None
+            )
+
+            # 路径 2：LLM 直接给出每字读音（无空元素表示连词）
+            if (
+                isinstance(reading, list)
+                and len(reading) == len(surface)
+                and all(r for r in reading)
+            ):
+                for i, ch in enumerate(surface):
+                    results.append(
+                        RubyResult(
+                            text=ch, reading=reading[i],
+                            start_idx=start + i, end_idx=start + i + 1,
+                            morpheme_span=mspan,
+                        )
+                    )
+                pos = end
+                continue
+
+            # 路径 2 退化：数组中含空元素 → 拼成字符串走路径 3 的整块分配
+            # （空元素自然不贡献字符，等价于「前字承载、后字连词」语义）。
+            reading_str: str = (
+                "".join(reading) if isinstance(reading, list) else reading
+            )
+
             if (
                 self._annotate_katakana_with_english
                 and is_all_katakana(surface)
-                and is_english_reading(reading)
+                and is_english_reading(reading_str)
             ):
-                # 片假名外来语：整词单块，保留英文读音（不经过假名分配，避免被丢弃）
+                # 路径 1：片假名外来语英文标注
                 results.append(
                     RubyResult(
-                        text=surface, reading=reading.strip(),
+                        text=surface, reading=reading_str.strip(),
                         start_idx=start, end_idx=end,
+                        morpheme_span=mspan,
                     )
                 )
             else:
-                # 复用基类逐 pair 分配，再平移索引到本行内的绝对位置
-                for r in self._results_from_pairs([(surface, reading)]):
+                # 路径 3：复用基类逐 pair 分配，再平移索引到本行内的绝对位置
+                for r in self._results_from_pairs([(surface, reading_str)]):
                     results.append(
                         RubyResult(
                             text=r.text, reading=r.reading,
                             start_idx=r.start_idx + start,
                             end_idx=r.end_idx + start,
+                            morpheme_span=(
+                                (r.morpheme_span[0] + start, r.morpheme_span[1] + start)
+                                if r.morpheme_span is not None else mspan
+                            ),
                         )
                     )
             pos = end
@@ -634,5 +706,7 @@ class LLMRubyAnalyzer(KanaDistributingAnalyzer):
         self._ensure_prewarmed()
         pairs = self._cache.get(text)
         if pairs is not None:
-            return "".join(r for _, r in pairs)
+            return "".join(
+                "".join(r) if isinstance(r, list) else r for _, r in pairs
+            )
         return self._fallback.get_reading(text)

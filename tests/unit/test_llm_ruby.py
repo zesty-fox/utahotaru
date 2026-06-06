@@ -62,6 +62,46 @@ def test_parse_payload_invalid_json_raises():
         _parse_payload("not json at all", ["あ"])
 
 
+# ── r 数组形态 ──
+
+
+def test_parse_payload_array_reading_accepted():
+    """r 为字符串数组 + 长度等于 s → 原样接受。"""
+    text = (
+        '{"lines":[{"i":0,"tokens":'
+        '[{"s":"毎日","r":["まい","にち"]}]}]}'
+    )
+    assert _parse_payload(text, ["毎日"]) == {0: [("毎日", ["まい", "にち"])]}
+
+
+def test_parse_payload_array_with_empty_strings_accepted():
+    """r 数组含空串（表示连词）也接受，下游 _build_results 会拼成字符串走整块路径。"""
+    text = (
+        '{"lines":[{"i":0,"tokens":'
+        '[{"s":"今日","r":["きょう",""]}]}]}'
+    )
+    assert _parse_payload(text, ["今日"]) == {0: [("今日", ["きょう", ""])]}
+
+
+def test_parse_payload_array_length_mismatch_degrades_to_string():
+    """r 数组长度 ≠ s 字符数 → 退化为字符串拼接（避免错位映射）。"""
+    text = (
+        '{"lines":[{"i":0,"tokens":'
+        '[{"s":"毎日","r":["まいにち"]}]}]}'
+    )
+    assert _parse_payload(text, ["毎日"]) == {0: [("毎日", "まいにち")]}
+
+
+def test_parse_payload_array_non_string_element_degrades():
+    """r 数组含非字符串元素 → 退化（提取所有字符串拼接，否则用 s 自身）。"""
+    text = (
+        '{"lines":[{"i":0,"tokens":'
+        '[{"s":"毎日","r":["まい",null]}]}]}'
+    )
+    # null 被过滤；保留的字符串拼接 = "まい"
+    assert _parse_payload(text, ["毎日"]) == {0: [("毎日", "まい")]}
+
+
 def test_coerce_json_strips_code_fence():
     assert _coerce_json('```json\n{"lines":[]}\n```') == {"lines": []}
 
@@ -110,6 +150,55 @@ def test_analyzer_cache_hit_uses_llm(monkeypatch):
     # 今日 → きょう 分配（こ ょ う 等），は 自注音；至少包含「今」起始块
     assert "".join(r.reading for r in results) == "きょうは"
     assert analyzer.llm_failed is False
+
+
+def test_analyzer_array_reading_emits_per_char_results(monkeypatch):
+    """LLM 数组形态 r=["まい","にち"] → 直接逐字 emit，绕过本地分配启发式。
+
+    回归 LLM 注音 毎日→まいひ 的场景：现在 LLM 可直接说「毎=まい、日=にち」，
+    下游不再用 kanji_dict 拼接，保留 LLM 的高置信切分。
+    """
+    mapping = {0: [("毎日", ["まい", "にち"])]}
+    analyzer = _make_analyzer(monkeypatch, (mapping, None))
+    # _make_analyzer 默认 lines=["今日は", "空"]，需要直接调 analyze("毎日") 命中需另建。
+    cfg = LLMRubyConfig(enabled=True, base_url="http://x", api_key="k", model="m")
+    analyzer = LLMRubyAnalyzer(cfg, lines=["毎日"], fallback=_SelfAnalyzer())
+    monkeypatch.setattr(analyzer._client, "annotate_lines", lambda lines: (mapping, None))
+
+    results = analyzer.analyze("毎日")
+    # 期望 2 条 single-char RubyResult，分别承载 まい / にち；
+    # 且都标 morpheme_span=(0,2)，让下游 Phase 5 享有连词组保护。
+    assert len(results) == 2
+    assert results[0].text == "毎" and results[0].reading == "まい"
+    assert results[0].start_idx == 0 and results[0].end_idx == 1
+    assert results[0].morpheme_span == (0, 2)
+    assert results[1].text == "日" and results[1].reading == "にち"
+    assert results[1].start_idx == 1 and results[1].end_idx == 2
+    assert results[1].morpheme_span == (0, 2)
+
+
+def test_analyzer_array_with_empty_falls_back_to_compound(monkeypatch):
+    """数组含空串（如 ["きょう",""]）→ 退化为整块 reading，由本地分配处理。"""
+    mapping = {0: [("今日", ["きょう", ""])]}
+    cfg = LLMRubyConfig(enabled=True, base_url="http://x", api_key="k", model="m")
+    analyzer = LLMRubyAnalyzer(cfg, lines=["今日"], fallback=_SelfAnalyzer())
+    monkeypatch.setattr(analyzer._client, "annotate_lines", lambda lines: (mapping, None))
+
+    results = analyzer.analyze("今日")
+    # 拼接读音 "きょう"，由 _results_from_pairs/_distribute_morpheme_reading 处理。
+    # 期望整块单 RubyResult，下游可继续 fallback peel。
+    assert sum(r.end_idx - r.start_idx for r in results) == 2
+    joined = "".join(r.reading for r in results)
+    assert joined == "きょう"
+
+
+def test_get_reading_supports_array_form(monkeypatch):
+    """get_reading 需正确拼接数组形态。"""
+    mapping = {0: [("毎日", ["まい", "にち"])]}
+    cfg = LLMRubyConfig(enabled=True, base_url="http://x", api_key="k", model="m")
+    analyzer = LLMRubyAnalyzer(cfg, lines=["毎日"], fallback=_SelfAnalyzer())
+    monkeypatch.setattr(analyzer._client, "annotate_lines", lambda lines: (mapping, None))
+    assert analyzer.get_reading("毎日") == "まいにち"
 
 
 def test_analyzer_cache_miss_falls_back(monkeypatch):
