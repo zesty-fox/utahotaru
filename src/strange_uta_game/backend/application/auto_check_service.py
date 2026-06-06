@@ -750,6 +750,10 @@ class AutoCheckService:
         right = n - 1
 
         # Step 2: 尾部剥离（尝试所有字符，非汉字必须按自身剥；汉字按候选匹配）
+        # 防过吃：剥离后剩余读音长度必须 ≥ 「左侧还需填入的字符数」，否则该候选作废。
+        # 历史 bug：坩堝/るつぼ 中 堝 的 kun 字典恰好是整词读音 るつぼ（历史标注法），
+        # 不加约束就会让尾剥一口吃光全部读音 → split=["","るつぼ"]，
+        # 与「首字吃全部剩余」的兜底语义相反；约束后退回 ["るつぼ",""] 正确。
         while right > left:
             ch = word[right]
             ct = get_char_type(ch) if len(ch) == 1 else CharType.OTHER
@@ -758,16 +762,21 @@ class AutoCheckService:
                 # 非汉字无法剥 → 停止（假名/符号在 reading 里位置不对，放弃）
                 # 汉字无法剥 → 也停止（候选不匹配）
                 break
+            # 防过吃：剥后剩余读音长度需 ≥ 剩余字符数（right - left 个：左边未填的）。
+            if len(remaining) - len(match) < (right - left):
+                break
             split_parts[right] = match
             remaining = remaining[: len(remaining) - len(match)]
             right -= 1
 
-        # Step 3: 头部剥离
+        # Step 3: 头部剥离（同上：防过吃 —— 剩余读音长度 ≥ 右侧未填字符数）。
         while left < right:
             ch = word[left]
             ct = get_char_type(ch) if len(ch) == 1 else CharType.OTHER
             match = try_match_prefix(candidates[left], remaining)
             if match is None:
+                break
+            if len(remaining) - len(match) < (right - left):
                 break
             split_parts[left] = match
             remaining = remaining[len(match) :]

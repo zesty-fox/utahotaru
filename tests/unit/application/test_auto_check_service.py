@@ -439,6 +439,59 @@ class TestFallbackSplitPeelKana:
         parts = service._fallback_split_peel_kana("漢字", "")
         assert parts == ["", ""]
 
+    def test_tail_peel_does_not_eat_everything(self):
+        """坩堝 / るつぼ：堝 的 kun 字典恰为整词读音 るつぼ（历史标注法），
+        尾剥不应一口吃光、把首字清空。
+
+        历史 bug：堝.kun = ['るつぼ'] → tail_peel(るつぼ, 候选='るつぼ') 命中
+        → split=["", "るつぼ"]，与「首字吃全部剩余」的兜底语义相反。
+        修法：剥离后剩余读音长度需 ≥ 左侧未填字符数，否则拒绝该候选 →
+        退回 Step 5 → split=["るつぼ", ""]（兜底首字全吃）。
+        """
+        service = AutoCheckService(DummyAnalyzer())
+        parts = service._fallback_split_peel_kana("坩堝", "るつぼ")
+        assert parts == ["るつぼ", ""], (
+            f"坩堝 应首字全吃（堝.kun=['るつぼ'] 不应吃光），实际 {parts}"
+        )
+
+    def test_head_peel_does_not_eat_everything(self):
+        """head_peel 对称防过吃：单测 try_match_prefix 不允许吃光剩余字符额度。
+
+        通过直接调 try_match_prefix 验证约束在最底层生效；
+        实链路里 head_peel 通常先被 tail_peel/Step 5 绕开，
+        但保留这个内层约束可防止未来回归。
+        """
+        service = AutoCheckService(DummyAnalyzer())
+        # 直接构造 head_peel 场景：3 字词，head 候选若一口吃完整 reading
+        # （8 字符），剩余 0 < 还需填的 2 → 应被防过吃约束拒绝。
+        # 通过 monkeypatch _try_split_to_chars 屏蔽 Step 5。
+        service._try_split_to_chars = lambda *a, **k: None
+        original_kanji = service._kanji_dict
+        try:
+            # 三个汉字，首字字典 kun = 整词读音；后两字字典无任何候选 →
+            # tail_peel 失败 → head_peel 触发 → 候选 "こうおつてん" 命中
+            # 但剩余 0 < 2 → 拒绝 → Step 4 不触发（left=0, right=2）→
+            # Step 5 已被屏蔽 → 首字全吃兜底。
+            service._kanji_dict = {
+                "甲": {"on": [], "kun": ["こうおつてん"]},
+                "乙": {"on": [], "kun": []},
+                "丙": {"on": [], "kun": []},
+            }
+
+            # 同样 monkeypatch _get_single_char_candidates，让 乙/丙 拿不到候选，
+            # 避免 pykakasi 给出 おつ/てん 让尾剥逃逸。
+            orig = service._get_single_char_candidates
+            service._get_single_char_candidates = lambda ch: [] if ch in ("乙", "丙") else orig(ch)
+            try:
+                parts = service._fallback_split_peel_kana("甲乙丙", "こうおつてん")
+                assert parts == ["こうおつてん", "", ""], (
+                    f"head_peel 不得吃光全部读音，实际 {parts}"
+                )
+            finally:
+                service._get_single_char_candidates = orig
+        finally:
+            service._kanji_dict = original_kanji
+
 
 class TestLibraryBlockFallbackLinking:
     """library 块走 fallback 路径后同块汉字自动连词（端到端）"""
