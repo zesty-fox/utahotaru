@@ -545,7 +545,7 @@ class FileLoader:
             software_compensation_ms = settings.get("export.software_compensation_ms", 0)
 
             # 解析歌词
-            sentences, is_nicokara, new_singers = parse_lyric_content(
+            sentences, is_nicokara, new_singers, parse_meta = parse_lyric_content(
                 content, default_singer.id, self._project.singers,
                 software_compensation_ms=software_compensation_ms
             )
@@ -553,6 +553,13 @@ class FileLoader:
             # 添加新演唱者
             for singer in new_singers:
                 self._project.add_singer(singer)
+
+            # ASS Title → project.metadata.title（仅当项目无标题或为默认时覆盖）
+            ass_title = parse_meta.get("title") if parse_meta else None
+            if ass_title and self._project.metadata is not None:
+                cur = (self._project.metadata.title or "").strip()
+                if not cur or cur in ("Untitled", "未命名"):
+                    self._project.metadata.title = ass_title
             # 通知演唱者面板刷新（即使没有新增也要刷新一次，避免遗漏复用场景）
             if new_singers and self._store:
                 self._store.notify("singers")

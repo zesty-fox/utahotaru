@@ -41,6 +41,10 @@ class ParsedLine:
             ASS `#|` 续段给同字追加的内部 checkpoint 时间戳（不含首 ts）。
             parse_to_sentences 会全部 add_timestamp 进去，让 check_count 增长，
             使导出器能按 part 复原 `{\\k}` 时长。
+        char_singer_map: char_idx → singer 显示名。
+            ASS 的 `{\\sing_<name>}` per-char 演唱者切换标记解析产物。
+            parse_to_sentences 在外部 (frontend lyric_loader) 把显示名映射成
+            singer_id 后赋给 Character.singer_id。
     """
 
     text: str
@@ -48,6 +52,7 @@ class ParsedLine:
     line_end_ts: Optional[int] = None
     ruby_map: Dict[int, Tuple[List[str], int]] = field(default_factory=dict)
     extra_checkpoints_map: Dict[int, List[int]] = field(default_factory=dict)
+    char_singer_map: Dict[int, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -1464,7 +1469,9 @@ class LyricParserFactory:
 
 
 def parse_to_sentences(
-    parsed_lines: List[ParsedLine], singer_id: str
+    parsed_lines: List[ParsedLine],
+    singer_id: str,
+    singer_name_to_id: Optional[Dict[str, str]] = None,
 ) -> List[Sentence]:
     """将解析结果转换为 Sentence 对象。
 
@@ -1472,13 +1479,23 @@ def parse_to_sentences(
     1. 多 timestamps 同一字符 → 第二个 ts 自动绑为 sentence_end_ts。
     2. ParsedLine.line_end_ts（如 ASS 末尾 \\k 的尾时长）→ 末字符的
        sentence_end_ts；缺省时退化为「末 ts + 500ms」兜底拖音。
+       行尾释放点绑定到「连词组尾字符」（沿 linked_to_next 向右走到链尾），
+       而非简单的 last_idx_with_ts——否则连词链尾字符的 end_ts 会丢。
     3. ParsedLine.ruby_map（如 ASS 的 `汉字|<かな`）→ Character.set_ruby。
-    4. 最后强制 set_offset(0) 触发 global_timestamps / global_sentence_end_ts
+       多字 span（span>1）且单一 reading 段（parts_list 长度=1）的场景
+       （SUG 导出的 `大冒険|<だいぼうけん` 连词语法）不做均分，整段读音
+       挂在 ch0，块内字符全部 linked_to_next=True，保证 round-trip 可还原。
+    4. ParsedLine.char_singer_map → Character.singer_id。需要传入
+       singer_name_to_id 才会生效；调用方负责把演唱者显示名映射成 id
+       （找不到则不应用，回退到 sentence.singer_id）。
+    5. 最后强制 set_offset(0) 触发 global_timestamps / global_sentence_end_ts
        派生，否则导出器读不到任何全局时间。
 
     Args:
         parsed_lines: 解析后的行列表
-        singer_id: 演唱者 ID
+        singer_id: 演唱者 ID（行级默认）
+        singer_name_to_id: 可选，ASS `{\\sing_<name>}` per-char singer 标记
+            的「显示名 → Singer.id」映射；为 None 时忽略 char_singer_map
 
     Returns:
         Sentence 对象列表
@@ -1486,6 +1503,7 @@ def parse_to_sentences(
     from strange_uta_game.backend.domain import Ruby, RubyPart  # 局部导入避免环依赖
 
     sentences = []
+    name_to_id = singer_name_to_id or {}
 
     for parsed in parsed_lines:
         # 空行：保留为空 Sentence（用户排版意图）
@@ -1527,7 +1545,7 @@ def parse_to_sentences(
 
         # 注入 ruby（统一新签名：(parts_list, span_length)）
         # - span=1, parts=N → 单字多 part（ASS 的 `#|` 续段产物）
-        # - span=N, parts=1 → 多字共享 reading（旧 `漢字|<おもいで` 整段语法）
+        # - span=N, parts=1 → 多字共享 reading（SUG 导出的连词单 reading）
         # - span=1, parts=1 → 标准单字单 part
         for char_idx, ruby_payload in parsed.ruby_map.items():
             if not (0 <= char_idx < len(sentence.characters)):
@@ -1559,8 +1577,23 @@ def parse_to_sentences(
                 if ch.check_count < len(parts_list):
                     ch.check_count = len(parts_list)
                 ch.push_to_ruby()
+            elif len(parts_list) == 1:
+                # SUG 多字 span 单 reading：整段读音不可拆，挂在 ch0；
+                # 块内字符全部 linked_to_next=True（块尾保持 False）。
+                # 这对应导出器 anchor + compound_tail 的契约，roundtrip 时
+                # 二次导出会还原成 `<整段汉字>|<<整段假名>`。
+                ch0 = sentence.characters[char_idx]
+                ch0.set_ruby(Ruby(parts=[RubyPart(text=parts_list[0])]))
+                if ch0.check_count < 1:
+                    ch0.check_count = 1
+                ch0.push_to_ruby()
+                for i in range(span_len - 1):
+                    sentence.characters[char_idx + i].linked_to_next = True
+                # 块尾不外延
+                sentence.characters[char_idx + span_len - 1].linked_to_next = False
             else:
-                # 多字 span 单 reading：复用 Nicokara 路径同款均分实现
+                # 多字 span + 多段 reading：保留旧路径（Aegisub 手写罕见用法）。
+                # 复用 Nicokara 同款均分实现。
                 ruby_text = "".join(parts_list)
                 _distribute_reading_to_chars(
                     sentence,
@@ -1568,24 +1601,52 @@ def parse_to_sentences(
                     span_len,
                     [(ruby_text, 0)],
                 )
-                # linked_to_next：段内 i 与 i+1 之间，仅当 i+1 没有独立
-                # body timestamp 时才视为连词（与 Nicokara 路径同规则）
                 for i in range(span_len - 1):
                     next_ch = sentence.characters[char_idx + i + 1]
                     sentence.characters[char_idx + i].linked_to_next = not bool(
                         next_ch.timestamps
                     )
 
-        # 行尾释放点：优先用解析器给的 line_end_ts，没有就兜底
+        # per-char singer：把 char_singer_map 的显示名映射成 id 后赋给 Character.singer_id。
+        # 找不到映射的名字静默忽略（调用方负责保证映射齐全；缺失时回退到行级 singer_id）。
+        if parsed.char_singer_map and name_to_id:
+            for ch_idx, singer_name in parsed.char_singer_map.items():
+                if not (0 <= ch_idx < len(sentence.characters)):
+                    continue
+                mapped = name_to_id.get(singer_name)
+                if mapped:
+                    sentence.characters[ch_idx].singer_id = mapped
+
+        # 行尾释放点：沿 linked_to_next 链从 last_idx_with_ts 走到连词组尾字符，
+        # 把 sentence_end_ts 绑到链尾——避免「大冒険」末字「険」的 end_ts 丢失。
         if last_idx_with_ts is not None:
-            last_char = sentence.characters[last_idx_with_ts]
+            tail_idx = last_idx_with_ts
+            while (
+                tail_idx < len(sentence.characters) - 1
+                and sentence.characters[tail_idx].linked_to_next
+            ):
+                tail_idx += 1
+            tail_char = sentence.characters[tail_idx]
             if parsed.line_end_ts is not None:
-                last_char.is_sentence_end = True
-                last_char.sentence_end_ts = parsed.line_end_ts
-            elif not last_char.is_sentence_end:
-                # 兜底：给一个 500ms 拖音，保证导出有句尾释放点
-                last_char.is_sentence_end = True
-                last_char.sentence_end_ts = last_char.timestamps[-1] + 500
+                tail_char.is_sentence_end = True
+                tail_char.sentence_end_ts = parsed.line_end_ts
+                if tail_char.check_count == 0:
+                    tail_char.check_count = 1
+                # last_idx_with_ts 字符若被沿链转移，需要清掉它的 end_ts，
+                # 避免「锚字 + 链尾」同时持有 end_ts 导致二次导出多写一段
+                if tail_idx != last_idx_with_ts:
+                    anchor = sentence.characters[last_idx_with_ts]
+                    anchor.is_sentence_end = False
+                    anchor.sentence_end_ts = None
+            elif not tail_char.is_sentence_end:
+                # 兜底：给一个 500ms 拖音，保证导出有句尾释放点。
+                # 末字若没有 ts（连词组尾字），用 last_idx_with_ts 字符的最末 ts 作基准
+                anchor = sentence.characters[last_idx_with_ts]
+                base = anchor.timestamps[-1] if anchor.timestamps else 0
+                tail_char.is_sentence_end = True
+                tail_char.sentence_end_ts = base + 500
+                if tail_char.check_count == 0:
+                    tail_char.check_count = 1
 
         # 核心：派生 global_timestamps / global_sentence_end_ts，
         # 否则导出器无法读到全局时间（这是旧版 bug）。

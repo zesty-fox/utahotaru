@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import List
+from typing import Dict, List, Tuple
 
 from strange_uta_game.backend.domain.entities import Sentence
 
@@ -77,4 +77,63 @@ class ProjectImportService:
         except ProjectImportError:
             raise
         except Exception as e:  # parser 异常统一包装
+            raise ProjectImportError(f"歌词解析失败: {e}") from e
+
+    @staticmethod
+    def load_lyrics_and_meta_from_file(
+        path: str, default_singer_id: str
+    ) -> Tuple[List[Sentence], Dict[str, str]]:
+        """从文件加载歌词及元数据。
+
+        在 :meth:`load_lyrics_from_file` 的基础上额外返回 metadata 字典。
+        目前 ASS 格式会返回 ``{"title": ..., "generator": ...}`` 等字段；
+        其他格式 metadata 为空字典。
+
+        Args:
+            path: 歌词文件路径
+            default_singer_id: 默认演唱者 ID
+
+        Returns:
+            (sentences, metadata) 元组
+        """
+        from strange_uta_game.backend.infrastructure.parsers.lyric_parser import (
+            LRCParser,
+            LyricParserFactory,
+            parse_to_sentences,
+        )
+        from strange_uta_game.backend.infrastructure.parsers.inline_format import (
+            sentences_from_inline_text,
+        )
+        from strange_uta_game.backend.infrastructure.parsers.ass_parser import (
+            ASSParser,
+        )
+
+        try:
+            content = Path(path).read_text(encoding="utf-8")
+        except OSError as e:
+            raise ProjectImportError(f"无法读取歌词文件: {e}") from e
+
+        meta: Dict[str, str] = {}
+
+        try:
+            if _INLINE_PATTERN.search(content):
+                sentences = sentences_from_inline_text(content, default_singer_id)
+                return sentences, meta
+
+            suffix = Path(path).suffix.lower()
+            if suffix == ".ass":
+                # ASS 走显式分支以拿到 metadata（Title / Generator 等）
+                parser = ASSParser()
+                parsed_lines = parser.parse(content)
+                meta = parser.parse_metadata()
+                sentences = parse_to_sentences(parsed_lines, default_singer_id)
+                return sentences, meta
+
+            parsed_lines = LyricParserFactory.parse_file(path)
+            if suffix == ".txt" and _LRC_PATTERN.search(content):
+                parsed_lines = LRCParser().parse(content)
+            return parse_to_sentences(parsed_lines, default_singer_id), meta
+        except ProjectImportError:
+            raise
+        except Exception as e:
             raise ProjectImportError(f"歌词解析失败: {e}") from e

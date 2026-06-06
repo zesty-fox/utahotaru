@@ -150,6 +150,13 @@ class ASSDirectExporter(BaseExporter):
         title = project.metadata.title if project.metadata else "Untitled"
         return [
             "[Script Info]",
+            # SUG 私有哨兵：parser 见到 Generator: StrangeUtaGame 才会按
+            # 下列 SUG-PreRollMs/PostRollMs 反向补偿 pre/post-roll，保证
+            # ASS 文件 export→import→export roundtrip 不漂移。
+            # 第三方工具（Aegisub 等）写的 ASS 不会有这些字段，parser 不补偿。
+            "; Generator: StrangeUtaGame",
+            f"; SUG-PreRollMs: {_PRE_ROLL_MS}",
+            f"; SUG-PostRollMs: {_POST_ROLL_MS}",
             f"Title: {title}",
             "ScriptType: v4.00+",
             "Collisions: Normal",

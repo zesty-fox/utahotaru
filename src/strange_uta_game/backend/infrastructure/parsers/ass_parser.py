@@ -1,15 +1,22 @@
-"""ASS 字幕格式解析器
+r"""ASS 字幕格式解析器
 
-支持 ASS/SSA 字幕文件的解析。提取卡拉OK时间标签（\\k/\\kf/\\ko/\\K/\\kF/\\kO）、
-Aegisub 注音 (`{\\k...}汉字|<かな`)，以及末尾 \\k 的尾部时长（绑为句尾释放点）。
+支持 ASS/SSA 字幕文件的解析。提取卡拉OK时间标签（\k/\kf/\ko/\K/\kF/\kO）、
+Aegisub 注音 (`{\k...}汉字|<かな`)，末尾 \k 的尾部时长（绑为句尾释放点），
+以及 SUG 私有 `{\\sing_<name>}` per-char 演唱者切换标记。
 
 设计原则（与 entities.py 对齐）：
-1. 末尾 \\k 的时长不再丢弃，作为 ParsedLine.line_end_ts 输出，
+1. 末尾 \k 的时长不再丢弃，作为 ParsedLine.line_end_ts 输出，
    parse_to_sentences 会把它绑给末字符的 sentence_end_ts。
-2. Aegisub 注音 `{\\k...}汉字|<かな` 不再被无差别去掉，而是按段提取，
+2. Aegisub 注音 `{\k...}汉字|<かな` 不再被无差别去掉，而是按段提取，
    写入 ParsedLine.ruby_map。
-3. 仅保留卡拉OK相关的 `\\k/\\kf/\\ko/\\K/\\kF/\\kO` 计算；其他 ASS 标签
-   （`\\b`, `\\r`, `\\c` 等）剥除时不连带删掉注音文本。
+3. 仅保留卡拉OK相关的 `\k/\kf/\ko/\\K/\kF/\kO` 与 `\\sing_*` 计算；
+   其他 ASS 标签（`\\b`, `\\r`, `\\c` 等）剥除时不连带删掉注音文本。
+
+SUG 私有约定（roundtrip 用）：
+- [Script Info] 段若含 `; Generator: StrangeUtaGame`，启用 pre-roll 补偿：
+  Dialogue Start 实际比首字 ts 早 SUG-PreRollMs，解析时 start_ms 加回去；
+  line_end_ts 自然回到 last_end_ts（post-roll 只影响 Dialogue End，不影响 \k 链）。
+- 第三方工具写的 ASS 没有哨兵 → 不补偿，按原语义解析。
 """
 
 import re
@@ -25,7 +32,12 @@ class ASSParser(LyricParser):
     ASS_TIME_PATTERN = re.compile(r"(\d+):(\d{2}):(\d{2})\.(\d{2})")
 
     # 卡拉OK标签: {\kf32}, {\k50}, {\ko10}, {\K30}, {\kF20}, {\kO15}
+    # 注意：模式不能匹配 {\sing_...}（\sing 以 s 开头不是 [kK]）
     KARAOKE_TAG_PATTERN = re.compile(r"\{\\[kK][oOfF]?(\d+)\}")
+
+    # SUG 私有 per-char singer 切换标记: {\sing_<name>}
+    # name 允许中文/拉丁/数字/下划线/连字符，遇到 `}` 结束
+    SING_TAG_PATTERN = re.compile(r"\{\\sing_([^}]*)\}")
 
     # Dialogue 行（10 个字段）
     DIALOGUE_PATTERN = re.compile(
@@ -41,30 +53,63 @@ class ASSParser(LyricParser):
         r"(.*)$"  # Text
     )
 
+    # [Script Info] 中的 SUG 哨兵 & 数值 & 标准 Title
+    _SUG_GENERATOR_RE = re.compile(
+        r"^\s*;\s*Generator\s*:\s*StrangeUtaGame\s*$", re.IGNORECASE
+    )
+    _SUG_PRE_ROLL_RE = re.compile(
+        r"^\s*;\s*SUG-PreRollMs\s*:\s*(\d+)\s*$", re.IGNORECASE
+    )
+    _SUG_POST_ROLL_RE = re.compile(
+        r"^\s*;\s*SUG-PostRollMs\s*:\s*(\d+)\s*$", re.IGNORECASE
+    )
+    _TITLE_RE = re.compile(r"^Title\s*:\s*(.*)$", re.IGNORECASE)
+
+    def __init__(self) -> None:
+        # parse() 填充；parse_metadata() 暴露给上层
+        self.metadata: Dict[str, str] = {}
+        self._is_sug: bool = False
+        self._pre_roll_ms: int = 0
+        self._post_roll_ms: int = 0
+
+    def parse_metadata(self) -> Dict[str, str]:
+        """返回上一次 parse() 收集到的元数据（Title 等）。
+
+        仅 ASSParser 暴露此方法；调用方在 parse() 之后取用。
+        """
+        return dict(self.metadata)
+
     def parse(self, content: str) -> List[ParsedLine]:
         """解析 ASS 格式内容"""
+        # 重置状态，避免同一实例多次解析时旧 metadata 残留
+        self.metadata = {}
+        self._is_sug = False
+        self._pre_roll_ms = 0
+        self._post_roll_ms = 0
+
         lines: List[ParsedLine] = []
-        in_events = False
+        section = ""  # 当前所在 section（小写）
 
         for raw_line in content.split("\n"):
-            raw_line = raw_line.strip()
+            raw_line = raw_line.rstrip("\r")
+            stripped = raw_line.strip()
 
-            if raw_line.lower() == "[events]":
-                in_events = True
+            # section 切换
+            if stripped.startswith("[") and stripped.endswith("]"):
+                section = stripped.lower()
                 continue
 
-            if raw_line.startswith("[") and raw_line.endswith("]") and in_events:
-                if raw_line.lower() != "[events]":
-                    in_events = False
-                    continue
-
-            if not in_events:
+            if section == "[script info]":
+                self._consume_script_info_line(stripped)
                 continue
 
-            if raw_line.startswith("Format:") or raw_line.startswith(";"):
+            if section != "[events]":
                 continue
 
-            match = self.DIALOGUE_PATTERN.match(raw_line)
+            if stripped.startswith("Format:") or stripped.startswith(";"):
+                continue
+
+            match = self.DIALOGUE_PATTERN.match(stripped)
             if not match:
                 continue
 
@@ -75,11 +120,47 @@ class ASSParser(LyricParser):
             if start_ms is None:
                 continue
 
+            # SUG 哨兵：实际首字 ts = Dialogue Start + pre_roll_ms。
+            # 第三方 ASS 没有哨兵 → 不补偿。
+            if self._is_sug:
+                start_ms = max(0, start_ms + self._pre_roll_ms)
+
             parsed_line = self._parse_karaoke_text(text_field, start_ms)
             if parsed_line and parsed_line.text.strip():
                 lines.append(parsed_line)
 
         return lines
+
+    def _consume_script_info_line(self, line: str) -> None:
+        """处理 [Script Info] 段的一行"""
+        if not line:
+            return
+
+        if self._SUG_GENERATOR_RE.match(line):
+            self._is_sug = True
+            self.metadata["generator"] = "StrangeUtaGame"
+            return
+
+        m = self._SUG_PRE_ROLL_RE.match(line)
+        if m:
+            try:
+                self._pre_roll_ms = int(m.group(1))
+            except ValueError:
+                pass
+            return
+
+        m = self._SUG_POST_ROLL_RE.match(line)
+        if m:
+            try:
+                self._post_roll_ms = int(m.group(1))
+            except ValueError:
+                pass
+            return
+
+        m = self._TITLE_RE.match(line)
+        if m:
+            self.metadata["title"] = m.group(1).strip()
+            return
 
     def _parse_ass_timestamp(self, time_str: str) -> Optional[int]:
         """解析 ASS 时间戳 H:MM:SS.cc → 毫秒"""
@@ -100,16 +181,16 @@ class ASSParser(LyricParser):
 
     @staticmethod
     def _strip_non_karaoke_tags(text: str) -> str:
-        """剥除非卡拉OK的 ASS 标签（如 {\\r}, {\\b1}, {\\c&HFFFFFF&}）。
+        r"""剥除非卡拉OK、非 \sing_* 的 ASS 标签（如 {\r}, {\b1}, {\c&HFFFFFF&}）。
 
-        卡拉OK标签 {\\k.../\\kf.../\\ko...} 在外部已经先抽走，这里只用
-        去除残留装饰性标签。注音文本（| 后内容）保持原样。
+        卡拉OK标签 {\k.../\kf.../\ko...} 与 SUG 私有 {\sing_...} 在外部已经
+        先抽走，这里只用去除残留装饰性标签。注音文本（| 后内容）保持原样。
         """
         return re.sub(r"\{[^}]*\}", "", text)
 
     @staticmethod
     def _classify_segment(segment: str) -> Tuple[str, str, str, str]:
-        """识别 \\k 段的语义类型并拆分。
+        r"""识别 \k 段的语义类型并拆分。
 
         Aegisub 注音三类段：
         - "continuation"  `#|<かな>` 或 `#|かな`: 续段，无主文，假名归属上一汉字
@@ -120,12 +201,9 @@ class ASSParser(LyricParser):
             (kind, main_text, ruby_text, raw_segment)
             kind ∈ {"continuation", "with_ruby", "plain"}
         """
-        # 续段标记：`#|` 开头（# 之前可能有别的字符吗？Aegisub 规范不会，
-        # 但用户工具可能在 #| 前放其他字符。保守起见仅匹配净 # 起始）
         stripped = segment.lstrip()
         if stripped.startswith("#|"):
             rest = stripped[2:]
-            # `#|<かな` 也可能（极少见），剥掉 `<`
             ruby_text = rest.lstrip("<")
             return "continuation", "", ruby_text, segment
 
@@ -139,16 +217,21 @@ class ASSParser(LyricParser):
     def _parse_karaoke_text(
         self, text: str, start_ms: int
     ) -> Optional[ParsedLine]:
-        """解析含卡拉OK标签的文本。
+        r"""解析含卡拉OK标签的文本。
 
         Aegisub karaoke-template 注音真实语法（三类段）：
-        - `{\\k<d>}<字>`            普通段
-        - `{\\k<d>}<汉字>|<<かな>`   带 ruby 首段（新建字符 + ruby.parts[0]）
-        - `{\\k<d>}#|<かな>`         续段（不新建字符；ts 与 part 追加给前一字）
+        - `{\k<d>}<字>`            普通段
+        - `{\k<d>}<汉字>|<<かな>`   带 ruby 首段（新建字符 + ruby.parts[0]）
+        - `{\k<d>}#|<かな>`         续段（不新建字符；ts 与 part 追加给前一字）
+
+        SUG 扩展：`{\sing_<name>}` 可出现在任意 `{\k...}` 段前/段内，
+        声明该段（及之后段）的演唱者，直到下一次 `\sing_` 切换。
 
         策略：
-        - 把整段按 `\\k...` 切片，每片用 `_classify_segment` 区分种类。
-        - "with_ruby"/"plain"：产生新字符 + 一条 timetag。
+        - 先抽出全部 `\k...` 与 `\\sing_...` token，按位置排序。
+        - 按 `\k` 段切片，每段用 `_classify_segment` 区分种类。
+        - 每段开始前若有 `\\sing_`，更新 current_singer。
+        - "with_ruby"/"plain"：产生新字符 + 一条 timetag；首字写入 char_singer_map。
         - "continuation"：把 (上一字的 char_idx → ts) 写入 extra_checkpoints_map，
           把假名追加到该字 ruby_map 的 parts_list。
         - 累加 duration → 下一片的起始时间。
@@ -158,7 +241,6 @@ class ASSParser(LyricParser):
 
         if not karaoke_tags:
             clean_text = self._strip_non_karaoke_tags(text)
-            # 兼容无 \k 但带 `|<` 注音
             if "|" in clean_text:
                 main_text, _, _ = clean_text.partition("|")
                 main_text = main_text.strip()
@@ -168,22 +250,39 @@ class ASSParser(LyricParser):
                 return ParsedLine(text=main_text, timetags=[(0, start_ms)])
             return None
 
+        # 预扫所有 \sing_ 位置 → 排序索引，按 \k 段切片时同步推进
+        sing_tags = list(self.SING_TAG_PATTERN.finditer(text))
+        sing_iter_idx = 0
+
         lyric_chars: List[str] = []
         timetags: List[Tuple[int, int]] = []
-        # 新签名：char_idx → (parts_list, span_length)
+        # char_idx → (parts_list, span_length)
         ruby_map: Dict[int, Tuple[List[str], int]] = {}
-        # ASS `#|` 续段给同字追加的额外 checkpoint
         extra_checkpoints_map: Dict[int, List[int]] = {}
+        char_singer_map: Dict[int, str] = {}
         current_ms = start_ms
         char_idx = 0
         last_duration_ms = 0
-        # 续段归属：最近一次产生新字符的起始 char_idx
         last_char_idx_for_ruby: Optional[int] = None
+        current_singer: str = ""
 
         for i, tag_match in enumerate(karaoke_tags):
             duration_cs = int(tag_match.group(1))
             duration_ms = duration_cs * 10
             last_duration_ms = duration_ms
+
+            # 推进 \sing_ 游标：任何位于本 \k 段之前（含同位置）的 \sing_
+            # 都更新 current_singer，作为本段的有效 singer。
+            # 注意：出现在「本段文本之后、下一段 \k 之前」的 \sing_ 属于下一段
+            # 的切换（参考 SUG 导出契约：sing 标签插在新 singer 字符的 \k 段之前），
+            # 由下一次迭代的 pre-loop 拾起，本段不消费。
+            seg_left_bound = tag_match.start()
+            while (
+                sing_iter_idx < len(sing_tags)
+                and sing_tags[sing_iter_idx].start() <= seg_left_bound
+            ):
+                current_singer = sing_tags[sing_iter_idx].group(1).strip()
+                sing_iter_idx += 1
 
             text_start = tag_match.end()
             text_end = (
@@ -193,41 +292,37 @@ class ASSParser(LyricParser):
             )
 
             raw_segment = text[text_start:text_end]
-            # 先剥掉装饰性 ASS 标签
             cleaned = self._strip_non_karaoke_tags(raw_segment)
-
             kind, main_text, ruby_text, _ = self._classify_segment(cleaned)
 
             if kind == "continuation":
-                # 续段：本段 ts 归属上一字符，假名追加到其 ruby.parts
                 if last_char_idx_for_ruby is not None and ruby_text:
                     extra_checkpoints_map.setdefault(
                         last_char_idx_for_ruby, []
                     ).append(current_ms)
-                    # 追加 part 到既有 ruby_map 项
                     if last_char_idx_for_ruby in ruby_map:
                         parts_list, span = ruby_map[last_char_idx_for_ruby]
                         parts_list.append(ruby_text)
                         ruby_map[last_char_idx_for_ruby] = (parts_list, span)
                     else:
-                        # 极少见：上一字没有首 part 注音却有续段。建一条新项。
                         ruby_map[last_char_idx_for_ruby] = ([ruby_text], 1)
-                # 续段不新建字符，不追加 lyric_chars
                 current_ms += duration_ms
                 continue
 
-            # with_ruby / plain：产生新字符（可能多字）
             if main_text:
                 first_char_idx_in_segment = char_idx
                 timetags.append((first_char_idx_in_segment, current_ms))
                 if ruby_text:
-                    # span = main_text 字符数。
-                    # - 单字 main_text + ruby_text：span=1, parts=[ruby_text]（之后续段会 append part）
-                    # - 多字 main_text + ruby_text：span=N, parts=[ruby_text]（旧整段共享 reading 语法）
                     ruby_map[first_char_idx_in_segment] = (
                         [ruby_text],
                         len(main_text),
                     )
+                if current_singer:
+                    # 整段所有字符共享同一 singer（含 multi-char span）
+                    for offset in range(len(main_text)):
+                        char_singer_map[first_char_idx_in_segment + offset] = (
+                            current_singer
+                        )
                 last_char_idx_for_ruby = first_char_idx_in_segment
 
                 for ch in main_text:
@@ -255,13 +350,16 @@ class ASSParser(LyricParser):
                 for ci, ts_list in extra_checkpoints_map.items()
                 if ci >= leading
             }
+            char_singer_map = {
+                ci - leading: name
+                for ci, name in char_singer_map.items()
+                if ci >= leading
+            }
 
         # 句尾释放：最后一片 \k 的 duration_ms 不丢弃
         line_end_ts: Optional[int] = None
         if timetags or extra_checkpoints_map:
             line_end_ts = current_ms
-            # 防御：若解析过程异常导致 line_end_ts 反而小于等于末 ts，
-            # 退化为「末 ts + 末片 duration」
             all_ts = [ts for _, ts in timetags]
             for extras in extra_checkpoints_map.values():
                 all_ts.extend(extras)
@@ -276,4 +374,5 @@ class ASSParser(LyricParser):
             line_end_ts=line_end_ts,
             ruby_map=ruby_map,
             extra_checkpoints_map=extra_checkpoints_map,
+            char_singer_map=char_singer_map,
         )

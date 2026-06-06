@@ -144,20 +144,22 @@ def parse_lyric_content(
     default_singer_id: str,
     project_singers: Optional[List[Singer]] = None,
     software_compensation_ms: int = 0,
-) -> Tuple[List[Sentence], bool, List[Singer]]:
+) -> Tuple[List[Sentence], bool, List[Singer], dict]:
     """解析歌词内容，返回解析后的句子列表。
 
     Args:
         content: 歌词文本内容
         default_singer_id: 默认演唱者 ID
-        project_singers: 当前项目的演唱者列表（用于 Nicokara 格式的演唱者匹配）
+        project_singers: 当前项目的演唱者列表（用于 Nicokara/ASS 格式的演唱者匹配）
         software_compensation_ms: 软件导出补偿（毫秒），导入时减去此值
 
     Returns:
-        (sentences, is_nicokara, new_singers):
+        (sentences, is_nicokara, new_singers, metadata):
         - sentences: 解析后的句子列表
         - is_nicokara: 是否为 Nicokara 格式
-        - new_singers: Nicokara 格式中需要新增的演唱者列表
+        - new_singers: Nicokara/ASS 格式中需要新增的演唱者列表
+        - metadata: 格式元数据字典（如 ASS 的 {"title": ..., "generator": ...}）；
+                    其他格式为空字典
 
     Raises:
         ValueError: 当内容是 SUG 项目文件格式时（由调用方处理为项目加载）
@@ -191,7 +193,7 @@ def parse_lyric_content(
     # 内联格式（包括 inline 和纯 RLF 文本格式）
     if fmt == "inline":
         sentences = sentences_from_inline_text(content, default_singer_id)
-        return _apply_compensation(sentences), False, []
+        return _apply_compensation(sentences), False, [], {}
 
     # Nicokara 格式
     if fmt == "nicokara":
@@ -247,7 +249,7 @@ def parse_lyric_content(
         # 其余未知 @ 标签原样收集到 tags["custom"]，导出器 round-trip 时按行回写。
         _sync_nicokara_metadata_to_settings(result.metadata)
 
-        return _apply_compensation(sentences), is_nicokara, new_singers
+        return _apply_compensation(sentences), is_nicokara, new_singers, {}
 
     # ASS 格式
     if fmt == "ass":
@@ -257,8 +259,40 @@ def parse_lyric_content(
 
         parser = ASSParser()
         parsed_lines = parser.parse(content)
-        sentences = parse_to_sentences(parsed_lines, default_singer_id)
-        return _apply_compensation(sentences), False, []
+
+        # 收集所有 per-char singer 显示名（{\sing_<name>} 解析产物）
+        all_singer_names: set = set()
+        for pl in parsed_lines:
+            for name in pl.char_singer_map.values():
+                if name:
+                    all_singer_names.add(name)
+
+        # 名字 → Singer.id：优先匹配已有同名 singer，否则新建
+        singer_name_to_id: dict = {}
+        singer_colors = [
+            "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", "#98D8C8",
+            "#C9B1FF", "#F7DC6F", "#82E0AA", "#F1948A", "#85C1E9",
+        ]
+        for idx, name in enumerate(sorted(all_singer_names)):
+            existing_id = None
+            if project_singers:
+                for s in project_singers:
+                    if s.name == name:
+                        existing_id = s.id
+                        break
+            if existing_id:
+                singer_name_to_id[name] = existing_id
+            else:
+                color = singer_colors[idx % len(singer_colors)]
+                new_singer = Singer(name=name, color=color, is_default=False)
+                singer_name_to_id[name] = new_singer.id
+                new_singers.append(new_singer)
+
+        sentences = parse_to_sentences(
+            parsed_lines, default_singer_id, singer_name_to_id=singer_name_to_id
+        )
+        meta = parser.parse_metadata()
+        return _apply_compensation(sentences), False, new_singers, meta
 
     # SRT 格式
     if fmt == "srt":
@@ -269,14 +303,14 @@ def parse_lyric_content(
         parser = SRTParser()
         parsed_lines = parser.parse(content)
         sentences = parse_to_sentences(parsed_lines, default_singer_id)
-        return _apply_compensation(sentences), False, []
+        return _apply_compensation(sentences), False, [], {}
 
     # LRC 格式
     if fmt == "lrc":
         lrc_parser = LRCParser()
         parsed_lines = lrc_parser.parse(content)
         sentences = parse_to_sentences(parsed_lines, default_singer_id)
-        return _apply_compensation(sentences), False, []
+        return _apply_compensation(sentences), False, [], {}
 
     # 纯文本：按行分割，保留空行作为空 Sentence（维持用户排版）。
     # 仅丢弃文件末尾换行符产生的终止空段，避免无谓追加空行。
@@ -298,7 +332,7 @@ def parse_lyric_content(
         )
         sentences.append(sentence)
 
-    return _apply_compensation(sentences), False, []
+    return _apply_compensation(sentences), False, [], {}
 
 
 def read_lyric_file(path: str) -> Optional[str]:
