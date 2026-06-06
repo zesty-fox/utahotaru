@@ -18,11 +18,12 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import (
     KanaDistributingAnalyzer,
@@ -39,9 +40,30 @@ Pairs = List[Tuple[str, Reading]]
 
 _ANTHROPIC_VERSION = "2023-06-01"
 
-# 会话级请求日志：写到程序目录 .cache/llm_ruby/requests.log，启动与退出时清理。
+# 会话级请求日志：写到程序目录 .cache/llm_ruby/，启动 / 退出时清理。
+#
+# 文件布局（每次 HTTP 调用三件套，按全局自增 seq 编号）：
+#   .cache/llm_ruby/
+#     index.log                  jsonl 概要：seq/ts/event/url/status/elapsed/error
+#     001-request.json           完整请求体（pretty JSON，api_key 已抹）
+#     001-response.json          完整响应体（JSON 则 pretty；非 JSON 则原样 .txt）
+#     001-extracted.txt          _extract_content 后的纯文本（用户最想读的那段）
+#     002-request.json           ...
+#
+# 不再把 body 塞进 index.log 字段（旧设计 JSON 套 JSON、转义满屏）。
 _LOG_DIR_NAME = "llm_ruby"
-_LOG_FILE_NAME = "requests.log"
+_INDEX_FILE_NAME = "index.log"
+
+# 全局调用序号（进程级单调递增），并发安全。
+_call_lock = threading.Lock()
+_call_seq = 0
+
+
+def _next_call_seq() -> int:
+    global _call_seq
+    with _call_lock:
+        _call_seq += 1
+        return _call_seq
 
 
 def _llm_log_dir() -> Path:
@@ -51,14 +73,66 @@ def _llm_log_dir() -> Path:
 
 
 def llm_log_event(event: str, **fields) -> None:
-    """追加一条 JSON 行日志（失败静默，绝不影响主流程）。"""
+    """向 index.log 追加一条 JSON 行（仅放小字段：seq/url/status/elapsed_ms/error）。
+
+    完整请求/响应内容请用 :func:`_dump_call`，不要塞进这里 —— 否则又会变成
+    JSON 套 JSON、转义满屏。失败静默，绝不影响主流程。
+    """
     try:
         d = _llm_log_dir()
         d.mkdir(parents=True, exist_ok=True)
         record = {"ts": datetime.now().isoformat(timespec="seconds"), "event": event}
         record.update(fields)
-        with open(d / _LOG_FILE_NAME, "a", encoding="utf-8") as f:
+        with open(d / _INDEX_FILE_NAME, "a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+def _dump_call(
+    seq: int, kind: str, content: Any,
+    redactor: Optional[Callable[[str], str]] = None,
+) -> None:
+    """把单次调用的请求 / 响应 / 抽取文本完整写到独立文件。
+
+    Args:
+        seq: 全局调用序号（来自 :func:`_next_call_seq`）。
+        kind: ``request`` / ``response`` / ``extracted`` / ``network_error`` /
+            ``parse_error``。决定文件名后缀和默认扩展。
+        content: 任意值。dict/list → pretty JSON；str → 原样写 .txt（或
+            尝试当 JSON 解析后 pretty）；其他 → str() 后写 .txt。
+        redactor: 可选回调，对序列化后的字符串再脱敏（如抹掉 api_key）。
+
+    失败静默。文件按 ``{seq:04d}-{kind}.{ext}`` 命名。
+    """
+    try:
+        d = _llm_log_dir()
+        d.mkdir(parents=True, exist_ok=True)
+        if isinstance(content, (dict, list)):
+            text = json.dumps(content, ensure_ascii=False, indent=2)
+            ext = "json"
+        elif isinstance(content, str):
+            # 尝试识别 JSON 文本并美化（响应体常是 JSON 字符串）；失败原样。
+            stripped = content.lstrip()
+            if stripped.startswith("{") or stripped.startswith("["):
+                try:
+                    parsed = json.loads(content)
+                    text = json.dumps(parsed, ensure_ascii=False, indent=2)
+                    ext = "json"
+                except Exception:
+                    text = content
+                    ext = "txt"
+            else:
+                text = content
+                ext = "txt"
+        else:
+            text = str(content)
+            ext = "txt"
+        if redactor is not None:
+            text = redactor(text)
+        path = d / f"{seq:04d}-{kind}.{ext}"
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
     except Exception:
         pass
 
@@ -67,10 +141,13 @@ def clear_llm_logs() -> None:
     """清除 LLM 请求日志目录（程序启动 / 退出时调用）。"""
     import shutil
 
+    global _call_seq
     try:
         d = _llm_log_dir()
         if d.exists():
             shutil.rmtree(d, ignore_errors=True)
+        with _call_lock:
+            _call_seq = 0
     except Exception:
         pass
 
@@ -193,6 +270,9 @@ class LLMRubyClient:
         self._proxies = proxies
         # 是否要求 LLM 为英语外来语片假名返回英文读音
         self._annotate_english = annotate_english
+        # 记录本次 _request 链路中最近一次（成功）HTTP 调用的全局 seq，
+        # 供 _request 把 extracted 文本对齐到同一调用编号下落盘。
+        self._last_call_seq: Optional[int] = None
 
     # ── 公共 API ──
 
@@ -249,7 +329,10 @@ class LLMRubyClient:
             mapping = _parse_payload(raw, lines)
         except Exception as e:  # noqa: BLE001
             snippet = (raw or "")[:300].replace("\n", " ")
-            llm_log_event("parse_error", error=str(e), raw=self._redact(raw)[:2000])
+            # 完整 raw 单独成文件，便于复盘解析失败的原始返回；index 只放短摘要。
+            err_seq = _next_call_seq()
+            _dump_call(err_seq, "parse_error", raw or "", redactor=self._redact)
+            llm_log_event("parse_error", seq=err_seq, error=str(e))
             return ({}, f"返回内容解析失败：{e}；原始返回：{snippet}")
         # 记录命中/缺失行数，便于核对按行回退
         llm_log_event(
@@ -320,9 +403,8 @@ class LLMRubyClient:
             }
             # Anthropic 参数稳定；仅 temperature 可能被个别模型拒绝，作为可选剥离项。
             data = self._post_with_param_fallback(url, headers, body, ["temperature"])
-            return _extract_content(data, "anthropic")
-
-        if fmt == "responses":
+            extracted = _extract_content(data, "anthropic")
+        elif fmt == "responses":
             headers = {
                 "Authorization": f"Bearer {self._cfg.api_key}",
                 "content-type": "application/json",
@@ -336,28 +418,36 @@ class LLMRubyClient:
             }
             # Responses API：text（结构化输出）与 temperature 在部分模型上不被支持。
             data = self._post_with_param_fallback(url, headers, body, ["text", "temperature"])
-            return _extract_content(data, "responses")
+            extracted = _extract_content(data, "responses")
+        else:
+            # OpenAI Chat Completions（兼容）
+            headers = {
+                "Authorization": f"Bearer {self._cfg.api_key}",
+                "content-type": "application/json",
+            }
+            body = {
+                "model": self._cfg.model,
+                "temperature": 0,
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt},
+                ],
+            }
+            # 不少兼容端点/推理模型不支持 response_format 或固定 temperature → 400。
+            # 逐步剥离重试（_coerce_json 已能兜底解析非严格 JSON）。
+            data = self._post_with_param_fallback(
+                url, headers, body, ["response_format", "temperature"]
+            )
+            extracted = _extract_content(data, "openai")
 
-        # OpenAI Chat Completions（兼容）
-        headers = {
-            "Authorization": f"Bearer {self._cfg.api_key}",
-            "content-type": "application/json",
-        }
-        body = {
-            "model": self._cfg.model,
-            "temperature": 0,
-            "response_format": {"type": "json_object"},
-            "messages": [
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ],
-        }
-        # 不少兼容端点/推理模型不支持 response_format 或固定 temperature → 400。
-        # 逐步剥离重试（_coerce_json 已能兜底解析非严格 JSON）。
-        data = self._post_with_param_fallback(
-            url, headers, body, ["response_format", "temperature"]
-        )
-        return _extract_content(data, "openai")
+        # 把抽取出的模型纯文本单独落盘 —— 这是用户最常想读的那段（annotated 行）。
+        # _post_with_param_fallback 内部已落盘过本次成功响应（在重试链中），
+        # 这里再写一个 extracted 文件对齐到最近的 seq。
+        extracted_seq = self._last_call_seq
+        if extracted_seq is not None:
+            _dump_call(extracted_seq, "extracted", extracted or "", redactor=self._redact)
+        return extracted
 
     def _post_with_param_fallback(
         self, url: str, headers: dict, body: dict, optional_keys: List[str]
@@ -397,15 +487,19 @@ class LLMRubyClient:
         """POST 并返回解析后的 JSON 响应体；非 200 抛 LLMRubyError。
 
         瞬时失败（网络中断 / 429 / 5xx）按 :attr:`_MAX_RETRIES` 退避重试；
-        每次请求/响应/错误写入会话级日志（api_key 已脱敏）。
+        每次请求/响应/错误**完整**落盘到 ``.cache/llm_ruby/NNNN-*.json``，
+        index.log 只记 seq/url/status/elapsed 等小字段（不再 JSON 套 JSON）。
         """
         import requests
 
         last_err: Optional[LLMRubyError] = None
         for attempt in range(self._MAX_RETRIES + 1):
+            seq = _next_call_seq()
+            # 请求体完整落盘（pretty JSON，api_key 抹掉）
+            _dump_call(seq, "request", body, redactor=self._redact)
             llm_log_event(
-                "request", url=url, attempt=attempt + 1,
-                format=self._cfg.api_format, body=self._redact(body),
+                "request", seq=seq, url=url, attempt=attempt + 1,
+                format=self._cfg.api_format,
             )
             start = time.time()
             try:
@@ -417,8 +511,9 @@ class LLMRubyClient:
                     proxies=self._proxies,
                 )
             except requests.exceptions.RequestException as e:
+                _dump_call(seq, "network_error", str(e))
                 llm_log_event(
-                    "network_error", url=url, attempt=attempt + 1, error=str(e)
+                    "network_error", seq=seq, url=url, attempt=attempt + 1, error=str(e)
                 )
                 last_err = LLMRubyError(f"网络请求失败：{e}")
                 if attempt < self._MAX_RETRIES:
@@ -428,13 +523,16 @@ class LLMRubyClient:
 
             elapsed_ms = int((time.time() - start) * 1000)
             text = resp.text or ""
+            # 响应体完整落盘（识别 JSON 则 pretty；非 JSON 原样 .txt；不再截断）
+            _dump_call(seq, "response", text, redactor=self._redact)
             llm_log_event(
-                "response", url=url, attempt=attempt + 1,
+                "response", seq=seq, url=url, attempt=attempt + 1,
                 status=resp.status_code, elapsed_ms=elapsed_ms,
-                body=self._redact(text)[:20000],
             )
 
             if resp.status_code == 200:
+                # 记下本次成功 seq，供 _request 把 extracted 文本对齐到同 seq 落盘。
+                self._last_call_seq = seq
                 try:
                     return resp.json()
                 except ValueError as e:

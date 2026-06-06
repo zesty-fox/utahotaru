@@ -470,14 +470,70 @@ def test_redact_hides_api_key():
 
 
 def test_log_write_and_clear(tmp_path, monkeypatch):
+    """index.log 写入小字段、clear 后整目录消失。"""
     import strange_uta_game.backend.infrastructure.parsers.llm_ruby as m
 
     monkeypatch.setattr(m, "_llm_log_dir", lambda: tmp_path / "llm_ruby")
-    m.llm_log_event("request", url="http://x", attempt=1)
-    log_file = tmp_path / "llm_ruby" / "requests.log"
+    m.llm_log_event("request", url="http://x", attempt=1, seq=1)
+    log_file = tmp_path / "llm_ruby" / "index.log"
     assert log_file.exists() and "request" in log_file.read_text(encoding="utf-8")
     m.clear_llm_logs()
     assert not (tmp_path / "llm_ruby").exists()
+
+
+def test_dump_call_writes_individual_files(tmp_path, monkeypatch):
+    """_dump_call 把请求/响应分别写入独立文件，无 JSON 套 JSON 转义。"""
+    import strange_uta_game.backend.infrastructure.parsers.llm_ruby as m
+
+    monkeypatch.setattr(m, "_llm_log_dir", lambda: tmp_path / "llm_ruby")
+    # dict → pretty JSON .json 文件
+    m._dump_call(1, "request", {"model": "x", "messages": [{"role": "user", "content": "今日は"}]})
+    req = tmp_path / "llm_ruby" / "0001-request.json"
+    assert req.exists()
+    text = req.read_text(encoding="utf-8")
+    # 日语原文应可读、没有 \\u 转义
+    assert "今日は" in text
+    assert "\\u" not in text
+    # pretty 应有换行缩进
+    assert "\n" in text and "  " in text
+
+    # 字符串响应若可识别为 JSON 也美化
+    m._dump_call(1, "response", '{"choices":[{"message":{"content":"{今日||きょう,}"}}]}')
+    resp = tmp_path / "llm_ruby" / "0001-response.json"
+    assert resp.exists()
+    # 美化后 content 内 annotated 文本可读
+    assert "{今日||きょう,}" in resp.read_text(encoding="utf-8")
+
+    # 非 JSON 字符串以 .txt 落盘
+    m._dump_call(2, "extracted", "{今日||きょう,}は{毎日||まい,にち}")
+    ext = tmp_path / "llm_ruby" / "0002-extracted.txt"
+    assert ext.exists()
+    assert ext.read_text(encoding="utf-8") == "{今日||きょう,}は{毎日||まい,にち}"
+
+
+def test_dump_call_redactor_strips_api_key(tmp_path, monkeypatch):
+    """redactor 回调把 api_key 抹掉再落盘。"""
+    import strange_uta_game.backend.infrastructure.parsers.llm_ruby as m
+
+    monkeypatch.setattr(m, "_llm_log_dir", lambda: tmp_path / "llm_ruby")
+    redactor = lambda s: s.replace("sk-secret", "***")
+    m._dump_call(3, "request", {"api_key": "sk-secret", "model": "x"}, redactor=redactor)
+    text = (tmp_path / "llm_ruby" / "0003-request.json").read_text(encoding="utf-8")
+    assert "sk-secret" not in text
+    assert "***" in text
+
+
+def test_call_seq_monotonic_and_reset_on_clear(tmp_path, monkeypatch):
+    """_next_call_seq 单调自增、clear_llm_logs 后归零。"""
+    import strange_uta_game.backend.infrastructure.parsers.llm_ruby as m
+
+    monkeypatch.setattr(m, "_llm_log_dir", lambda: tmp_path / "llm_ruby")
+    m.clear_llm_logs()
+    a, b, c = m._next_call_seq(), m._next_call_seq(), m._next_call_seq()
+    assert a < b < c
+    m.clear_llm_logs()
+    d = m._next_call_seq()
+    assert d == 1  # 归零后第一次从 1 开始
 
 
 def test_katakana_english_helpers():
