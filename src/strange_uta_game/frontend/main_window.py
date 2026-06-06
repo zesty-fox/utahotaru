@@ -103,6 +103,12 @@ class MainWindow(MSFluentWindow):
         # 监听主题变化，更新 Win10 兜底背景色
         theme.changed.connect(self._on_theme_changed)
 
+        # 启动时清空上一次会话的 LLM 注音日志（.cache/llm_ruby/）。
+        # 历史方案是「启动 + 退出双清」，但退出清会把崩溃前的请求/响应一并删掉，
+        # 调试时拿不到现场。现改成仅启动清 —— 上次会话日志保留到下次启动前，
+        # 用户随时可以打开 .cache/llm_ruby/ 复盘。
+        self._clear_llm_logs()
+
         # 全局 Ctrl+S 保存快捷键 —— standalone 专用；embedded 模式宿主可在
         # 自己的顶层窗口注册并转发到 :meth:`trigger_save`。
         if not self._embedded:
@@ -1070,7 +1076,7 @@ class MainWindow(MSFluentWindow):
                         AppSettings.set_default_provider(None)
                 except Exception:
                     pass
-            self._clear_llm_logs()
+            # LLM 日志不在退出时清，保留到下次启动以便复盘（启动时再清）。
             e.accept()
             return
 
@@ -1090,7 +1096,7 @@ class MainWindow(MSFluentWindow):
                     self.editorInterface.release_resources()
                 except Exception:
                     pass
-            self._clear_llm_logs()
+            # LLM 日志保留（启动时清）
             QApplication.quit()
             e.accept()
             return
@@ -1124,13 +1130,18 @@ class MainWindow(MSFluentWindow):
         # 释放编辑器资源
         if hasattr(self, "editorInterface"):
             self.editorInterface.release_resources()
-        self._clear_llm_logs()
+        # LLM 日志保留（启动时清）
         QApplication.quit()
         e.accept()
 
     @staticmethod
     def _clear_llm_logs() -> None:
-        """退出时清除会话级 LLM 请求日志。"""
+        """启动时清除上次会话遗留的 LLM 请求日志。
+
+        历史方案是「启动 + 退出双清」，但退出清会带走崩溃前的请求/响应，
+        无法事后复盘。现仅在启动时清，让上次会话日志在 .cache/llm_ruby/
+        持续保留到下次启动。
+        """
         try:
             from strange_uta_game.backend.infrastructure.parsers.llm_ruby import (
                 clear_llm_logs,

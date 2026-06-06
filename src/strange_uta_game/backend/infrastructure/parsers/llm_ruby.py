@@ -40,7 +40,8 @@ Pairs = List[Tuple[str, Reading]]
 
 _ANTHROPIC_VERSION = "2023-06-01"
 
-# 会话级请求日志：写到程序目录 .cache/llm_ruby/，启动 / 退出时清理。
+# 会话级请求日志：写到程序目录 .cache/llm_ruby/，**仅启动时清理**。
+# 退出时保留以便事后复盘（崩溃前的请求 / 响应不会随退出消失）。
 #
 # 文件布局（每次 HTTP 调用三件套，按全局自增 seq 编号）：
 #   .cache/llm_ruby/
