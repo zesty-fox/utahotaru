@@ -61,6 +61,7 @@ class Singer:
         color_mode: 颜色模式，"solid"（单色）或 "split"（分色）
         split_colors: 分色模式下的额外颜色列表（colors[1..4]，最多4项使总数≤5）
         is_default: 是否为默认演唱者
+        is_placeholder: 是否为软件初始占位演唱者（用户修改后自动清除）
         display_priority: 显示优先级（数字越小越优先显示）
         enabled: 是否启用（禁用的演唱者不参与全局序列）
         backend_number: 后台编号（从1开始递增，不随显示名改变）
@@ -79,6 +80,7 @@ class Singer:
     split_colors: List[str] = field(default_factory=list)
     backend_number: int = 0
     is_default: bool = False
+    is_placeholder: bool = False
     display_priority: int = 0
     enabled: bool = True
     group: str = ""
@@ -117,6 +119,7 @@ class Singer:
         if not new_name:
             raise ValidationError("演唱者名称不能为空")
         self.name = new_name
+        self.is_placeholder = False
 
     def change_color(
         self,
@@ -138,10 +141,12 @@ class Singer:
                 c for c in split_colors
                 if c and c.startswith("#") and len(c) == 7
             ][:4]
+        self.is_placeholder = False
 
     def set_enabled(self, enabled: bool) -> None:
         """设置启用状态"""
         self.enabled = enabled
+        self.is_placeholder = False
 
 
 @dataclass

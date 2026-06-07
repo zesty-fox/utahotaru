@@ -93,6 +93,7 @@ class Project:
                 name="未命名",
                 color="#FF6B6B",
                 is_default=True,
+                is_placeholder=True,
                 display_priority=0,
                 backend_number=1,
             )

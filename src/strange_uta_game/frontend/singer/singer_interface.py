@@ -1670,6 +1670,7 @@ class SingerManagerInterface(QWidget):
                 "color_mode": s.color_mode,
                 "split_colors": s.split_colors,
                 "is_default": s.is_default,
+                "is_placeholder": s.is_placeholder,
                 "backend_number": s.backend_number,
                 "group": s.group,
             }
@@ -1710,12 +1711,11 @@ class SingerManagerInterface(QWidget):
         if not selected_presets:
             return
 
-        # 若项目中仅有一个未命名默认演唱者（软件初始占位符），导入后将其替换
+        # 若项目中仅有一个占位演唱者（软件初始占位符），导入后将其替换
         unnamed_default_id = None
         if (
             len(self._project.singers) == 1
-            and self._project.singers[0].name == "未命名"
-            and self._project.singers[0].is_default
+            and self._project.singers[0].is_placeholder
         ):
             unnamed_default_id = self._project.singers[0].id
 

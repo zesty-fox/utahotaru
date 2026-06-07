@@ -22,6 +22,7 @@ class TestProject:
 
         default_singer = project.singers[0]
         assert default_singer.is_default is True
+        assert default_singer.is_placeholder is True
         assert default_singer.name == "未命名"
         assert default_singer.backend_number == 1
 

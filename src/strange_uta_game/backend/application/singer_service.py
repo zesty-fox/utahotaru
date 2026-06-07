@@ -209,6 +209,7 @@ class SingerService:
             return False
 
         singer.group = group
+        singer.is_placeholder = False
 
         if self._callbacks.on_singer_updated:
             self._callbacks.on_singer_updated(singer)
@@ -243,6 +244,8 @@ class SingerService:
 
         for s in self._project.singers:
             s.is_default = s.id == singer_id
+
+        target.is_placeholder = False
 
         if self._callbacks.on_singer_updated:
             self._callbacks.on_singer_updated(target)

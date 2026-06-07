@@ -14,6 +14,7 @@ class TestSinger:
         assert singer.name == "未命名"
         assert singer.color == "#FF6B6B"
         assert singer.is_default is False
+        assert singer.is_placeholder is False
         assert singer.display_priority == 0
         assert singer.enabled is True
         assert singer.id is not None  # 自动生成 UUID
@@ -35,6 +36,7 @@ class TestSinger:
         singer.rename("初音ミク")
 
         assert singer.name == "初音ミク"
+        assert singer.is_placeholder is False
 
     def test_rename_empty_raises_error(self):
         """测试重命名为空应该抛出 ValidationError"""
@@ -49,6 +51,7 @@ class TestSinger:
         singer.change_color("#39C5BB")
 
         assert singer.color == "#39C5BB"
+        assert singer.is_placeholder is False
 
     def test_change_color_invalid_format(self):
         """测试修改颜色为无效格式应该抛出 ValidationError"""
@@ -68,6 +71,7 @@ class TestSinger:
         singer.set_enabled(False)
 
         assert singer.enabled is False
+        assert singer.is_placeholder is False
 
     def test_mutable_attributes(self):
         """测试 Singer 属性可变性（实体特性）"""
@@ -79,6 +83,29 @@ class TestSinger:
 
         assert singer.name == "新名称"
         assert singer.color == "#000000"
+
+    def test_is_placeholder_flag(self):
+        """测试 is_placeholder 标记在创建后默认为 False"""
+        singer = Singer(name="测试")
+        assert singer.is_placeholder is False
+
+    def test_placeholder_cleared_on_rename(self):
+        """测试重命名时 is_placeholder 被清除"""
+        singer = Singer(name="未命名", is_placeholder=True)
+        singer.rename("新名字")
+        assert singer.is_placeholder is False
+
+    def test_placeholder_cleared_on_color_change(self):
+        """测试改色时 is_placeholder 被清除"""
+        singer = Singer(is_placeholder=True)
+        singer.change_color("#00FF00")
+        assert singer.is_placeholder is False
+
+    def test_placeholder_cleared_on_set_enabled(self):
+        """测试设置启用状态时 is_placeholder 被清除"""
+        singer = Singer(is_placeholder=True)
+        singer.set_enabled(False)
+        assert singer.is_placeholder is False
 
     def test_id_uniqueness(self):
         """测试每个 Singer 有唯一的 ID"""
