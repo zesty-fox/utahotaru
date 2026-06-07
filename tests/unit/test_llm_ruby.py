@@ -695,6 +695,125 @@ def test_annotated_parser_isolated_single_block_keeps_string_form():
     assert pairs == [("あ", "あ"), ("る", "る"), ("日", "ひ")]
 
 
+# ── LLM 输出 → 项目内部 → 序列化回 annotated 的语义等价（核心回归） ──
+#
+# LLM 按辞典锚点输出 {毎日||まい,にち}（可拆），项目内部必须表现为「两个独立
+# 字符不连词」、序列化回项目 annotated 形式必须是 {毎||まい}{日||にち}（而不是
+# {毎日||まい,にち} —— 那是 linked compound 写法）。同时 morpheme 保护机制
+# 通过独立字段 morpheme_span 工作，不依赖 linked_to_next/连词渲染。
+
+
+def _llm_to_internal(line_text: str, llm_annotated: str, user_dict=None):
+    """跑一次 LLM → AutoCheckService → Character[] 全链路，返回结果句子。"""
+    from strange_uta_game.backend.application import AutoCheckService
+    from strange_uta_game.backend.domain import Sentence
+    from strange_uta_game.backend.infrastructure.parsers.llm_ruby import (
+        LLMRubyAnalyzer,
+        LLMRubyConfig,
+        _parse_payload,
+    )
+
+    cfg = LLMRubyConfig(enabled=True, base_url="x", api_key="k", model="m")
+    analyzer = LLMRubyAnalyzer(cfg, lines=[line_text], fallback=_SelfAnalyzer())
+    payload = '{"lines":[{"i":0,"text":' + repr(llm_annotated).replace("'", '"') + "}]}"
+    # 简化：直接打桩 mapping
+    mapping = _parse_payload(payload, [line_text])
+    analyzer._client.annotate_lines = lambda _l: (mapping, None)
+
+    svc = AutoCheckService(
+        ruby_analyzer=analyzer, auto_check_flags={},
+        user_dictionary=user_dict or [],
+    )
+    s = Sentence.from_text(line_text, "s0")
+    svc.apply_to_sentence(s, apply_user_dict=bool(user_dict), skip_romanize=True)
+    return s
+
+
+def test_llm_splittable_compound_yields_independent_chars():
+    """LLM {毎日||まい,にち}（可拆） → 内部两个独立字符（毎/日 都不连词）。"""
+    s = _llm_to_internal("毎日", "{毎日||まい,にち}")
+    assert len(s.characters) == 2
+    毎, 日 = s.characters
+    assert 毎.char == "毎" and "".join(p.text for p in 毎.ruby.parts) == "まい"
+    assert 日.char == "日" and "".join(p.text for p in 日.ruby.parts) == "にち"
+    # 关键：可拆复合词内部不连词，与 {毎||まい}{日||にち} 等价
+    assert not 毎.linked_to_next, "毎 不应连词（LLM 给了 {毎日||まい,にち} = 可拆）"
+    assert not 日.linked_to_next
+
+
+def test_llm_jukujikun_compound_yields_linked_chars():
+    """LLM {今日||きょう,}（熟字訓） → 内部 linked compound（今 连词到 日）。"""
+    s = _llm_to_internal("今日", "{今日||きょう,}")
+    assert len(s.characters) == 2
+    今, 日 = s.characters
+    assert "".join(p.text for p in 今.ruby.parts) == "きょう"
+    assert 日.ruby is None or not any(p.text for p in 日.ruby.parts)
+    # 关键：熟字訓 linked
+    assert 今.linked_to_next, "今日 是熟字訓，必须 linked"
+
+
+def test_llm_splittable_round_trip_to_project_annotated():
+    """端到端 round-trip：LLM {毎日||まい,にち} → 序列化回项目 annotated 必须
+    是 {毎||まい}{日||にち}（两个独立块），不是 LLM 输入的 {毎日||まい,にち}。
+
+    这是「LLM 协议」和「项目语义」的关键转换点：LLM 用辞典锚点的多字 ,
+    写法表达"可拆"，项目用独立单字块表达"两个独立字符"，转换由 _build_results
+    +AutoCheckService 完成。
+    """
+    from strange_uta_game.backend.infrastructure.parsers.annotated_text import (
+        sentence_to_annotated_line,
+    )
+
+    s = _llm_to_internal("毎日", "{毎日||まい,にち}")
+    roundtrip = sentence_to_annotated_line(s.characters)
+    # 应输出独立单字块形式（mora 边界 | 可能存在，但块结构必须是两个独立 {}）
+    assert "{毎" in roundtrip and "{日" in roundtrip
+    assert "{毎日" not in roundtrip, (
+        f"可拆复合词不应回写为 linked compound 形式，actual: {roundtrip}"
+    )
+
+
+def test_llm_jukujikun_round_trip_preserves_linked_form():
+    """熟字訓 round-trip 保持 {今日||...,} linked compound 形式。"""
+    from strange_uta_game.backend.infrastructure.parsers.annotated_text import (
+        sentence_to_annotated_line,
+    )
+
+    s = _llm_to_internal("今日", "{今日||きょう,}")
+    roundtrip = sentence_to_annotated_line(s.characters)
+    # 必须保持一个多字块形式
+    assert roundtrip.startswith("{今日"), (
+        f"熟字訓应回写为 linked compound 形式，actual: {roundtrip}"
+    )
+
+
+def test_morpheme_protection_decoupled_from_linking():
+    """morpheme 保护机制独立于连词渲染：可拆复合词虽然内部不连词，
+    用户词典 日→ひ 仍不能穿透 LLM 已确定的 毎+日=まい+にち 上下文。
+
+    本地注音和 LLM 注音共用同一套 morpheme_span 保护（PR1），与 linked_to_next
+    无关。
+    """
+    user_dict = [{"enabled": True, "word": "日", "reading": "{日||ひ}"}]
+
+    # 可拆复合词：内部不连词，但 morpheme 保护应阻止 日→ひ 覆盖 日
+    s = _llm_to_internal("毎日", "{毎日||まい,にち}", user_dict=user_dict)
+    日 = s.characters[1]
+    日_reading = "".join(p.text for p in 日.ruby.parts)
+    assert 日_reading == "にち", (
+        f"毎日 内的 日 应保留 LLM 给的 にち（morpheme 保护），"
+        f"被错误覆盖为 {日_reading!r}"
+    )
+    # 验证内部确实不连词（保护机制不依赖 linked_to_next）
+    assert not s.characters[0].linked_to_next
+
+    # 隔离单字：morpheme 保护不应阻止用户词典对孤立 日 生效
+    s2 = _llm_to_internal("ある日", "ある{日||ひ}", user_dict=user_dict)
+    孤立日 = s2.characters[2]
+    孤立日_reading = "".join(p.text for p in 孤立日.ruby.parts)
+    assert 孤立日_reading == "ひ"  # LLM 和词典恰好一致；关键是没出错
+
+
 def test_autocheck_renders_katakana_english_block():
     """端到端：AutoCheckService 把 ギター/guitar 渲染为首字带英文、整词连词。"""
     from strange_uta_game.backend.application import AutoCheckService
