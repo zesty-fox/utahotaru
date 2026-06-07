@@ -646,15 +646,22 @@ def _annotated_to_pairs(text: str) -> Tuple[Pairs, str]:
     - 块外字符按原样输出。
 
     Pairs 编码：
-    - 多字块：所有字读音非空 → ``(原文, [r1, r2, ...])`` 数组形；
+    - 多字块（直接 multi-char）：所有字读音非空 → ``(原文, [r1, r2, ...])`` 数组形；
       含尾随空读音 → ``(原文, "".join(读音))`` 字符串形（首字承载、其余连词）。
-    - 单字块：``(原文, 读音)`` 字符串形。
+    - 单字块：``(原文, 读音)`` 字符串形；**但连续的单字块 run 会被合并成一个
+      多字 array 形 pair**，让下游 ``_build_results`` 给整段加 ``morpheme_span``，
+      保证 Phase 5 用户词典不能把其中任一字单独覆盖。LLM 把复合词按 PR6 规则拆成
+      ``{毎||まい}{日||にち}`` 时，两块在语法上独立但语义上是同一 morpheme —— 用户
+      词典 ``日→ひ`` 不应破坏 LLM 已确定的 ``毎+日=まい+にち`` 上下文读音。
+      bare 字符（无 ``{}`` 包裹）会打断 run；多字块本身就是独立 morpheme，也打断 run。
     - 块外字符：每字 ``(c, c)`` 自注音。
 
     解析失败（未闭合 ``{``、读音段数不符等）会原样吃掉异常 token 并尽量恢复；
     最终 ``raw_text`` 与原行不符时调用方应丢弃该行。
     """
-    pairs: Pairs = []
+    # 中间结构：(surface, reading, kind)
+    # kind: 'single_block' / 'multi_block' / 'bare'
+    interm: List[Tuple[str, Reading, str]] = []
     raw_chars: List[str] = []
     i = 0
     n = len(text)
@@ -664,7 +671,7 @@ def _annotated_to_pairs(text: str) -> Tuple[Pairs, str]:
             if close == -1:
                 # 未闭合 → 当普通字符
                 raw_chars.append(text[i])
-                pairs.append((text[i], text[i]))
+                interm.append((text[i], text[i], "bare"))
                 i += 1
                 continue
             content = text[i + 1 : close]
@@ -680,17 +687,17 @@ def _annotated_to_pairs(text: str) -> Tuple[Pairs, str]:
                     "".join(seg for seg in r.split("|") if seg) for r in per_char_raw
                 ]
                 raw_chars.extend(text_part)
-                # 单字块统一字符串形：array/string 在下游等价但 string 更直观。
                 if len(text_part) == 1:
-                    pairs.append(
-                        (text_part, per_char_clean[0] if per_char_clean else text_part)
-                    )
+                    reading_s = per_char_clean[0] if per_char_clean else text_part
+                    interm.append((text_part, reading_s, "single_block"))
                 elif len(per_char_clean) == len(text_part) and all(per_char_clean):
-                    # 多字干净逐字 → 数组形（保留 morpheme_span 给 Phase 5 保护）
-                    pairs.append((text_part, list(per_char_clean)))
+                    # 多字干净逐字 → 数组形
+                    interm.append((text_part, list(per_char_clean), "multi_block"))
                 else:
                     # 含尾随空 / 段数不符 → 拼成字符串走整块分配
-                    pairs.append((text_part, "".join(per_char_clean) or text_part))
+                    interm.append(
+                        (text_part, "".join(per_char_clean) or text_part, "multi_block")
+                    )
             elif "|" in content:
                 # 兼容短形：{原文|读音}
                 text_part, _, reading_part = content.partition("|")
@@ -700,19 +707,48 @@ def _annotated_to_pairs(text: str) -> Tuple[Pairs, str]:
                 reading = "".join(seg for seg in reading_part.split("|") if seg)
                 raw_chars.extend(text_part)
                 if len(text_part) == 1:
-                    pairs.append((text_part, reading or text_part))
+                    interm.append((text_part, reading or text_part, "single_block"))
                 else:
-                    pairs.append((text_part, reading or text_part))
+                    interm.append((text_part, reading or text_part, "multi_block"))
             else:
-                # {原文} 无读音 → 每字自注音
+                # {原文} 无读音 → 每字自注音（按 bare 处理，不参与单字块合并）
                 for c in content:
                     raw_chars.append(c)
-                    pairs.append((c, c))
+                    interm.append((c, c, "bare"))
             i = close + 1
         else:
             raw_chars.append(text[i])
-            pairs.append((text[i], text[i]))
+            interm.append((text[i], text[i], "bare"))
             i += 1
+
+    # 合并连续单字块 run：把它们捏成一个多字 morpheme（array 形），
+    # 让 _build_results 给整段挂同一 morpheme_span，Phase 5 用户词典做不到单字穿刺。
+    pairs: Pairs = []
+    j = 0
+    m = len(interm)
+    while j < m:
+        surface, reading, kind = interm[j]
+        if kind != "single_block":
+            pairs.append((surface, reading))
+            j += 1
+            continue
+        # 向后收集连续 single_block run
+        run_surfaces: List[str] = [surface]
+        run_readings: List[str] = [reading if isinstance(reading, str) else "".join(reading)]
+        k = j + 1
+        while k < m and interm[k][2] == "single_block":
+            run_surfaces.append(interm[k][0])
+            r_k = interm[k][1]
+            run_readings.append(r_k if isinstance(r_k, str) else "".join(r_k))
+            k += 1
+        if len(run_surfaces) == 1:
+            # 孤立 single_block：保留字符串形（与多字 morpheme 区分，不享受 Phase 5 保护）
+            pairs.append((surface, reading))
+        else:
+            # 合并：多字 array → 下游加 morpheme_span，Phase 5 保护整段
+            pairs.append(("".join(run_surfaces), list(run_readings)))
+        j = k
+
     return pairs, "".join(raw_chars)
 
 

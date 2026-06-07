@@ -628,29 +628,74 @@ def test_prompt_schema_hint_examples_consistent():
     assert "{逆光||ぎゃっ,こう}" not in _OUTPUT_SCHEMA_HINT
 
 
-def test_annotated_parser_round_trip_split_blocks():
-    """新拆字写法（多个单字块）能被解析器还原为期望 Pairs。"""
+def test_annotated_parser_merges_consecutive_single_blocks():
+    """连续单字块被合并为一个多字 morpheme（array 形），让 Phase 5 用户词典保护整段。
+
+    LLM 把复合词按 PR6 规则拆成 {毎||まい}{日||にち} 时，两块语法独立、语义同 morpheme；
+    用户词典 日→ひ 不应破坏 LLM 已确定的 毎+日=まい+にち 上下文。
+    """
     from strange_uta_game.backend.infrastructure.parsers.llm_ruby import _annotated_to_pairs
 
     pairs, raw = _annotated_to_pairs("{物||もの}{語||がたり}")
     assert raw == "物語"
-    # 两个独立单字 morpheme：各自 ('字', '读音')
-    assert pairs == [("物", "もの"), ("語", "がたり")]
+    # 合并为一个多字 array morpheme
+    assert pairs == [("物語", ["もの", "がたり"])]
 
-    # 熟字訓写法不变
+    # 熟字訓 multi-char 块不变
     pairs, raw = _annotated_to_pairs("{今日||きょう,}")
     assert raw == "今日"
-    assert pairs == [("今日", "きょう")]  # 字符串形（含尾随空 → 拼成 "きょう"）
+    assert pairs == [("今日", "きょう")]
 
-    # 混合
+    # 混合：今日（multi 块，独立 morpheme）+ は（bare）+ 毎日（两个单字块合并）
     pairs, raw = _annotated_to_pairs("{今日||きょう,}は{毎||まい}{日||にち}")
     assert raw == "今日は毎日"
     assert pairs == [
         ("今日", "きょう"),
         ("は", "は"),
-        ("毎", "まい"),
-        ("日", "にち"),
+        ("毎日", ["まい", "にち"]),
     ]
+
+
+def test_annotated_parser_bare_char_breaks_single_block_run():
+    """中间夹 bare 字符（非 {} 块）→ 不合并。"""
+    from strange_uta_game.backend.infrastructure.parsers.llm_ruby import _annotated_to_pairs
+
+    pairs, _ = _annotated_to_pairs("{毎||まい}は{日||にち}")
+    assert pairs == [("毎", "まい"), ("は", "は"), ("日", "にち")]
+
+
+def test_annotated_parser_multi_block_breaks_single_block_run():
+    """多字块在单字 run 中间出现 → 各自独立，不合并到一起。"""
+    from strange_uta_game.backend.infrastructure.parsers.llm_ruby import _annotated_to_pairs
+
+    # 毎(single) + 今日(multi) + 楽(single)：三个独立 morpheme
+    pairs, _ = _annotated_to_pairs("{毎||まい}{今日||きょう,}{楽||らく}")
+    assert pairs == [
+        ("毎", "まい"),
+        ("今日", "きょう"),
+        ("楽", "らく"),
+    ]
+
+
+def test_annotated_parser_three_consecutive_single_blocks_merge():
+    """连续 3 个单字块也能合并为同一 3 字 morpheme。"""
+    from strange_uta_game.backend.infrastructure.parsers.llm_ruby import _annotated_to_pairs
+
+    pairs, raw = _annotated_to_pairs("{愛||あい}{国||こく}{心||しん}")
+    assert raw == "愛国心"
+    assert pairs == [("愛国心", ["あい", "こく", "しん"])]
+
+
+def test_annotated_parser_isolated_single_block_keeps_string_form():
+    """孤立单字块（前后无其他单字块）保持字符串形，**不享受 morpheme 保护**。
+
+    这是"标准独立字"语义（用户词典若有匹配可正常生效）。
+    """
+    from strange_uta_game.backend.infrastructure.parsers.llm_ruby import _annotated_to_pairs
+
+    pairs, _ = _annotated_to_pairs("ある{日||ひ}")
+    assert pairs == [("あ", "あ"), ("る", "る"), ("日", "ひ")]
+    # 末尾的 日 是孤立单字块 → 字符串形 → 无 morpheme_span → 用户词典可覆盖
 
 
 def test_autocheck_renders_katakana_english_block():
