@@ -65,6 +65,9 @@ from qfluentwidgets import (
 
 from strange_uta_game.frontend.theme import theme, ThemeColors
 
+from strange_uta_game.backend.infrastructure.exporters.nicokara_exporter import (
+    strip_variation_selectors,
+)
 from strange_uta_game.backend.domain import (
     Character,
     Ruby,
@@ -724,9 +727,7 @@ class InsertGuideSymbolDialog(QDialog):
     def _on_execute(self):
         from strange_uta_game.backend.domain.models import Character
 
-        # 不再过滤 Unicode 变体选择符（U+FE00-U+FE0F）等非用户主动输入的字符
-        # 例如 ☢︎ 会被解析为 ☢ + VS15(0xFE0E)，不需要过滤掉变体选择符
-        symbol = self.edit_symbol.text().strip()
+        symbol = strip_variation_selectors(self.edit_symbol.text().strip())
         if not symbol:
             return
 

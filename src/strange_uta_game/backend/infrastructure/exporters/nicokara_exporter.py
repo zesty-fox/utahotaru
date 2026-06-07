@@ -44,6 +44,33 @@ _FULLWIDTH_CARET = "\uff3e"  # ＾
 _ASCII_CARET = "^"
 
 
+def strip_variation_selectors(text: str) -> str:
+    """移除所有 Unicode 变体选择符（共 259 个不可见字符）。
+
+    覆盖三类：
+    - U+FE00–U+FE0F  基本变体选择符 VS1–VS16（含 emoji VS16 0xFE0F）
+    - U+180B–U+180D  蒙古文自由变体选择符 FVS1–FVS3
+    - U+E0100–U+E01EF  补充变体选择符 VS17–VS256（CJK IVS 用）
+
+    这些字符为零宽度的不可见格式控制符，仅用于修饰前一个字符的
+    呈现风格。在导唱符 / 导出等纯文本交换场景中应移除，否则其他
+    软件可能将其渲染为 tofu 方框。
+    """
+    if not text:
+        return text
+    result = []
+    for ch in text:
+        cp = ord(ch)
+        if (
+            0xFE00 <= cp <= 0xFE0F
+            or 0x180B <= cp <= 0x180D
+            or 0xE0100 <= cp <= 0xE01EF
+        ):
+            continue
+        result.append(ch)
+    return "".join(result)
+
+
 def _pause_char_variants(pause_char: str) -> set:
     """返回停顿符及其全角/半角变体"""
     variants = {pause_char}
@@ -252,12 +279,18 @@ class NicokaraExporter(BaseExporter):
                     parts.append(f"【{singer_name}】")
                 prev_singer_id = effective_singer
 
+            # 过滤变体选择符：纯变体选择符字符整体跳过（含时间戳），
+            # 非纯变体选择符则移除尾随的选择符后输出
+            cleaned_char = strip_variation_selectors(ch.char)
+            if not cleaned_char:
+                continue
+
             # 字符起始时间戳（第一个 checkpoint，使用导出时间戳含偏移）
             # 注意：无 global_timestamps 时**不**填占位（如 [00:00:00]），
             # 直接输出字符。Nicokara 解析器会把该字符视为与前一字"连读"。
             if ch.global_timestamps:
                 parts.append(_format_nicokara_ts(ch.global_timestamps[0]))
-            parts.append(ch.char)
+            parts.append(cleaned_char)
 
             # 句中演唱停顿点的释放时间戳：当某个非行尾字符被标为
             # "演唱停顿"（is_sentence_end，命名遗留，真实语义是
@@ -585,6 +618,7 @@ class NicokaraWithRubyExporter(NicokaraExporter):
                 end_idx = i
 
                 kanji = "".join(c.char for c in chars[start_idx:end_idx])
+                kanji = strip_variation_selectors(kanji)
                 reading_fallback = "".join(
                     p.text
                     for c in chars[start_idx:end_idx]
