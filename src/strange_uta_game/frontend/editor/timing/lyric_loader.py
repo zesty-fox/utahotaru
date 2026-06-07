@@ -55,7 +55,7 @@ def _is_json_content(content: str) -> bool:
         return False
 
 
-def _sync_nicokara_metadata_to_settings(metadata: dict) -> None:
+def _sync_nicokara_metadata_to_settings(metadata: dict, *, setting_iface=None) -> None:
     """把 Nicokara 解析出的 @ 元数据写回 AppSettings.nicokara_tags（覆盖式）。
 
     SHINTA 2025 规格 K：未知 @ 标签需要保留并在导出时原样回写，
@@ -63,6 +63,10 @@ def _sync_nicokara_metadata_to_settings(metadata: dict) -> None:
 
     Args:
         metadata: NicokaraParseResult.metadata，{key: value} 扁平字典（key 不含 @）。
+        setting_iface: 可选 SettingsInterface 实例。给定时使用其共享 _settings，
+            确保后续 _settings.save() 不会用启动期旧内存覆盖磁盘；
+            None 时回退到新建 AppSettings()（仅写磁盘，旧内存仍会回滚——
+            仅用于无 UI 上下文的纯测试场景）。
 
     映射：
         Title         → tags["title"]
@@ -110,7 +114,12 @@ def _sync_nicokara_metadata_to_settings(metadata: dict) -> None:
         tags["custom"] = custom
 
     try:
-        AppSettings().set("nicokara_tags", tags)
+        if setting_iface is not None and hasattr(setting_iface, "get_settings"):
+            settings = setting_iface.get_settings()
+        else:
+            settings = AppSettings()
+        settings.set("nicokara_tags", tags)
+        settings.save()  # 持久化到磁盘——旧实现遗漏 save 导致新建实例的修改根本未落盘
     except Exception:
         # 写入失败不阻断导入；exporter 端 fallback 仍可用旧值
         pass
@@ -144,6 +153,8 @@ def parse_lyric_content(
     default_singer_id: str,
     project_singers: Optional[List[Singer]] = None,
     software_compensation_ms: int = 0,
+    *,
+    setting_iface=None,
 ) -> Tuple[List[Sentence], bool, List[Singer], dict]:
     """解析歌词内容，返回解析后的句子列表。
 
@@ -247,7 +258,9 @@ def parse_lyric_content(
         # 覆盖式（每次导入一个 Nicokara 文件即代表用户切换到新项目）。
         # 已知键 (@Title/@Artist/@Album/@TaggingBy/@SilencemSec) 落到对应字段；
         # 其余未知 @ 标签原样收集到 tags["custom"]，导出器 round-trip 时按行回写。
-        _sync_nicokara_metadata_to_settings(result.metadata)
+        _sync_nicokara_metadata_to_settings(
+            result.metadata, setting_iface=setting_iface
+        )
 
         return _apply_compensation(sentences), is_nicokara, new_singers, {}
 

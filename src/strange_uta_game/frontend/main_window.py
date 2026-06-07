@@ -487,12 +487,15 @@ class MainWindow(MSFluentWindow):
         # extras 可能为空（旧版 sug 无 extras 字段），但仍需重置 nicokara_tags，
         # 否则上一个项目残留的 tags 会在保存时回写到当前 sug，造成跨项目污染。
 
-        # nicokara_tags：始终覆盖到 AppSettings；sug 内缺失则 reset 为默认值
+        # nicokara_tags：始终覆盖到 AppSettings；sug 内缺失则 reset 为默认值。
+        # 必须写到 SettingsInterface 共享的 _settings 实例（而非新建 AppSettings()），
+        # 否则共享实例内存中的旧值会在后续任何 self._settings.save() 时回滚磁盘。
         nicokara_tags = extras.get("nicokara_tags")
         if nicokara_tags is None:
             nicokara_tags = AppSettings.DEFAULT_SETTINGS.get("nicokara_tags", {})
         try:
-            settings = AppSettings()
+            setting_iface = getattr(self, "settingInterface", None)
+            settings = setting_iface.get_settings() if setting_iface else AppSettings()
             settings.set("nicokara_tags", nicokara_tags)
             settings.save()
         except Exception:

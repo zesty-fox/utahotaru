@@ -739,10 +739,19 @@ class HomeInterface(QWidget):
 
         # SHINTA 2025 规格透明性 (差异 K)：把解析到的 @ 元数据写回 AppSettings.nicokara_tags。
         # 与打轴页"加载歌词文件"路径保持一致——见 lyric_loader._sync_nicokara_metadata_to_settings。
+        # 传入 SettingsInterface 共享实例，避免新建 AppSettings() 改不到长寿命 _settings
+        # 内存中的旧值（启动后续 _settings.save() 会用旧值覆盖磁盘）。
         from strange_uta_game.frontend.editor.timing.lyric_loader import (
             _sync_nicokara_metadata_to_settings,
         )
-        _sync_nicokara_metadata_to_settings(result.metadata)
+        setting_iface = None
+        try:
+            setting_iface = getattr(self.window(), "settingInterface", None)
+        except Exception:
+            pass
+        _sync_nicokara_metadata_to_settings(
+            result.metadata, setting_iface=setting_iface
+        )
 
         # 收集所有出现的 singer_key
         all_singer_keys: set = set()
