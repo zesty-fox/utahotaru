@@ -105,8 +105,16 @@ class NicokaraExporter(BaseExporter):
         known_singer_ids: Set[str] = {s.id for s in project.singers}
 
         for i, sentence in enumerate(project.sentences):
-            # 空行（用户排版意图）无条件保留
-            is_blank_line = not sentence.text.strip() and not sentence.characters
+            # 空行（用户排版意图）无条件保留：
+            # 1. 无 text 且无 characters；
+            # 2. text 全为空白 + 无 timetag + characters 全为空白（checkcount=0 的空格行）
+            is_blank_line = not sentence.text.strip() and (
+                not sentence.characters
+                or (
+                    not sentence.has_timetags
+                    and all(c.char.strip() == "" for c in sentence.characters)
+                )
+            )
             # 演唱者过滤：检查行内是否有选中的演唱者字符
             if singer_ids is not None and not is_blank_line:
                 if not self._sentence_has_singer(
@@ -369,8 +377,16 @@ class NicokaraWithRubyExporter(NicokaraExporter):
         default_singer_id = self._get_default_singer_id(project)
 
         for i, sentence in enumerate(project.sentences):
-            # 空行（用户排版意图）无条件保留
-            is_blank_line = not sentence.text.strip() and not sentence.characters
+            # 空行（用户排版意图）无条件保留：
+            # 1. 无 text 且无 characters；
+            # 2. text 全为空白 + 无 timetag + characters 全为空白（checkcount=0 的空格行）
+            is_blank_line = not sentence.text.strip() and (
+                not sentence.characters
+                or (
+                    not sentence.has_timetags
+                    and all(c.char.strip() == "" for c in sentence.characters)
+                )
+            )
             # 演唱者过滤
             if singer_ids is not None and not is_blank_line:
                 if not self._sentence_has_singer(
