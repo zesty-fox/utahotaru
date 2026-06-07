@@ -596,106 +596,103 @@ def test_prompt_includes_english_rule_only_when_enabled():
 
 
 def test_prompt_contains_split_vs_jukujikun_rule():
-    """系统提示词应包含「拆字 vs 不拆」判定规则及关键正反例。"""
+    """系统提示词应包含「拆字 vs 不拆」判定规则及关键正反例（辞典 ‐/＝ 锚点）。"""
     from strange_uta_game.backend.infrastructure.parsers.llm_ruby import _SYSTEM_PROMPT
 
-    # 关键术语
-    assert "拆字" in _SYSTEM_PROMPT or "分け" in _SYSTEM_PROMPT
+    # 锚点：明确引用 小学館デジタル大辞泉 + ‐ / ＝ 分隔
+    assert "小学館" in _SYSTEM_PROMPT
+    assert "‐" in _SYSTEM_PROMPT  # U+2010
+    assert "＝" in _SYSTEM_PROMPT  # U+FF1D
     assert "熟字訓" in _SYSTEM_PROMPT
-    # 拆字正例（独立读音）
-    assert "{物||もの}{語||がたり}" in _SYSTEM_PROMPT
-    assert "{笑||え}{顔||かお}" in _SYSTEM_PROMPT
-    assert "{毎||まい}{日||にち}" in _SYSTEM_PROMPT
-    # 不拆反例（熟字訓 / 当て字）
+    # 拆字正例（多字块 + , 分隔，新写法）
+    assert "{物語||もの,がたり}" in _SYSTEM_PROMPT
+    assert "{毎日||まい,にち}" in _SYSTEM_PROMPT
+    assert "{大冒険||だい,ぼう,けん}" in _SYSTEM_PROMPT
+    # 不拆反例（多字块 + 末尾,）
     assert "{今日||きょう,}" in _SYSTEM_PROMPT
     assert "{昨日||きのう,}" in _SYSTEM_PROMPT
     assert "{大人||おとな,}" in _SYSTEM_PROMPT
     assert "{風邪||かぜ,}" in _SYSTEM_PROMPT
     # 一日的双重读（ついたち 熟字訓 vs いちにち 可拆）须有提示
     assert "ついたち" in _SYSTEM_PROMPT
+    # 块边界 = morpheme 边界 的明示
+    assert "morpheme 境界" in _SYSTEM_PROMPT
+
+
+def test_prompt_no_longer_uses_single_block_compound_notation():
+    """PR8 后旧的「连续单字块表示复合词」写法不应再出现在 prompt 里。"""
+    from strange_uta_game.backend.infrastructure.parsers.llm_ruby import (
+        _SYSTEM_PROMPT, _OUTPUT_SCHEMA_HINT,
+    )
+
+    # PR6 引入的旧写法（已被 PR8 取代）：不能再出现
+    for bad in ("{物||もの}{語||がたり}", "{笑||え}{顔||かお}", "{毎||まい}{日||にち}",
+                "{大||だい}{冒||ぼう}{険||けん}", "{日||に}{本||ほん}"):
+        assert bad not in _SYSTEM_PROMPT, f"prompt 仍含旧写法 {bad!r}"
+        assert bad not in _OUTPUT_SCHEMA_HINT, f"schema hint 仍含旧写法 {bad!r}"
 
 
 def test_prompt_schema_hint_examples_consistent():
-    """schema hint 内的拆字/不拆示例与 system prompt 一致，不再使用旧 `{毎日||まい,にち}` 写法。"""
+    """schema hint 用 PR8 新写法。"""
     from strange_uta_game.backend.infrastructure.parsers.llm_ruby import _OUTPUT_SCHEMA_HINT
 
-    # 新写法
-    assert "{毎||まい}{日||にち}" in _OUTPUT_SCHEMA_HINT
-    assert "{物||もの}{語||がたり}" in _OUTPUT_SCHEMA_HINT
+    assert "{毎日||まい,にち}" in _OUTPUT_SCHEMA_HINT
+    assert "{物語||もの,がたり}" in _OUTPUT_SCHEMA_HINT
     assert "{今日||きょう,}" in _OUTPUT_SCHEMA_HINT
-    # 旧写法不应再出现（避免 LLM 仿写）
-    assert "{毎日||まい,にち}" not in _OUTPUT_SCHEMA_HINT
-    assert "{逆光||ぎゃっ,こう}" not in _OUTPUT_SCHEMA_HINT
+    # 隣接复合词示例
+    assert "{物語||もの,がたり}{映画||えい,が}" in _OUTPUT_SCHEMA_HINT
 
 
-def test_annotated_parser_merges_consecutive_single_blocks():
-    """连续单字块被合并为一个多字 morpheme（array 形），让 Phase 5 用户词典保护整段。
+def test_annotated_parser_does_not_merge_consecutive_single_blocks():
+    """PR8 后：连续单字块各自独立，不再合并。
 
-    LLM 把复合词按 PR6 规则拆成 {毎||まい}{日||にち} 时，两块语法独立、语义同 morpheme；
-    用户词典 日→ひ 不应破坏 LLM 已确定的 毎+日=まい+にち 上下文。
+    多个复合词紧贴时（如 物語+映画 写成连续 4 个单字块）按邻接合并是错的；
+    现严格遵守「{...}{...} 块边界 = morpheme 边界」。
     """
     from strange_uta_game.backend.infrastructure.parsers.llm_ruby import _annotated_to_pairs
 
-    pairs, raw = _annotated_to_pairs("{物||もの}{語||がたり}")
-    assert raw == "物語"
-    # 合并为一个多字 array morpheme
+    # 4 个连续单字块 → 4 个独立 pair（不再合并）
+    pairs, raw = _annotated_to_pairs("{物||もの}{語||がたり}{映||えい}{画||が}")
+    assert raw == "物語映画"
+    assert pairs == [
+        ("物", "もの"),
+        ("語", "がたり"),
+        ("映", "えい"),
+        ("画", "が"),
+    ]
+
+    # 复合词用多字块写：morpheme 整段保护
+    pairs, raw = _annotated_to_pairs("{物語||もの,がたり}{映画||えい,が}")
+    assert raw == "物語映画"
+    assert pairs == [
+        ("物語", ["もの", "がたり"]),
+        ("映画", ["えい", "が"]),
+    ]
+
+
+def test_annotated_parser_multi_block_for_compounds():
+    """复合词用多字块表达：可拆用 ',' 分字，不可拆用末尾 ','。"""
+    from strange_uta_game.backend.infrastructure.parsers.llm_ruby import _annotated_to_pairs
+
+    # 可拆复合词（辞典 もの‐がたり）
+    pairs, _ = _annotated_to_pairs("{物語||もの,がたり}")
     assert pairs == [("物語", ["もの", "がたり"])]
 
-    # 熟字訓 multi-char 块不变
-    pairs, raw = _annotated_to_pairs("{今日||きょう,}")
-    assert raw == "今日"
+    # 不可拆复合词（辞典 きょう 一塊）
+    pairs, _ = _annotated_to_pairs("{今日||きょう,}")
     assert pairs == [("今日", "きょう")]
 
-    # 混合：今日（multi 块，独立 morpheme）+ は（bare）+ 毎日（两个单字块合并）
-    pairs, raw = _annotated_to_pairs("{今日||きょう,}は{毎||まい}{日||にち}")
-    assert raw == "今日は毎日"
-    assert pairs == [
-        ("今日", "きょう"),
-        ("は", "は"),
-        ("毎日", ["まい", "にち"]),
-    ]
-
-
-def test_annotated_parser_bare_char_breaks_single_block_run():
-    """中间夹 bare 字符（非 {} 块）→ 不合并。"""
-    from strange_uta_game.backend.infrastructure.parsers.llm_ruby import _annotated_to_pairs
-
-    pairs, _ = _annotated_to_pairs("{毎||まい}は{日||にち}")
-    assert pairs == [("毎", "まい"), ("は", "は"), ("日", "にち")]
-
-
-def test_annotated_parser_multi_block_breaks_single_block_run():
-    """多字块在单字 run 中间出现 → 各自独立，不合并到一起。"""
-    from strange_uta_game.backend.infrastructure.parsers.llm_ruby import _annotated_to_pairs
-
-    # 毎(single) + 今日(multi) + 楽(single)：三个独立 morpheme
-    pairs, _ = _annotated_to_pairs("{毎||まい}{今日||きょう,}{楽||らく}")
-    assert pairs == [
-        ("毎", "まい"),
-        ("今日", "きょう"),
-        ("楽", "らく"),
-    ]
-
-
-def test_annotated_parser_three_consecutive_single_blocks_merge():
-    """连续 3 个单字块也能合并为同一 3 字 morpheme。"""
-    from strange_uta_game.backend.infrastructure.parsers.llm_ruby import _annotated_to_pairs
-
-    pairs, raw = _annotated_to_pairs("{愛||あい}{国||こく}{心||しん}")
-    assert raw == "愛国心"
-    assert pairs == [("愛国心", ["あい", "こく", "しん"])]
+    # 三字可拆
+    pairs, _ = _annotated_to_pairs("{大冒険||だい,ぼう,けん}")
+    assert pairs == [("大冒険", ["だい", "ぼう", "けん"])]
 
 
 def test_annotated_parser_isolated_single_block_keeps_string_form():
-    """孤立单字块（前后无其他单字块）保持字符串形，**不享受 morpheme 保护**。
-
-    这是"标准独立字"语义（用户词典若有匹配可正常生效）。
-    """
+    """孤立单字块保留字符串形（独立 morpheme，无 Phase 5 保护，用户词典可生效）。"""
     from strange_uta_game.backend.infrastructure.parsers.llm_ruby import _annotated_to_pairs
 
     pairs, _ = _annotated_to_pairs("ある{日||ひ}")
     assert pairs == [("あ", "あ"), ("る", "る"), ("日", "ひ")]
-    # 末尾的 日 是孤立单字块 → 字符串形 → 无 morpheme_span → 用户词典可覆盖
 
 
 def test_autocheck_renders_katakana_english_block():
