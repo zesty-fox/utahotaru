@@ -4,7 +4,14 @@
 AppSettings["nicokara_tags"]["custom"]，并记忆首行参数供下次预填。
 
 @Emoji 格式（SHINTA NicokaraMaker3 规格）：
-  @Emoji=<触发字符>,<前画像>,<后画像（可空）>,<选项...>
+  @Emoji=<用于替换为图片的字符>,<擦除前图片>,<擦除后图片（可省略）>,<选项...>
+
+选项：
+  Zoom=n%     ：按字幕尺寸缩放图片，保持宽高比（10%~500%，默认 100%）
+  Fix         ：保持原图尺寸
+  NoDecor     ：不给表情符号添加文字装饰
+  ForceWipeDecor：前后图片相同时也强制擦除文字装饰
+  MarginLeft=n, MarginRight=n, MarginBottom=n：留白（像素，允许负值）
 
 典型用途（无图标分色，仅用透明 1x1 占位）：
   @Emoji=【演唱者名】,透明画像1x1.png,,Zoom=1,NoDecor,MarginRight=-170
@@ -13,7 +20,7 @@ AppSettings["nicokara_tags"]["custom"]，并记忆首行参数供下次预填。
 from __future__ import annotations
 
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 # AppSettings 延迟导入（避免循环 / Qt 未初始化时失败），
 # 同时在模块级声明以便 unittest.mock.patch 可以 patch。
@@ -27,8 +34,8 @@ from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
+    QFrame,
     QHBoxLayout,
-    QLabel,
     QScrollArea,
     QVBoxLayout,
     QWidget,
@@ -36,6 +43,8 @@ from PyQt6.QtWidgets import (
 from qfluentwidgets import (
     BodyLabel,
     CaptionLabel,
+    CheckBox,
+    ComboBox,
     LineEdit,
     PrimaryPushButton,
     PushButton,
@@ -46,6 +55,136 @@ from qfluentwidgets import (
 _EMOJI_TAG_RE = re.compile(r"^@Emoji\d*=", re.IGNORECASE)
 
 DEFAULT_PARAMS = "透明画像1x1.png,,Zoom=1,NoDecor,MarginRight=-170"
+
+
+def split_params(params_str: str) -> Tuple[str, str, str]:
+    """拆分参数字符串为 (前画像, 后画像, 选项)。
+
+    Args:
+        params_str: 逗号分隔的参数串，格式为 "前画像,后画像,选项..."
+                    例如 "img.png,,Zoom=1,NoDecor"
+
+    Returns:
+        (前画像, 后画像, 选项) 三元组，缺失字段返回空串。
+    """
+    parts = params_str.split(",")
+    front_img = parts[0] if len(parts) > 0 else ""
+    back_img = parts[1] if len(parts) > 1 else ""
+    options = ",".join(parts[2:]) if len(parts) > 2 else ""
+    return front_img, back_img, options
+
+
+def parse_option_str(options_str: str) -> Dict[str, Any]:
+    """解析选项字符串为各参数字典。
+
+    Args:
+        options_str: 如 "Zoom=1,NoDecor,MarginRight=-170"
+
+    Returns:
+        {"zoom_mode": "Zoom"|"Fix"|None, "zoom_value": int,
+         "nodecor": bool, "forcewipedecor": bool,
+         "margin_left": int, "margin_right": int, "margin_bottom": int}
+    """
+    result: Dict[str, Any] = {
+        "zoom_mode": None,
+        "zoom_value": 100,
+        "nodecor": False,
+        "forcewipedecor": False,
+        "margin_left": 0,
+        "margin_right": 0,
+        "margin_bottom": 0,
+    }
+    if not options_str.strip():
+        return result
+
+    for part in options_str.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "=" in part:
+            key, val = part.split("=", 1)
+            key_lower = key.strip().lower()
+            val = val.strip()
+            if key_lower == "zoom":
+                result["zoom_mode"] = "Zoom"
+                val_clean = val.rstrip("%")
+                try:
+                    result["zoom_value"] = int(val_clean)
+                except ValueError:
+                    pass
+            elif key_lower == "marginleft":
+                try:
+                    result["margin_left"] = int(val)
+                except ValueError:
+                    pass
+            elif key_lower == "marginright":
+                try:
+                    result["margin_right"] = int(val)
+                except ValueError:
+                    pass
+            elif key_lower == "marginbottom":
+                try:
+                    result["margin_bottom"] = int(val)
+                except ValueError:
+                    pass
+        else:
+            kw = part.lower()
+            if kw == "fix":
+                result["zoom_mode"] = "Fix"
+            elif kw == "nodecor":
+                result["nodecor"] = True
+            elif kw == "forcewipedecor":
+                result["forcewipedecor"] = True
+    return result
+
+
+def build_option_str(opts: Dict[str, Any]) -> str:
+    """从各参数字典构建选项字符串。
+
+    Args:
+        opts: parse_option_str 返回格式的字典。
+
+    Returns:
+        选项字符串，如 "Zoom=1,NoDecor,MarginRight=-170"
+    """
+    parts: List[str] = []
+
+    zoom_mode = opts.get("zoom_mode")
+    if zoom_mode == "Zoom":
+        parts.append(f"Zoom={opts.get('zoom_value', 100)}")
+    elif zoom_mode == "Fix":
+        parts.append("Fix")
+
+    if opts.get("nodecor"):
+        parts.append("NoDecor")
+    if opts.get("forcewipedecor"):
+        parts.append("ForceWipeDecor")
+
+    for key, label in [("margin_left", "MarginLeft"),
+                       ("margin_right", "MarginRight"),
+                       ("margin_bottom", "MarginBottom")]:
+        val = opts.get(key, 0)
+        if val != 0:
+            parts.append(f"{label}={val}")
+
+    return ",".join(parts)
+
+
+def join_params(front_img: str, back_img: str, options: str) -> str:
+    """将分拆的三个字段合并为参数字符串。
+
+    Args:
+        front_img: 前画像路径（可空）
+        back_img:  后画像路径（可空）
+        options:   逗号分隔的选项（可空）
+
+    Returns:
+        逗号连接的参数字符串，如 "img.png,,Zoom=1,NoDecor"
+    """
+    parts = [front_img, back_img]
+    if options:
+        parts.append(options)
+    return ",".join(parts)
 
 
 def strip_emoji_tags(custom: List[str]) -> List[str]:
@@ -109,9 +248,13 @@ def apply_emoji_tags_to_settings(
 class EmojiTagDialog(QDialog):
     """分色标签设置助手弹窗
 
-    按演唱者逐行配置 @Emoji 标签。每行包含：
-    - 触发字符（默认 =【演唱者名】，可修改）
-    - 参数（默认为首行记忆值，否则为 DEFAULT_PARAMS）
+    按演唱者逐行配置 @Emoji 标签。每位演唱者一个分组卡片，包含：
+    - 触发字符（默认 =【演唱者名】，必须填写）
+    - 前画像（擦除前图片，可留空）
+    - 後画像（擦除后图片，可省略；留空则与前画像相同）
+    - 缩放模式：未指定（默认 100%）/ Zoom（指定比例）/ Fix（保持原尺寸）
+    - NoDecor / ForceWipeDecor 复选框
+    - 左／右／下 余白（像素，可负值）
 
     「确定」后调用 apply_emoji_tags_to_settings 写入配置。
     """
@@ -123,12 +266,11 @@ class EmojiTagDialog(QDialog):
     ):
         super().__init__(parent)
         self.setWindowTitle("分色标签设置助手")
-        self.setMinimumWidth(620)
+        self.setMinimumWidth(820)
         self.setMinimumHeight(300)
 
-        self._singers = singers  # 当前需要配置的演唱者列表
-        # [(singer_name, trigger_edit, params_edit), ...]
-        self._rows: List[Tuple[str, LineEdit, LineEdit]] = []
+        self._singers = singers
+        self._rows: List[Dict[str, Any]] = []
 
         self._init_ui()
         self._populate_rows()
@@ -146,32 +288,18 @@ class EmojiTagDialog(QDialog):
         layout.addWidget(title)
 
         desc = CaptionLabel(
-            "为每位演唱者配置 @Emoji 标签。触发字符与正文中的【演唱者名】对应，\n"
-            "参数部分格式：前画像,后画像（可空）,选项... （逗号分隔）"
+            "为每位演唱者配置 @Emoji 标签。触发字符与正文中的【演唱者名】对应。\n"
+            "後画像留空时，表示与前画像相同（无擦除效果）。\n"
+            "缩放默认 100%（与字幕等大）；Zoom 可指定 10%~500% 比例；Fix 保持原图尺寸。"
         )
         desc.setWordWrap(True)
         layout.addWidget(desc)
 
-        # 表头
-        header = QHBoxLayout()
-        lbl_singer = QLabel("演唱者")
-        lbl_singer.setFixedWidth(90)
-        lbl_singer.setFont(QFont("Microsoft YaHei", 9))
-        lbl_trigger = QLabel("触发字符")
-        lbl_trigger.setFixedWidth(130)
-        lbl_trigger.setFont(QFont("Microsoft YaHei", 9))
-        lbl_params = QLabel("参数（前画像, 后画像, 选项...）")
-        lbl_params.setFont(QFont("Microsoft YaHei", 9))
-        header.addWidget(lbl_singer)
-        header.addWidget(lbl_trigger)
-        header.addWidget(lbl_params)
-        layout.addLayout(header)
-
-        # 滚动区容纳行列表
+        # 滚动区容纳演唱者卡片列表
         self._row_widget = QWidget()
         self._row_layout = QVBoxLayout(self._row_widget)
         self._row_layout.setContentsMargins(0, 0, 0, 0)
-        self._row_layout.setSpacing(6)
+        self._row_layout.setSpacing(8)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -205,51 +333,210 @@ class EmojiTagDialog(QDialog):
         except Exception:
             return DEFAULT_PARAMS
 
+    def _make_option_controls(self, default_opts: Dict[str, Any]):
+        """创建一行选项控件，返回各控件字典。"""
+        ctrls: Dict[str, Any] = {}
+
+        ctrls["zoom_mode"] = ComboBox()
+        ctrls["zoom_mode"].addItems(["未指定", "Zoom", "Fix"])
+        ctrls["zoom_mode"].setFixedWidth(96)
+        if default_opts["zoom_mode"] == "Fix":
+            ctrls["zoom_mode"].setCurrentText("Fix")
+        elif default_opts["zoom_mode"] == "Zoom":
+            ctrls["zoom_mode"].setCurrentText("Zoom")
+
+        ctrls["zoom_value"] = LineEdit()
+        ctrls["zoom_value"].setFont(QFont("Microsoft YaHei", 10))
+        ctrls["zoom_value"].setText(str(default_opts["zoom_value"]))
+        ctrls["zoom_value"].setFixedWidth(54)
+        ctrls["zoom_value"].setPlaceholderText("100")
+        ctrls["zoom_value"].setEnabled(default_opts["zoom_mode"] == "Zoom")
+
+        ctrls["zoom_mode"].currentTextChanged.connect(
+            lambda text: ctrls["zoom_value"].setEnabled(text == "Zoom")
+        )
+
+        ctrls["zoom_pct"] = BodyLabel("%")
+
+        ctrls["nodecor"] = CheckBox("NoDecor")
+        ctrls["nodecor"].setChecked(default_opts["nodecor"])
+
+        ctrls["forcewipedecor"] = CheckBox("ForceWipeDecor")
+        ctrls["forcewipedecor"].setChecked(default_opts["forcewipedecor"])
+
+        ctrls["margin_lbl"] = BodyLabel("余白")
+
+        ctrls["margin_left_lbl"] = BodyLabel("L")
+
+        ctrls["margin_left"] = LineEdit()
+        ctrls["margin_left"].setFont(QFont("Microsoft YaHei", 10))
+        ctrls["margin_left"].setText(str(default_opts["margin_left"]))
+        ctrls["margin_left"].setFixedWidth(54)
+        ctrls["margin_left"].setPlaceholderText("0")
+        ctrls["margin_left"].setToolTip("MarginLeft：图片左侧留白（像素，允许负值）")
+
+        ctrls["margin_right_lbl"] = BodyLabel("R")
+
+        ctrls["margin_right"] = LineEdit()
+        ctrls["margin_right"].setFont(QFont("Microsoft YaHei", 10))
+        ctrls["margin_right"].setText(str(default_opts["margin_right"]))
+        ctrls["margin_right"].setFixedWidth(54)
+        ctrls["margin_right"].setPlaceholderText("0")
+        ctrls["margin_right"].setToolTip("MarginRight：图片右侧留白（像素，允许负值）")
+
+        ctrls["margin_bottom_lbl"] = BodyLabel("B")
+
+        ctrls["margin_bottom"] = LineEdit()
+        ctrls["margin_bottom"].setFont(QFont("Microsoft YaHei", 10))
+        ctrls["margin_bottom"].setText(str(default_opts["margin_bottom"]))
+        ctrls["margin_bottom"].setFixedWidth(54)
+        ctrls["margin_bottom"].setPlaceholderText("0")
+        ctrls["margin_bottom"].setToolTip("MarginBottom：图片下方留白（像素，允许负值）")
+
+        return ctrls
+
+    def _add_option_row(self, card_layout: QVBoxLayout, ctrls: Dict[str, Any]):
+        """将选项控件添加到卡片布局的第二行。"""
+        row = QHBoxLayout()
+        row.setSpacing(4)
+        row.setContentsMargins(0, 2, 0, 0)
+
+        row.addWidget(ctrls["zoom_mode"])
+        row.addWidget(ctrls["zoom_value"])
+        row.addWidget(ctrls["zoom_pct"])
+        row.addSpacing(10)
+        row.addWidget(ctrls["nodecor"])
+        row.addWidget(ctrls["forcewipedecor"])
+        row.addSpacing(10)
+        row.addWidget(ctrls["margin_lbl"])
+        row.addWidget(ctrls["margin_left_lbl"])
+        row.addWidget(ctrls["margin_left"])
+        row.addWidget(ctrls["margin_right_lbl"])
+        row.addWidget(ctrls["margin_right"])
+        row.addWidget(ctrls["margin_bottom_lbl"])
+        row.addWidget(ctrls["margin_bottom"])
+        row.addStretch()
+
+        card_layout.addLayout(row)
+
     def _populate_rows(self):
-        """根据 self._singers 填充每行配置控件。"""
-        default_params = self._get_default_params()
+        """根据 self._singers 填充每位演唱者的配置卡片。"""
+        default_str = self._get_default_params()
+        default_front, default_back, default_opts_str = split_params(default_str)
+        default_opts = parse_option_str(default_opts_str)
 
         for _singer_id, singer_name in self._singers:
-            row_layout = QHBoxLayout()
-            row_layout.setSpacing(8)
+            card = QFrame()
+            card.setFrameShape(QFrame.Shape.StyledPanel)
+            card.setFrameShadow(QFrame.Shadow.Raised)
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(10, 8, 10, 8)
+            card_layout.setSpacing(4)
+
+            # --- 第一行：演唱者名 · 触发字符 · 前画像 · 後画像 ---
+            row1 = QHBoxLayout()
+            row1.setSpacing(6)
 
             name_lbl = BodyLabel(singer_name)
-            name_lbl.setFixedWidth(90)
-            row_layout.addWidget(name_lbl)
+            name_lbl.setFixedWidth(80)
+            row1.addWidget(name_lbl)
+
+            trigger_lbl = BodyLabel("触发")
+            row1.addWidget(trigger_lbl)
 
             trigger_edit = LineEdit()
-            trigger_edit.setFixedWidth(130)
             trigger_edit.setFont(QFont("Microsoft YaHei", 10))
             trigger_edit.setText(f"【{singer_name}】")
-            trigger_edit.setPlaceholderText("触发字符")
-            row_layout.addWidget(trigger_edit)
+            trigger_edit.setPlaceholderText("必填")
+            trigger_edit.setFixedWidth(110)
+            row1.addWidget(trigger_edit)
 
-            params_edit = LineEdit()
-            params_edit.setFont(QFont("Microsoft YaHei", 10))
-            params_edit.setText(default_params)
-            params_edit.setPlaceholderText("前画像,后画像（可空）,选项...")
-            row_layout.addWidget(params_edit)
+            front_lbl = BodyLabel("前画像")
+            front_lbl.setToolTip("擦除前图片文件名（可留空）")
+            row1.addWidget(front_lbl)
 
-            self._row_layout.addLayout(row_layout)
-            self._rows.append((singer_name, trigger_edit, params_edit))
+            front_edit = LineEdit()
+            front_edit.setFont(QFont("Microsoft YaHei", 10))
+            front_edit.setText(default_front)
+            front_edit.setPlaceholderText("可留空")
+            row1.addWidget(front_edit, stretch=2)
+
+            back_lbl = BodyLabel("後画像")
+            back_lbl.setToolTip("擦除后图片文件名（可省略；留空=与前画像相同）")
+            row1.addWidget(back_lbl)
+
+            back_edit = LineEdit()
+            back_edit.setFont(QFont("Microsoft YaHei", 10))
+            back_edit.setText(default_back)
+            back_edit.setPlaceholderText("留空=同前画像")
+            row1.addWidget(back_edit, stretch=2)
+
+            card_layout.addLayout(row1)
+
+            # --- 第二行：缩放 · 飾り · 余白 ---
+            opt_ctrls = self._make_option_controls(default_opts)
+            self._add_option_row(card_layout, opt_ctrls)
+
+            self._row_layout.addWidget(card)
+            self._rows.append({
+                "singer_name": singer_name,
+                "trigger": trigger_edit,
+                "front": front_edit,
+                "back": back_edit,
+                "zoom_mode": opt_ctrls["zoom_mode"],
+                "zoom_value": opt_ctrls["zoom_value"],
+                "nodecor": opt_ctrls["nodecor"],
+                "forcewipedecor": opt_ctrls["forcewipedecor"],
+                "margin_left": opt_ctrls["margin_left"],
+                "margin_right": opt_ctrls["margin_right"],
+                "margin_bottom": opt_ctrls["margin_bottom"],
+            })
 
         self._row_layout.addStretch()
 
     def get_singer_params(self) -> List[Tuple[str, str, str]]:
         """返回 [(singer_name, trigger, params), ...] 列表。"""
+        def _int(text: str, default: int = 0) -> int:
+            try:
+                return int(text.strip())
+            except (ValueError, AttributeError):
+                return default
+
         result = []
-        for singer_name, trigger_edit, params_edit in self._rows:
-            trigger = trigger_edit.text().strip()
-            params = params_edit.text().strip()
-            result.append((singer_name, trigger, params))
+        for row in self._rows:
+            trigger = row["trigger"].text().strip()
+            front = row["front"].text().strip()
+            back = row["back"].text().strip()
+
+            zoom_mode_text = row["zoom_mode"].currentText()
+            opts = {
+                "zoom_mode": zoom_mode_text if zoom_mode_text != "未指定" else None,
+                "zoom_value": _int(row["zoom_value"].text(), 100),
+                "nodecor": row["nodecor"].isChecked(),
+                "forcewipedecor": row["forcewipedecor"].isChecked(),
+                "margin_left": _int(row["margin_left"].text(), 0),
+                "margin_right": _int(row["margin_right"].text(), 0),
+                "margin_bottom": _int(row["margin_bottom"].text(), 0),
+            }
+            options_str = build_option_str(opts)
+            params = join_params(front, back, options_str)
+            result.append((row["singer_name"], trigger, params))
         return result
 
     def _copy_first_row_params(self):
         if not self._rows:
             return
-        first_params = self._rows[0][2].text()
-        for _, _, params_edit in self._rows[1:]:
-            params_edit.setText(first_params)
+        first = self._rows[0]
+        for row in self._rows[1:]:
+            row["front"].setText(first["front"].text())
+            row["back"].setText(first["back"].text())
+            row["zoom_mode"].setCurrentText(first["zoom_mode"].currentText())
+            row["zoom_value"].setText(first["zoom_value"].text())
+            row["nodecor"].setChecked(first["nodecor"].isChecked())
+            row["forcewipedecor"].setChecked(first["forcewipedecor"].isChecked())
+            row["margin_left"].setText(first["margin_left"].text())
+            row["margin_right"].setText(first["margin_right"].text())
+            row["margin_bottom"].setText(first["margin_bottom"].text())
 
     def _on_accept(self):
         singer_params = self.get_singer_params()
