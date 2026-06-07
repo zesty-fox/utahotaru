@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QRadioButton,
     QButtonGroup,
+    QSizePolicy,
 )
 from PyQt6.QtCore import Qt, QRect, QSize, pyqtSignal
 from PyQt6.QtGui import QColor, QPixmap, QPainter
@@ -48,6 +49,7 @@ _FILTER_NO_GROUP = "\x00nogroup"
 from strange_uta_game.backend.domain import Project, Singer
 from strange_uta_game.backend.application import SingerService
 from strange_uta_game.backend.domain.entities import _compute_complement_color
+from strange_uta_game.frontend.theme import theme
 
 
 def _make_singer_icon(colors: List[str], w: int = 32, h: int = 18):
@@ -62,6 +64,38 @@ def _make_singer_icon(colors: List[str], w: int = 32, h: int = 18):
         p.fillRect(QRect(0, y0, w, y1 - y0), QColor(c))
     p.end()
     return QIcon(pixmap)
+
+
+class _ColorSwatch(QLabel):
+    """可点击的颜色色块（用 QLabel 避免 QPushButton 原生样式覆盖背景色）"""
+    clicked = pyqtSignal(str)
+
+    def __init__(self, color: str):
+        super().__init__()
+        self._color = color
+        self.setFixedSize(32, 32)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip(f"点击设置颜色\n{color}")
+        self._apply_style(False)
+
+    def _apply_style(self, hover: bool):
+        bw = "2px" if hover else "1px"
+        c = "#fff" if hover else "#888"
+        self.setStyleSheet(
+            f"background-color: {self._color};"
+            f"border: {bw} solid {c};"
+            f"border-radius: 2px;"
+        )
+
+    def enterEvent(self, event):
+        self._apply_style(True)
+
+    def leaveEvent(self, event):
+        self._apply_style(False)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit(self._color)
 
 
 class SingerEditDialog(QDialog):
@@ -82,20 +116,31 @@ class SingerEditDialog(QDialog):
         self._color_mode = singer.color_mode if singer else "solid"
         self._split_colors: List[str] = list(singer.split_colors) if singer else []
         self._existing_groups = existing_groups or []
+        # 项目全部演唱者（用于提取已用颜色）
+        self._all_singers: List[Singer] = list(existing_singers or [])
         # 可用于"加载颜色"的演唱者列表（排除自身）
         self._existing_singers: List[Singer] = [
-            s for s in (existing_singers or [])
+            s for s in self._all_singers
             if not singer or s.id != singer.id
         ]
+        # 分色模式下当前激活的颜色槽位（用于右侧已用颜色面板的赋值目标）
+        self._active_split_idx = 0
 
         self.setWindowTitle("编辑演唱者" if singer else "添加演唱者")
-        self.resize(340, 300)
+        self.resize(520, 350)
         self._init_ui()
 
     # ── 初始化 ────────────────────────────────────────────────────────────
 
     def _init_ui(self):
-        outer = QVBoxLayout(self)
+        # 主水平布局：左侧表单 + 右侧已用颜色面板
+        main_layout = QHBoxLayout(self)
+        main_layout.setSpacing(12)
+
+        # ── 左侧：原有表单 ──
+        left_widget = QWidget()
+        outer = QVBoxLayout(left_widget)
+        outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(8)
 
         # 名称 / 分组
@@ -203,6 +248,13 @@ class SingerEditDialog(QDialog):
         button_box.rejected.connect(self.reject)
         outer.addWidget(button_box)
 
+        main_layout.addWidget(left_widget, stretch=1)
+
+        # ── 右侧：项目已用颜色面板 ──
+        self._used_colors_panel = self._build_used_colors_panel()
+        main_layout.addWidget(self._used_colors_panel, stretch=0)
+
+        self.setMinimumWidth(520)
         self._update_panel_visibility()
 
     # ── 模式切换 ──────────────────────────────────────────────────────────
@@ -211,7 +263,9 @@ class SingerEditDialog(QDialog):
         is_split = self._rb_split.isChecked()
         self._solid_panel.setVisible(not is_split)
         self._split_panel.setVisible(is_split)
+        w = self.width()
         self.adjustSize()
+        self.resize(max(w, self.minimumWidth()), self.height())
 
     def _on_mode_changed(self):
         self._color_mode = "split" if self._rb_split.isChecked() else "solid"
@@ -249,12 +303,18 @@ class SingerEditDialog(QDialog):
         all_colors = self._all_split_colors()
         n = len(all_colors)
         for i, color in enumerate(all_colors):
-            self._split_rows_layout.addWidget(self._make_split_row(i, color, n))
+            active = (i == self._active_split_idx)
+            self._split_rows_layout.addWidget(self._make_split_row(i, color, n, active))
 
         self._btn_add_split.setEnabled(n < self.MAX_COLORS)
         self._refresh_split_preview()
 
-    def _make_split_row(self, idx: int, color: str, total: int) -> QWidget:
+    def _set_active_split_idx(self, idx: int):
+        if self._active_split_idx != idx:
+            self._active_split_idx = idx
+            self._rebuild_split_rows()
+
+    def _make_split_row(self, idx: int, color: str, total: int, active: bool = False) -> QWidget:
         row = QWidget()
         row_layout = QHBoxLayout(row)
         row_layout.setContentsMargins(0, 0, 0, 0)
@@ -262,7 +322,11 @@ class SingerEditDialog(QDialog):
 
         swatch = QLabel()
         swatch.setFixedSize(40, 24)
-        swatch.setStyleSheet(f"background-color: {color}; border: 1px solid gray;")
+        border = f"2px solid {theme.accent_secondary.name()}" if active else "1px solid gray"
+        swatch.setStyleSheet(f"background-color: {color}; border: {border};")
+        swatch.setCursor(Qt.CursorShape.PointingHandCursor)
+        swatch.setToolTip("点击选中此颜色位，然后从右侧面板选择颜色")
+        swatch.mousePressEvent = lambda event, i=idx: self._set_active_split_idx(i)
 
         btn_pick = PushButton(f"颜色 {idx + 1}")
         btn_pick.setFixedWidth(80)
@@ -281,6 +345,7 @@ class SingerEditDialog(QDialog):
         return row
 
     def _on_pick_split_color(self, idx: int):
+        self._set_active_split_idx(idx)
         all_colors = self._all_split_colors()
         current = all_colors[idx] if idx < len(all_colors) else "#FFFFFF"
         color = QColorDialog.getColor(QColor(current), self, f"选择颜色 {idx + 1}")
@@ -298,6 +363,10 @@ class SingerEditDialog(QDialog):
                 self._color = self._split_colors.pop(0)
         else:
             del self._split_colors[idx - 1]
+        # 确保激活索引不越界
+        total = len(self._all_split_colors())
+        if self._active_split_idx >= total:
+            self._active_split_idx = max(0, total - 1)
         self._rebuild_split_rows()
 
     def _on_add_split_color(self):
@@ -357,6 +426,83 @@ class SingerEditDialog(QDialog):
         self._refresh_solid_swatch()
         self._rebuild_split_rows()
         self._update_panel_visibility()
+
+    # ── 项目已用颜色面板 ──────────────────────────────────────────────────
+
+    def _get_project_used_colors(self) -> List[str]:
+        """从项目全部演唱者中提取所有不重复的颜色（拆分多色为单色，按 RGB 去重）"""
+        seen: Set[str] = set()
+        colors: List[str] = []
+        for s in self._all_singers:
+            for c in s.get_all_colors():
+                key = c.upper()
+                if key not in seen:
+                    seen.add(key)
+                    colors.append(c)
+        return colors
+
+    def _build_used_colors_panel(self) -> QWidget:
+        """构建右侧「项目已用颜色」面板（固定宽度，溢出时滚动）"""
+        from PyQt6.QtWidgets import QScrollArea, QGridLayout
+
+        panel = QWidget()
+        panel.setFixedWidth(180)
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(8, 0, 0, 0)
+        layout.setSpacing(4)
+
+        title = CaptionLabel("项目已用颜色")
+        layout.addWidget(title)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+
+        grid_widget = QWidget()
+        grid = QGridLayout(grid_widget)
+        grid.setContentsMargins(2, 2, 8, 2)
+        grid.setSpacing(3)
+        # 列拉伸使色块均匀分布在可用宽度内
+        for c in range(4):
+            grid.setColumnStretch(c, 1)
+
+        colors = self._get_project_used_colors()
+        cols = 4
+        for i, color in enumerate(colors):
+            swatch = _ColorSwatch(color)
+            swatch.clicked.connect(self._on_used_color_clicked)
+            row, col = divmod(i, cols)
+            grid.addWidget(swatch, row, col, Qt.AlignmentFlag.AlignCenter)
+
+        # 底部弹簧：色块不足填满时保持靠上排列
+        grid.setRowStretch(grid.rowCount(), 1)
+
+        if not colors:
+            empty_label = QLabel("暂无已用颜色")
+            empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            empty_label.setStyleSheet("color: #888;")
+            grid.addWidget(empty_label, 0, 0, 1, cols)
+
+        scroll.setWidget(grid_widget)
+        layout.addWidget(scroll)
+
+        return panel
+
+    def _on_used_color_clicked(self, color: str):
+        """点击已用颜色块：单色模式设置主颜色，分色模式设置当前激活槽位"""
+        if self._color_mode == "split":
+            idx = self._active_split_idx
+            if idx == 0:
+                self._color = color
+            else:
+                if idx - 1 < len(self._split_colors):
+                    self._split_colors[idx - 1] = color
+            self._rebuild_split_rows()
+        else:
+            self._color = color
+            self._refresh_solid_swatch()
 
     # ── 数据获取 ──────────────────────────────────────────────────────────
 
