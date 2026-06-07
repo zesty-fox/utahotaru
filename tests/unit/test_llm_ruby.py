@@ -595,6 +595,64 @@ def test_prompt_includes_english_rule_only_when_enabled():
     assert "guitar" not in off
 
 
+def test_prompt_contains_split_vs_jukujikun_rule():
+    """系统提示词应包含「拆字 vs 不拆」判定规则及关键正反例。"""
+    from strange_uta_game.backend.infrastructure.parsers.llm_ruby import _SYSTEM_PROMPT
+
+    # 关键术语
+    assert "拆字" in _SYSTEM_PROMPT or "分け" in _SYSTEM_PROMPT
+    assert "熟字訓" in _SYSTEM_PROMPT
+    # 拆字正例（独立读音）
+    assert "{物||もの}{語||がたり}" in _SYSTEM_PROMPT
+    assert "{笑||え}{顔||かお}" in _SYSTEM_PROMPT
+    assert "{毎||まい}{日||にち}" in _SYSTEM_PROMPT
+    # 不拆反例（熟字訓 / 当て字）
+    assert "{今日||きょう,}" in _SYSTEM_PROMPT
+    assert "{昨日||きのう,}" in _SYSTEM_PROMPT
+    assert "{大人||おとな,}" in _SYSTEM_PROMPT
+    assert "{風邪||かぜ,}" in _SYSTEM_PROMPT
+    # 一日的双重读（ついたち 熟字訓 vs いちにち 可拆）须有提示
+    assert "ついたち" in _SYSTEM_PROMPT
+
+
+def test_prompt_schema_hint_examples_consistent():
+    """schema hint 内的拆字/不拆示例与 system prompt 一致，不再使用旧 `{毎日||まい,にち}` 写法。"""
+    from strange_uta_game.backend.infrastructure.parsers.llm_ruby import _OUTPUT_SCHEMA_HINT
+
+    # 新写法
+    assert "{毎||まい}{日||にち}" in _OUTPUT_SCHEMA_HINT
+    assert "{物||もの}{語||がたり}" in _OUTPUT_SCHEMA_HINT
+    assert "{今日||きょう,}" in _OUTPUT_SCHEMA_HINT
+    # 旧写法不应再出现（避免 LLM 仿写）
+    assert "{毎日||まい,にち}" not in _OUTPUT_SCHEMA_HINT
+    assert "{逆光||ぎゃっ,こう}" not in _OUTPUT_SCHEMA_HINT
+
+
+def test_annotated_parser_round_trip_split_blocks():
+    """新拆字写法（多个单字块）能被解析器还原为期望 Pairs。"""
+    from strange_uta_game.backend.infrastructure.parsers.llm_ruby import _annotated_to_pairs
+
+    pairs, raw = _annotated_to_pairs("{物||もの}{語||がたり}")
+    assert raw == "物語"
+    # 两个独立单字 morpheme：各自 ('字', '读音')
+    assert pairs == [("物", "もの"), ("語", "がたり")]
+
+    # 熟字訓写法不变
+    pairs, raw = _annotated_to_pairs("{今日||きょう,}")
+    assert raw == "今日"
+    assert pairs == [("今日", "きょう")]  # 字符串形（含尾随空 → 拼成 "きょう"）
+
+    # 混合
+    pairs, raw = _annotated_to_pairs("{今日||きょう,}は{毎||まい}{日||にち}")
+    assert raw == "今日は毎日"
+    assert pairs == [
+        ("今日", "きょう"),
+        ("は", "は"),
+        ("毎", "まい"),
+        ("日", "にち"),
+    ]
+
+
 def test_autocheck_renders_katakana_english_block():
     """端到端：AutoCheckService 把 ギター/guitar 渲染为首字带英文、整词连词。"""
     from strange_uta_game.backend.application import AutoCheckService
