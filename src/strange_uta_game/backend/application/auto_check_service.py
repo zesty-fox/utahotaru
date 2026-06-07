@@ -205,6 +205,44 @@ def _parse_dict_reading(reading: str, expected_word: str) -> Optional[
     return per_char_parts, char_block_id
 
 
+def _build_compound_ranges(
+    results: "List[AutoCheckResult]",
+) -> "Dict[int, Tuple[int, int]]":
+    """从 AutoCheckResult 列表构建「char_idx → (group_start, group_end)」映射。
+
+    同时聚合 origin_morpheme_id（分析器 morpheme_span 来源）和
+    compound_group_id（分发块来源，覆盖 clean-split / Step3 均分后被清空
+    char_to_block 的多字块）两个维度，取二者的并集，保证所有来自同一多字单元
+    的字符都被归入同一保护区间，供 Phase 5 连词组完整性检查使用。
+    """
+    groups: Dict[int, Tuple[int, int]] = {}
+    # 先聚合 origin_morpheme_id，再叠加 compound_group_id（两者可能重叠，幂等）
+    for gid_attr in ("origin_morpheme_id", "compound_group_id"):
+        partial: Dict[int, Tuple[int, int]] = {}
+        for r in results:
+            gid = getattr(r, gid_attr)
+            if gid < 0:
+                continue
+            idx = r.char_idx
+            grp = partial.get(gid)
+            if grp is None:
+                partial[gid] = (idx, idx)
+            else:
+                partial[gid] = (min(grp[0], idx), max(grp[1], idx))
+        for grp_start, grp_end in partial.values():
+            if grp_end <= grp_start:
+                continue  # 单字组，不写入（起不到保护作用）
+            for k in range(grp_start, grp_end + 1):
+                # 已有更宽的区间时不覆盖（取最宽优先级）
+                existing = groups.get(k)
+                new_rng = (grp_start, grp_end)
+                if existing is None or (
+                    existing[1] - existing[0] < new_rng[1] - new_rng[0]
+                ):
+                    groups[k] = new_rng
+    return groups
+
+
 @dataclass
 class AutoCheckResult:
     """自动检查结果"""
@@ -223,6 +261,16 @@ class AutoCheckResult:
     # 「连词组保护」判定，避免单字词条把多字 morpheme 切成两半（如 日→にち 不应
     # 污染 一日/日々/毎日 等复合词）。单字 morpheme 该字段为 -1。
     origin_morpheme_id: int = -1
+    # 复合词组 id（独立于 origin_morpheme_id，专供 Phase 5 保护使用）。
+    # 来源比 origin_morpheme_id 更广：
+    #   - 包含 morpheme_span 给出的分析器复合词边界（与 origin_morpheme_id 重合）；
+    #   - 还包含经 is_clean_per_char_split 或 Step 3 均分后被抹掉 char_to_block
+    #     的多字分发块（即这些字符来自同一个 multi-char ruby_result 但 block_id
+    #     已被清空的情形）。
+    # 保证所有「一起从同一个多字块分发出来的字符」都被归入同一 compound_group_id，
+    # 无论后续分发路径如何处理，确保 Phase 5 都能做完整覆盖检查。
+    # 单字（来自独立 1-char pair）该字段为 -1。
+    compound_group_id: int = -1
 
 
 class AutoCheckService:
@@ -1270,6 +1318,10 @@ class AutoCheckService:
         # 创建字符到注音的映射（按 mora 分割到每个字符）
         char_to_ruby_raw: Dict[int, str] = {}
         char_to_block: Dict[int, int] = {}
+        # 复合词块归组：记录「来自同一个 multi-char ruby_result」的字符，
+        # 不受 is_clean_per_char_split / Step 3 清空 char_to_block 的影响。
+        # 专供下游 compound_group_id 构建，确保 Phase 5 保护不因拆分路径丢失。
+        char_to_dist_block: Dict[int, int] = {}
         for block_id, result in enumerate(ruby_results):
             block_len = result.end_idx - result.start_idx
             # 片假名外来语块：整词连词，首字承载英文读音，其余字符无 ruby 但同块连词。
@@ -1356,6 +1408,10 @@ class AutoCheckService:
                     # 大冒険=だい,ぼう,けん → 大/冒/険 各自独立。
                     if not is_clean_per_char_split:
                         char_to_block[idx] = block_id
+                    # compound_group_id 追踪：无论 is_clean_per_char_split 如何，
+                    # 只要来自同一个多字 block 就记录归组，供 Phase 5 保护使用。
+                    if block_len > 1:
+                        char_to_dist_block[idx] = block_id
 
         # 首尾假名剥离：若连词块的首/尾字符是假名（送り仮名/接头假名模式），
         # 将它们从 char_to_block 中移除，使其成为独立自注音字符，
@@ -1570,6 +1626,23 @@ class AutoCheckService:
                 if _idx < len(check_counts):
                     check_counts[_idx] = 1 if (_idx - _start) in _syllable_starts else 0
 
+        # compound_group_id 构建：在 char_to_morpheme（morpheme_span 来源）基础上，
+        # 补入 char_to_dist_block（分发块来源）里未被 morpheme_span 覆盖的多字块。
+        # 须在分发循环、Step3 均分全部完成之后执行，确保 char_to_dist_block 已填满。
+        # 这样 is_clean_per_char_split / Step3 均分清空 char_to_block 之后，
+        # 仍能通过 compound_group_id 知道哪些字符来自同一个多字 block，
+        # 保证 Phase 5 做完整覆盖检查时信息不丢失。
+        char_to_compound_group: Dict[int, int] = dict(char_to_morpheme)
+        _dist_bid_to_cg: Dict[int, int] = {}
+        _next_cg_id = len(span_to_id)
+        for _idx, _bid in char_to_dist_block.items():
+            if _idx in char_to_compound_group:
+                continue  # 已被 morpheme_span 覆盖，跳过
+            if _bid not in _dist_bid_to_cg:
+                _dist_bid_to_cg[_bid] = _next_cg_id
+                _next_cg_id += 1
+            char_to_compound_group[_idx] = _dist_bid_to_cg[_bid]
+
         # 构建结果
         # check_n 关闭（「んン 不打节奏点」规则生效）时，把字符注音里非起始的
         # ん/ン 分段并入前一拍，节奏点数同步收敛。例：険[け|ん] 2拍 → [けん] 1拍。
@@ -1601,6 +1674,7 @@ class AutoCheckService:
                     origin_block_id=block_id,
                     origin_source=source,
                     origin_morpheme_id=char_to_morpheme.get(i, -1),
+                    compound_group_id=char_to_compound_group.get(i, -1),
                 )
             )
 
@@ -1861,25 +1935,7 @@ class AutoCheckService:
         # 子串严格匹配 sentence 字面文本，不跨 Sentence。
         # apply_user_dict=False 时跳过，由调用方在删除注音后手动调用。
         if apply_user_dict and self._dict:
-            # 把分析器给出的 morpheme 边界传给 Phase 5，做「连词组保护」判断：
-            # 单字词条（如 日→にち）不应把多字 morpheme（如 一日/日々/毎日）打成两半。
-            morpheme_groups: Dict[int, Tuple[int, int]] = {}
-            for r in results:
-                if r.origin_morpheme_id < 0:
-                    continue
-                idx = r.char_idx
-                grp = morpheme_groups.get(r.origin_morpheme_id)
-                if grp is None:
-                    morpheme_groups[r.origin_morpheme_id] = (idx, idx)
-                else:
-                    morpheme_groups[r.origin_morpheme_id] = (
-                        min(grp[0], idx), max(grp[1], idx),
-                    )
-            # 翻成「char_idx → (group_start, group_end)」便于 Phase 5 O(1) 查
-            char_morpheme_range: Dict[int, Tuple[int, int]] = {}
-            for grp_start, grp_end in morpheme_groups.values():
-                for k in range(grp_start, grp_end + 1):
-                    char_morpheme_range[k] = (grp_start, grp_end)
+            char_morpheme_range = _build_compound_ranges(results)
             self._apply_user_dictionary_to_sentence(
                 sentence, morpheme_ranges=char_morpheme_range
             )
@@ -2122,13 +2178,19 @@ class AutoCheckService:
         project.shift_selected_checkpoint_if_lost()
 
     def apply_user_dict_to_project(self, project: Project, skip_romanize: bool = False) -> None:
-        """对整个项目执行 Phase 5 用户词典覆盖。"""
+        """对整个项目执行 Phase 5 用户词典覆盖。
+
+        每句重新调用 analyze_sentence 拿到最新的复合词归组信息（compound_group_id），
+        构建 morpheme_ranges 后传给 Phase 5，确保保护与 apply_to_sentence 路径一致。
+        """
         if self._chinese_mode:
             return
         if not self._dict:
             return
         for sentence in project.sentences:
-            self._apply_user_dictionary_to_sentence(sentence)
+            results = self.analyze_sentence(sentence)
+            morpheme_ranges = _build_compound_ranges(results) or None
+            self._apply_user_dictionary_to_sentence(sentence, morpheme_ranges=morpheme_ranges)
             if not skip_romanize:
                 self._romanize_sentence_ruby(sentence)
 
