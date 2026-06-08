@@ -56,7 +56,7 @@ class NicokaraTagsDialog(QDialog):
             row = QHBoxLayout()
             lbl = QLabel(label_text)
             lbl.setFont(QFont("Microsoft YaHei", 10))
-            lbl.setFixedWidth(120)
+            lbl.setFixedWidth(150)
             edit = LineEdit()
             edit.setFont(QFont("Microsoft YaHei", 10))
             row.addWidget(lbl)
@@ -73,7 +73,7 @@ class NicokaraTagsDialog(QDialog):
         silence_row = QHBoxLayout()
         silence_lbl = QLabel("@SilencemSec（静音）")
         silence_lbl.setFont(QFont("Microsoft YaHei", 10))
-        silence_lbl.setFixedWidth(120)
+        silence_lbl.setFixedWidth(150)
 
         self._spin_silence = SpinBox()
         self._spin_silence.setRange(0, 99999)
