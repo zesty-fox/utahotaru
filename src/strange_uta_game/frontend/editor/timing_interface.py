@@ -5831,9 +5831,32 @@ class EditorInterface(QWidget):
         self._analyze_rubies_subset(line_idx, None, "按行注音分析")
 
     def _on_analyze_rubies_selected(self):
-        """工具栏「注音分析所选字符」— 仅分析当前行的选中字符范围。"""
+        """工具栏「注音分析所选字符」— 分析选中字符范围（支持跨行）。"""
         if not self._project:
             return
+
+        # 跨行选中：收集每行的字符范围，批量提交分析
+        if self.preview.is_multi_line_selection():
+            sel = self.preview.get_normalized_selection()
+            if sel is None:
+                return
+            start_line, start_char, end_line, end_char = sel
+            specs = []
+            for line_idx in range(start_line, end_line + 1):
+                if line_idx < 0 or line_idx >= len(self._project.sentences):
+                    continue
+                sentence = self._project.sentences[line_idx]
+                if not sentence.characters:
+                    continue
+                s = start_char if line_idx == start_line else 0
+                e = end_char if line_idx == end_line else len(sentence.characters) - 1
+                if s > e:
+                    continue
+                specs.append((line_idx, set(range(s, e + 1))))
+            if specs:
+                self._analyze_rubies_specs_async(specs, "注音分析所选字符")
+            return
+
         line_idx = self._current_line_idx
         char_idx = self.preview._current_char_idx
         if line_idx < 0 or line_idx >= len(self._project.sentences):
