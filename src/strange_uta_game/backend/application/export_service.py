@@ -206,8 +206,32 @@ class ExportService:
 
         if completed_lines < total_lines:
             errors.append(f"只有 {completed_lines}/{total_lines} 行完成打轴")
+            # 找出未完成打轴的行
+            untimed_info = self._get_untimed_lines_info(project)
+            if untimed_info:
+                errors.append(untimed_info)
 
         return errors
+
+    @staticmethod
+    def _get_untimed_lines_info(project: Project) -> str:
+        """获取未完成打轴的具体行信息
+
+        返回缩略信息字符串，如 "未打轴行: 第1行「こんにちは」、第3行「さようなら」"
+        超过 10 行时截断并显示总数。
+        """
+        untimed = []
+        for i, s in enumerate(project.sentences):
+            if any(c.total_timing_points > 0 for c in s.characters) and not s.is_fully_timed():
+                untimed.append(f"第{i + 1}行「{s.text}」")
+
+        if not untimed:
+            return ""
+
+        if len(untimed) <= 10:
+            return "未打轴行: " + "、".join(untimed)
+        else:
+            return "未打轴行: " + "、".join(untimed[:10]) + f" 等{len(untimed)}行"
 
     def validate_ruby_parts(self, project: Project) -> List[dict]:
         """校验项目中所有字符的 rubyPart 数量与 checkCount 是否匹配
