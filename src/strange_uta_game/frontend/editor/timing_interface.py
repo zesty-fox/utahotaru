@@ -5651,6 +5651,9 @@ class EditorInterface(QWidget):
         if not self._project or not specs:
             return
         if getattr(self, "_ruby_subset_analyzing", False):
+            if not hasattr(self, "_ruby_analysis_queue"):
+                self._ruby_analysis_queue = []
+            self._ruby_analysis_queue.append((list(specs), label, show_winrt_dialog))
             return
 
         from strange_uta_game.backend.application import AutoCheckService
@@ -5736,6 +5739,9 @@ class EditorInterface(QWidget):
             self._ruby_subset_analyze_worker = None
             self._ruby_subset_analyze_thread = None
             self._ruby_subset_analyzing = False
+            if hasattr(self, "_ruby_analysis_queue") and self._ruby_analysis_queue:
+                ns, nl, nswd = self._ruby_analysis_queue.pop(0)
+                self._analyze_rubies_specs_async(ns, nl, show_winrt_dialog=nswd)
 
         def _close_tooltip() -> None:
             if subset_tooltip is not None:
@@ -5831,11 +5837,11 @@ class EditorInterface(QWidget):
         self._analyze_rubies_subset(line_idx, None, "按行注音分析")
 
     def _on_analyze_rubies_selected(self):
-        """工具栏「注音分析所选字符」— 分析选中字符范围（支持跨行）。"""
+        """工具栏「注音分析所选字符」— 分析选中字符范围（支持跨行逐行排队）。"""
         if not self._project:
             return
 
-        # 跨行选中：收集每行的字符范围，批量提交分析
+        # 跨行选中：逐行提交，由 _analyze_rubies_specs_async 队列顺序执行
         if self.preview.is_multi_line_selection():
             sel = self.preview.get_normalized_selection()
             if sel is None:
@@ -5852,9 +5858,19 @@ class EditorInterface(QWidget):
                 e = end_char if line_idx == end_line else len(sentence.characters) - 1
                 if s > e:
                     continue
-                specs.append((line_idx, set(range(s, e + 1))))
+                ri = set(range(s, e + 1))
+                specs.append((line_idx, ri))
             if specs:
-                self._analyze_rubies_specs_async(specs, "注音分析所选字符")
+                # 第一行立即执行，后续行加入队列
+                first_li, first_ri = specs[0]
+                self._analyze_rubies_subset(first_li, first_ri, "注音分析所选字符")
+                if len(specs) > 1:
+                    if not hasattr(self, "_ruby_analysis_queue"):
+                        self._ruby_analysis_queue = []
+                    for li, ri in specs[1:]:
+                        self._ruby_analysis_queue.append(
+                            ([(li, ri)], "注音分析所选字符", False)
+                        )
             return
 
         line_idx = self._current_line_idx
