@@ -488,6 +488,9 @@ class BassTsmEngine(IAudioEngine):
         """
         if not 0.2 <= speed <= 2.0:
             raise ValueError(f"速度 {speed} 超出范围 [0.2, 2.0]")
+        if self._stream == 0:
+            self._speed = float(speed)
+            return
         with self._stream_lock:
             self._speed = float(speed)
             q = _quantize(self._speed)
