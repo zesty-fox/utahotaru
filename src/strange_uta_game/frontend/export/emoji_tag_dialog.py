@@ -371,7 +371,7 @@ class EmojiTagDialog(QDialog):
         ctrls["margin_left"] = LineEdit()
         ctrls["margin_left"].setFont(QFont("Microsoft YaHei", 10))
         ctrls["margin_left"].setText(str(default_opts["margin_left"]))
-        ctrls["margin_left"].setFixedWidth(54)
+        ctrls["margin_left"].setFixedWidth(68)
         ctrls["margin_left"].setPlaceholderText("0")
         ctrls["margin_left"].setToolTip("MarginLeft：图片左侧留白（像素，允许负值）")
 
@@ -380,7 +380,7 @@ class EmojiTagDialog(QDialog):
         ctrls["margin_right"] = LineEdit()
         ctrls["margin_right"].setFont(QFont("Microsoft YaHei", 10))
         ctrls["margin_right"].setText(str(default_opts["margin_right"]))
-        ctrls["margin_right"].setFixedWidth(54)
+        ctrls["margin_right"].setFixedWidth(68)
         ctrls["margin_right"].setPlaceholderText("0")
         ctrls["margin_right"].setToolTip("MarginRight：图片右侧留白（像素，允许负值）")
 
@@ -389,7 +389,7 @@ class EmojiTagDialog(QDialog):
         ctrls["margin_bottom"] = LineEdit()
         ctrls["margin_bottom"].setFont(QFont("Microsoft YaHei", 10))
         ctrls["margin_bottom"].setText(str(default_opts["margin_bottom"]))
-        ctrls["margin_bottom"].setFixedWidth(54)
+        ctrls["margin_bottom"].setFixedWidth(68)
         ctrls["margin_bottom"].setPlaceholderText("0")
         ctrls["margin_bottom"].setToolTip("MarginBottom：图片下方留白（像素，允许负值）")
 
