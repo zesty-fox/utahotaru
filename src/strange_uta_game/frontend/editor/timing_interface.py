@@ -270,6 +270,8 @@ class EditorInterface(QWidget):
         self.preview.seek_to_checkpoint_requested.connect(self._on_seek_to_checkpoint)
         self.preview.singer_change_requested.connect(self._on_singer_change_selection)
         self.preview.delete_chars_requested.connect(self._on_delete_chars_requested)
+        self.preview.delete_chars_multi_requested.connect(self._on_delete_chars_multi_requested)
+        self.preview.singer_change_multi_requested.connect(self._on_singer_change_multi_requested)
         self.preview.delete_timestamp_requested.connect(self._on_delete_timestamp_requested)
         self.preview.insert_space_before_requested.connect(
             self._on_insert_space_before_requested
@@ -1038,6 +1040,7 @@ class EditorInterface(QWidget):
 
         编码为内联格式字符串写入系统剪贴板，Ctrl+V 时可经
         _INLINE_TS_DETECT_RE 识别并通过 _paste_inline_format 无损还原。
+        跨行复制时各行用 \\n 分隔，保留行边界信息。
         """
         from PyQt6.QtWidgets import QApplication
         from strange_uta_game.backend.infrastructure.parsers.annotated_text import (
@@ -1047,40 +1050,75 @@ class EditorInterface(QWidget):
         if not self._project:
             return
 
-        if (
-            self.preview._focus_line_idx >= 0
-            and self.preview._focus_char_idx >= 0
-            and self.preview._focus_char_range_end >= 0
-        ):
-            line_idx = self.preview._focus_line_idx
-            start = min(self.preview._focus_char_idx, self.preview._focus_char_range_end)
-            end = max(self.preview._focus_char_idx, self.preview._focus_char_range_end)
+        id_to_name = {s.id: s.name for s in self._project.singers}
+        offset = getattr(self._project, "global_offset_ms", 0) or 0
+
+        sel = self.preview.get_normalized_selection()
+        if sel is not None and self.preview.is_multi_line_selection():
+            start_line, start_char, end_line, end_char = sel
+            line_texts = []
+            total_chars = 0
+            inherited = ""
+            for line_idx in range(start_line, end_line + 1):
+                if line_idx < 0 or line_idx >= len(self._project.sentences):
+                    continue
+                sentence = self._project.sentences[line_idx]
+                if not sentence.characters:
+                    continue
+                s = start_char if line_idx == start_line else 0
+                e = end_char if line_idx == end_line else len(sentence.characters) - 1
+                if s > e:
+                    continue
+                chars = [deepcopy(sentence.characters[i]) for i in range(s, e + 1)]
+                line_text, inherited = sentence_to_timed_line(
+                    chars,
+                    singer_id_to_name=id_to_name,
+                    line_singer_id=sentence.singer_id,
+                    default_singer_id=sentence.singer_id,
+                    inherited_singer_id=inherited,
+                    offset_ms=offset,
+                )
+                line_texts.append(line_text)
+                total_chars += len(chars)
+            inline_text = "\n".join(line_texts)
+        elif sel is not None:
+            start_line, start_char, end_line, end_char = sel
+            # 单行划选
+            if start_line < 0 or start_line >= len(self._project.sentences):
+                return
+            sentence = self._project.sentences[start_line]
+            if not sentence.characters:
+                return
+            start_char = max(0, min(start_char, len(sentence.characters) - 1))
+            end_char = max(start_char, min(end_char, len(sentence.characters) - 1))
+            chars = [deepcopy(sentence.characters[i]) for i in range(start_char, end_char + 1)]
+            inline_text, _ = sentence_to_timed_line(
+                chars,
+                singer_id_to_name=id_to_name,
+                line_singer_id=sentence.singer_id,
+                default_singer_id=sentence.singer_id,
+                offset_ms=offset,
+            )
+            total_chars = len(chars)
         else:
             line_idx = self._current_line_idx
             start = self.preview._current_char_idx
-            end = start
-
-        if line_idx < 0 or line_idx >= len(self._project.sentences):
-            return
-        sentence = self._project.sentences[line_idx]
-        if not sentence.characters:
-            return
-
-        start = max(0, min(start, len(sentence.characters) - 1))
-        end = max(start, min(end, len(sentence.characters) - 1))
-        chars = [deepcopy(sentence.characters[i]) for i in range(start, end + 1)]
-        if not chars:
-            return
-
-        id_to_name = {s.id: s.name for s in self._project.singers}
-        offset = getattr(self._project, "global_offset_ms", 0) or 0
-        inline_text, _ = sentence_to_timed_line(
-            chars,
-            singer_id_to_name=id_to_name,
-            line_singer_id=sentence.singer_id,
-            default_singer_id=sentence.singer_id,
-            offset_ms=offset,
-        )
+            if 0 <= line_idx < len(self._project.sentences):
+                sentence = self._project.sentences[line_idx]
+                if sentence.characters and 0 <= start < len(sentence.characters):
+                    chars = [deepcopy(sentence.characters[start])]
+                    inline_text, _ = sentence_to_timed_line(
+                        chars,
+                        singer_id_to_name=id_to_name,
+                        line_singer_id=sentence.singer_id,
+                        default_singer_id=sentence.singer_id,
+                        offset_ms=offset,
+                    )
+                    total_chars = 1
+                else:
+                    return
+            else:
+                return
 
         clipboard = QApplication.clipboard()
         if clipboard:
@@ -1088,7 +1126,7 @@ class EditorInterface(QWidget):
 
         InfoBar.success(
             title="已复制",
-            content=f"已复制 {len(chars)} 个字符",
+            content=f"已复制 {total_chars} 个字符",
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -1495,6 +1533,18 @@ class EditorInterface(QWidget):
         """Ctrl+H — 打开批量変更对话框，自动填充当前焦点字符的连词或划选区域"""
         from strange_uta_game.frontend.editor.timing import BulkChangeDialog
 
+        if self.preview.is_multi_line_selection():
+            InfoBar.warning(
+                title="暂不允许多行",
+                content="批量编辑暂不允许多行选择",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self,
+            )
+            return
+
         initial_word = ""
         initial_reading = ""
         if self._project:
@@ -1542,6 +1592,18 @@ class EditorInterface(QWidget):
     def _on_modify_char(self):
         """打开修改所选字符对话框"""
         if not self._project:
+            return
+
+        if self.preview.is_multi_line_selection():
+            InfoBar.warning(
+                title="暂不允许多行",
+                content="修改所选字符暂不允许多行选择",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self,
+            )
             return
 
         # Determine selection range
@@ -1852,6 +1914,7 @@ class EditorInterface(QWidget):
 
         弹出对话框显示当前选中字符信息，用户可选择演唱者并应用到选中字符。
         通过 _execute_structural_edit 包装，支持撤销/重做。
+        支持跨行选择：逐行应用演唱者。
         """
         if not self._project:
             return
@@ -1872,11 +1935,52 @@ class EditorInterface(QWidget):
 
         if line_idx < 0 or line_idx >= len(self._project.sentences):
             return
+
+        # 获取选中字符范围（支持跨行）
+        sel = self.preview.get_normalized_selection()
+        if sel is not None and self.preview.is_multi_line_selection():
+            start_line, start_char, end_line, end_char = sel
+            all_char_texts = []
+            singer_ids = set()
+            for li in range(start_line, end_line + 1):
+                if li >= len(self._project.sentences):
+                    continue
+                s = self._project.sentences[li]
+                if not s.characters:
+                    continue
+                sc = start_char if li == start_line else 0
+                ec = end_char if li == end_line else len(s.characters) - 1
+                if sc > ec:
+                    continue
+                for ci in range(sc, ec + 1):
+                    ch = s.characters[ci]
+                    all_char_texts.append(ch.char)
+                    if ch.singer_id:
+                        singer_ids.add(ch.singer_id)
+            char_text = "".join(all_char_texts)
+            if len(char_text) > 20:
+                char_text = char_text[:17] + "..."
+            singer_map = {s.id: s for s in self._project.singers}
+            current_singers = [singer_map[sid] for sid in singer_ids if sid in singer_map]
+            from .timing.dialogs import ApplySingerDialog
+            dlg = ApplySingerDialog(
+                char_text,
+                current_singers,
+                [s for s in self._project.singers if s.enabled],
+                self,
+            )
+            dlg.apply_requested.connect(
+                lambda singer_id: self._apply_singer_multi_line(
+                    start_line, start_char, end_line, end_char, singer_id
+                )
+            )
+            dlg.exec()
+            return
+
         sentence = self._project.sentences[line_idx]
         if char_idx < 0 or char_idx >= len(sentence.characters):
             return
 
-        # 获取选中字符范围
         start_idx = char_idx
         end_idx = char_idx
         if (
@@ -1890,7 +1994,6 @@ class EditorInterface(QWidget):
         chars = sentence.characters[start_idx:end_idx + 1]
         char_text = "".join(c.char for c in chars)
 
-        # 获取当前演唱者信息
         singer_ids = set()
         for ch in chars:
             if ch.singer_id:
@@ -1909,6 +2012,60 @@ class EditorInterface(QWidget):
         )
         dlg.apply_requested.connect(lambda singer_id: self._on_apply_singer_to_chars(line_idx, start_idx, end_idx, singer_id))
         dlg.exec()
+
+    def _apply_singer_multi_line(self, start_line: int, start_char: int, end_line: int, end_char: int, singer_id: str):
+        """跨行应用演唱者（批量单次 undo）。"""
+        if not self._project:
+            return
+        project = self._project
+        def _mutate():
+            changed = False
+            for line_idx in range(end_line, start_line - 1, -1):
+                if line_idx >= len(project.sentences):
+                    continue
+                sentence = project.sentences[line_idx]
+                if not sentence.characters:
+                    continue
+                s = start_char if line_idx == start_line else 0
+                e = end_char if line_idx == end_line else len(sentence.characters) - 1
+                if s > e:
+                    continue
+                for ci in range(s, e + 1):
+                    if 0 <= ci < len(sentence.characters):
+                        ch = sentence.characters[ci]
+                        if ch.singer_id != singer_id:
+                            ch.singer_id = singer_id
+                            if ch.ruby:
+                                ch.push_to_ruby()
+                            changed = True
+                if s == 0 and e >= len(sentence.characters) - 1:
+                    if sentence.singer_id != singer_id:
+                        sentence.singer_id = singer_id
+                        changed = True
+            if not changed:
+                return None
+            return (start_line, start_char, None, "singers")
+        ok = self._execute_structural_edit("应用演唱者", _mutate)
+        if not ok:
+            InfoBar.info(
+                title="无变化",
+                content="所选字符的演唱者未发生变化",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2500,
+                parent=self,
+            )
+            return
+        InfoBar.success(
+            title="设置完成",
+            content="已为选中字符设置演唱者",
+            orient=Qt.Orientation.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=4000,
+            parent=self,
+        )
 
     def _on_apply_singer_to_chars(self, line_idx: int, start_idx: int, end_idx: int, singer_id: str):
         """处理应用演唱者到选中字符的请求"""
@@ -3368,6 +3525,29 @@ class EditorInterface(QWidget):
 
         # Del 仅在编辑模式触发（keyPressEvent 路由）。focus 域为真理：
         # 用户拖选范围 → 删整段；单点 focus → 删该字符；focus 无效 → 删 current。
+        if self.preview.is_multi_line_selection():
+            sel = self.preview.get_normalized_selection()
+            if sel is None:
+                return
+            start_line, start_char, end_line, end_char = sel
+            def _multi_delete():
+                for line_idx in range(end_line, start_line - 1, -1):
+                    if line_idx < 0 or line_idx >= len(self._project.sentences):
+                        continue
+                    sentence = self._project.sentences[line_idx]
+                    if not sentence.characters:
+                        continue
+                    s = start_char if line_idx == start_line else 0
+                    e = end_char if line_idx == end_line else len(sentence.characters) - 1
+                    if s > e:
+                        continue
+                    self._delete_char_range(line_idx, s, e + 1)
+                total = len(self._project.sentences)
+                fl = max(0, min(start_line, total - 1)) if total > 0 else 0
+                return (fl, min(start_char, len(self._project.sentences[fl].characters) - 1) if self._project.sentences[fl].characters else 0, 0, "lyrics")
+            self._execute_structural_edit("删除字符", _multi_delete)
+            return
+
         if (
             self.preview._focus_line_idx >= 0
             and self.preview._focus_char_idx >= 0
@@ -3520,6 +3700,18 @@ class EditorInterface(QWidget):
         linked_to_next 都置为 False。
         """
         if not self._project:
+            return
+
+        if self.preview.is_multi_line_selection():
+            InfoBar.warning(
+                title="暂不允许多行",
+                content="F3连词暂不允许多行选择",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self,
+            )
             return
 
         # 解析选择范围（与 _on_modify_char 一致：优先划选区域，回退单字符）
@@ -3682,6 +3874,7 @@ class EditorInterface(QWidget):
         # 直接写 focus 域（与 _on_nav_char 同款，不依赖 cp 回调链污染）
         self.preview._focus_line_idx = new_line
         self.preview._focus_char_idx = new_char
+        self.preview._focus_line_range_end = new_line
         self.preview._focus_char_range_end = new_char
         # 驱动 current 跟随：找最近 cp 反馈到 current。
         # 抑制 _apply_checkpoint_position 的居中滚动，以 focus 域为基准。
@@ -3758,6 +3951,7 @@ class EditorInterface(QWidget):
         # 直接更新 focus 域（不依赖 cp 回调链）
         self.preview._focus_line_idx = new_line
         self.preview._focus_char_idx = new_char
+        self.preview._focus_line_range_end = new_line
         self.preview._focus_char_range_end = new_char
         # 驱动 current 跟随：让 TimingService 找最近 cp，
         # 反馈经 _apply_checkpoint_position 更新 current 域。
@@ -3996,7 +4190,56 @@ class EditorInterface(QWidget):
             lambda: self._delete_char_range(line_idx, start, end),
             move_cp=False,
         )
-    
+
+    def _on_delete_chars_multi_requested(self, start_line: int, start_char: int, end_line: int, end_char: int):
+        def _mutate():
+            for line_idx in range(end_line, start_line - 1, -1):
+                if line_idx < 0 or line_idx >= len(self._project.sentences):
+                    continue
+                sentence = self._project.sentences[line_idx]
+                if not sentence.characters:
+                    continue
+                s = start_char if line_idx == start_line else 0
+                e = end_char if line_idx == end_line else len(sentence.characters) - 1
+                if s > e:
+                    continue
+                self._delete_char_range(line_idx, s, e + 1)
+            total = len(self._project.sentences)
+            fl = max(0, min(start_line, total - 1)) if total > 0 else 0
+            return (fl, min(start_char, len(self._project.sentences[fl].characters) - 1) if self._project.sentences[fl].characters else 0, 0, "lyrics")
+        self._execute_structural_edit("删除字符", _mutate, move_cp=False)
+
+    def _on_singer_change_multi_requested(self, start_line: int, start_char: int, end_line: int, end_char: int, singer_id: str):
+        if not self._project:
+            return
+        project = self._project
+        def _mutate():
+            changed = False
+            for line_idx in range(end_line, start_line - 1, -1):
+                if line_idx >= len(project.sentences):
+                    continue
+                sentence = project.sentences[line_idx]
+                if not sentence.characters:
+                    continue
+                s = start_char if line_idx == start_line else 0
+                e = end_char if line_idx == end_line else len(sentence.characters) - 1
+                if s > e:
+                    continue
+                for ci in range(s, e + 1):
+                    if ci < len(sentence.characters):
+                        ch = sentence.characters[ci]
+                        if ch.singer_id != singer_id:
+                            ch.singer_id = singer_id
+                            ch.push_to_ruby()
+                            changed = True
+                if s == 0 and e >= len(sentence.characters) - 1:
+                    if sentence.singer_id != singer_id:
+                        sentence.singer_id = singer_id
+                        changed = True
+            if not changed:
+                return None
+            return (start_line, start_char, None, "singers")
+        self._execute_structural_edit("划选设置演唱者", _mutate)
     def _on_delete_timestamp_requested(self, line_idx: int, char_idx: int):
         if not self._project or line_idx >= len(self._project.sentences):
             return
