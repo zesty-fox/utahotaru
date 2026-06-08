@@ -1348,9 +1348,9 @@ class KaraokePreview(QWidget):
                         marker_char = self._checkpoint_markers["cp_multi_timed"] if cp_idx < len(ch_obj.global_timestamps) else self._checkpoint_markers["cp_multi_empty"]
                     total_cp_w += fm_checkpoint.horizontalAdvance(marker_char)
                 char_widths[ci] = max(char_widths[ci], total_cp_w)
-            # 句尾字符扩展该字符自身宽度的一半用于放置句尾marker（单独追踪，不混入 char_widths）
+            # 句尾字符扩展一个全角汉字宽度的一半用于放置句尾marker（单独追踪，不混入 char_widths）
             if ch_obj.is_sentence_end:
-                end_sentence_w[ci] = char_widths[ci] // 2
+                end_sentence_w[ci] = main_fm.horizontalAdvance("一") // 2
 
         # ---------- wipe 时间线（离散字符开始时间模型） ----------
         # 每个字符的 wipe 开始时间 = 该字符第一个 cp 的时间戳（global_timestamps[0]）。
