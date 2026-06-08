@@ -36,6 +36,7 @@ from strange_uta_game.backend.infrastructure.parsers.english_ruby import (
     EnglishRubyLookup,
     find_english_words,
     get_syllable_start_offsets,
+    _TRAILING_COMMA_CHARS,
 )
 from strange_uta_game.backend.infrastructure.parsers.e2k_engine import (
     EnglishToKanaEngine,
@@ -1137,6 +1138,7 @@ class AutoCheckService:
         english_syllable_check = self._flags.get("english_syllable_check", True)
         check_english_word_end = self._flags.get("check_english_word_end", True)
         english_sentence_end_idx: set = set()
+        english_word_trailing_comma_idx: set = set()  # 英文单词后紧跟的逗号索引
         for start, end, word in find_english_words(text):
             syllable_starts = (
                 get_syllable_start_offsets(word) if english_syllable_check else {0}
@@ -1146,6 +1148,9 @@ class AutoCheckService:
                     check_counts[idx] = 1 if (idx - start) in syllable_starts else 0
             if end - 1 < n and end - start > 1 and check_english_word_end:
                 english_sentence_end_idx.add(end - 1)
+            # 收集紧跟英文单词的逗号，避免其被空格规则误标句尾
+            if end < len(text) and text[end] in _TRAILING_COMMA_CHARS:
+                english_word_trailing_comma_idx.add(end)
 
         # 行尾 / 空格视为句尾
         add_line_end = self._flags.get("check_line_end", True) and not is_blank_line
@@ -1170,6 +1175,7 @@ class AutoCheckService:
                     check_space_as_line_end
                     and (i + 1 < n)
                     and chars[i + 1].isspace()
+                    and i not in english_word_trailing_comma_idx
                 ):
                     is_sentence_end = True
                 if i in english_sentence_end_idx:
@@ -1788,6 +1794,7 @@ class AutoCheckService:
         # （analyze_sentence 内 chars 由 split_text(text) 产出，逐字符英文路径保持索引对齐）。
         english_sentence_end_idx: set = set()
         english_word_end_idx: set = set()  # 所有英文单词结尾索引（不受开关控制）
+        english_word_trailing_comma_idx: set = set()  # 英文单词后紧跟的逗号索引
         check_english_word_end = self._flags.get("check_english_word_end", True)
         for _start, _end, _word in find_english_words(sentence.text):
             _is_single = _end - _start <= 1
@@ -1795,12 +1802,16 @@ class AutoCheckService:
                 english_word_end_idx.add(_end - 1)  # 含单字母词，确保空格豁免生效
                 if not _is_single and check_english_word_end:
                     english_sentence_end_idx.add(_end - 1)
+            # 收集紧跟英文单词的逗号，避免其被空格规则误标句尾
+            if _end < len(sentence.text) and sentence.text[_end] in _TRAILING_COMMA_CHARS:
+                english_word_trailing_comma_idx.add(_end)
 
         new_characters: List[Character] = []
         for i, result in enumerate(results):
             is_last = i == len(results) - 1
             # 空格视为句尾：当前字符后面紧跟空格时额外+1
             # 当英文单词结尾句尾关闭时，英文单词结尾不受空格规则影响
+            # 英文单词后的逗号也不受空格规则影响（如 "Smile, Love" 中的逗号）
             is_before_space = (
                 not is_last
                 and check_space_as_line_end
@@ -1808,6 +1819,7 @@ class AutoCheckService:
                 and len(results[i + 1].char) == 1
                 and results[i + 1].char.isspace()
                 and not (i in english_word_end_idx and not check_english_word_end)
+                and i not in english_word_trailing_comma_idx
             )
             extra = 0
             is_sentence_end = False
@@ -2301,6 +2313,7 @@ class AutoCheckService:
         # （文本拆分器对英文走逐字符路径，保持字符-文本索引对齐）。
         english_sentence_end_idx: set[int] = set()
         english_word_end_idx: set[int] = set()  # 所有英文单词结尾索引（不受开关控制）
+        english_word_trailing_comma_idx: set[int] = set()  # 英文单词后紧跟的逗号索引
         check_english_word_end = self._flags.get("check_english_word_end", True)
         _english_syllable_check = self._flags.get("english_syllable_check", True)
         for start, end, word in find_english_words(sentence.text):
@@ -2315,6 +2328,9 @@ class AutoCheckService:
                 english_word_end_idx.add(end - 1)  # 含单字母词，确保空格豁免生效
                 if not _is_single and check_english_word_end:
                     english_sentence_end_idx.add(end - 1)
+            # 收集紧跟英文单词的逗号，避免其被空格规则误标句尾
+            if end < len(sentence.text) and sentence.text[end] in _TRAILING_COMMA_CHARS:
+                english_word_trailing_comma_idx.add(end)
 
         # 更新字符属性
         # 空行（text.strip() 为空）不应被 check_line_end/check_space_as_line_end 强制打句尾 CP
@@ -2327,6 +2343,7 @@ class AutoCheckService:
             is_last = i == len(sentence.characters) - 1
             # 空格视为句尾：当前字符后面紧跟空格时额外+1
             # 当英文单词结尾句尾关闭时，英文单词结尾不受空格规则影响
+            # 英文单词后的逗号也不受空格规则影响（如 "Smile, Love" 中的逗号）
             is_before_space = (
                 not is_last
                 and check_space_as_line_end
@@ -2334,6 +2351,7 @@ class AutoCheckService:
                 and len(chars[i + 1]) == 1
                 and chars[i + 1].isspace()
                 and not (i in english_word_end_idx and not check_english_word_end)
+                and i not in english_word_trailing_comma_idx
             )
             extra = 0
             is_sentence_end = False

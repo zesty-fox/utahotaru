@@ -136,6 +136,17 @@ def get_syllable_start_offsets(word: str) -> Set[int]:
         return {0}
 
 
+# 各类逗号：英文逗号、中文全角逗号、日文逗号
+_TRAILING_COMMA_CHARS = frozenset({',', '\uff0c', '\u3001'})
+
+
+def _extend_past_trailing_commas(text: str, end: int) -> int:
+    """将 end 索引向后扩展到跳过所有尾部逗号。"""
+    while end < len(text) and text[end] in _TRAILING_COMMA_CHARS:
+        end += 1
+    return end
+
+
 def find_english_words(text: str) -> List[Tuple[int, int, str]]:
     """在文本中定位所有英文单词。
 
