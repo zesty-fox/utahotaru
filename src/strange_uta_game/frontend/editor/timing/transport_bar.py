@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QWheelEvent
+from PyQt6.QtCore import QPoint, Qt, pyqtSignal
+from PyQt6.QtGui import QColor, QMouseEvent, QWheelEvent
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel
 from qfluentwidgets import (
     CaptionLabel,
@@ -12,10 +12,44 @@ from qfluentwidgets import (
     Slider,
     ToolButton,
 )
+from qfluentwidgets.components.widgets.slider import SliderHandle as _SliderHandle
+
+
+class _ResetHandle(_SliderHandle):
+    """SliderHandle that resets the parent slider on double-click."""
+
+    def mouseDoubleClickEvent(self, event: QMouseEvent | None) -> None:
+        p = self.parent()
+        if isinstance(p, WheelSpeedSlider) and p._default_value is not None:
+            p.setValue(p._default_value)
+        if event is not None:
+            event.accept()
 
 
 class WheelSpeedSlider(Slider):
-    """Speed slider that accepts wheel input while hovered."""
+    """Slider that accepts wheel input while hovered and resets on double-click."""
+
+    def __init__(
+        self,
+        orientation: Qt.Orientation,
+        parent=None,
+        default_value: int | None = None,
+    ):
+        super().__init__(orientation, parent)
+        self._default_value = default_value
+
+    def _postInit(self):
+        self.handle = _ResetHandle(self)
+        self._pressedPos = QPoint()
+        self.lightGrooveColor = QColor()
+        self.darkGrooveColor = QColor()
+        self.setOrientation(self.orientation())
+        self.handle.pressed.connect(self.sliderPressed)
+        self.handle.released.connect(self.sliderReleased)
+        self.valueChanged.connect(self._adjustHandlePos)
+
+    def setDefaultValue(self, value: int) -> None:
+        self._default_value = value
 
     def wheelEvent(self, event: QWheelEvent | None) -> None:
         if event is None:
@@ -83,7 +117,7 @@ class TransportBar(QFrame):
         layout.addWidget(self.slider_progress, stretch=1)
 
         layout.addWidget(CaptionLabel("速度"))
-        self.slider_speed = WheelSpeedSlider(Qt.Orientation.Horizontal, self)
+        self.slider_speed = WheelSpeedSlider(Qt.Orientation.Horizontal, self, default_value=100)
         self.slider_speed.setRange(50, 100)
         self.slider_speed.setSingleStep(5)
         self.slider_speed.setPageStep(5)
@@ -108,7 +142,7 @@ class TransportBar(QFrame):
         layout.addWidget(self.lbl_render)
 
         layout.addWidget(CaptionLabel("音量"))
-        self.slider_volume = Slider(Qt.Orientation.Horizontal, self)
+        self.slider_volume = WheelSpeedSlider(Qt.Orientation.Horizontal, self, default_value=100)
         self.slider_volume.setRange(0, 100)
         self.slider_volume.setValue(100)
         self.slider_volume.setFixedWidth(100)
@@ -254,3 +288,11 @@ class TransportBar(QFrame):
         else:
             pct = max(0, min(99, int(progress * 100)))
             self.lbl_render.setText(f"{speed:.2f}x 渲染 {pct}%")
+
+    def set_default_speed(self, pct: int) -> None:
+        """Set the default speed value for double-click reset."""
+        self.slider_speed.setDefaultValue(self._clamp_speed_pct(pct))
+
+    def set_default_volume(self, vol: int) -> None:
+        """Set the default volume value for double-click reset."""
+        self.slider_volume.setDefaultValue(max(0, min(100, vol)))
