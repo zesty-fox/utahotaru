@@ -211,6 +211,8 @@ class KaraokePreview(QWidget):
         int, int, int, str
     )  # line_idx, start_char, end_char, singer_id
     delete_chars_requested = pyqtSignal(int, int, int)
+    delete_chars_multi_requested = pyqtSignal(int, int, int, int)  # start_line, start_char, end_line, end_char
+    singer_change_multi_requested = pyqtSignal(int, int, int, int, str)  # start_line, start_char, end_line, end_char, singer_id
     delete_timestamp_requested = pyqtSignal(int, int)
     insert_space_before_requested = pyqtSignal(int, int)
     insert_space_after_requested = pyqtSignal(int, int)
@@ -246,6 +248,7 @@ class KaraokePreview(QWidget):
         # 划词选中状态
         self._focus_line_idx: int = -1
         self._focus_char_idx: int = -1
+        self._focus_line_range_end: int = -1
         self._focus_char_range_end: int = -1
         self._focus_dragging: bool = False
 
@@ -262,6 +265,12 @@ class KaraokePreview(QWidget):
         self._click_timer.timeout.connect(self._clear_click_snapshot)
         self._press_pos: Optional[tuple] = None  # 鼠标按下位置 (x, y)
         self._CLICK_MOVE_THRESHOLD = 5  # 像素级防抖阈值：移动超过此距离视为划词
+
+        self._drag_scroll_timer = QTimer(self)
+        self._drag_scroll_timer.setInterval(50)
+        self._drag_scroll_timer.timeout.connect(self._on_drag_scroll_tick)
+        self._drag_scroll_direction: int = 0  # -1=上, 0=无, 1=下
+        self._drag_scroll_mouse_y: int = 0
 
         # 缓存字体和 QFontMetrics，避免每帧重建
         self._font_current = QFont("Microsoft YaHei", 22, QFont.Weight.Bold)
@@ -457,6 +466,7 @@ class KaraokePreview(QWidget):
         # focus 是用户视觉/操作真理来源（点字符/拖选/纯←→），与 current（cp 域反馈）独立。
         self._focus_line_idx = -1
         self._focus_char_idx = -1
+        self._focus_line_range_end = -1
         self._focus_char_range_end = -1
         self._focus_dragging = False
         if project and project.sentences:
@@ -464,6 +474,7 @@ class KaraokePreview(QWidget):
                 if sentence.characters:
                     self._focus_line_idx = idx
                     self._focus_char_idx = 0
+                    self._focus_line_range_end = idx
                     self._focus_char_range_end = 0
                     break
             # 预渲染所有句子到缓存
@@ -477,11 +488,13 @@ class KaraokePreview(QWidget):
         new_line = float(line_idx)
         if new_line == self._scroll_center_line and line_idx == self._current_char_idx:
             self._focus_char_idx = char_idx
+            self._focus_line_range_end = line_idx
             self._focus_char_range_end = char_idx
             self._update_display()
             return
         self._focus_line_idx = line_idx
         self._focus_char_idx = char_idx
+        self._focus_line_range_end = line_idx
         self._focus_char_range_end = char_idx
         if self._is_playing:
             self._warm_nearby_cache(budget=2)
@@ -516,6 +529,37 @@ class KaraokePreview(QWidget):
         self._scroll_center_line = new_line
         self._sync_scrollbar_to_scroll_center()
         self._update_display()
+
+    def is_multi_line_selection(self) -> bool:
+        return (
+            self._focus_line_idx >= 0
+            and self._focus_char_idx >= 0
+            and self._focus_line_range_end >= 0
+            and self._focus_line_idx != self._focus_line_range_end
+        )
+
+    def get_normalized_selection(self):
+        """返回 (start_line, start_char, end_line, end_char) 闭区间，或 None。"""
+        if self._focus_line_idx < 0 or self._focus_char_idx < 0 or self._focus_line_range_end < 0:
+            return None
+        if self._focus_line_idx < self._focus_line_range_end:
+            return (
+                self._focus_line_idx,
+                self._focus_char_idx,
+                self._focus_line_range_end,
+                self._focus_char_range_end,
+            )
+        elif self._focus_line_idx > self._focus_line_range_end:
+            return (
+                self._focus_line_range_end,
+                self._focus_char_range_end,
+                self._focus_line_idx,
+                self._focus_char_idx,
+            )
+        else:
+            lo = min(self._focus_char_idx, self._focus_char_range_end)
+            hi = max(self._focus_char_idx, self._focus_char_range_end)
+            return (self._focus_line_idx, lo, self._focus_line_idx, hi)
 
     def _scroll_to_line(self, line_idx: int):
         """纯视觉滚动：将指定行移到视口中央，不改变 _current_line_idx（编辑光标）。
@@ -856,6 +900,7 @@ class KaraokePreview(QWidget):
             if char_rect.contains(click_x, click_y):
                 self._focus_line_idx = line_idx
                 self._focus_char_idx = char_idx
+                self._focus_line_range_end = line_idx
                 self._focus_char_range_end = char_idx
                 self._focus_dragging = True
                 self._pending_click = {
@@ -872,6 +917,7 @@ class KaraokePreview(QWidget):
             hit_type, line_idx, char_idx, cp_idx = nearest
             self._focus_line_idx = line_idx
             self._focus_char_idx = char_idx
+            self._focus_line_range_end = line_idx
             self._focus_char_range_end = char_idx
             self._focus_dragging = True
             if hit_type == "cp":
@@ -894,6 +940,7 @@ class KaraokePreview(QWidget):
         # 先清除旧快照（避免上次单击 300ms 计时器延迟触发 set_current_position）
         self._focus_line_idx = -1
         self._focus_char_idx = -1
+        self._focus_line_range_end = -1
         self._focus_char_range_end = -1
         self._clear_click_snapshot()
 
@@ -909,6 +956,7 @@ class KaraokePreview(QWidget):
             # _on_char_selected 负责居中并通过 timing_service 向前找最近节奏点。
             self._focus_line_idx = target_idx
             self._focus_char_idx = 0
+            self._focus_line_range_end = target_idx
             self._focus_char_range_end = 0
             self._focus_dragging = True
             self._pending_click = {
@@ -919,12 +967,13 @@ class KaraokePreview(QWidget):
         self.update()
 
     def mouseMoveEvent(self, a0: Optional[QMouseEvent]):
-        """鼠标拖拽 → 扩展划词选择范围"""
+        """鼠标拖拽 → 扩展划词选择范围；边缘自动滚动。"""
         if not a0:
             return
 
         move_x = int(a0.position().x())
         move_y = int(a0.position().y())
+        self._drag_scroll_mouse_y = move_y
 
         # 像素级防抖：移动超过阈值时清除待处理点击（说明用户是划词而非单击）
         if self._press_pos is not None and self._pending_click is not None:
@@ -936,11 +985,55 @@ class KaraokePreview(QWidget):
         if not self._focus_dragging:
             return
 
+        hit = False
         for char_rect, line_idx, char_idx in self._char_hitboxes:
-            if char_rect.contains(move_x, move_y) and line_idx == self._focus_line_idx:
+            if char_rect.contains(move_x, move_y):
+                self._focus_line_range_end = line_idx
                 self._focus_char_range_end = char_idx
-                self.update()
-                return
+                hit = True
+                break
+        if hit:
+            self.update()
+
+        # 边缘自动滚动
+        h = self.height()
+        SCROLL_ZONE = 36
+        new_dir = 0
+        if self._project and self._project.sentences:
+            total = len(self._project.sentences) - 1
+            if move_y < SCROLL_ZONE and self._scroll_center_line > 0:
+                new_dir = -1
+            elif move_y > h - SCROLL_ZONE and self._scroll_center_line < total:
+                new_dir = 1
+        if new_dir != self._drag_scroll_direction:
+            self._drag_scroll_direction = new_dir
+            if new_dir != 0:
+                self._drag_scroll_timer.start()
+            else:
+                self._drag_scroll_timer.stop()
+
+    def _on_drag_scroll_tick(self):
+        """拖拽边缘滚动：超出越多滚动越快。"""
+        if not self._focus_dragging or self._drag_scroll_direction == 0:
+            self._drag_scroll_timer.stop()
+            return
+        h = self.height()
+        SCROLL_ZONE = 36
+        my = self._drag_scroll_mouse_y
+        if self._drag_scroll_direction < 0:
+            dist = SCROLL_ZONE - my
+        else:
+            dist = my - (h - SCROLL_ZONE)
+        dist = max(0, min(dist, SCROLL_ZONE * 3))
+        speed = 0.02 + (dist / SCROLL_ZONE) * 0.25
+        delta = speed * self._drag_scroll_direction
+        new_center = self._scroll_center_line + delta
+        total = len(self._project.sentences) - 1 if self._project and self._project.sentences else 0
+        new_center = max(0, min(float(total), new_center))
+        if new_center != self._scroll_center_line:
+            self._scroll_center_line = new_center
+            self._sync_scrollbar_to_scroll_center()
+            self.update()
 
     def mouseReleaseEvent(self, a0: Optional[QMouseEvent]):
         """鼠标释放 → 结束划词，或触发单击"""
@@ -948,6 +1041,8 @@ class KaraokePreview(QWidget):
             return
 
         self._focus_dragging = False
+        self._drag_scroll_timer.stop()
+        self._drag_scroll_direction = 0
 
         # 双击的 Release #2：双击事件已处理，跳过一切单击逻辑
         if self._double_click_handled:
@@ -1013,6 +1108,13 @@ class KaraokePreview(QWidget):
                         return
             self.set_current_position(self._focus_line_idx, self._focus_char_idx)
 
+    def _emit_multi_line_action(self, action_type: str, start_line: int, start_char: int, end_line: int, end_char: int, singer_id: str = ""):
+        """跨行选择操作：发射对应的多行信号（由 timing_interface 批量处理）。"""
+        if action_type == "delete":
+            self.delete_chars_multi_requested.emit(start_line, start_char, end_line, end_char)
+        elif action_type == "singer":
+            self.singer_change_multi_requested.emit(start_line, start_char, end_line, end_char, singer_id)
+
     def _show_context_menu(self, global_pos, click_x: int, click_y: int):
         """显示字符上下文菜单。"""
         if not self._project or not self._project.sentences:
@@ -1047,6 +1149,7 @@ class KaraokePreview(QWidget):
             # 保证菜单关闭后 F4/F5 等操作指向正确位置）
             self._focus_line_idx = target_line_idx
             self._focus_char_idx = target_char_idx
+            self._focus_line_range_end = target_line_idx
             self._focus_char_range_end = target_char_idx
 
         if target_line_idx < 0 or target_line_idx >= len(self._project.sentences):
@@ -1058,15 +1161,19 @@ class KaraokePreview(QWidget):
         if sentence.characters and target_char_idx >= len(sentence.characters):
             target_char_idx = len(sentence.characters) - 1
 
+        norm_sel = self.get_normalized_selection()
+        multi_line = norm_sel is not None and norm_sel[0] != norm_sel[2]
         in_selection = False
-        if (
-            self._focus_line_idx == target_line_idx
-            and self._focus_char_idx >= 0
-            and self._focus_char_range_end >= 0
-        ):
-            sel_start = min(self._focus_char_idx, self._focus_char_range_end)
-            sel_end = max(self._focus_char_idx, self._focus_char_range_end)
-            in_selection = sel_start <= target_char_idx <= sel_end
+        if norm_sel is not None:
+            sel_start = norm_sel[1]
+            sel_end = norm_sel[3]
+            if multi_line:
+                in_selection = norm_sel[0] <= target_line_idx <= norm_sel[2]
+            else:
+                in_selection = (
+                    target_line_idx == norm_sel[0]
+                    and sel_start <= target_char_idx <= sel_end
+                )
         else:
             sel_start = target_char_idx
             sel_end = target_char_idx
@@ -1076,13 +1183,23 @@ class KaraokePreview(QWidget):
 
         menu = RoundMenu(parent=self)
 
-        delete_action = Action("删除字符", menu)
-        delete_action.triggered.connect(
-            lambda checked=False: self.delete_chars_requested.emit(
-                target_line_idx, delete_start, delete_end
+        if multi_line and in_selection:
+            _dl_sl, _dl_sc, _dl_el, _dl_ec = norm_sel
+            delete_action = Action("删除字符", menu)
+            delete_action.triggered.connect(
+                lambda checked=False: self._emit_multi_line_action(
+                    "delete", _dl_sl, _dl_sc, _dl_el, _dl_ec
+                )
             )
-        )
-        menu.addAction(delete_action)
+            menu.addAction(delete_action)
+        else:
+            delete_action = Action("删除字符", menu)
+            delete_action.triggered.connect(
+                lambda checked=False: self.delete_chars_requested.emit(
+                    target_line_idx, delete_start, delete_end
+                )
+            )
+            menu.addAction(delete_action)
 
         delete_timestamp = Action("删除当前时间戳并回滚", menu)
         delete_timestamp.triggered.connect(
@@ -1160,29 +1277,49 @@ class KaraokePreview(QWidget):
         menu.addAction(toggle_sentence_end_action)
         menu.addSeparator()
 
-        singer_start = delete_start if in_selection else target_char_idx
-        singer_end = delete_end - 1 if in_selection else target_char_idx
-        singer_menu = RoundMenu("设置演唱者", self)
-        default_singer = self._project.get_default_singer()
-        default_action = Action("默认演唱者", singer_menu)
-        default_action.triggered.connect(
-            lambda checked=False: self.singer_change_requested.emit(
-                target_line_idx, singer_start, singer_end, default_singer.id
-            )
-        )
-        singer_menu.addAction(default_action)
-        singer_menu.addSeparator()
-
-        for singer in self._project.singers:
-            action = Action(singer.name, singer_menu)
-            action.triggered.connect(
-                lambda checked=False, sid=singer.id: self.singer_change_requested.emit(
-                    target_line_idx, singer_start, singer_end, sid
+        if multi_line and in_selection:
+            _dl_sl, _dl_sc, _dl_el, _dl_ec = norm_sel
+            singer_menu = RoundMenu("设置演唱者", self)
+            default_singer = self._project.get_default_singer()
+            default_action = Action("默认演唱者", singer_menu)
+            default_action.triggered.connect(
+                lambda checked=False: self._emit_multi_line_action(
+                    "singer", _dl_sl, _dl_sc, _dl_el, _dl_ec, singer_id=default_singer.id
                 )
             )
-            singer_menu.addAction(action)
-
-        menu.addMenu(singer_menu)
+            singer_menu.addAction(default_action)
+            singer_menu.addSeparator()
+            for singer in self._project.singers:
+                action = Action(singer.name, singer_menu)
+                action.triggered.connect(
+                    lambda checked=False, sid=singer.id: self._emit_multi_line_action(
+                        "singer", _dl_sl, _dl_sc, _dl_el, _dl_ec, singer_id=sid
+                    )
+                )
+                singer_menu.addAction(action)
+            menu.addMenu(singer_menu)
+        else:
+            singer_start = delete_start if in_selection else target_char_idx
+            singer_end = delete_end - 1 if in_selection else target_char_idx
+            singer_menu = RoundMenu("设置演唱者", self)
+            default_singer = self._project.get_default_singer()
+            default_action = Action("默认演唱者", singer_menu)
+            default_action.triggered.connect(
+                lambda checked=False: self.singer_change_requested.emit(
+                    target_line_idx, singer_start, singer_end, default_singer.id
+                )
+            )
+            singer_menu.addAction(default_action)
+            singer_menu.addSeparator()
+            for singer in self._project.singers:
+                action = Action(singer.name, singer_menu)
+                action.triggered.connect(
+                    lambda checked=False, sid=singer.id: self.singer_change_requested.emit(
+                        target_line_idx, singer_start, singer_end, sid
+                    )
+                )
+                singer_menu.addAction(action)
+            menu.addMenu(singer_menu)
         menu.exec(global_pos)
 
     def _find_next_line_first_timestamp(self, current_line_idx: int) -> Optional[int]:
@@ -1866,6 +2003,8 @@ class KaraokePreview(QWidget):
             else self._current_line_idx
         )
 
+        _norm_sel = self.get_normalized_selection() if self._focus_char_idx >= 0 else None
+
         for idx in range(first_visible, last_visible + 1):
             # 行中心 y 坐标
             y_center_f = center_y + (idx - self._scroll_center_line) * line_height
@@ -2030,18 +2169,20 @@ class KaraokePreview(QWidget):
                     painter.fillRect(bg_rect, highlight_bg)
 
                 # 划词选中高亮背景
-                if idx == self._focus_line_idx and self._focus_char_idx >= 0:
-                    sel_lo = min(self._focus_char_idx, self._focus_char_range_end)
-                    sel_hi = max(self._focus_char_idx, self._focus_char_range_end)
-                    if sel_lo <= char_pos <= sel_hi:
-                        sel_bg = theme.karaoke_selection_bg
-                        sel_rect = QRect(
-                            int(curr_x) - 1,
-                            _rect_top,
-                            int(char_w) + 2,
-                            _rect_height,
-                        )
-                        painter.fillRect(sel_rect, sel_bg)
+                if _norm_sel is not None:
+                    _sl, _sc, _el, _ec = _norm_sel
+                    if _sl <= idx <= _el:
+                        _lo = _sc if idx == _sl else 0
+                        _hi = _ec if idx == _el else len(line.chars) - 1
+                        if _lo <= char_pos <= _hi:
+                            sel_bg = theme.karaoke_selection_bg
+                            sel_rect = QRect(
+                                int(curr_x) - 1,
+                                _rect_top,
+                                int(char_w) + 2,
+                                _rect_height,
+                            )
+                            painter.fillRect(sel_rect, sel_bg)
 
                 # 连词组 non-leader：fillRect 可能覆盖 leader 那一轮画的 ruby 框的
                 # 右半段 outline，这里查表重绘恢复。leader 自己不需要重绘（它本轮的
