@@ -230,6 +230,7 @@ class FileLoader:
                 settings = setting_iface.get_settings()
                 default_volume = int(settings.get("audio.default_volume", 80))
                 self._editor.transport.slider_volume.setValue(default_volume)
+                self._editor.transport.set_default_volume(default_volume)
                 speed_min = settings.get("audio.speed_slider_min", 0.5)
                 speed_max = settings.get("audio.speed_slider_max", 1.0)
                 self._editor.transport.set_speed_range(
@@ -241,6 +242,7 @@ class FileLoader:
                 speed_pct = self._editor.transport.set_speed_value(
                     int(default_speed * 100), emit_signal=False
                 )
+                self._editor.transport.set_default_speed(speed_pct)
                 self._timing_service.set_speed(speed_pct / 100.0)
                 self._timing_service.prewarm_speeds(
                     speed_min=speed_min,

@@ -2678,6 +2678,7 @@ class EditorInterface(QWidget):
                 settings = setting_iface.get_settings()
                 default_volume = int(settings.get("audio.default_volume", 80))
                 self.transport.slider_volume.setValue(default_volume)
+                self.transport.set_default_volume(default_volume)
                 speed_min = settings.get("audio.speed_slider_min", 0.5)
                 speed_max = settings.get("audio.speed_slider_max", 1.0)
                 self.transport.set_speed_range(
@@ -2689,6 +2690,7 @@ class EditorInterface(QWidget):
                 speed_pct = self.transport.set_speed_value(
                     int(default_speed * 100), emit_signal=False
                 )
+                self.transport.set_default_speed(speed_pct)
                 self._timing_service.set_speed(speed_pct / 100.0)
                 # 用实际滑块范围重新触发预渲染，过滤掉用户不会用到的速度档。
                 # 已渲染/已入队的速度幂等跳过，无重复开销。
