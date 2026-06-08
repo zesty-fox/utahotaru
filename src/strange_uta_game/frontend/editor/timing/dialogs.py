@@ -9,10 +9,10 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, QRect, QSize, pyqtSignal
+from PyQt6.QtCore import QEvent, Qt, QRect, QSize, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import (
-
+    QApplication,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -1231,7 +1231,7 @@ class SetSingerByLineDialog(QDialog):
         layout = QVBoxLayout(self)
 
         # 提示标签
-        hint = CaptionLabel("选择要设置演唱者的行，然后从下方选择演唱者，点击「应用」执行：")
+        hint = CaptionLabel("选择要设置演唱者的行：点击切换选择，Shift+点击范围选择，然后从下方选择演唱者，点击「应用」执行：")
         layout.addWidget(hint)
 
         # 行列表表格
@@ -1244,6 +1244,9 @@ class SetSingerByLineDialog(QDialog):
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+
+        self._last_clicked_row = self._focus_line_idx if 0 <= self._focus_line_idx < len(sentences) else -1
+        self.table.viewport().installEventFilter(self)
 
         for idx, sentence in enumerate(sentences):
             # 复选框
@@ -1273,15 +1276,8 @@ class SetSingerByLineDialog(QDialog):
 
         layout.addWidget(self.table, stretch=1)
 
-        if 0 <= self._focus_line_idx < len(sentences):
-            focus_item = self.table.item(self._focus_line_idx, 2)
-            if focus_item:
-                focus_bg = theme.bg_selected
-                for col in range(self.table.columnCount()):
-                    item = self.table.item(self._focus_line_idx, col)
-                    if item:
-                        item.setBackground(focus_bg)
-                self.table.scrollToItem(focus_item, QTableWidget.ScrollHint.PositionAtCenter)
+        if 0 <= self._last_clicked_row < len(sentences):
+            self._highlight_row(self._last_clicked_row)
 
         # 全选/全不选按钮
         select_layout = QHBoxLayout()
@@ -1372,6 +1368,7 @@ class SetSingerByLineDialog(QDialog):
                 chk = widget.findChild(QCheckBox)
                 if chk:
                     chk.setChecked(True)
+        self._last_clicked_row = -1
 
     def _deselect_all(self):
         """全不选"""
@@ -1381,6 +1378,58 @@ class SetSingerByLineDialog(QDialog):
                 chk = widget.findChild(QCheckBox)
                 if chk:
                     chk.setChecked(False)
+        self._last_clicked_row = -1
+
+    def eventFilter(self, obj, event):
+        if obj is self.table.viewport() and event.type() == QEvent.Type.MouseButtonPress \
+                and event.button() == Qt.MouseButton.LeftButton:
+            pos = event.pos()
+            row = self.table.rowAt(pos.y())
+            if row >= 0:
+                modifiers = QApplication.keyboardModifiers()
+                if modifiers & Qt.KeyboardModifier.ShiftModifier:
+                    self._select_range(row)
+                else:
+                    self._toggle_row(row)
+                return True
+        return super().eventFilter(obj, event)
+
+    def _get_checkbox(self, row: int):
+        widget = self.table.cellWidget(row, 0)
+        if widget:
+            return widget.findChild(QCheckBox)
+        return None
+
+    def _select_range(self, row: int):
+        if self._last_clicked_row < 0:
+            self._last_clicked_row = row
+        start = min(self._last_clicked_row, row)
+        end = max(self._last_clicked_row, row)
+        for i in range(start, end + 1):
+            chk = self._get_checkbox(i)
+            if chk:
+                chk.setChecked(True)
+        self._last_clicked_row = row
+        self._highlight_row(row)
+
+    def _toggle_row(self, row: int):
+        chk = self._get_checkbox(row)
+        if chk:
+            chk.setChecked(not chk.isChecked())
+        self._last_clicked_row = row
+        self._highlight_row(row)
+
+    def _highlight_row(self, row: int):
+        normal_bg = QColor(0, 0, 0, 0)
+        highlight_bg = theme.bg_selected
+        for r in range(self.table.rowCount()):
+            for c in range(self.table.columnCount()):
+                item = self.table.item(r, c)
+                if item:
+                    item.setBackground(highlight_bg if r == row else normal_bg)
+        focus_item = self.table.item(row, 2)
+        if focus_item:
+            self.table.scrollToItem(focus_item, QTableWidget.ScrollHint.EnsureVisible)
 
     def _apply_singer_filter(self):
         """按名称/分组过滤演唱者列表"""
