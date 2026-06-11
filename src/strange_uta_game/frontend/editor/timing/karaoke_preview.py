@@ -131,6 +131,25 @@ def _anchor_segment(anchors: list[int], current_time: int) -> tuple[int, float, 
     return (n - 1, 1.0, n)
 
 
+def _anchor_part_ratio(
+    anchors: list[int], current_time: int, part_ws: "Optional[list[int]]" = None
+) -> float:
+    """锚点轴上的整体 wipe 进度 ∈ [0,1]，段间按 ruby 部件宽度加权推进。
+
+    part_ws 为各锚点段对应的 ruby 部件像素宽度（len == 段数 N 时启用）；
+    第 i 段推进的总进度占比 = part_ws[i] / sum(part_ws)。
+    部件宽度缺失或与段数不匹配时回退为各段等分（与 _anchor_ratio 等价）。
+    """
+    i, sr, n = _anchor_segment(anchors, current_time)
+    if n <= 0:
+        return 1.0
+    if part_ws is not None and len(part_ws) == n:
+        total = sum(part_ws)
+        if total > 0:
+            return (sum(part_ws[:i]) + part_ws[i] * sr) / total
+    return (i + sr) / n
+
+
 def _piecewise_wipe_ratio(
     segments: list[tuple[int, int, float, float]], current_time: int
 ) -> float:
@@ -1524,6 +1543,13 @@ class KaraokePreview(QWidget):
                     fallback_sentence_end_ts = self._duration_ms
 
         char_wipe_times: dict = {}
+        # ---------- 合并段锚点组（多cp leader + 后随 cc=0 字符） ----------
+        # 当 leader 有 >=2 个时间戳且其段内后随字符全为 cc=0 时，把整段
+        # （leader+followers）的 ink 合并成一条轴，用 [gts..., end_ts] 锚点走完；
+        # 各锚点段的推进量按 leader 的 ruby 部件宽度加权（数量匹配时）。
+        # seg_anchor_groups[leader_ci] = {anchors, ink_offsets, total_ink, part_ws}
+        seg_anchor_groups: dict[int, dict] = {}
+        seg_member_to_leader: dict[int, int] = {}
         _prev_line_last_ts: Optional[int] = None  # lazy-loaded，仅行首无 leader 时使用
         for sent_start, sent_end in sent_ranges:
             # 句子内有 start_ts 的 leader 字符索引
@@ -1604,6 +1630,54 @@ class KaraokePreview(QWidget):
                     char_end_ts = int(start_times[leader] + (end_ts - start_times[leader]) * next_ratio)
                     char_wipe_times[ci] = (char_start_ts, char_end_ts)
                     cum_w += w
+
+                # 合并段锚点组：仅限连词场景——段内所有字符属于同一连词组、
+                # leader 有 >=2 个时间戳、后随组员全为 cc=0 时，把该段 ink 合并成
+                # 一条轴，用 [gts..., end_ts] 走完（替代上面按像素切窗口的模型；
+                # char_wipe_times 保留作兜底）。
+                # leader 可以是组首，也可以是组中段成员——如「今日特殊字符今日」
+                # 整体连词时组内有两个多cp leader，各自与后随 cc=0 组员成一段。
+                _gts = [int(t) for t in characters[leader].global_timestamps]
+                if leader in linked_leader_groups:
+                    _seg_grp = linked_leader_groups[leader]
+                elif leader in non_leader_to_leader:
+                    _seg_grp = linked_leader_groups[non_leader_to_leader[leader]]
+                else:
+                    _seg_grp = None
+                if (
+                    _seg_grp is not None
+                    and seg_end <= _seg_grp[-1]
+                    and len(_gts) >= 2
+                    and seg_end > leader
+                    and all(
+                        characters[ci].check_count == 0
+                        for ci in range(leader + 1, seg_end + 1)
+                    )
+                    and all(_gts[k] < _gts[k + 1] for k in range(len(_gts) - 1))
+                    and end_ts > _gts[-1]
+                ):
+                    _anchors = _gts + [int(end_ts)]
+                    _ink_offsets: dict[int, int] = {}
+                    _cum_ink = 0
+                    for ci in range(leader, seg_end + 1):
+                        _ink_offsets[ci] = _cum_ink
+                        _cum_ink += char_ink_widths[ci]
+                    if _cum_ink > 0:
+                        # ruby 部件宽度（数量与锚点段数匹配时按部件宽度推进）
+                        _part_ws: Optional[list[int]] = None
+                        _l_ruby = characters[leader].ruby
+                        if _l_ruby and _l_ruby.parts and len(_l_ruby.parts) == len(_anchors) - 1:
+                            _part_ws = [
+                                fm_ruby.horizontalAdvance(p.text) for p in _l_ruby.parts
+                            ]
+                        seg_anchor_groups[leader] = {
+                            "anchors": _anchors,
+                            "ink_offsets": _ink_offsets,
+                            "total_ink": _cum_ink,
+                            "part_ws": _part_ws,
+                        }
+                        for ci in range(leader, seg_end + 1):
+                            seg_member_to_leader[ci] = leader
 
             # 句子内第一个 leader 之前的无 ts 字符
             first_leader = leaders[0]
@@ -1786,6 +1860,8 @@ class KaraokePreview(QWidget):
             "linked_non_leader": linked_non_leader,
             "non_leader_to_leader": non_leader_to_leader,
             "char_part_anchors": char_part_anchors,
+            "seg_anchor_groups": seg_anchor_groups,
+            "seg_member_to_leader": seg_member_to_leader,
             "char_ruby_ink": char_ruby_ink,
             "group_ruby_ink": group_ruby_ink,
             "group_ruby_wipe": group_ruby_wipe,
@@ -2096,6 +2172,8 @@ class KaraokePreview(QWidget):
             _linked_non_leader = _rd["linked_non_leader"]
             _non_leader_to_leader = _rd["non_leader_to_leader"]
             _char_part_anchors = _rd["char_part_anchors"]
+            _seg_anchor_groups = _rd["seg_anchor_groups"]
+            _seg_member_to_leader = _rd["seg_member_to_leader"]
             # 连词组 ruby 框几何缓存：leader 那一轮画完框后存 (x, y, w, h, color)，
             # 后续 non-leader 字符的 fillRect 会盖住框的右半段 outline，需要从这里
             # 查表重绘以恢复框。
@@ -2479,11 +2557,28 @@ class KaraokePreview(QWidget):
                     char_time, next_time = char_wipe_times[char_pos]
 
                     # 决定 wipe ratio 来源：
-                    # 1) 字符 part 锚点（check_count>=2 且打过轴）→ 该字符 ratio
-                    # 2) 否则 → 整字线性（char_wipe_times 已按像素宽度加权分配）
+                    # 1) 合并段锚点组（多cp leader + 后随 cc=0）→ 整段 ink 合并走轴，
+                    #    各锚点段按 ruby 部件宽度推进，映射回该字符 ink 区间
+                    # 2) 字符 part 锚点（check_count>=2 且打过轴）→ 该字符 ratio
+                    # 3) 否则 → 整字线性（char_wipe_times 已按像素宽度加权分配）
                     # 注：连词组（linked_to_next）仅影响视觉层（ruby 合并绘制），
-                    #     不改变 wipe 时间分配，每字独立走 char_wipe_times。
-                    if char_pos in _char_part_anchors:
+                    #     不改变 wipe 时间分配。
+                    _seg_leader = _seg_member_to_leader.get(char_pos)
+                    if _seg_leader is not None:
+                        _seg = _seg_anchor_groups[_seg_leader]
+                        _seg_ratio = _anchor_part_ratio(
+                            _seg["anchors"], current_time, _seg["part_ws"]
+                        )
+                        _wiped_ink = _seg["total_ink"] * _seg_ratio
+                        _local_ink = _wiped_ink - _seg["ink_offsets"][char_pos]
+                        _my_ink = _char_ink_widths[char_pos]
+                        if _local_ink <= 0:
+                            wipe_ratio = 0.0
+                        elif _my_ink <= 0 or _local_ink >= _my_ink:
+                            wipe_ratio = 1.0
+                        else:
+                            wipe_ratio = _local_ink / _my_ink
+                    elif char_pos in _char_part_anchors:
                         wipe_ratio = _anchor_ratio(
                             _char_part_anchors[char_pos], current_time
                         )
