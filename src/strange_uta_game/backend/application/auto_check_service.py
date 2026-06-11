@@ -24,6 +24,7 @@ from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import (
     create_analyzer,
     RubyAnalyzer,
     RubyResult,
+    _arabic_to_kanji,
     _group_reading_for_character,
     is_all_katakana,
     is_english_reading,
@@ -530,6 +531,73 @@ class AutoCheckService:
         merged = filtered + overrides
         merged.sort(key=lambda r: r.start_idx)
         return merged, covered
+
+    def _handle_number_readings(
+        self,
+        text: str,
+        ruby_results: List[RubyResult],
+    ) -> List[RubyResult]:
+        """对文本中的阿拉伯数字序列计算日语读音。
+
+        检测 ruby_results 中读音与原文相同的数字段，将其替换为漢数字表记后
+        经注音分析器获取的日语读音（如 ``"999"`` → ``"きゅうひゃくきゅうじゅうきゅう"``）。
+
+        仅当分析器对数字返回自注音（reading == text）时介入；若分析器已给出
+        有效读音则保留原结果（如 ``"2024年"`` 被整体分析为 ``"にせんにじゅうよねん"``）。
+
+        Args:
+            text: 原句子文本
+            ruby_results: 当前已处理的 ruby 结果
+
+        Returns:
+            更新后的 ruby_results
+        """
+        import re
+
+        _digit_re = re.compile(r"\d+")
+        new_results = list(ruby_results)
+
+        for m in _digit_re.finditer(text):
+            seq_start, seq_end = m.start(), m.end()
+            num_str = text[seq_start:seq_end]
+
+            existing = [
+                r
+                for r in new_results
+                if r.start_idx >= seq_start
+                and r.end_idx <= seq_end
+                and r.text.isdigit()
+            ]
+            if not existing:
+                continue
+            if not all(r.text == r.reading for r in existing):
+                continue
+
+            kanji = _arabic_to_kanji(num_str)
+            reading = self._analyzer.get_reading(kanji)
+            if not reading or reading == kanji:
+                continue
+
+            new_results = [
+                r
+                for r in new_results
+                if not (
+                    r.start_idx >= seq_start
+                    and r.end_idx <= seq_end
+                    and r.text.isdigit()
+                )
+            ]
+            new_results.append(
+                RubyResult(
+                    text=num_str,
+                    reading=reading,
+                    start_idx=seq_start,
+                    end_idx=seq_end,
+                )
+            )
+
+        new_results.sort(key=lambda r: r.start_idx)
+        return new_results
 
     def _try_split_to_chars(self, word: str, reading: str) -> Optional[List[str]]:
         """尝试将多字词的读音拆分到各字符（分析器分词边界 + 汉字音读字典组合匹配）。
@@ -1223,6 +1291,9 @@ class AutoCheckService:
 
         # 分析注音
         ruby_results = self._analyzer.analyze(text)
+
+        # 为数字序列计算日语读音（如 "999" → 漢数字 → 注音分析器获取读音）
+        ruby_results = self._handle_number_readings(text, ruby_results)
 
         # #11: 过滤掉符号/括号等非目标字符的注音条目
         # 自动注音仅针对：英文字符、英文单词、汉字、日汉字、平假名、片假名

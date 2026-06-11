@@ -36,6 +36,49 @@ def is_all_katakana(text: str) -> bool:
     return all(0x30A0 <= ord(c) <= 0x30FF for c in text)
 
 
+def _arabic_to_kanji(num_str: str) -> str:
+    """将阿拉伯数字字符串转换为漢数字（漢字表記）。
+
+    供注音分析器将数字序列转为漢字后获取日语读音。如 ``"999"`` → ``"九百九十九"``。
+
+    Examples:
+        "0"    → "零"
+        "10"   → "十"
+        "100"  → "百"
+        "999"  → "九百九十九"
+        "2024" → "二千二十四"
+        "10000" → "一万"
+    """
+    n = int(num_str)
+    if n == 0:
+        return "零"
+
+    _kanji_digits = "零一二三四五六七八九"
+    _units = [
+        (10**12, "兆"),
+        (10**8, "億"),
+        (10**4, "万"),
+        (1000, "千"),
+        (100, "百"),
+        (10, "十"),
+        (1, ""),
+    ]
+
+    result: List[str] = []
+    remaining = n
+
+    for unit_val, unit_name in _units:
+        if remaining >= unit_val:
+            count = remaining // unit_val
+            if count > 1 or unit_val >= 10000 or unit_val == 1:
+                result.append(_kanji_digits[count])
+            if unit_name:
+                result.append(unit_name)
+            remaining %= unit_val
+
+    return "".join(result)
+
+
 def is_english_reading(reading: str) -> bool:
     """reading 是英文读音（ASCII 字母，可含空格 / ' / -），且至少含一个字母。
 
@@ -79,7 +122,31 @@ class KanaDistributingAnalyzer(RubyAnalyzer):
     2. 对纯漢字块，尝试用 pykakasi 的单字读音作参考进行分配
        （如 世界{せかい} → 世{せ}界{かい}）
     3. 分配失败时保持复合词读音不拆分（如 今日{きょう}）
+
+    数字处理：analyze() 会在分析前将阿拉伯数字序列转为漢数字
+    （如 ``"20日"`` → ``"二十日"``），使分析器能产出正确读音
+    （``"はつか"`` 而非 ``"にじゅうにち"``）。分析后映射回原始位置。
     """
+
+    def analyze(self, text: str) -> List[RubyResult]:
+        """分析文本，对阿拉伯数字序列做漢数字前置转换。
+
+        子类无需重写本办法，只需实现 :meth:`_get_pairs`。
+        """
+        if not text:
+            return []
+        try:
+            modified_text, replacements = _replace_digits_with_kanji(text)
+            pairs = self._get_pairs(modified_text)
+            results = self._results_from_pairs(pairs)
+            if replacements:
+                results = _map_results_to_original(results, replacements, text)
+            return results
+        except Exception:
+            return [
+                RubyResult(text=c, reading=c, start_idx=i, end_idx=i + 1)
+                for i, c in enumerate(text)
+            ]
 
     def _results_from_pairs(
         self, pairs: List[Tuple[str, str]]
@@ -449,18 +516,6 @@ class WinRTAnalyzer(KanaDistributingAnalyzer):
         except Exception:
             return text
 
-    def analyze(self, text: str) -> List[RubyResult]:
-        if not text:
-            return []
-        try:
-            pairs = self._get_pairs(text)
-        except Exception:
-            return [
-                RubyResult(text=c, reading=c, start_idx=i, end_idx=i + 1)
-                for i, c in enumerate(text)
-            ]
-        return self._results_from_pairs(pairs)
-
 
 # ──────────────────────────────────────────────
 # Sudachi 分析器（noWinIME / mac 变体主引擎）
@@ -532,18 +587,6 @@ class SudachiAnalyzer(KanaDistributingAnalyzer):
             return "".join(r for _, r in self._get_pairs(text))
         except Exception:
             return text
-
-    def analyze(self, text: str) -> List[RubyResult]:
-        if not text:
-            return []
-        try:
-            pairs = self._get_pairs(text)
-        except Exception:
-            return [
-                RubyResult(text=c, reading=c, start_idx=i, end_idx=i + 1)
-                for i, c in enumerate(text)
-            ]
-        return self._results_from_pairs(pairs)
 
 
 # ──────────────────────────────────────────────
@@ -796,6 +839,107 @@ def create_analyzer(use_pykakasi: bool = True) -> RubyAnalyzer:
     return DummyAnalyzer()
 
 
+def _replace_digits_with_kanji(text: str) -> Tuple[str, List[Tuple[int, int, int, int]]]:
+    """将文本中的阿拉伯数字序列替换为漢数字表記。
+
+    供 :meth:`KanaDistributingAnalyzer.analyze` 前置处理，
+    使分析器在完整日文上下文中处理数字（如 ``"20日"`` → ``"二十日"``
+    可让分析器产出 ``"はつか"`` 而非 ``"にじゅうにち"``）。
+
+    Returns:
+        (modified_text, replacements)
+        replacements 每项为 (orig_start, orig_end, kanji_start, kanji_end)
+    """
+    import re
+
+    replacements: List[Tuple[int, int, int, int]] = []
+    result: List[str] = []
+    orig_cursor = 0
+    kanji_cursor = 0
+
+    for m in re.finditer(r"\d+", text):
+        prefix = text[orig_cursor : m.start()]
+        result.append(prefix)
+        kanji_cursor += len(prefix)
+
+        kanji = _arabic_to_kanji(m.group())
+        kanji_len = len(kanji)
+        replacements.append((m.start(), m.end(), kanji_cursor, kanji_cursor + kanji_len))
+
+        result.append(kanji)
+        kanji_cursor += kanji_len
+        orig_cursor = m.end()
+
+    result.append(text[orig_cursor:])
+    return "".join(result), replacements
+
+
+def _map_results_to_original(
+    results: List[RubyResult],
+    replacements: List[Tuple[int, int, int, int]],
+    original_text: str,
+) -> List[RubyResult]:
+    """将分析器在漢数字文本上的结果映射回原始阿拉伯数字文本。
+
+    - 落入替换区间内的结果合并为单个结果，span 覆盖原始数字区间
+    - 其余结果的索引按累计偏移量调整
+    """
+    if not replacements:
+        return results
+
+    # 按替换区间归组
+    replacement_groups: List[List[RubyResult]] = [[] for _ in replacements]
+    other_results: List[RubyResult] = []
+
+    for r in results:
+        placed = False
+        for i, (_os, _oe, kanji_s, kanji_e) in enumerate(replacements):
+            if r.start_idx >= kanji_s and r.end_idx <= kanji_e:
+                replacement_groups[i].append(r)
+                placed = True
+                break
+        if not placed:
+            other_results.append(r)
+
+    new_results: List[RubyResult] = []
+
+    # 合并每个替换区间内的结果为单个结果
+    for i, (orig_s, orig_e, _ks, _ke) in enumerate(replacements):
+        group = replacement_groups[i]
+        if group:
+            merged_reading = "".join(r.reading for r in group)
+            new_results.append(
+                RubyResult(
+                    text=original_text[orig_s:orig_e],
+                    reading=merged_reading,
+                    start_idx=orig_s,
+                    end_idx=orig_e,
+                )
+            )
+
+    # 调整落在替换区间外的结果的索引
+    for r in other_results:
+        adj_start = r.start_idx
+        adj_end = r.end_idx
+        for orig_s, orig_e, kanji_s, kanji_e in replacements:
+            offset = (kanji_e - kanji_s) - (orig_e - orig_s)
+            if kanji_e <= adj_start:
+                adj_start -= offset
+                adj_end -= offset
+        new_results.append(
+            RubyResult(
+                text=r.text,
+                reading=r.reading,
+                start_idx=adj_start,
+                end_idx=adj_end,
+                morpheme_span=r.morpheme_span,
+            )
+        )
+
+    new_results.sort(key=lambda x: x.start_idx)
+    return new_results
+
+
 def _group_reading_for_character(reading: str, checkpoint_count: int) -> List[str]:
     """按字符 checkpoint 数量拆分读音为分段列表。
 
@@ -825,6 +969,7 @@ def analyze_sentence_ruby(
         char.set_ruby(None)
 
     results = analyzer.analyze(sentence.text)
+
     for result in results:
         block_len = result.end_idx - result.start_idx
         if block_len <= 0:
