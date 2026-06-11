@@ -157,6 +157,14 @@ class WaveformDisplay(QWidget):
         self._peaks_cache_key = None
         self.update()
 
+    def clear_audio_data(self):
+        self._samples = None
+        self._sample_rate = 0
+        self._channels = 0
+        self._peaks_cache = None
+        self._peaks_cache_key = None
+        self.update()
+
     def set_zoom(self, zoom: float):
         self._zoom_factor = max(1.0, min(100.0, zoom))
         # 缩放变化后重新 clamp，避免当前滚动位置超出新的有效范围
@@ -501,6 +509,10 @@ class TimelineWidget(QWidget):
 
     def set_audio_data(self, samples: np.ndarray, sample_rate: int, channels: int):
         self.waveform_display.set_audio_data(samples, sample_rate, channels)
+
+    def clear_audio_data(self):
+        self.waveform_display.clear_audio_data()
+        self.lbl_audio_name.setText("未加载音频")
 
     def set_audio_name(self, name: str):
         """设置音频文件名称显示"""

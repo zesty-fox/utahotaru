@@ -314,8 +314,7 @@ class ProjectStore(QObject):
         
         self._project = project
         self._save_path = save_path
-        if audio_path is not None:
-            self._audio_path = audio_path
+        self._audio_path = audio_path
         self._original_media_path = None
         self._dirty = False
         self._start_periodic_save()

@@ -831,6 +831,8 @@ class EditorInterface(QWidget):
         self._update_status()
         # 重新应用设置（字体大小、行间距、对齐方式等）
         self._apply_settings()
+        # 加载新项目时清除旧音频缓存，避免旧波形/时长/缓存残留
+        self._clear_audio_state()
 
     def release_resources(self):
         """释放音频资源"""
@@ -841,6 +843,26 @@ class EditorInterface(QWidget):
         if self._keysound_player is not None:
             self._keysound_player.invalidate()
         self._keysound_style = None
+
+    def _clear_audio_state(self):
+        """清除音频状态并重置所有音频相关子控件。
+        在加载新项目（含新建和打开）且新项目未附带音频时调用，
+        避免旧项目的波形/时长/缓存残留造成用户误解。
+        """
+        self.release_resources()
+
+        self.transport.set_duration(0)
+        self.transport.set_position(0)
+        self.transport.set_playing(False)
+
+        self.timeline.set_duration(0)
+        self.timeline.set_position(0)
+        self.timeline.clear_audio_data()
+
+        self.preview.set_duration(0)
+
+        self._audio_file_path = None
+        self._audio_loading = False
 
     # ==================== 拖拽加载 ====================
 
