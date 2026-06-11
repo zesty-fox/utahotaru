@@ -425,9 +425,10 @@ class MainWindow(MSFluentWindow):
         # 切换到设置界面时从磁盘重新加载配置
         if hasattr(self, "settingInterface") and interface is self.settingInterface:
             self.settingInterface.reload_from_disk()
-        # 切换到导出界面时同步默认格式
+        # 切换到导出界面时同步默认格式和输出目录
         if hasattr(self, "exportInterface") and interface is self.exportInterface:
             self.exportInterface._sync_default_format()
+            self.exportInterface._sync_default_output_dir()
         self._current_interface = interface
         super().switchTo(interface)
 

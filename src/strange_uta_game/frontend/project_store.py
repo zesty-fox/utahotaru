@@ -202,8 +202,9 @@ class ProjectStore(QObject):
           1. 已正式保存的项目目录（排除 .cache 临时项目）
           2. 音频文件所在目录
           3. 最近加载/导入的歌词文件所在目录
-          4. settings["export.last_export_dir"]
-          5. ""（让 Qt 用系统默认）
+          4. settings["export.default_export_dir"]（用户在设置中显式指定的默认导出目录）
+          5. settings["export.last_export_dir"]（系统自动记录的最后操作目录）
+          6. ""（让 Qt 用系统默认）
         """
         if self._save_path and not self.is_temp_save_path(self._save_path):
             parent = str(Path(self._save_path).parent)
@@ -217,7 +218,11 @@ class ProjectStore(QObject):
             return self._last_lyric_dir
         try:
             from strange_uta_game.frontend.settings.app_settings import AppSettings
-            last = AppSettings().get("export.last_export_dir", "") or ""
+            settings = AppSettings()
+            default_dir = settings.get("export.default_export_dir", "") or ""
+            if default_dir and Path(default_dir).is_dir():
+                return default_dir
+            last = settings.get("export.last_export_dir", "") or ""
         except Exception:
             last = ""
         if last and Path(last).is_dir():

@@ -33,7 +33,8 @@ class ExportSubInterface(SubSettingInterface):
                    "SRT", "txt2ass", "ASS", "Nicokara", "Nicokara (带注音)", "RL 编辑模式"],
             parent=g)
         self.card_export_dir = BrowseSettingCard(FIF.FOLDER, "默认导出目录",
-            "导出文件的默认保存位置", parent=g)
+            "设置后，导出时将始终优先使用此目录。\n留空则不启用，导出时自动使用最近加载的文件所在目录。",
+            clearable=True, parent=g)
         self.card_software_compensation = SpinSettingCard(FIF.HISTORY, "软件导出补偿",
             "导出时给时间戳加上此补偿值（除.sug外的所有格式），负值=提前，正值=延后",
             min_val=-5000, max_val=5000, step=10, suffix=" ms", parent=g)
@@ -59,7 +60,7 @@ class ExportSubInterface(SubSettingInterface):
     def load_settings(self, s):
         self.card_default_format.setCurrentIndex(
             _FMT_TO_IDX.get(s.get("export.default_format", "Nicokara (带注音)"), 9))
-        export_dir = s.get("export.last_export_dir", "")
+        export_dir = s.get("export.default_export_dir", "")
         if export_dir:
             self.card_export_dir.setText(export_dir)
         self.card_software_compensation.setValue(s.get("export.software_compensation_ms", 0))
@@ -68,8 +69,6 @@ class ExportSubInterface(SubSettingInterface):
     def collect_settings(self, s):
         s.set("export.default_format",
               _IDX_TO_FMT.get(self.card_default_format.currentIndex(), "Nicokara (带注音)"))
-        export_dir = self.card_export_dir.text()
-        if export_dir:
-            s.set("export.last_export_dir", export_dir)
+        s.set("export.default_export_dir", self.card_export_dir.text())
         s.set("export.software_compensation_ms", self.card_software_compensation.value())
         s.set("export.nicokara_pause_char", self.card_nicokara_pause_char.value())

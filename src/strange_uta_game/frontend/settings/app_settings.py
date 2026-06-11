@@ -153,6 +153,7 @@ class AppSettings:
             "default_format": "Nicokara (带注音)",
             "auto_add_extension": True,
             "last_export_dir": "",
+            "default_export_dir": "",
             "offset_ms": 0,
             "software_compensation_ms": 0,
             "nicokara_pause_char": "^",

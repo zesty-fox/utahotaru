@@ -246,17 +246,25 @@ class BrowseSettingCard(SettingCard):
     """目录浏览设定卡片"""
 
     path_changed = pyqtSignal(str)
+    cleared = pyqtSignal()
 
-    def __init__(self, icon, title: str, content: str, parent=None):
+    def __init__(self, icon, title: str, content: str, clearable: bool = False, parent=None):
         super().__init__(icon, title, content, parent)
+        self._clearable = clearable
         self.line = LineEdit(self)
-        self.line.setPlaceholderText("点击选择...")
+        self.line.setPlaceholderText("未设置")
         self.line.setReadOnly(True)
         self.line.setFixedWidth(200)
+        if clearable:
+            self.btn_clear = PushButton("清除", self)
+            self.btn_clear.setFixedWidth(60)
+            self.btn_clear.clicked.connect(self._on_clear)
         self.btn = PushButton("浏览", self)
         self.btn.setFixedWidth(60)
         self.btn.clicked.connect(self._on_browse)
         self.hBoxLayout.addWidget(self.line, 0, Qt.AlignmentFlag.AlignRight)
+        if clearable:
+            self.hBoxLayout.addWidget(self.btn_clear, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addWidget(self.btn, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addSpacing(16)
 
@@ -265,6 +273,11 @@ class BrowseSettingCard(SettingCard):
         if dir_path:
             self.line.setText(dir_path)
             self.path_changed.emit(dir_path)
+
+    def _on_clear(self):
+        self.line.clear()
+        self.cleared.emit()
+        self.path_changed.emit("")
 
     def setText(self, text: str):
         self.line.setText(text)

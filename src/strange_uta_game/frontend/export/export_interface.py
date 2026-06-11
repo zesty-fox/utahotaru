@@ -398,6 +398,7 @@ class ExportInterface(QWidget):
             self._refresh_singer_checkboxes()
         elif change_type == "settings":
             self._sync_default_format()
+            self._sync_default_output_dir()
 
     def _sync_default_format(self):
         """将 format_list 的选中项与配置中的 default_format 同步。"""
