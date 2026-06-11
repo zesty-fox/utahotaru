@@ -927,15 +927,15 @@ class RubyInterface(QWidget):
             AppSettings().llm_apply_user_dict() if _llm_active else True
         )
 
-        # 第一步：应用注音
         try:
-            auto_check.apply_to_project(
+            auto_check.analyze_and_apply_pipeline(
                 self._project, only_noruby=only_noruby,
                 apply_user_dict=_apply_user_dict,
             )
             self._refresh_display()
             if hasattr(self, "_store"):
                 self._store.notify("rubies")
+                self._store.notify("checkpoints")
             # LLM 注音失败时已回退本地引擎，提示用户。
             _analyzer = getattr(auto_check, "_analyzer", None)
             if getattr(_analyzer, "llm_failed", False):
@@ -948,23 +948,6 @@ class RubyInterface(QWidget):
                     duration=5000,
                     parent=self,
                 )
-        except Exception as e:
-            InfoBar.warning(
-                title="注音分析失败",
-                content=str(e),
-                orient=Qt.Orientation.Horizontal,
-                isClosable=True,
-                position=InfoBarPosition.TOP,
-                duration=3000,
-                parent=self,
-            )
-            return
-
-        # 第二步：更新节奏点（失败时保留已更新的注音）
-        try:
-            auto_check.update_checkpoints_for_project(self._project)
-            if hasattr(self, "_store"):
-                self._store.notify("checkpoints")
             InfoBar.success(
                 title="分析完成",
                 content=f"已为 {len(self._project.sentences)} 行自动分析注音并更新节奏点",
@@ -976,8 +959,8 @@ class RubyInterface(QWidget):
             )
         except Exception as e:
             InfoBar.warning(
-                title="节奏点更新失败",
-                content=f"注音已更新，但节奏点更新失败: {e}",
+                title="注音分析失败",
+                content=str(e),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,

@@ -477,6 +477,7 @@ class HomeInterface(QWidget):
                     )
 
                     auto_check = None
+                    delete_types = auto_check_flags.get("delete_ruby_types", [])
                     if chinese_mode:
                         auto_check = AutoCheckService(
                             auto_check_flags=auto_check_flags,
@@ -484,7 +485,10 @@ class HomeInterface(QWidget):
                             annotate_katakana_with_english=annotate_katakana_with_english,
                             chinese_mode=True,
                         )
-                        auto_check.apply_to_project(project, only_noruby=True, skip_romanize=True)
+                        auto_check.analyze_and_apply_pipeline(
+                            project, only_noruby=True, apply_user_dict=True,
+                            delete_types=delete_types or None,
+                        )
                     else:
                         # LLM 注音激活时不需要本地日语 IME，跳过 WinRT 引导。
                         _proceed = True
@@ -506,9 +510,10 @@ class HomeInterface(QWidget):
                                 user_dictionary=user_dict,
                                 annotate_katakana_with_english=annotate_katakana_with_english,
                             )
-                            auto_check.apply_to_project(
-                                project, only_noruby=True, skip_romanize=True,
+                            auto_check.analyze_and_apply_pipeline(
+                                project, only_noruby=True,
                                 apply_user_dict=_apply_user_dict,
+                                delete_types=delete_types or None,
                             )
                             if getattr(analyzer, "llm_failed", False):
                                 InfoBar.warning(
@@ -520,23 +525,6 @@ class HomeInterface(QWidget):
                                     duration=5000,
                                     parent=self,
                                 )
-
-                    # 自动删除指定类型的注音
-                    delete_types = auto_check_flags.get("delete_ruby_types", [])
-                    if delete_types:
-                        from strange_uta_game.backend.application.auto_check_service import (
-                            delete_rubies_by_type_names,
-                        )
-
-                        delete_rubies_by_type_names(project, delete_types)
-                        # delete 后重新应用用户词典，补回被删除类型覆盖的词典条目
-                        # （与 RubyAnalyzeWorker 路径行为一致）
-                        if auto_check is not None and _apply_user_dict:
-                            auto_check.apply_user_dict_to_project(project, skip_romanize=True)
-
-                    # 罗马音转换（在 delete 之后，只转换剩余的假名注音）
-                    if auto_check is not None:
-                        auto_check.romanize_project_rubies(project)
             except Exception:
                 pass  # 注音分析失败不阻止项目创建
 

@@ -208,30 +208,13 @@ class RubyAnalyzeWorker(QObject):
                 self.llm_waiting.emit()
                 _analyzer.prewarm()
 
-            # Step 1: 生成假名注音（延迟 romaji，delete 之后再转）
-            self._auto_check.apply_to_project(
+            deleted_count = self._auto_check.analyze_and_apply_pipeline(
                 self._project,
                 only_noruby=self._only_noruby,
-                apply_user_dict=(not bool(self._delete_types)) and self._llm_apply_user_dict,
+                apply_user_dict=self._llm_apply_user_dict,
+                delete_types=self._delete_types or None,
                 progress_callback=_progress_cb,
-                skip_romanize=True,
             )
-            self._auto_check.update_checkpoints_for_project(self._project)
-
-            # Step 2: 按类型删除注音
-            deleted_count = 0
-            if self._delete_types:
-                from strange_uta_game.backend.application.auto_check_service import (
-                    delete_rubies_by_type_names,
-                )
-                deleted_count = delete_rubies_by_type_names(
-                    self._project, self._delete_types
-                )
-                if self._llm_apply_user_dict:
-                    self._auto_check.apply_user_dict_to_project(self._project, skip_romanize=True)
-
-            # Step 3: 罗马音转换（走在 delete 之后，只转换剩余的假名注音）
-            self._auto_check.romanize_project_rubies(self._project)
 
             self.finished.emit(self._project, deleted_count)
         except Exception as e:
@@ -283,11 +266,12 @@ class RubySubsetAnalyzeWorker(QObject):
 
             for line_idx, restrict_indices in self._specs:
                 sentence = self._project.sentences[line_idx]
-                self._auto_check.apply_to_sentence(
-                    sentence, only_noruby=False, restrict_indices=restrict_indices,
+                self._auto_check.analyze_and_apply_sentence_pipeline(
+                    sentence,
+                    only_noruby=False,
+                    restrict_indices=restrict_indices,
                     apply_user_dict=self._apply_user_dict,
                 )
-                self._auto_check.update_checkpoints_from_rubies(sentence)
 
             self.finished.emit(self._project)
         except Exception as e:

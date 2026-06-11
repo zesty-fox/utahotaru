@@ -1044,6 +1044,100 @@ class AutoCheckService:
             if i < len(check_counts) and ch in PUNCTUATION_SET and not ch.isspace():
                 check_counts[i] = max(check_counts[i], 1) if _enable_punct_cp else 0
 
+    def _apply_english_and_endpoints(
+        self,
+        sentence: Sentence,
+        check_counts: List[int],
+    ) -> None:
+        """英文词音节规则 + 行尾/句尾标记 + check_count 写入（共用）。
+
+        前置条件：sentence.characters 已建好；check_counts 已经过
+        _apply_flags_filter / ruby 计算等前序步骤。
+        本方法在 check_counts 基础上叠加英文音节规则、行尾句尾标记，
+        并最终调用 set_check_count 写入字符。
+        """
+        if not sentence.characters:
+            return
+
+        text = sentence.text
+        chars = [c.char for c in sentence.characters]
+        n = len(sentence.characters)
+
+        # ── 英文词组节奏点规则 ──
+        english_sentence_end_idx: set[int] = set()
+        english_word_end_idx: set[int] = set()
+        english_word_trailing_comma_idx: set[int] = set()
+        check_english_word_end = self._flags.get("check_english_word_end", True)
+        _english_syllable_check = self._flags.get("english_syllable_check", True)
+        for start, end, word in find_english_words(text):
+            _is_single = end - start <= 1
+            _syllable_starts = (
+                get_syllable_start_offsets(word) if _english_syllable_check else {0}
+            )
+            for idx in range(start, end):
+                if idx < len(check_counts):
+                    check_counts[idx] = 1 if (idx - start) in _syllable_starts else 0
+            if end - 1 < n:
+                english_word_end_idx.add(end - 1)
+                if not _is_single and check_english_word_end:
+                    english_sentence_end_idx.add(end - 1)
+            if end < len(text) and text[end] in _TRAILING_COMMA_CHARS:
+                english_word_trailing_comma_idx.add(end)
+
+        # ── 行尾 / 空格视为句尾 ──
+        _is_blank_line = not text.strip()
+        add_line_end = self._flags.get("check_line_end", True) and not _is_blank_line
+        check_space_as_line_end = (
+            self._flags.get("check_space_as_line_end", True) and not _is_blank_line
+        )
+
+        for i, char in enumerate(sentence.characters):
+            is_last = i == n - 1
+            is_before_space = (
+                not is_last
+                and check_space_as_line_end
+                and i + 1 < n
+                and len(chars[i + 1]) == 1
+                and chars[i + 1].isspace()
+                and not (i in english_word_end_idx and not check_english_word_end)
+                and i not in english_word_trailing_comma_idx
+            )
+
+            is_sentence_end = False
+            if is_last and add_line_end:
+                is_sentence_end = True
+            if is_before_space:
+                is_sentence_end = True
+            if i in english_sentence_end_idx:
+                is_sentence_end = True
+
+            # 守卫：已持有 timestamps 的字符不可被截断（n3 加载场景）
+            in_ruby_block_follower = (
+                i > 0
+                and sentence.characters[i - 1].linked_to_next
+                and sentence.characters[i - 1].ruby is not None
+                and len(sentence.characters[i - 1].ruby.parts) > 0
+                and not char.ruby
+            )
+            if char.timestamps and check_counts[i] < len(char.timestamps) and not in_ruby_block_follower:
+                check_counts[i] = len(char.timestamps)
+
+            # 守卫：n3 加载已携带 sentence_end_ts 的字符必须保留
+            if char.sentence_end_ts is not None:
+                is_sentence_end = True
+
+            if in_ruby_block_follower and check_counts[i] == 0:
+                preserved_ts = list(char.timestamps)
+                char.set_check_count(check_counts[i], force=True)
+                char.timestamps = preserved_ts
+            else:
+                char.set_check_count(check_counts[i], force=True)
+
+            char.is_line_end = is_last and add_line_end
+            char.is_sentence_end = is_sentence_end
+            if not char.is_sentence_end:
+                char.clear_sentence_end_ts()
+
     def _apply_chinese_to_sentence(
         self,
         sentence: Sentence,
@@ -1051,18 +1145,10 @@ class AutoCheckService:
     ) -> None:
         """中文歌词模式：按字符流计算节奏点；跳过日语注音引擎、用户词典、ruby、罗马音。
 
-        完整尊重 auto_check_flags：
-        - 字符类型开关：hiragana/katakana/kanji/alphabet/digit/symbol（关→该类 cc=0）
-        - 空格：space + space_after_alphabet/space_after_symbol 子开关
-        - 行首/行尾：check_line_start / check_line_end / check_space_as_line_end
-        - 括号/标点：check_parentheses（False 时括号内 cc=0）/ checkpoint_on_punctuation
-        - 英文：english_syllable_check（按音节）/ check_english_word_end（多字母词末为停顿）
-        - 空行：check_empty_lines（保留语义但中文模式不生成 ruby）
-
         全程不产生 ruby，也不查询用户词典/词组词典。
+        check 规则与日文路径共用 _apply_flags_filter + _apply_english_and_endpoints。
         """
         text = sentence.text
-        is_blank_line = not text.strip()
         if not text:
             return
 
@@ -1080,126 +1166,29 @@ class AutoCheckService:
         n = len(chars)
         check_counts: List[int] = [1] * n
 
-        # 字符类型开关 + 空格规则
-        for i, ch in enumerate(chars):
-            ct = get_char_type(ch) if len(ch) == 1 else CharType.OTHER
-            if ct == CharType.SPACE:
-                if not self._flags.get("space", True) or i == 0:
-                    check_counts[i] = 0
-                else:
-                    prev_ct = (
-                        get_char_type(chars[i - 1])
-                        if len(chars[i - 1]) == 1
-                        else CharType.OTHER
-                    )
-                    if prev_ct == CharType.ALPHABET:
-                        check_counts[i] = (
-                            1 if self._flags.get("space_after_alphabet", True) else 0
-                        )
-                    elif prev_ct in (CharType.SYMBOL, CharType.NUMBER):
-                        check_counts[i] = (
-                            1 if self._flags.get("space_after_symbol", True) else 0
-                        )
-                    else:
-                        # 汉字/假名/其他：仅受 space 主开关控制（已通过），1 cp
-                        check_counts[i] = 1
-                continue
-            flag_key = _TYPE_FLAG_MAP.get(ct)
-            if flag_key and not self._flags.get(flag_key, True):
-                check_counts[i] = 0
-
-        # 行首
-        if self._flags.get("check_line_start", False) and not is_blank_line:
-            for i in range(n):
-                if not chars[i].isspace():
-                    check_counts[i] = max(check_counts[i], 1)
-                    break
-
-        # 括号内字符过滤
-        if not self._flags.get("check_parentheses", True):
-            in_paren = False
-            for i, ch in enumerate(chars):
-                if ch in ("(", "（"):
-                    in_paren = True
-                    check_counts[i] = 0
-                elif ch in (")", "）"):
-                    check_counts[i] = 0
-                    in_paren = False
-                elif in_paren:
-                    check_counts[i] = 0
-
-        # 标点符号最终覆盖
-        enable_punct_cp = self._flags.get("checkpoint_on_punctuation", False)
-        for i, ch in enumerate(chars):
-            if ch in PUNCTUATION_SET and not ch.isspace():
-                check_counts[i] = max(check_counts[i], 1) if enable_punct_cp else 0
-
-        # 英文音节规则
-        english_syllable_check = self._flags.get("english_syllable_check", True)
-        check_english_word_end = self._flags.get("check_english_word_end", True)
-        english_sentence_end_idx: set = set()
-        english_word_trailing_comma_idx: set = set()  # 英文单词后紧跟的逗号索引
-        for start, end, word in find_english_words(text):
-            syllable_starts = (
-                get_syllable_start_offsets(word) if english_syllable_check else {0}
-            )
-            for idx in range(start, end):
-                if idx < n:
-                    check_counts[idx] = 1 if (idx - start) in syllable_starts else 0
-            if end - 1 < n and end - start > 1 and check_english_word_end:
-                english_sentence_end_idx.add(end - 1)
-            # 收集紧跟英文单词的逗号，避免其被空格规则误标句尾
-            if end < len(text) and text[end] in _TRAILING_COMMA_CHARS:
-                english_word_trailing_comma_idx.add(end)
-
-        # 行尾 / 空格视为句尾
-        add_line_end = self._flags.get("check_line_end", True) and not is_blank_line
-        check_space_as_line_end = (
-            self._flags.get("check_space_as_line_end", True) and not is_blank_line
-        )
-        last_non_space_idx = -1
-        for i, ch in enumerate(chars):
-            if not ch.isspace():
-                last_non_space_idx = i
-
         new_characters: List[Character] = []
         for i, ch in enumerate(chars):
-            cc = check_counts[i]
-            is_line_end = False
-            is_sentence_end = False
-            if not ch.isspace():
-                if add_line_end and i == last_non_space_idx:
-                    is_line_end = True
-                    is_sentence_end = True
-                if (
-                    check_space_as_line_end
-                    and (i + 1 < n)
-                    and chars[i + 1].isspace()
-                    and i not in english_word_trailing_comma_idx
-                ):
-                    is_sentence_end = True
-                if i in english_sentence_end_idx:
-                    is_sentence_end = True
-
             character = Character(
                 char=ch,
                 ruby=None,
-                check_count=cc,
-                is_line_end=is_line_end,
-                is_sentence_end=is_sentence_end,
+                check_count=1,
+                is_line_end=False,
+                is_sentence_end=False,
                 singer_id=old_singer_map.get(i, sentence.singer_id),
             )
             new_characters.append(character)
+        sentence.characters = new_characters
+
+        self._apply_flags_filter(chars, check_counts, text)
+        self._apply_english_and_endpoints(sentence, check_counts)
 
         if keep_existing_timetags:
-            for i, char in enumerate(new_characters):
+            for i, char in enumerate(sentence.characters):
                 if i in old_timestamps:
                     char.timestamps = old_timestamps[i][: char.check_count]
                 if char.is_sentence_end and i in old_sentence_end_ts:
                     char.sentence_end_ts = old_sentence_end_ts[i]
                     char.push_to_ruby()
-
-        sentence.characters = new_characters
 
     def analyze_sentence(
         self, sentence: Sentence, split_config: Optional[SplitConfig] = None
@@ -2308,89 +2297,7 @@ class AutoCheckService:
         chars = [c.char for c in sentence.characters]
         self._apply_flags_filter(chars, check_counts, sentence.text)
 
-        # 批 18 #9：英文词组节奏点规则（按音节首字=1，其余=0，末字母标句尾）
-        # find_english_words 基于 sentence.text 的字符索引，与 sentence.characters 一一对应
-        # （文本拆分器对英文走逐字符路径，保持字符-文本索引对齐）。
-        english_sentence_end_idx: set[int] = set()
-        english_word_end_idx: set[int] = set()  # 所有英文单词结尾索引（不受开关控制）
-        english_word_trailing_comma_idx: set[int] = set()  # 英文单词后紧跟的逗号索引
-        check_english_word_end = self._flags.get("check_english_word_end", True)
-        _english_syllable_check = self._flags.get("english_syllable_check", True)
-        for start, end, word in find_english_words(sentence.text):
-            _is_single = end - start <= 1
-            _syllable_starts = (
-                get_syllable_start_offsets(word) if _english_syllable_check else {0}
-            )
-            for idx in range(start, end):
-                if idx < len(check_counts):
-                    check_counts[idx] = 1 if (idx - start) in _syllable_starts else 0
-            if end - 1 < len(sentence.characters):
-                english_word_end_idx.add(end - 1)  # 含单字母词，确保空格豁免生效
-                if not _is_single and check_english_word_end:
-                    english_sentence_end_idx.add(end - 1)
-            # 收集紧跟英文单词的逗号，避免其被空格规则误标句尾
-            if end < len(sentence.text) and sentence.text[end] in _TRAILING_COMMA_CHARS:
-                english_word_trailing_comma_idx.add(end)
-
-        # 更新字符属性
-        # 空行（text.strip() 为空）不应被 check_line_end/check_space_as_line_end 强制打句尾 CP
-        _is_blank_line = not sentence.text.strip()
-        add_line_end = self._flags.get("check_line_end", True) and not _is_blank_line
-        check_space_as_line_end = (
-            self._flags.get("check_space_as_line_end", True) and not _is_blank_line
-        )
-        for i, char in enumerate(sentence.characters):
-            is_last = i == len(sentence.characters) - 1
-            # 空格视为句尾：当前字符后面紧跟空格时额外+1
-            # 当英文单词结尾句尾关闭时，英文单词结尾不受空格规则影响
-            # 英文单词后的逗号也不受空格规则影响（如 "Smile, Love" 中的逗号）
-            is_before_space = (
-                not is_last
-                and check_space_as_line_end
-                and i + 1 < len(sentence.characters)
-                and len(chars[i + 1]) == 1
-                and chars[i + 1].isspace()
-                and not (i in english_word_end_idx and not check_english_word_end)
-                and i not in english_word_trailing_comma_idx
-            )
-            extra = 0
-            is_sentence_end = False
-            if is_last and add_line_end:
-                is_sentence_end = True
-            if is_before_space:
-                is_sentence_end = True
-            if i in english_sentence_end_idx:
-                is_sentence_end = True
-            # 守卫：已持有 timestamps 的字符不可被截断（n3 加载场景）
-            # set_check_count 不变式 len(timestamps) <= check_count；cc=0 会清空 ts
-            # 例外：连词块内 ruby-overridden 后字（前驱 linked_to_next + 有 ruby parts）
-            # 保留 cc=0，由后续 _emit_body 的特殊处理保住 timestamps
-            in_ruby_block_follower = (
-                i > 0
-                and sentence.characters[i - 1].linked_to_next
-                and sentence.characters[i - 1].ruby is not None
-                and len(sentence.characters[i - 1].ruby.parts) > 0
-                and not char.ruby
-            )
-            if char.timestamps and check_counts[i] < len(char.timestamps) and not in_ruby_block_follower:
-                check_counts[i] = len(char.timestamps)
-            # 守卫：n3 加载已携带 sentence_end_ts（句中双 ts 释放）的字符必须保留
-            # （AUTOCHECK 默认规则会把非"行尾/英文词尾/空格前"字符标为非句尾，
-            #   从而清空 release ts，导致 round-trip 丢失 [ts1][ts2] 模式）
-            if char.sentence_end_ts is not None:
-                is_sentence_end = True
-            # 自动流程：force=True，允许 cc==0 退化为 Nicokara 无 mora 格式
-            if in_ruby_block_follower and check_counts[i] == 0:
-                # 连词块内后字：保留 body timestamps，绕过 set_check_count 清空
-                preserved_ts = list(char.timestamps)
-                char.set_check_count(check_counts[i], force=True)
-                char.timestamps = preserved_ts
-            else:
-                char.set_check_count(check_counts[i], force=True)
-            char.is_line_end = is_last and add_line_end
-            char.is_sentence_end = is_sentence_end
-            if not char.is_sentence_end:
-                char.clear_sentence_end_ts()
+        self._apply_english_and_endpoints(sentence, check_counts)
 
         # #10: 此函数仅更新节奏点，不改变 linked_to_next。
         # linked_to_next 已由 analyze_sentence/apply_to_sentence 根据注音来源
@@ -2419,6 +2326,82 @@ class AutoCheckService:
             self.update_checkpoints_from_rubies(
                 sentence, split_config, preserve_ruby_segments=preserve_ruby_segments
             )
+
+    def analyze_and_apply_pipeline(
+        self,
+        project: Project,
+        *,
+        only_noruby: bool = False,
+        apply_user_dict: bool = True,
+        delete_types: Optional[List[str]] = None,
+        progress_callback=None,
+    ) -> int:
+        """注音分析 → 节奏点更新 → 按类型删除 → 用户词典补回 → 罗马音转换。
+
+        统一全项目注音分析的完整管线，保证所有入口（新建项目加载、手动重新
+        分析、全文本编辑界面分析）走同一路径，避免遗漏或顺序不一致。
+
+        Args:
+            project: 目标项目。
+            only_noruby: 仅对未注音字符应用。
+            apply_user_dict: 是否应用用户词典（LLM 模式可关闭）。
+            delete_types: 按类型删除注音的类型名列表（如 ``["hiragana"]``）。
+                为空或 None 时跳过删除步骤。
+            progress_callback: ``(current, total)`` 进度回调。
+
+        Returns:
+            按类型删除的注音数量（无删除步骤时返回 0）。
+        """
+        # Step 1: 注音分析（延迟 romaji，delete 之后再转）
+        self.apply_to_project(
+            project,
+            only_noruby=only_noruby,
+            apply_user_dict=(not bool(delete_types)) and apply_user_dict,
+            progress_callback=progress_callback,
+            skip_romanize=True,
+        )
+
+        # Step 2: 根据已有注音更新节奏点（统一 check 规则应用）
+        self.update_checkpoints_for_project(project)
+
+        # Step 3: 按类型删除注音
+        deleted_count = 0
+        if delete_types:
+            deleted_count = delete_rubies_by_type_names(project, delete_types)
+            if apply_user_dict:
+                self.apply_user_dict_to_project(project, skip_romanize=True)
+
+        # Step 4: 罗马音转换（在 delete 之后，只转换剩余的假名注音）
+        self.romanize_project_rubies(project)
+
+        return deleted_count
+
+    def analyze_and_apply_sentence_pipeline(
+        self,
+        sentence: Sentence,
+        *,
+        only_noruby: bool = False,
+        restrict_indices: Optional[set] = None,
+        apply_user_dict: bool = True,
+    ) -> None:
+        """单句注音分析 → 节奏点更新。
+
+        统一单句/子集注音分析管线，保证 apply_to_sentence 后一定跟
+        update_checkpoints_from_rubies。
+
+        Args:
+            sentence: 目标句子。
+            only_noruby: 仅对未注音字符应用。
+            restrict_indices: 仅对这些字符索引应用分析。
+            apply_user_dict: 是否应用用户词典。
+        """
+        self.apply_to_sentence(
+            sentence,
+            only_noruby=only_noruby,
+            restrict_indices=restrict_indices,
+            apply_user_dict=apply_user_dict,
+        )
+        self.update_checkpoints_from_rubies(sentence)
 
     def estimate_check_count(self, text: str) -> int:
         """估算文本的节奏点数量
