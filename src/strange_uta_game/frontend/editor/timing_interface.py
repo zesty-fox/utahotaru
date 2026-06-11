@@ -1792,6 +1792,9 @@ class EditorInterface(QWidget):
                             is_hira = _ruby_is_all_hiragana(ch.ruby.text)
                             if (is_hira and delete_kata_hira) or (not is_hira and delete_kata_eng):
                                 ch.set_ruby(None)
+                                ch.linked_to_next = False
+                                if idx > 0:
+                                    sentence.characters[idx - 1].linked_to_next = False
                                 removed += 1
                         continue
 
@@ -1799,6 +1802,9 @@ class EditorInterface(QWidget):
                         if ct == CharType.SOKUON and ch.char == "っ" and CharType.HIRAGANA not in ct_selected:
                             continue
                         ch.set_ruby(None)
+                        ch.linked_to_next = False
+                        if idx > 0:
+                            sentence.characters[idx - 1].linked_to_next = False
                         removed += 1
             if removed == 0:
                 return None

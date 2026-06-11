@@ -2554,6 +2554,9 @@ def delete_rubies_by_type_names(
                     is_hira = _ruby_is_all_hiragana(ch.ruby.text)
                     if (is_hira and delete_kata_hira) or (not is_hira and delete_kata_eng):
                         ch.set_ruby(None)
+                        ch.linked_to_next = False
+                        if idx > 0:
+                            sentence.characters[idx - 1].linked_to_next = False
                         removed += 1
                 continue
 
@@ -2561,6 +2564,9 @@ def delete_rubies_by_type_names(
                 if ct == CharType.SOKUON and ch.char == "っ" and CharType.HIRAGANA not in ct_selected:
                     continue
                 ch.set_ruby(None)
+                ch.linked_to_next = False
+                if idx > 0:
+                    sentence.characters[idx - 1].linked_to_next = False
                 removed += 1
 
     return removed
