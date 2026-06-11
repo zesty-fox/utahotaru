@@ -10,15 +10,21 @@ import re
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from strange_uta_game.backend.domain import Sentence, Singer
+from strange_uta_game.backend.domain import Character, Ruby, RubyPart, Sentence, Singer
 from strange_uta_game.backend.infrastructure.parsers.lyric_parser import (
     LRCParser,
     NicokaraParser,
+    UtatenRubyParser,
     nicokara_result_to_sentences,
     parse_to_sentences,
 )
 from strange_uta_game.backend.infrastructure.parsers.inline_format import (
     sentences_from_inline_text,
+    split_into_moras,
+)
+from strange_uta_game.backend.infrastructure.parsers.text_splitter import (
+    CharType,
+    get_char_type,
 )
 
 
@@ -32,6 +38,212 @@ _ASS_PATTERN = re.compile(r"^\[Script Info\]|^Dialogue:\s*\d+", re.MULTILINE)
 _SRT_PATTERN = re.compile(
     r"\d{2}:\d{2}:\d{2}[,.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,.]\d{3}"
 )
+
+
+def _ruby_text(ch: Character) -> str:
+    return "".join(part.text for part in ch.ruby.parts) if ch.ruby else ""
+
+
+def _is_kana_char(ch: str) -> bool:
+    if len(ch) != 1:
+        return False
+    return get_char_type(ch) in (
+        CharType.HIRAGANA,
+        CharType.KATAKANA,
+        CharType.SOKUON,
+        CharType.LONG_VOWEL,
+    )
+
+
+def _utaten_block_ranges(sentence: Sentence) -> list[tuple[int, int, str]]:
+    """Return ruby block ranges from the raw Utaten import sentence.
+
+    ``parse_to_sentences(..., utaten_format=False)`` keeps a multi-character
+    Utaten ruby as one linked block: the first char carries the full reading and
+    ``linked_to_next`` marks the covered span.
+    """
+    ranges: list[tuple[int, int, str]] = []
+    chars = sentence.characters
+    i = 0
+    while i < len(chars):
+        reading = _ruby_text(chars[i])
+        if not reading:
+            i += 1
+            continue
+        end = i
+        while end < len(chars) - 1 and chars[end].linked_to_next:
+            end += 1
+        ranges.append((i, end, reading))
+        i = end + 1
+    return ranges
+
+
+def _reference_tokens_for_block(
+    reference: Sentence,
+    start: int,
+    end: int,
+) -> list[str]:
+    tokens: list[str] = []
+    for idx in range(start, end + 1):
+        if idx >= len(reference.characters):
+            tokens.append("")
+            continue
+        ch = reference.characters[idx]
+        ruby = _ruby_text(ch)
+        if ruby:
+            tokens.append(ruby)
+        elif _is_kana_char(ch.char):
+            tokens.append(ch.char)
+        else:
+            tokens.append("")
+    return tokens
+
+
+def _split_reading_by_reference(reading: str, tokens: list[str]) -> Optional[list[str]]:
+    """Split a Utaten reading by normal-pipeline reference tokens.
+
+    The split is accepted only when the reference tokens concatenate exactly to
+    the Utaten reading, so analyzer/user-dictionary readings never replace the
+    source reading. They only provide boundaries.
+    """
+    if not tokens:
+        return None
+    if "".join(tokens) == reading:
+        return tokens
+    return None
+
+
+def _legacy_utaten_split(word: str, reading: str) -> tuple[list[str], bool]:
+    from strange_uta_game.backend.infrastructure.parsers.kanji_reading_split import (
+        compute_per_kanji_readings,
+    )
+
+    return compute_per_kanji_readings(word, reading)
+
+
+def _clean_user_dict_split(
+    word: str,
+    reading: str,
+    user_dict: list[dict],
+) -> Optional[list[str]]:
+    for entry in user_dict:
+        if not entry.get("enabled", True):
+            continue
+        if entry.get("word") != word:
+            continue
+        dict_reading = str(entry.get("reading") or "")
+        if "," not in dict_reading:
+            continue
+        parts = [p.strip() for p in dict_reading.split(",")]
+        if len(parts) == len(word) and all(parts) and "".join(parts) == reading:
+            return parts
+    return None
+
+
+def _set_utaten_char_ruby(ch: Character, segment: str, reference: Optional[Character]) -> None:
+    ch.ruby = None
+    if segment and not (_is_kana_char(ch.char) and segment == ch.char):
+        ch.set_ruby(Ruby(parts=[RubyPart(text=segment)]))
+    ref_count = reference.check_count if reference is not None else None
+    if ref_count is None:
+        ref_count = len(split_into_moras(segment)) if segment else 0
+    if ch.ruby:
+        ch.set_check_count(max(1, ref_count), ruby_split_mode="mora")
+    else:
+        ch.set_check_count(max(0, ref_count), force=True)
+
+
+def _align_utaten_sentences_with_auto_check(
+    sentences: list[Sentence],
+    *,
+    setting_iface=None,
+) -> None:
+    """Align Utaten ruby blocks with the normal SUG auto-check pipeline.
+
+    Utaten remains the authority for reading text. The normal pipeline is used
+    only to decide per-character boundaries, checkpoint counts, and linked-word
+    state, so user dictionary entries affect Utaten imports the same way they
+    affect normal LRC imports.
+    """
+    if not sentences:
+        return
+
+    user_dict: list[dict] = []
+    try:
+        from strange_uta_game.backend.application import AutoCheckService
+        from strange_uta_game.frontend.settings.app_settings import AppSettings
+
+        app_settings = (
+            setting_iface.get_settings()
+            if setting_iface is not None and hasattr(setting_iface, "get_settings")
+            else setting_iface
+        ) or AppSettings()
+        auto_check_flags = app_settings.get_all().get("auto_check", {})
+        user_dict = app_settings.load_effective_dictionary()
+        annotate_katakana_with_english = app_settings.get(
+            "ruby_dictionary.annotate_katakana_with_english", False
+        )
+        auto_check = AutoCheckService(
+            auto_check_flags=auto_check_flags,
+            user_dictionary=user_dict,
+            annotate_katakana_with_english=annotate_katakana_with_english,
+        )
+    except Exception:
+        auto_check = None
+
+    for sentence in sentences:
+        ranges = _utaten_block_ranges(sentence)
+        if not ranges:
+            continue
+
+        reference: Optional[Sentence] = None
+        if auto_check is not None:
+            try:
+                reference = Sentence.from_text(sentence.text, sentence.singer_id)
+                auto_check.apply_to_sentence(reference, skip_romanize=True)
+            except Exception:
+                reference = None
+
+        for start, end, reading in ranges:
+            if end >= len(sentence.characters):
+                continue
+            word = "".join(ch.char for ch in sentence.characters[start : end + 1])
+            split_parts: Optional[list[str]] = None
+            is_ateji = True
+            force_unlinked = False
+            clean_dict_parts = _clean_user_dict_split(word, reading, user_dict)
+            if clean_dict_parts is not None:
+                split_parts = clean_dict_parts
+                is_ateji = False
+                force_unlinked = True
+            if reference is not None and end < len(reference.characters):
+                tokens = _reference_tokens_for_block(reference, start, end)
+                ref_split = _split_reading_by_reference(reading, tokens)
+                if split_parts is None and ref_split is not None:
+                    split_parts = ref_split
+                    is_ateji = False
+            if split_parts is None:
+                split_parts, is_ateji = _legacy_utaten_split(word, reading)
+
+            for offset, idx in enumerate(range(start, end + 1)):
+                ref_ch = (
+                    reference.characters[idx]
+                    if reference is not None and idx < len(reference.characters)
+                    else None
+                )
+                segment = split_parts[offset] if offset < len(split_parts) else ""
+                _set_utaten_char_ruby(sentence.characters[idx], segment, ref_ch)
+
+            for idx in range(start, end):
+                if force_unlinked:
+                    sentence.characters[idx].linked_to_next = False
+                elif reference is not None and end < len(reference.characters) and not is_ateji:
+                    sentence.characters[idx].linked_to_next = bool(
+                        reference.characters[idx].linked_to_next
+                    )
+                else:
+                    sentence.characters[idx].linked_to_next = bool(is_ateji)
+            sentence.characters[end].linked_to_next = False
 
 
 def _is_json_content(content: str) -> bool:
@@ -129,11 +341,13 @@ def detect_lyric_format(content: str) -> str:
     """检测歌词内容的格式。
 
     Returns:
-        格式名称: "sug", "inline", "nicokara", "ass", "srt", "lrc", "text"
+        格式名称: "sug", "utaten", "inline", "nicokara", "ass", "srt", "lrc", "text"
     """
     # SUG/JSON 格式检测（最高优先级，避免误解析）
     if _is_json_content(content):
         return "sug"
+    if UtatenRubyParser.is_utaten_format(content):
+        return "utaten"
     # 内联格式检测（包括 inline 和纯 RLF 文本格式）
     if _INLINE_PATTERN.search(content):
         return "inline"
@@ -200,6 +414,13 @@ def parse_lyric_content(
     # SUG 项目文件格式：抛出异常，由调用方处理为项目加载
     if fmt == "sug":
         raise ValueError("__SUG_PROJECT__")
+
+    if fmt == "utaten":
+        parser = UtatenRubyParser()
+        parsed_lines = parser.parse(content)
+        sentences = parse_to_sentences(parsed_lines, default_singer_id, utaten_format=False)
+        _align_utaten_sentences_with_auto_check(sentences, setting_iface=setting_iface)
+        return _apply_compensation(sentences), False, [], {"format": "utaten"}
 
     # 内联格式（包括 inline 和纯 RLF 文本格式）
     if fmt == "inline":
