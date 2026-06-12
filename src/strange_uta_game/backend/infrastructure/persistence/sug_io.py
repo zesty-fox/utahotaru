@@ -518,10 +518,11 @@ class SugProjectParser:
 
         characters = []
         pause_char = get_ruby_pause_char()
+        legacy_pause_texts = pause_char_variants(pause_char) | {RUBY_PAUSE_SENTINEL, ""}
         for char_data in data.get("characters", []):
             # 解析 Ruby。任何 part 都不丢弃（空 part 曾被静默过滤，导致
-            # check_count 与 parts 数失配）：哨兵 token 与历史遗留的空串
-            # 统一映射为当前配置的停顿符占位。
+            # check_count 与 parts 数失配）：哨兵 token、历史遗留的空串、
+            # 以及旧版直接写入的停顿符字面值，统一映射为当前配置的停顿符。
             ruby = None
             ruby_data = char_data.get("ruby")
             if ruby_data:
@@ -530,7 +531,7 @@ class SugProjectParser:
                     parts = []
                     for p in parts_data:
                         raw_text = str(p.get("text", "") or "")
-                        if raw_text in (RUBY_PAUSE_SENTINEL, ""):
+                        if raw_text in legacy_pause_texts:
                             raw_text = pause_char
                         parts.append(
                             RubyPart(
