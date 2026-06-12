@@ -24,6 +24,7 @@ from strange_uta_game.backend.domain.models import (
     Ruby,
     RubyPart,
     TimeTagType,
+    get_ruby_pause_char,
 )
 from strange_uta_game.backend.domain.entities import Sentence
 
@@ -134,7 +135,7 @@ def distribute_ruby_chars_evenly(chars: List[str], target_count: int) -> List[st
 
     每组获得 ceil(剩余字符数 / 剩余组数) 个字符。
     前面组可能比后面组多一个字符。
-    当字符数 <= target_count 时，逐字符分配，不足补空串。
+    当字符数 <= target_count 时，逐字符分配，不足补占位符（停顿符）。
 
     Args:
         chars: 字符列表（已去除逗号）
@@ -149,7 +150,7 @@ def distribute_ruby_chars_evenly(chars: List[str], target_count: int) -> List[st
     if target_count == 1:
         return ["".join(chars)]
     if len(chars) <= target_count:
-        return chars + [""] * (target_count - len(chars))
+        return chars + [get_ruby_pause_char()] * (target_count - len(chars))
     result = []
     remaining = len(chars)
     remaining_parts = target_count
@@ -188,11 +189,55 @@ def split_ruby_for_checkpoints(ruby_text: str, total_cps: int) -> List[str]:
     # 按字符拆分时跳过逗号
     chars = [ch for ch in ruby_text if ch != ',']
     if len(chars) <= total_cps:
-        # 字符数 ≤ cp 数: 每个 cp 分一个字符，多余 cp 分空串
-        return chars + [""] * (total_cps - len(chars))
+        # 字符数 ≤ cp 数: 每个 cp 分一个字符，多余 cp 分占位符（停顿符）
+        return chars + [get_ruby_pause_char()] * (total_cps - len(chars))
 
     # 字符数 > cp 数: 均分到各段
     return distribute_ruby_chars_evenly(chars, total_cps)
+
+
+def split_ruby_segments(
+    ruby_text: str, check_count: int, mode: str
+) -> List[str]:
+    """按指定分段方式把读音文本切为 RubyPart 文本列表。
+
+    字符修改/批量变更对话框的**预览与实际写回共用本函数**，保证所见即所得。
+    占位规则：缺读音的节奏点一律用占位符（停顿符）补位，禁止空串。
+
+    mode:
+      - "direct": 逗号手动分段。空段（连续/首尾逗号）解析为占位符；
+        段数 < check_count 时补占位符，> check_count 时合并尾段——
+        与 ``Character.set_check_count`` 的不变式收口行为一致。
+      - "char" / "mora": 委托 ``distribute_ruby_chars_evenly`` /
+        ``split_ruby_for_checkpoints``（check_count >= 2 时恒返回
+        check_count 段）；check_count <= 1 时整段不拆。
+
+    Returns:
+        分段文本列表；输入为空白时返回 ``[]``（表示无注音）。
+    """
+    text = ruby_text.strip()
+    if not text:
+        return []
+
+    if mode == "direct":
+        pause = get_ruby_pause_char()
+        segs = text.split(",")
+        segs = [s if s else pause for s in segs]
+        if check_count >= 1 and len(segs) < check_count:
+            segs = segs + [pause] * (check_count - len(segs))
+        elif check_count >= 1 and len(segs) > check_count:
+            segs = segs[: check_count - 1] + ["".join(segs[check_count - 1 :])]
+        return segs
+
+    clean = text.replace(",", "")
+    if not clean:
+        return []
+    if check_count <= 1:
+        return [clean]
+    if mode == "char":
+        return distribute_ruby_chars_evenly(list(clean), check_count)
+    # mode == "mora"
+    return split_ruby_for_checkpoints(clean, check_count)
 
 
 def align_ruby_parts_to_checkpoints(

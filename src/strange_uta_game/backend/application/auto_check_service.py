@@ -2182,7 +2182,9 @@ class AutoCheckService:
                             ch.check_count = 0
                         elif self._should_make_romaji_self_ruby(ch.char):
                             ch.ruby = Ruby(parts=[RubyPart(text=ch.char)])
-                            ch.check_count = max(ch.check_count, 1)
+                            # 经 setter 收口：原 check_count >= 2 时补占位符，
+                            # 而非留下 parts(1) != cc(>=2) 的失配
+                            ch.set_check_count(max(ch.check_count, 1), force=True)
                     # linked_to_next：同 block 内相邻字符 → True；否则 False。
                     # 词末字符（k == wlen-1）的 linked_to_next 不在 word 内部决定，
                     # 保守置 False（不连到 word 之外的下一字符）。

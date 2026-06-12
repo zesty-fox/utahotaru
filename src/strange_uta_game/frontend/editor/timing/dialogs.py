@@ -75,9 +75,6 @@ from strange_uta_game.backend.domain import (
     Sentence,
     Singer,
 )
-from strange_uta_game.backend.infrastructure.parsers.inline_format import (
-    distribute_ruby_chars_evenly,
-)
 
 
 def _get_ruby_split_mode() -> str:
@@ -132,12 +129,21 @@ def _create_ruby_split_group(parent: QWidget) -> tuple[QRadioButton, QRadioButto
 
 def _save_ruby_split_mode(radio_direct: QRadioButton, radio_by_char: QRadioButton, radio_by_mora: QRadioButton) -> None:
     """保存注音分段方式配置值"""
+    _set_ruby_split_mode(_radio_split_mode(radio_direct, radio_by_char))
+
+
+def _radio_split_mode(radio_direct: QRadioButton, radio_by_char: QRadioButton) -> str:
+    """读取分段方式单选组的当前选择。
+
+    解析写回必须用本函数取 radio 实时值并显式传给 parse_ruby_text，
+    不能依赖落盘配置——配置在 _save_ruby_split_mode 之前还是旧值，
+    会造成预览与写回分段方式不一致。
+    """
     if radio_direct.isChecked():
-        _set_ruby_split_mode("direct")
-    elif radio_by_char.isChecked():
-        _set_ruby_split_mode("char")
-    else:
-        _set_ruby_split_mode("mora")
+        return "direct"
+    if radio_by_char.isChecked():
+        return "char"
+    return "mora"
 
 
 # ── 字符编辑类对话框（修改所选字符 / 编辑字符(F2) / 批量变更）统一外观 ──
@@ -188,55 +194,36 @@ def style_quick_link_button(btn: PushButton) -> None:
     )
 
 
-def parse_ruby_text(raw: str, check_count: int = 1) -> Optional[Ruby]:
+def parse_ruby_text(
+    raw: str, check_count: int = 1, mode: Optional[str] = None
+) -> Optional[Ruby]:
     """解析 ruby 文本，根据 check_count 自动分段
 
-    规则：
-    1. 直接应用：用逗号手动分段，无逗号则不分段
+    规则（详见 ``inline_format.split_ruby_segments``，预览与写回共用）：
+    1. 直接应用：用逗号手动分段，空段解析为占位符（停顿符）
     2. 按字符均分：始终按字符拆分，忽略逗号
     3. 按 mora 均分：始终按 mora 拆分，忽略逗号
-    4. 当分段数 > check_count 时，多余部分合到末段
+    4. 分段数 > check_count 时多余部分合到末段，< check_count 时补占位符
+       （不再静默丢弃任何分段——空串 part 曾导致 checkcount/rubyparts 失配）
 
     Args:
         raw: 用户输入的注音文本
         check_count: 节奏点数量
+        mode: 分段方式 "direct"/"char"/"mora"；None 时读取用户配置
 
     Returns:
         Ruby 对象，或 None（无注音时）
     """
-    text = raw.strip()
-    if not text:
+    from strange_uta_game.backend.infrastructure.parsers.inline_format import (
+        split_ruby_segments,
+    )
+
+    if mode is None:
+        mode = _get_ruby_split_mode()
+    parts = split_ruby_segments(raw, check_count, mode)
+    if not parts:
         return None
-
-    # 获取用户选择的分段方式
-    mode = _get_ruby_split_mode()
-
-    if mode == "direct":
-        # 直接应用：用逗号手动分段，无逗号则不分段
-        parts = [p.strip() for p in text.split(",") if p.strip()]
-        if not parts:
-            return None
-        return Ruby(parts=[RubyPart(text=p) for p in parts if p])
-    elif mode == "char":
-        clean_text = text.replace(",", "")
-        if not clean_text:
-            return None
-        if check_count <= 1:
-            return Ruby(parts=[RubyPart(text=clean_text)])
-        parts = distribute_ruby_chars_evenly(list(clean_text), check_count)
-        return Ruby(parts=[RubyPart(text=p) for p in parts if p])
-    else:
-        # 按 mora 均分（始终按 mora 拆分，忽略逗号）
-        from strange_uta_game.backend.infrastructure.parsers.inline_format import (
-            split_ruby_for_checkpoints,
-        )
-        clean_text = text.replace(",", "")
-        if not clean_text:
-            return None
-        if check_count <= 1:
-            return Ruby(parts=[RubyPart(text=clean_text)])
-        parts = split_ruby_for_checkpoints(clean_text, check_count)
-        return Ruby(parts=[RubyPart(text=p) for p in parts if p])
+    return Ruby(parts=[RubyPart(text=p) for p in parts])
 
 
 class ModifyCharacterDialog(QDialog):
@@ -454,48 +441,28 @@ class ModifyCharacterDialog(QDialog):
         self._update_preview()
 
     def _update_preview(self):
-        """更新预览区域"""
+        """更新预览区域（与写回共用 split_ruby_segments，所见即所得）"""
+        from strange_uta_game.backend.infrastructure.parsers.inline_format import (
+            split_ruby_segments,
+        )
+
+        mode = _radio_split_mode(self._radio_direct, self._radio_by_char)
         preview_items = []
         for _, edit_ruby, edit_check, _ in self._char_rows:
-            ruby_text = edit_ruby.text().strip()
             try:
                 check_count = max(1, int(edit_check.text().strip()))
             except ValueError:
                 check_count = 1
-
-            if ruby_text:
-                # 获取当前选择的分段方式
-                if self._radio_direct.isChecked():
-                    mode = "direct"
-                elif self._radio_by_char.isChecked():
-                    mode = "char"
-                else:
-                    mode = "mora"
-
-                # 根据分段方式解析注音
-                if mode == "direct":
-                    # 直接应用：用逗号手动分段，无逗号则不分段
-                    parts = [p.strip() for p in ruby_text.split(",") if p.strip()]
-                elif mode == "char":
-                    clean_text = ruby_text.replace(",", "")
-                    parts = distribute_ruby_chars_evenly(list(clean_text), check_count)
-                else:
-                    # 按 mora 均分（始终按 mora 拆分，忽略逗号）
-                    from strange_uta_game.backend.infrastructure.parsers.inline_format import (
-                        split_ruby_for_checkpoints,
-                    )
-                    clean_text = ruby_text.replace(",", "")
-                    parts = split_ruby_for_checkpoints(clean_text, check_count)
-
-                preview_items.append(f"[{','.join(parts)}]")
-            else:
-                preview_items.append("[]")
+            parts = split_ruby_segments(edit_ruby.text(), check_count, mode)
+            preview_items.append(f"[{','.join(parts)}]")
 
         self.preview_label.setText(f"预览: {' '.join(preview_items)}")
 
     def _parse_ruby(self, raw: str, check_count: int = 1):
-        """解析 ruby 文本，根据 check_count 自动分段"""
-        return parse_ruby_text(raw, check_count)
+        """解析 ruby 文本，根据 check_count 自动分段（用 radio 实时模式）"""
+        return parse_ruby_text(
+            raw, check_count, _radio_split_mode(self._radio_direct, self._radio_by_char)
+        )
 
     def _on_execute(self):
         from strange_uta_game.backend.domain.models import Character
@@ -1073,42 +1040,20 @@ class CharEditDialog(QDialog):
         self._update_preview()
 
     def _update_preview(self):
-        """更新预览区域"""
+        """更新预览区域（与写回共用 split_ruby_segments，所见即所得）"""
+        from strange_uta_game.backend.infrastructure.parsers.inline_format import (
+            split_ruby_segments,
+        )
+
+        mode = _radio_split_mode(self._radio_direct, self._radio_by_char)
         preview_items = []
         for _, edit_ruby, edit_check, _ in self._char_rows:
-            ruby_text = edit_ruby.text().strip()
             try:
                 check_count = max(1, int(edit_check.text().strip()))
             except ValueError:
                 check_count = 1
-
-            if ruby_text:
-                # 获取当前选择的分段方式
-                if self._radio_direct.isChecked():
-                    mode = "direct"
-                elif self._radio_by_char.isChecked():
-                    mode = "char"
-                else:
-                    mode = "mora"
-
-                # 根据分段方式解析注音
-                if mode == "direct":
-                    # 直接应用：用逗号手动分段，无逗号则不分段
-                    parts = [p.strip() for p in ruby_text.split(",") if p.strip()]
-                elif mode == "char":
-                    clean_text = ruby_text.replace(",", "")
-                    parts = distribute_ruby_chars_evenly(list(clean_text), check_count)
-                else:
-                    # 按 mora 均分（始终按 mora 拆分，忽略逗号）
-                    from strange_uta_game.backend.infrastructure.parsers.inline_format import (
-                        split_ruby_for_checkpoints,
-                    )
-                    clean_text = ruby_text.replace(",", "")
-                    parts = split_ruby_for_checkpoints(clean_text, check_count)
-
-                preview_items.append(f"[{','.join(parts)}]")
-            else:
-                preview_items.append("[]")
+            parts = split_ruby_segments(edit_ruby.text(), check_count, mode)
+            preview_items.append(f"[{','.join(parts)}]")
 
         self.preview_label.setText(f"预览: {' '.join(preview_items)}")
 
@@ -1136,7 +1081,13 @@ class CharEditDialog(QDialog):
             except ValueError:
                 check_count = 1
             per_char_check.append(check_count)
-            per_char_ruby.append(parse_ruby_text(edit_ruby.text(), check_count))
+            per_char_ruby.append(
+                parse_ruby_text(
+                    edit_ruby.text(),
+                    check_count,
+                    _radio_split_mode(self._radio_direct, self._radio_by_char),
+                )
+            )
             per_char_linked_req.append(bool(chk_linked.isChecked()))
 
         # 应用到当前连词组

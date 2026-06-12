@@ -385,7 +385,9 @@ class ASSDirectExporter(BaseExporter):
                     for linked_idx in compound_tail[ci]:
                         kanji += self._escape_ass_text(chars[linked_idx].char)
                 if ch.ruby and ch.ruby.parts:
-                    first_part_text = self._escape_ass_text(ch.ruby.parts[0].text)
+                    first_part_text = self._escape_ass_text(
+                        self._strip_ruby_placeholder(ch.ruby.parts[0].text)
+                    )
                     seg_body = f"{kanji}|<{first_part_text}"
                 else:
                     seg_body = kanji
@@ -394,7 +396,9 @@ class ASSDirectExporter(BaseExporter):
                 # ruby.parts[pi] 必定存在（push_to_ruby 保证 parts 数 = ts 数）
                 part_text = ""
                 if ch.ruby and pi < len(ch.ruby.parts):
-                    part_text = self._escape_ass_text(ch.ruby.parts[pi].text)
+                    part_text = self._escape_ass_text(
+                        self._strip_ruby_placeholder(ch.ruby.parts[pi].text)
+                    )
                 seg_body = f"#|{part_text}"
 
             # 追加该段尾巴的无 ts 文字（标点等）
@@ -405,6 +409,24 @@ class ASSDirectExporter(BaseExporter):
         parts.append("{\\k0}")
 
         return "".join(parts)
+
+    @staticmethod
+    def _strip_ruby_placeholder(text: str) -> str:
+        """移除 ruby 文本中的占位符（停顿符）。
+
+        check_count 多于读音 mora 数的节奏点用停顿符占位（领域层不变式），
+        ASS 输出中该段应为纯时长段（无文字），与占位符引入前的行为一致。
+        """
+        if not text:
+            return text
+        from strange_uta_game.backend.domain.models import (
+            get_ruby_pause_char,
+            pause_char_variants,
+        )
+
+        for pc in pause_char_variants(get_ruby_pause_char()):
+            text = text.replace(pc, "")
+        return text
 
     @staticmethod
     def _escape_ass_field(text: str) -> str:

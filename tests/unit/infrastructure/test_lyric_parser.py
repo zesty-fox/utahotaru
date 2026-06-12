@@ -233,6 +233,31 @@ class TestApplyRubyEntries:
             assert chars[fi].check_count == 0, f"follower {fi} 应 cc=0"
             assert chars[fi].ruby is None, f"follower {fi} 应无 ruby"
 
+    def test_consecutive_reading_timestamps_yield_placeholder_parts(self):
+        """读音中连续时间戳（す[ts][ts]）的空拍解析为占位符（停顿符）part。
+
+        禁止空串——空串 part 曾被存档加载等防御性过滤静默丢弃，造成
+        check_count 与 parts 数失配；禁止空格——空格读音是实义字符。
+        """
+        from strange_uta_game.backend.infrastructure.parsers.lyric_parser import (
+            _apply_ruby_entries,
+            NicokaraRubyEntry,
+        )
+
+        s = self._make_sentence("寿し", [10000, 11000])
+        _apply_ruby_entries(
+            s,
+            [NicokaraRubyEntry(
+                kanji="寿",
+                reading="す[00:00:15][00:00:30]",
+            )],
+        )
+        ch = s.characters[0]
+        assert ch.ruby is not None
+        assert [p.text for p in ch.ruby.parts] == ["す", "^", "^"]
+        # 不变式：cc 与 parts 数一致
+        assert ch.check_count == len(ch.ruby.parts) == 3
+
     def test_multi_kanji_ruby_links_even_with_per_char_ts(self):
         """两汉字各有独立 body ts 时仍是连词（世界=せ/か/い）。
 

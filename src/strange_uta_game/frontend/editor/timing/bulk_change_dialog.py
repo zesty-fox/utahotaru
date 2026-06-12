@@ -38,9 +38,6 @@ from copy import deepcopy
 
 from strange_uta_game.backend.domain import Project
 from strange_uta_game.backend.domain.models import Character, Ruby, RubyPart
-from strange_uta_game.backend.infrastructure.parsers.inline_format import (
-    distribute_ruby_chars_evenly,
-)
 
 
 class BulkChangeDialog(QDialog):
@@ -301,43 +298,21 @@ class BulkChangeDialog(QDialog):
         self._update_preview()
 
     def _update_preview(self):
-        """更新预览区域"""
-        from strange_uta_game.frontend.editor.timing.dialogs import parse_ruby_text
+        """更新预览区域（与写回共用 split_ruby_segments，所见即所得）"""
+        from strange_uta_game.backend.infrastructure.parsers.inline_format import (
+            split_ruby_segments,
+        )
+        from strange_uta_game.frontend.editor.timing.dialogs import _radio_split_mode
+
+        mode = _radio_split_mode(self._radio_direct, self._radio_by_char)
         preview_items = []
         for _, edit_ruby, edit_check, _ in self._char_rows:
-            ruby_text = edit_ruby.text().strip()
             try:
                 check_count = max(1, int(edit_check.text().strip()))
             except ValueError:
                 check_count = 1
-
-            if ruby_text:
-                # 获取当前选择的分段方式
-                if self._radio_direct.isChecked():
-                    mode = "direct"
-                elif self._radio_by_char.isChecked():
-                    mode = "char"
-                else:
-                    mode = "mora"
-
-                # 根据分段方式解析注音
-                if mode == "direct":
-                    # 直接应用：用逗号手动分段，无逗号则不分段
-                    parts = [p.strip() for p in ruby_text.split(",") if p.strip()]
-                elif mode == "char":
-                    clean_text = ruby_text.replace(",", "")
-                    parts = distribute_ruby_chars_evenly(list(clean_text), check_count)
-                else:
-                    # 按 mora 均分（始终按 mora 拆分，忽略逗号）
-                    from strange_uta_game.backend.infrastructure.parsers.inline_format import (
-                        split_ruby_for_checkpoints,
-                    )
-                    clean_text = ruby_text.replace(",", "")
-                    parts = split_ruby_for_checkpoints(clean_text, check_count)
-
-                preview_items.append(f"[{','.join(parts)}]")
-            else:
-                preview_items.append("[]")
+            parts = split_ruby_segments(edit_ruby.text(), check_count, mode)
+            preview_items.append(f"[{','.join(parts)}]")
 
         self.preview_label.setText(f"预览: {' '.join(preview_items)}")
 
@@ -442,9 +417,14 @@ class BulkChangeDialog(QDialog):
     # ---------- 解析 ----------
 
     def _parse_ruby(self, raw: str, check_count: int = 1) -> Optional[Ruby]:
-        """解析 ruby 文本，根据 check_count 自动分段"""
-        from strange_uta_game.frontend.editor.timing.dialogs import parse_ruby_text
-        return parse_ruby_text(raw, check_count)
+        """解析 ruby 文本，根据 check_count 自动分段（用 radio 实时模式）"""
+        from strange_uta_game.frontend.editor.timing.dialogs import (
+            parse_ruby_text,
+            _radio_split_mode,
+        )
+        return parse_ruby_text(
+            raw, check_count, _radio_split_mode(self._radio_direct, self._radio_by_char)
+        )
 
     def _collect_per_char(
         self, new_text: str

@@ -25,6 +25,11 @@ from strange_uta_game.backend.domain import (
     RubyPart,
     DomainError,
 )
+from strange_uta_game.backend.domain.models import (
+    RUBY_PAUSE_SENTINEL,
+    get_ruby_pause_char,
+    pause_char_variants,
+)
 
 
 class SugParseError(Exception):
@@ -415,9 +420,20 @@ class SugProjectParser:
                 "singer_id": char.singer_id,
             }
             if char.ruby:
+                # 占位 part（停顿符及其全/半角变体）统一写为哨兵 token，使存档
+                # 与用户的停顿符配置解耦；空串 part（历史遗留）一并规范化为哨兵，
+                # 加载时映射回当前配置的停顿符。
+                placeholder_texts = pause_char_variants(get_ruby_pause_char()) | {""}
                 char_dict["ruby"] = {
                     "parts": [
-                        {"text": p.text, "offset_ms": p.offset_ms}
+                        {
+                            "text": (
+                                RUBY_PAUSE_SENTINEL
+                                if p.text in placeholder_texts
+                                else p.text
+                            ),
+                            "offset_ms": p.offset_ms,
+                        }
                         for p in char.ruby.parts
                     ],
                 }
@@ -501,21 +517,27 @@ class SugProjectParser:
         singer_id = data.get("singer_id", "")
 
         characters = []
+        pause_char = get_ruby_pause_char()
         for char_data in data.get("characters", []):
-            # 解析 Ruby
+            # 解析 Ruby。任何 part 都不丢弃（空 part 曾被静默过滤，导致
+            # check_count 与 parts 数失配）：哨兵 token 与历史遗留的空串
+            # 统一映射为当前配置的停顿符占位。
             ruby = None
             ruby_data = char_data.get("ruby")
             if ruby_data:
                 parts_data = ruby_data.get("parts")
                 if parts_data:
-                    parts = [
-                        RubyPart(
-                            text=str(p.get("text", "")),
-                            offset_ms=int(p.get("offset_ms", 0)),
+                    parts = []
+                    for p in parts_data:
+                        raw_text = str(p.get("text", "") or "")
+                        if raw_text in (RUBY_PAUSE_SENTINEL, ""):
+                            raw_text = pause_char
+                        parts.append(
+                            RubyPart(
+                                text=raw_text,
+                                offset_ms=int(p.get("offset_ms", 0)),
+                            )
                         )
-                        for p in parts_data
-                        if p.get("text")
-                    ]
                     if parts:
                         ruby = Ruby(parts=parts)
 
@@ -551,6 +573,15 @@ class SugProjectParser:
                 is_rest=bool(char_data.get("is_rest", False)),
                 singer_id=char_data.get("singer_id", "") or singer_id,
             )
+            # 不变式自愈：旧版存档丢过空 part、或旧迁移路径减 cc 未并段的
+            # 存量损伤，在此通过 set_check_count 的收口逻辑修复
+            # （不足补占位符、多余并尾段；一致时为 no-op）。
+            if (
+                char.ruby is not None
+                and char.check_count >= 1
+                and len(char.ruby.parts) != char.check_count
+            ):
+                char.set_check_count(char.check_count, force=True)
             # 推送时间戳和演唱者到 Ruby
             char.push_to_ruby()
             characters.append(char)

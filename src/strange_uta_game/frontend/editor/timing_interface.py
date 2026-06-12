@@ -124,6 +124,7 @@ class EditorInterface(QWidget):
         self._rewind_ms = 5000
         self._key_map = {}  # key_string -> action_name, populated by _apply_settings
         self._settings_loaded = False  # 配置是否已加载成功
+        self._last_pause_char: str = ""  # 跟踪停顿符变更，用于实时迁移 ruby parts
         # 长按/短按支持
         self._long_press_timer = QTimer(self)
         self._long_press_timer.setSingleShot(True)
@@ -647,6 +648,18 @@ class EditorInterface(QWidget):
                         ch.set_offset(render_offset)
                     except Exception as e:
                         print(f"[Settings] set_offset 跳过脏字符: {e}")
+        # 停顿符变更时立即迁移所有 ruby parts（不等重开项目）
+        new_pause_char = settings.get("export.nicokara_pause_char", "^") or "^"
+        if self._last_pause_char and new_pause_char != self._last_pause_char and self._project:
+            from strange_uta_game.backend.domain.models import pause_char_variants
+            old_variants = pause_char_variants(self._last_pause_char)
+            for sentence in self._project.sentences:
+                for ch in sentence.characters:
+                    if ch.ruby:
+                        for p in ch.ruby.parts:
+                            if p.text in old_variants:
+                                p.text = new_pause_char
+        self._last_pause_char = new_pause_char
         # 应用歌词对齐方式
         lyrics_alignment = settings.get("ui.lyrics_alignment", "center")
         self.preview.set_alignment(lyrics_alignment)
@@ -2564,9 +2577,7 @@ class EditorInterface(QWidget):
                             else:
                                 ts = max(0, chars[ci + 1].timestamps[0] - head_offset_ms)
                             chars[ci].timestamps = [ts]
-                            chars[ci].check_count = 1
-                            chars[ci]._update_offset_timestamps()
-                            chars[ci].push_to_ruby()
+                            chars[ci].set_check_count(1, force=True)
                             total_count += 1
                     elif is_at_end:
                         # 行尾：只有前方时间戳
@@ -2581,10 +2592,8 @@ class EditorInterface(QWidget):
                             # 符号特殊处理：原句尾转普通，新句尾 = 原句尾 + tail_offset
                             original_end_ts = last_char.sentence_end_ts
                             last_char.timestamps = [original_end_ts]
-                            last_char.check_count = 1
                             last_char.sentence_end_ts = original_end_ts + tail_offset_ms
-                            last_char._update_offset_timestamps()
-                            last_char.push_to_ruby()
+                            last_char.set_check_count(1, force=True)
                             total_count += 1
                             # 前面的字符均分(prev_ts, original_end_ts)
                             if segment_len > 1:
@@ -2592,9 +2601,7 @@ class EditorInterface(QWidget):
                                 for idx, ci in enumerate(range(segment_start, last_ci)):
                                     ts = prev_ts + time_diff * (idx + 1) // segment_len
                                     chars[ci].timestamps = [ts]
-                                    chars[ci].check_count = 1
-                                    chars[ci]._update_offset_timestamps()
-                                    chars[ci].push_to_ruby()
+                                    chars[ci].set_check_count(1, force=True)
                                     total_count += 1
                         else:
                             # 非符号：均分(prev_ts, 句尾时间戳)
@@ -2606,9 +2613,7 @@ class EditorInterface(QWidget):
                             for idx, ci in enumerate(range(segment_start, segment_end)):
                                 ts = prev_ts + time_diff * (idx + 1) // (segment_len + 1)
                                 chars[ci].timestamps = [ts]
-                                chars[ci].check_count = 1
-                                chars[ci]._update_offset_timestamps()
-                                chars[ci].push_to_ruby()
+                                chars[ci].set_check_count(1, force=True)
                                 total_count += 1
                     else:
                         # 行中：前后都应该有时间戳
@@ -2617,18 +2622,14 @@ class EditorInterface(QWidget):
                         if segment_len == 1:
                             avg_ts = (prev_ts + next_ts) // 2
                             chars[segment_start].timestamps = [avg_ts]
-                            chars[segment_start].check_count = 1
-                            chars[segment_start]._update_offset_timestamps()
-                            chars[segment_start].push_to_ruby()
+                            chars[segment_start].set_check_count(1, force=True)
                             total_count += 1
                         else:
                             time_diff = next_ts - prev_ts
                             for idx, ci in enumerate(range(segment_start, segment_end)):
                                 ts = prev_ts + time_diff * (idx + 1) // (segment_len + 1)
                                 chars[ci].timestamps = [ts]
-                                chars[ci].check_count = 1
-                                chars[ci]._update_offset_timestamps()
-                                chars[ci].push_to_ruby()
+                                chars[ci].set_check_count(1, force=True)
                                 total_count += 1
 
             if total_count == 0:
@@ -2683,11 +2684,9 @@ class EditorInterface(QWidget):
                     and ch.sentence_end_ts is not None
                 ):
                     old_end_ts = ch.sentence_end_ts
-                    ch.check_count = 1
                     ch.timestamps = [old_end_ts]
                     ch.sentence_end_ts = old_end_ts + post_comp_ms
-                    ch._update_offset_timestamps()
-                    ch.push_to_ruby()
+                    ch.set_check_count(1, force=True)
                     post_count += 1
 
             # ── Pass 2: 前补偿 ──────────────────────────────
@@ -2708,10 +2707,8 @@ class EditorInterface(QWidget):
                 old_sym_ts = ch.timestamps[0]
 
                 # 给紧跟非符号字符赋予符号的原始时间戳
-                next_non_sym.check_count = 1
                 next_non_sym.timestamps = [old_sym_ts]
-                next_non_sym._update_offset_timestamps()
-                next_non_sym.push_to_ruby()
+                next_non_sym.set_check_count(1, force=True)
 
                 # 符号时间戳前移
                 ch.timestamps = [max(0, old_sym_ts - pre_comp_ms)]

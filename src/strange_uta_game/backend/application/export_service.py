@@ -328,7 +328,10 @@ class ExportService:
             split_ruby_for_checkpoints,
             distribute_ruby_chars_evenly,
         )
-        from strange_uta_game.backend.domain.models import RubyPart
+        from strange_uta_game.backend.domain.models import (
+            RubyPart,
+            get_ruby_pause_char,
+        )
 
         mismatches = self.validate_ruby_parts(project)
         for m in mismatches:
@@ -343,7 +346,7 @@ class ExportService:
                 parts = (
                     distribute_ruby_chars_evenly(clean, cc)
                     if clean
-                    else [""] * max(1, cc)
+                    else [get_ruby_pause_char()] * max(1, cc)
                 )
             else:
                 parts = split_ruby_for_checkpoints(full_text, cc)

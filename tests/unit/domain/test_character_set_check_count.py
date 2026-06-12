@@ -73,11 +73,12 @@ class TestSetCheckCountGrow:
         ch.set_check_count(3)
         assert ch.check_count == 3
         assert ch.ruby is not None
-        # 增大时按 mora 模式重新拆分 ruby.parts 以维持不变式
+        # 增大时按 mora 模式重新拆分 ruby.parts 以维持不变式；
+        # 缺读音的节奏点用占位符（停顿符）补位而非空串
         assert len(ch.ruby.parts) == 3
         assert ch.ruby.parts[0].text == "は"
         assert ch.ruby.parts[1].text == "る"
-        assert ch.ruby.parts[2].text == ""
+        assert ch.ruby.parts[2].text == "^"
 
 
 class TestSetCheckCountZero:
@@ -138,3 +139,77 @@ class TestPushToRubyResidualClear:
         ch.push_to_ruby()
         assert ch.ruby is not None
         assert all(p.offset_ms == 0 for p in ch.ruby.parts)
+
+
+class TestSetCheckCountInvariantEnforcement:
+    """set_check_count 的不变式收口：new_count == old_count 的修复式调用"""
+
+    def test_same_count_pads_missing_parts_with_placeholder(self):
+        """parts < cc（如旧版存档丢空 part）：同值调用补占位符"""
+        ruby = Ruby(parts=[RubyPart(text="す")])
+        ch = Character(char="寿", check_count=3, timestamps=[1000, 1100, 1200], ruby=ruby)
+        ch.set_check_count(3, force=True)
+        assert ch.check_count == 3
+        assert [p.text for p in ch.ruby.parts] == ["す", "^", "^"]
+
+    def test_same_count_merges_excess_parts(self):
+        """parts > cc：同值调用合并尾段"""
+        ruby = Ruby(
+            parts=[RubyPart(text="そ"), RubyPart(text="ら"), RubyPart(text="あ")]
+        )
+        ch = Character(char="空", check_count=2, timestamps=[1000, 1100], ruby=ruby)
+        ch.set_check_count(2, force=True)
+        assert ch.check_count == 2
+        assert [p.text for p in ch.ruby.parts] == ["そ", "らあ"]
+
+    def test_same_count_consistent_is_noop(self):
+        """parts == cc：同值调用不改动 parts"""
+        ruby = Ruby(parts=[RubyPart(text="は"), RubyPart(text="る")])
+        ch = Character(char="春", check_count=2, timestamps=[1000, 1200], ruby=ruby)
+        ch.set_check_count(2)
+        assert [p.text for p in ch.ruby.parts] == ["は", "る"]
+
+    def test_zero_count_keeps_parts_untouched(self):
+        """cc=0（无 mora 格式）不参与收口，parts 原样保留"""
+        ruby = Ruby(parts=[RubyPart(text="ゆ"), RubyPart(text="め")])
+        ch = Character(char="夢", check_count=2, timestamps=[], ruby=ruby)
+        ch.set_check_count(0, force=True)
+        assert ch.check_count == 0
+        assert [p.text for p in ch.ruby.parts] == ["ゆ", "め"]
+
+
+class TestSetCheckCountFromZeroWithMultiPartRuby:
+    """cc=0 多 part 字符（无 mora 格式）经补全时间戳后走 set_check_count(1)，
+    不变式收口应把多 part 合并为 1 part，避免 parts!=cc 失配。
+    模拟 timing_interface 补全/分离时间戳的场景。"""
+
+    def test_zero_to_one_merges_multi_parts(self):
+        """cc=0, parts=2 → set_check_count(1) → parts 合并为 1"""
+        ruby = Ruby(parts=[RubyPart(text="ゆ"), RubyPart(text="め")])
+        ch = Character(char="夢", check_count=0, timestamps=[], ruby=ruby)
+        ch.timestamps = [5000]
+        ch.set_check_count(1, force=True)
+        assert ch.check_count == 1
+        assert ch.ruby is not None
+        assert len(ch.ruby.parts) == 1
+        assert ch.ruby.parts[0].text == "ゆめ"
+        assert ch.timestamps == [5000]
+
+    def test_zero_to_one_single_part_unchanged(self):
+        """cc=0, parts=1 → set_check_count(1) → 不变"""
+        ruby = Ruby(parts=[RubyPart(text="あ")])
+        ch = Character(char="愛", check_count=0, timestamps=[], ruby=ruby)
+        ch.timestamps = [3000]
+        ch.set_check_count(1, force=True)
+        assert ch.check_count == 1
+        assert len(ch.ruby.parts) == 1
+        assert ch.ruby.parts[0].text == "あ"
+
+    def test_zero_to_one_no_ruby_no_error(self):
+        """cc=0, ruby=None → set_check_count(1) 正常"""
+        ch = Character(char="あ", check_count=0, timestamps=[])
+        ch.timestamps = [1000]
+        ch.set_check_count(1, force=True)
+        assert ch.check_count == 1
+        assert ch.ruby is None
+        assert ch.timestamps == [1000]

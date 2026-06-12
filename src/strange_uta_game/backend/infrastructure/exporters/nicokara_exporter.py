@@ -514,13 +514,15 @@ class NicokaraWithRubyExporter(NicokaraExporter):
         for idx, entry in enumerate(ruby_entries, 1):
             output_lines.append(f"@Ruby{idx}={entry}")
 
-        # 读取nicokara停顿符配置，删除rubyTag中的停顿符
-        pause_char = ""
+        # 读取nicokara停顿符配置，删除rubyTag中的停顿符。
+        # 注意：停顿符同时是 ruby 占位符（check_count 多于 mora 数的节奏点
+        # 用它占位，见 models.get_ruby_pause_char），剥离是正确性要求而非
+        # 可选项，因此配置为空时回退 '^' 而不是跳过剥离。
         try:
             from strange_uta_game.frontend.settings.settings_interface import (
                 AppSettings,
             )
-            pause_char = AppSettings().get("export.nicokara_pause_char", "^")
+            pause_char = AppSettings().get("export.nicokara_pause_char", "^") or "^"
         except Exception:
             pause_char = "^"
 

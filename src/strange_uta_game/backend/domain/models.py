@@ -56,6 +56,47 @@ RubyDataLossError = RubyMoraDegradeError
 PUNCTUATION_SET = frozenset('''()【】[]{}「」!?、，"' ''')
 
 
+# ──────────────────────────────────────────────
+# Ruby 占位符（演唱停顿符）
+# ──────────────────────────────────────────────
+
+# .sug 存储用哨兵 token。占位符在文件中统一写为该 token，使存档与用户的
+# 停顿符配置解耦：换了配置再打开旧文件，占位符自动映射为新配置的字符。
+RUBY_PAUSE_SENTINEL = "^pause^"
+
+_FULLWIDTH_CARET = "＾"  # ＾
+_ASCII_CARET = "^"
+
+
+def get_ruby_pause_char() -> str:
+    """当前会话的注音占位符（= nicokara 演唱停顿符）。
+
+    check_count 多于读音 mora 数时，多出的节奏点用本字符占位，表示
+    「该拍无新文字（延音/停顿）」。禁止用空串（隐形、易被防御性代码误删，
+    曾导致 checkcount/rubyparts 失配）或空格（导出文件中空格读音是实义字符）。
+
+    领域层读取前端 AppSettings 是刻意取舍：占位符必须与导出剥离、编辑显示
+    使用同一字符。无配置 / 配置为空 / 读取异常时回退 '^'。
+    """
+    try:
+        from strange_uta_game.frontend.settings.app_settings import AppSettings
+
+        ch = AppSettings().get("export.nicokara_pause_char", _ASCII_CARET)
+        return ch if ch else _ASCII_CARET
+    except Exception:
+        return _ASCII_CARET
+
+
+def pause_char_variants(pause_char: str) -> set:
+    """返回停顿符及其全角/半角变体集合。"""
+    variants = {pause_char}
+    if pause_char == _ASCII_CARET:
+        variants.add(_FULLWIDTH_CARET)
+    elif pause_char == _FULLWIDTH_CARET:
+        variants.add(_ASCII_CARET)
+    return variants
+
+
 class TimeTagType(Enum):
     """时间标签类型（用于导出兼容）
 
@@ -366,9 +407,36 @@ class Character:
                 )
                 self.ruby.parts = [RubyPart(text=t) for t in new_parts]
             elif ruby_split_mode == "direct":
-                # 无文本时仅补齐空 part
+                # 无文本时补齐占位符 part
                 while len(self.ruby.parts) < new_count:
-                    self.ruby.parts.append(RubyPart(text=""))
+                    self.ruby.parts.append(RubyPart(text=get_ruby_pause_char()))
+
+        # 不变式收口：无论以何参数调用（含 new_count == old_count 的修复式调用），
+        # 离开本方法时必须满足 new_count >= 1 → len(ruby.parts) == new_count。
+        # 旧版存档丢失占位 part、或绕过本 setter 的历史写点造成的失配在此修复：
+        # 不足补占位符（停顿符），多余合并尾段。
+        if (
+            self.ruby is not None
+            and new_count >= 1
+            and len(self.ruby.parts) != new_count
+        ):
+            if len(self.ruby.parts) < new_count:
+                pause = get_ruby_pause_char()
+                self.ruby.parts = self.ruby.parts + [
+                    RubyPart(text=pause)
+                    for _ in range(new_count - len(self.ruby.parts))
+                ]
+            else:
+                keep = self.ruby.parts[: new_count - 1]
+                merged_text = "".join(
+                    p.text for p in self.ruby.parts[new_count - 1 :]
+                )
+                self.ruby.parts = keep + [
+                    RubyPart(
+                        text=merged_text,
+                        offset_ms=self.ruby.parts[new_count - 1].offset_ms,
+                    )
+                ]
 
         self._update_offset_timestamps()
         self.push_to_ruby()
@@ -382,7 +450,7 @@ class Character:
         """按指定模式将 ruby 文本重新拆分为 target_count 段。
 
         mode:
-          - "direct": 保留原文不分割，不足部分用空字符串补齐
+          - "direct": 保留原文不分割，不足部分用占位符（停顿符）补齐
           - "char": 按字符均分
           - "mora": 按 mora 均分（小假名附属前一拍）
 
@@ -394,13 +462,14 @@ class Character:
         if target_count == 1:
             return [text]
 
+        pause = get_ruby_pause_char()
         if mode == "direct":
-            return [text] + [""] * (target_count - 1)
+            return [text] + [pause] * (target_count - 1)
 
         # char / mora 模式都先去除逗号
         clean = text.replace(",", "")
         if not clean:
-            return [""] * target_count
+            return [pause] * target_count
 
         if mode == "char":
             from strange_uta_game.backend.infrastructure.parsers.inline_format import (
@@ -419,7 +488,7 @@ class Character:
             head = moras[: target_count - 1]
             tail = "".join(moras[target_count - 1 :])
             return head + [tail]
-        return moras + [""] * (target_count - len(moras))
+        return moras + [pause] * (target_count - len(moras))
 
     def get_timestamp(self, checkpoint_idx: int) -> Optional[int]:
         """获取指定 checkpoint_idx 的时间戳"""

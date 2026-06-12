@@ -228,3 +228,134 @@ class TestSugProjectParser:
             SugProjectParser.load(str(file_path))
 
         assert "JSON" in str(exc_info.value)
+
+
+class TestRubyPlaceholderRoundtrip:
+    """ruby 占位符（停顿符）的存档哨兵映射与不变式自愈"""
+
+    def _make_project(self, ch: Character) -> Project:
+        project = Project()
+        singer = project.get_default_singer()
+        sentence = Sentence(singer_id=singer.id, characters=[ch])
+        project.add_sentence(sentence)
+        return project
+
+    def test_placeholder_parts_saved_as_sentinel(self):
+        """占位 part（停顿符）序列化为 ^pause^ 哨兵 token"""
+        ch = Character(
+            char="寿",
+            ruby=Ruby(parts=[RubyPart("す"), RubyPart("^"), RubyPart("^")]),
+            check_count=3,
+            timestamps=[1000, 1100, 1200],
+        )
+        data = SugProjectParser._sentence_to_dict(
+            Sentence(singer_id="s1", characters=[ch])
+        )
+        texts = [p["text"] for p in data["characters"][0]["ruby"]["parts"]]
+        assert texts == ["す", "^pause^", "^pause^"]
+
+    def test_placeholder_roundtrip_lossless(self, tmp_path):
+        """占位 part 保存→加载无损（不再被静默丢弃）"""
+        ch = Character(
+            char="寿",
+            ruby=Ruby(parts=[RubyPart("す"), RubyPart("^"), RubyPart("^")]),
+            check_count=3,
+            timestamps=[1000, 1100, 1200],
+        )
+        project = self._make_project(ch)
+        file_path = tmp_path / "placeholder.sug"
+        SugProjectParser.save(project, str(file_path))
+        loaded = SugProjectParser.load(str(file_path))
+
+        loaded_ch = loaded.sentences[0].characters[0]
+        assert loaded_ch.check_count == 3
+        assert [p.text for p in loaded_ch.ruby.parts] == ["す", "^", "^"]
+
+    def test_legacy_empty_parts_healed_to_placeholder(self, tmp_path):
+        """旧版存档中的空文本 part 加载时映射为占位符，数量不丢"""
+        sentence_dict = {
+            "id": "sent1",
+            "singer_id": "s1",
+            "characters": [
+                {
+                    "char": "寿",
+                    "check_count": 3,
+                    "timestamps": [1000, 1100, 1200],
+                    "sentence_end_ts": None,
+                    "ruby": {
+                        "parts": [
+                            {"text": "す", "offset_ms": 0},
+                            {"text": "", "offset_ms": 100},
+                            {"text": "", "offset_ms": 200},
+                        ]
+                    },
+                }
+            ],
+        }
+        sentence = SugProjectParser._dict_to_sentence(sentence_dict)
+        ch = sentence.characters[0]
+        assert ch.check_count == 3
+        assert [p.text for p in ch.ruby.parts] == ["す", "^", "^"]
+
+    def test_legacy_dropped_parts_healed_by_padding(self):
+        """旧版已丢空 part 的存量损伤（parts < cc）：加载时补占位符自愈"""
+        sentence_dict = {
+            "id": "sent1",
+            "singer_id": "s1",
+            "characters": [
+                {
+                    "char": "寿",
+                    "check_count": 3,
+                    "timestamps": [1000, 1100, 1200],
+                    "sentence_end_ts": None,
+                    "ruby": {"parts": [{"text": "す", "offset_ms": 0}]},
+                }
+            ],
+        }
+        sentence = SugProjectParser._dict_to_sentence(sentence_dict)
+        ch = sentence.characters[0]
+        assert ch.check_count == 3
+        assert len(ch.ruby.parts) == 3
+        assert [p.text for p in ch.ruby.parts] == ["す", "^", "^"]
+
+    def test_excess_parts_healed_by_merging_tail(self):
+        """parts > cc 的存量损伤：加载时合并尾段自愈"""
+        sentence_dict = {
+            "id": "sent1",
+            "singer_id": "s1",
+            "characters": [
+                {
+                    "char": "空",
+                    "check_count": 2,
+                    "timestamps": [1000, 1100],
+                    "sentence_end_ts": None,
+                    "ruby": {
+                        "parts": [
+                            {"text": "そ", "offset_ms": 0},
+                            {"text": "ら", "offset_ms": 100},
+                            {"text": "あ", "offset_ms": 200},
+                        ]
+                    },
+                }
+            ],
+        }
+        sentence = SugProjectParser._dict_to_sentence(sentence_dict)
+        ch = sentence.characters[0]
+        assert ch.check_count == 2
+        assert [p.text for p in ch.ruby.parts] == ["そ", "らあ"]
+
+    def test_no_mora_cc0_parts_kept_verbatim(self, tmp_path):
+        """cc=0 无 mora 字符的多 part ruby 不受自愈影响，原样往返"""
+        ch = Character(
+            char="夢",
+            ruby=Ruby(parts=[RubyPart("ゆ"), RubyPart("め")]),
+            check_count=0,
+        )
+        project = self._make_project(ch)
+        file_path = tmp_path / "nomora.sug"
+        SugProjectParser.save(project, str(file_path))
+        loaded = SugProjectParser.load(str(file_path))
+
+        loaded_ch = loaded.sentences[0].characters[0]
+        assert loaded_ch.check_count == 0
+        assert [p.text for p in loaded_ch.ruby.parts] == ["ゆ", "め"]

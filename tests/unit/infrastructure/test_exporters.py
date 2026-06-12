@@ -458,6 +458,54 @@ class TestNicokaraWithRubyExporter:
         finally:
             os.unlink(temp_path)
 
+    def test_export_placeholder_parts_stripped_from_ruby(self):
+        """占位符（停顿符）part 在 @Ruby 输出中被剥离，仅留时间戳。
+
+        check_count 多于读音 mora 数时 parts 用停顿符占位（如 す,^,^），
+        导出结果须与历史空串占位完全一致：す[ts][ts]，不泄漏 ^。
+        """
+        from strange_uta_game.backend.domain import Ruby, RubyPart
+        from strange_uta_game.backend.infrastructure.exporters import (
+            NicokaraWithRubyExporter,
+        )
+
+        project = Project()
+        singer = project.singers[0]
+
+        sentence = Sentence.from_text("寿司", singer.id)
+        sentence.characters[0].check_count = 3
+        sentence.characters[0].set_ruby(
+            Ruby(parts=[RubyPart(text="す"), RubyPart(text="^"), RubyPart(text="^")])
+        )
+        sentence.characters[0].add_timestamp(5000, checkpoint_idx=0)
+        sentence.characters[0].add_timestamp(5150, checkpoint_idx=1)
+        sentence.characters[0].add_timestamp(5300, checkpoint_idx=2)
+        sentence.characters[1].set_ruby(Ruby(parts=[RubyPart(text="し")]))
+        sentence.characters[1].add_timestamp(6000)
+        project.add_sentence(sentence)
+
+        exporter = NicokaraWithRubyExporter()
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".lrc", delete=False, encoding="utf-8"
+        ) as f:
+            temp_path = f.name
+
+        try:
+            exporter.export(project, temp_path)
+
+            with open(temp_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # 读音 = す + 两个纯时间戳段（^ 被剥离）
+            assert "す[00:00:15][00:00:30]" in content
+            # @Ruby 标签行中不应泄漏占位符
+            for line in content.splitlines():
+                if line.startswith("@Ruby"):
+                    assert "^" not in line, line
+        finally:
+            os.unlink(temp_path)
+
 
     def test_export_ruby_multi_reading_disambiguation(self):
         """linked_to_next 切段策略：同 ruby tag 内的多字必须语义构成连词，

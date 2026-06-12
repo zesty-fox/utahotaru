@@ -1389,12 +1389,18 @@ def _parse_reading_with_timestamps(reading: str) -> List[Tuple[str, int]]:
                   补的空白 part / 空 mora）
 
     Returns:
-        [(text, offset_ms), ...] 序列；连续时间戳之间会插入 (" ", first_ts) 占位，
+        [(text, offset_ms), ...] 序列；连续时间戳之间会插入占位符（停顿符）part，
         确保 reading_parts 总数与导出器写入的 mapping 长度一致。
     """
+    from strange_uta_game.backend.domain.models import get_ruby_pause_char
+
     result: List[Tuple[str, int]] = []
     last_end = 0
     pending_offset: Optional[int] = None
+    # 连续时间戳之间无读音字符的拍用停顿符占位（禁止空串——隐形且易被
+    # 防御性代码误删；禁止空格——导出文件中空格读音是实义字符）。
+    # 再导出时 @Ruby 剥离停顿符，round-trip 仍为 `いっ[ts1][ts2]しょ`。
+    pause_char = get_ruby_pause_char()
 
     for m in _READING_TS_RE.finditer(reading):
         # 时间戳之前的文本
@@ -1406,11 +1412,9 @@ def _parse_reading_with_timestamps(reading: str) -> List[Tuple[str, int]]:
                 result.append((text_before, pending_offset or 0))
                 pending_offset = None
         else:
-            # 连续时间戳之间无文本：保留前一个 ts 作为占位空 part
-            # 使用空字符串（""）而非空格——空段语义上无读音字符，
-            # 不应在 round-trip 时被序列化为字面空格（避免出现 `いっ[ts1] [ts2]しょ`）
+            # 连续时间戳之间无文本：保留前一个 ts 作为占位 part
             if pending_offset is not None:
-                result.append(("", pending_offset))
+                result.append((pause_char, pending_offset))
                 pending_offset = None
 
         # 解析时间戳
@@ -1428,8 +1432,8 @@ def _parse_reading_with_timestamps(reading: str) -> List[Tuple[str, int]]:
         if text_after:
             result.append((text_after, pending_offset or 0))
     elif pending_offset is not None:
-        # 末尾还残留一个 pending ts，作为占位空 part
-        result.append(("", pending_offset))
+        # 末尾还残留一个 pending ts，作为占位 part
+        result.append((pause_char, pending_offset))
 
     return result
 

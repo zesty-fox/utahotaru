@@ -142,6 +142,69 @@ class Testsplit_ruby_for_checkpoints:
         result = split_ruby_for_checkpoints("abcd", 2)
         assert result == ["ab", "cd"]
 
+    def test_pad_with_placeholder_not_empty(self):
+        """mora 数 < cp 数：补占位符（停顿符）而非空串"""
+        assert split_ruby_for_checkpoints("す", 3) == ["す", "^", "^"]
+
+
+class TestSplitRubySegments:
+    """split_ruby_segments — 对话框预览与写回共用的分段函数"""
+
+    def test_empty_input_returns_empty(self):
+        from strange_uta_game.backend.infrastructure.parsers.inline_format import (
+            split_ruby_segments,
+        )
+        assert split_ruby_segments("", 2, "direct") == []
+        assert split_ruby_segments("  ", 2, "mora") == []
+
+    def test_direct_empty_segments_become_placeholder(self):
+        """direct 模式：连续/尾随逗号的空段解析为占位符，不静默丢弃"""
+        from strange_uta_game.backend.infrastructure.parsers.inline_format import (
+            split_ruby_segments,
+        )
+        assert split_ruby_segments("す,,", 3, "direct") == ["す", "^", "^"]
+
+    def test_direct_pads_to_check_count(self):
+        from strange_uta_game.backend.infrastructure.parsers.inline_format import (
+            split_ruby_segments,
+        )
+        assert split_ruby_segments("す", 3, "direct") == ["す", "^", "^"]
+
+    def test_direct_merges_excess_into_tail(self):
+        """direct 段数 > check_count：合并尾段（与 set_check_count 收口一致）"""
+        from strange_uta_game.backend.infrastructure.parsers.inline_format import (
+            split_ruby_segments,
+        )
+        assert split_ruby_segments("わ,た,し", 2, "direct") == ["わ", "たし"]
+
+    def test_direct_check_count_zero_keeps_user_segments(self):
+        from strange_uta_game.backend.infrastructure.parsers.inline_format import (
+            split_ruby_segments,
+        )
+        assert split_ruby_segments("ゆ,め", 0, "direct") == ["ゆ", "め"]
+
+    def test_mora_pads_with_placeholder(self):
+        from strange_uta_game.backend.infrastructure.parsers.inline_format import (
+            split_ruby_segments,
+        )
+        assert split_ruby_segments("す", 3, "mora") == ["す", "^", "^"]
+
+    def test_char_pads_with_placeholder(self):
+        from strange_uta_game.backend.infrastructure.parsers.inline_format import (
+            split_ruby_segments,
+        )
+        assert split_ruby_segments("す", 3, "char") == ["す", "^", "^"]
+
+    def test_placeholder_roundtrip_idempotent(self):
+        """对话框「不改内容点确定」幂等：显示文本重解析得到相同 parts"""
+        from strange_uta_game.backend.infrastructure.parsers.inline_format import (
+            split_ruby_segments,
+        )
+        parts = ["す", "^", "^"]
+        display = ",".join(parts)  # 对话框显示协议
+        for mode in ("direct", "mora", "char"):
+            assert split_ruby_segments(display, 3, mode) == parts, mode
+
 
 # ──────────────────────────────────────────────
 # 序列化 (to_inline_text)
