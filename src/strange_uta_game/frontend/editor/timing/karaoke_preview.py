@@ -1342,20 +1342,30 @@ class KaraokePreview(QWidget):
         menu.exec(global_pos)
 
     def _find_next_line_first_timestamp(self, current_line_idx: int) -> Optional[int]:
-        """查找下一行的第一个checkpoint时间戳，用于行尾非句尾时的wipe右边界。
+        """向后逐行查找最近一个有时间戳行的第一个时间戳，用于行尾非句尾时的 wipe 右边界。
+
+        对每一行执行早停检测：若该行存在 is_sentence_end=True 但无 global_sentence_end_ts，
+        或存在 check_count>0 但无 global_timestamps，视为该行未完整打轴，则结束（返回 None）。
+        若该行全为 cc=0 且无时间戳，则跳过继续向后找。
 
         Returns:
-            下一行第一个字符的 global_timestamps[0]，如果不存在返回 None
+            最近一个有时间戳行的第一个时间戳，或 None（遇到未完整打轴行或找到尾）。
         """
         if not self._project or not self._project.sentences:
             return None
-        next_line_idx = current_line_idx + 1
-        if next_line_idx >= len(self._project.sentences):
-            return None
-        next_sentence = self._project.sentences[next_line_idx]
-        for ch in next_sentence.characters:
-            if ch.global_timestamps:
-                return int(ch.global_timestamps[0])
+        total = len(self._project.sentences)
+        for line_idx in range(current_line_idx + 1, total):
+            line = self._project.sentences[line_idx]
+            first_ts: Optional[int] = None
+            for ch in line.characters:
+                if ch.is_sentence_end and ch.global_sentence_end_ts is None:
+                    return None
+                if ch.check_count > 0 and not ch.global_timestamps:
+                    return None
+                if ch.global_timestamps and first_ts is None:
+                    first_ts = int(ch.global_timestamps[0])
+            if first_ts is not None:
+                return first_ts
         return None
 
     def _find_prev_line_last_timestamp(self, current_line_idx: int) -> Optional[int]:
