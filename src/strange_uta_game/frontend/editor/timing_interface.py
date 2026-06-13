@@ -242,6 +242,8 @@ class EditorInterface(QWidget):
         self.toolbar.complete_timestamp_clicked.connect(self._on_complete_timestamp)
         self.toolbar.separate_symbol_timestamp_clicked.connect(self._on_separate_symbol_timestamp)
         self.toolbar.adjust_raw_timestamp_clicked.connect(self._on_adjust_raw_timestamp)
+        self.toolbar.adjust_raw_timestamp_line_clicked.connect(self._on_adjust_raw_timestamp_line)
+        self.toolbar.adjust_raw_timestamp_selected_clicked.connect(self._on_adjust_raw_timestamp_selected)
         self.toolbar.offset_changed.connect(self._on_offset_changed)
         layout.addWidget(self.toolbar)
 
@@ -2452,6 +2454,246 @@ class EditorInterface(QWidget):
         else:
             if hasattr(self, "_adjust_ts_dlg") and self._adjust_ts_dlg is not None:
                 self._adjust_ts_dlg.set_status("无可调整的时间戳", success=False)
+
+    def _on_adjust_raw_timestamp_line(self):
+        """按行调整原始时间戳 — 打开非模态调整窗口，作用于当前行。"""
+        if not self._project:
+            InfoBar.warning(
+                title="无项目",
+                content="请先创建或打开项目",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+            return
+
+        line_idx = self._current_line_idx
+        if line_idx < 0 or line_idx >= len(self._project.sentences):
+            InfoBar.warning(
+                title="未选中行",
+                content="请先选中要调整的歌词行",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+            return
+
+        from .timing.dialogs import AdjustRawTimestampDialog
+
+        self._adjust_ts_line_target = line_idx
+        scope_label = f"第 {line_idx + 1} 行"
+        if not hasattr(self, "_adjust_ts_line_dlg") or self._adjust_ts_line_dlg is None or not self._adjust_ts_line_dlg.isVisible():
+            self._adjust_ts_line_dlg = AdjustRawTimestampDialog(self, scope="line", scope_label=scope_label)
+            self._adjust_ts_line_dlg.apply_requested.connect(self._on_apply_adjust_raw_timestamp_line)
+        else:
+            self._adjust_ts_line_dlg.lbl_scope.setText(f"作用范围：{scope_label}")
+
+        self._adjust_ts_line_dlg.show()
+        self._adjust_ts_line_dlg.raise_()
+        self._adjust_ts_line_dlg.activateWindow()
+
+    def _on_apply_adjust_raw_timestamp_line(self, delta_ms: int):
+        """处理按行调整原始时间戳对话框的应用请求。"""
+        if not self._project:
+            return
+
+        line_idx = getattr(self, "_adjust_ts_line_target", -1)
+        if line_idx < 0 or line_idx >= len(self._project.sentences):
+            if hasattr(self, "_adjust_ts_line_dlg") and self._adjust_ts_line_dlg is not None:
+                self._adjust_ts_line_dlg.set_status("目标行已失效", success=False)
+            return
+
+        sentence = self._project.sentences[line_idx]
+
+        def _mutate():
+            modified = 0
+            for ch in sentence.characters:
+                if ch.check_count > 0 and ch.timestamps:
+                    ch.timestamps = [max(0, ts + delta_ms) for ts in ch.timestamps]
+                    modified += 1
+                if ch.sentence_end_ts is not None:
+                    ch.sentence_end_ts = max(0, ch.sentence_end_ts + delta_ms)
+                ch._update_offset_timestamps()
+                ch.push_to_ruby()
+            if modified == 0 and all(ch.sentence_end_ts is None for ch in sentence.characters):
+                return None
+            return (line_idx, self.preview._current_char_idx, None, "timetags")
+
+        ok = self._execute_structural_edit("按行调整原始时间戳", _mutate)
+        if ok:
+            if hasattr(self, "_adjust_ts_line_dlg") and self._adjust_ts_line_dlg is not None:
+                self._adjust_ts_line_dlg.set_status(f"已成功偏移 {delta_ms:+d} ms")
+            InfoBar.success(
+                title="调整完成",
+                content=f"第 {line_idx + 1} 行原始时间戳已整体偏移 {delta_ms:+d} ms",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+        else:
+            if hasattr(self, "_adjust_ts_line_dlg") and self._adjust_ts_line_dlg is not None:
+                self._adjust_ts_line_dlg.set_status("无可调整的时间戳", success=False)
+
+    def _on_adjust_raw_timestamp_selected(self):
+        """调整所选字符原始时间戳 — 打开非模态调整窗口，作用于选中字符范围。"""
+        if not self._project:
+            InfoBar.warning(
+                title="无项目",
+                content="请先创建或打开项目",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+            return
+
+        ranges = self._collect_selected_char_ranges()
+        if not ranges:
+            InfoBar.warning(
+                title="未选中字符",
+                content="请先选择要调整的字符",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+            return
+
+        from .timing.dialogs import AdjustRawTimestampDialog
+
+        self._adjust_ts_selected_ranges = ranges
+        scope_label = self._format_selected_scope_label(ranges)
+        if not hasattr(self, "_adjust_ts_sel_dlg") or self._adjust_ts_sel_dlg is None or not self._adjust_ts_sel_dlg.isVisible():
+            self._adjust_ts_sel_dlg = AdjustRawTimestampDialog(self, scope="selected", scope_label=scope_label)
+            self._adjust_ts_sel_dlg.apply_requested.connect(self._on_apply_adjust_raw_timestamp_selected)
+        else:
+            self._adjust_ts_sel_dlg.lbl_scope.setText(f"作用范围：{scope_label}")
+
+        self._adjust_ts_sel_dlg.show()
+        self._adjust_ts_sel_dlg.raise_()
+        self._adjust_ts_sel_dlg.activateWindow()
+
+    def _collect_selected_char_ranges(self) -> list[tuple[int, int, int]]:
+        """收集当前选中字符的 (line_idx, start_char, end_char) 闭区间列表。
+
+        支持跨行选择；若无明确选择，则使用当前光标所在单字符。
+        """
+        if not self._project:
+            return []
+
+        ranges: list[tuple[int, int, int]] = []
+
+        if self.preview.is_multi_line_selection():
+            sel = self.preview.get_normalized_selection()
+            if sel is None:
+                return []
+            start_line, start_char, end_line, end_char = sel
+            for li in range(start_line, end_line + 1):
+                if li < 0 or li >= len(self._project.sentences):
+                    continue
+                sentence = self._project.sentences[li]
+                if not sentence.characters:
+                    continue
+                s = start_char if li == start_line else 0
+                e = end_char if li == end_line else len(sentence.characters) - 1
+                s = max(0, s)
+                e = min(len(sentence.characters) - 1, e)
+                if s > e:
+                    continue
+                ranges.append((li, s, e))
+            return ranges
+
+        line_idx = self._current_line_idx
+        char_idx = self.preview._current_char_idx
+        if line_idx < 0 or line_idx >= len(self._project.sentences):
+            return []
+        sentence = self._project.sentences[line_idx]
+        if char_idx < 0 or char_idx >= len(sentence.characters):
+            return []
+
+        start_idx = char_idx
+        end_idx = char_idx
+        if (
+            self.preview._focus_line_idx == line_idx
+            and self.preview._focus_char_idx >= 0
+            and self.preview._focus_char_range_end >= 0
+        ):
+            start_idx = min(self.preview._focus_char_idx, self.preview._focus_char_range_end)
+            end_idx = max(self.preview._focus_char_idx, self.preview._focus_char_range_end)
+        ranges.append((line_idx, start_idx, end_idx))
+        return ranges
+
+    def _format_selected_scope_label(self, ranges: list[tuple[int, int, int]]) -> str:
+        if not ranges:
+            return "所选字符"
+        if len(ranges) == 1:
+            li, s, e = ranges[0]
+            if s == e:
+                return f"第 {li + 1} 行 第 {s + 1} 字"
+            return f"第 {li + 1} 行 第 {s + 1}-{e + 1} 字"
+        total = sum(e - s + 1 for _, s, e in ranges)
+        return f"{ranges[0][0] + 1} - {ranges[-1][0] + 1} 行，共 {total} 字"
+
+    def _on_apply_adjust_raw_timestamp_selected(self, delta_ms: int):
+        """处理调整所选字符原始时间戳对话框的应用请求。"""
+        if not self._project:
+            return
+
+        ranges: list[tuple[int, int, int]] = getattr(self, "_adjust_ts_selected_ranges", [])
+        if not ranges:
+            if hasattr(self, "_adjust_ts_sel_dlg") and self._adjust_ts_sel_dlg is not None:
+                self._adjust_ts_sel_dlg.set_status("选区已失效", success=False)
+            return
+
+        project = self._project
+
+        def _mutate():
+            modified = 0
+            touched_end_ts = False
+            for li, s, e in ranges:
+                if li < 0 or li >= len(project.sentences):
+                    continue
+                sentence = project.sentences[li]
+                for ci in range(s, e + 1):
+                    if ci < 0 or ci >= len(sentence.characters):
+                        continue
+                    ch = sentence.characters[ci]
+                    if ch.check_count > 0 and ch.timestamps:
+                        ch.timestamps = [max(0, ts + delta_ms) for ts in ch.timestamps]
+                        modified += 1
+                    if ch.sentence_end_ts is not None:
+                        ch.sentence_end_ts = max(0, ch.sentence_end_ts + delta_ms)
+                        touched_end_ts = True
+                    ch._update_offset_timestamps()
+                    ch.push_to_ruby()
+            if modified == 0 and not touched_end_ts:
+                return None
+            return (self._current_line_idx, self.preview._current_char_idx, None, "timetags")
+
+        ok = self._execute_structural_edit("调整所选字符原始时间戳", _mutate)
+        if ok:
+            if hasattr(self, "_adjust_ts_sel_dlg") and self._adjust_ts_sel_dlg is not None:
+                self._adjust_ts_sel_dlg.set_status(f"已成功偏移 {delta_ms:+d} ms")
+            InfoBar.success(
+                title="调整完成",
+                content=f"所选字符原始时间戳已偏移 {delta_ms:+d} ms",
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+        else:
+            if hasattr(self, "_adjust_ts_sel_dlg") and self._adjust_ts_sel_dlg is not None:
+                self._adjust_ts_sel_dlg.set_status("无可调整的时间戳", success=False)
 
     def _execute_complete_timestamp(self, scope_types: set[str], exclude_rules: list[str], head_offset_ms: int = 150, tail_offset_ms: int = 150) -> int:
         """执行补全时间戳的核心逻辑

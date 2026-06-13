@@ -1762,24 +1762,45 @@ class CompleteTimestampDialog(QDialog):
 class AdjustRawTimestampDialog(QDialog):
     """调整原始时间戳对话框 — 非模态，应用后不关闭，允许边测试边调整。
 
-    每次点击「应用」即执行一次整体偏移，结果可叠加。
+    每次点击「应用」即执行一次偏移，结果可叠加。
     窗口与主界面并存，用户可切换回主界面试听后继续调整。
+
+    ``scope`` 支持 ``"all"`` / ``"line"`` / ``"selected"`` 三种范围；
+    ``scope_label`` 用于在描述中显示当前作用范围（如 "第 3 行"）。
     """
 
     apply_requested = pyqtSignal(int)  # delta_ms
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, scope: str = "all", scope_label: str = ""):
         super().__init__(parent)
-        self.setWindowTitle("调整原始时间戳")
+        self._scope = scope
+        if scope == "line":
+            self.setWindowTitle("按行调整原始时间戳")
+            scope_text = f"作用范围：{scope_label or '当前行'}"
+            tip = "正数：该行所有原始时间戳向后移；负数：向前移。"
+        elif scope == "selected":
+            self.setWindowTitle("调整所选字符原始时间戳")
+            scope_text = f"作用范围：{scope_label or '所选字符'}"
+            tip = "正数：所选字符原始时间戳向后移；负数：向前移。"
+        else:
+            self.setWindowTitle("调整原始时间戳")
+            scope_text = "作用范围：所有原始时间戳"
+            tip = "正数：所有原始时间戳向后移；负数：向前移。"
+
         self.setWindowModality(Qt.WindowModality.NonModal)
-        self.resize(340, 200)
+        self.resize(360, 220)
         self.setFont(QFont("Microsoft YaHei", 10))
 
         layout = QVBoxLayout(self)
         layout.setSpacing(10)
 
+        self.lbl_scope = QLabel(scope_text)
+        self.lbl_scope.setWordWrap(True)
+        self.lbl_scope.setStyleSheet("font-weight: bold;")
+        layout.addWidget(self.lbl_scope)
+
         desc = QLabel(
-            "正数：所有原始时间戳向后移；负数：向前移。\n"
+            f"{tip}\n"
             "每次点击「应用」立即执行偏移，可叠加多次操作。"
         )
         desc.setWordWrap(True)
