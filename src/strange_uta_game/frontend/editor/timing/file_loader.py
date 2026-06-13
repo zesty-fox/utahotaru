@@ -20,7 +20,7 @@ from strange_uta_game.backend.infrastructure.audio.video_converter import (
 )
 from strange_uta_game.frontend.settings.app_settings import AppSettings
 
-from .lyric_loader import parse_lyric_content, read_lyric_file
+from .lyric_loader import parse_lyric_content
 
 if TYPE_CHECKING:
     from ..timing_interface import EditorInterface
@@ -40,11 +40,15 @@ class FileLoader:
 
     def __init__(self, editor: EditorInterface):
         self._editor = editor
-        # 异步加载相关
+        # 异步加载相关（项目/视频）
         self._loading_thread: QThread | None = None
         self._loading_worker = None
         self._state_tooltip = None
         self._project_on_success = None  # 可选的加载成功额外回调 (project, file_path)
+        # 异步歌词解析相关
+        self._lyric_thread: QThread | None = None
+        self._lyric_worker = None
+        self._lyric_tooltip = None
 
     @property
     def _project(self):
@@ -482,6 +486,116 @@ class FileLoader:
             self._loading_worker.deleteLater()
             self._loading_worker = None
 
+    def _on_lyric_progress(self, stage: str) -> None:
+        """更新歌词解析进度提示。"""
+        if self._lyric_tooltip:
+            self._lyric_tooltip.setContent(stage)
+
+    def _on_lyrics_parsed(self, result: dict) -> None:
+        """歌词解析完成的回调（主线程）。"""
+        if self._lyric_tooltip:
+            self._lyric_tooltip.setState(True)
+            self._lyric_tooltip.setContent("解析完成")
+            self._lyric_tooltip.close()
+            self._lyric_tooltip = None
+
+        sentences = result["sentences"]
+        is_nicokara = result["is_nicokara"]
+        new_singers = result["new_singers"]
+        parse_meta = result["parse_meta"]
+
+        # Nicokara 元数据延迟到主线程同步，确保写入共享 settings 实例
+        nicokara_raw_meta = parse_meta.pop("_nicokara_raw_meta", None)
+        if nicokara_raw_meta is not None:
+            from .lyric_loader import _sync_nicokara_metadata_to_settings
+            _sync_nicokara_metadata_to_settings(
+                nicokara_raw_meta,
+                setting_iface=self._editor._get_setting_interface(),
+            )
+
+        self._apply_lyrics_result(sentences, is_nicokara, new_singers, parse_meta)
+
+    def _on_lyrics_parse_error(self, error_msg: str) -> None:
+        """歌词解析失败的回调。"""
+        if self._lyric_tooltip:
+            self._lyric_tooltip.close()
+            self._lyric_tooltip = None
+
+        InfoBar.error(
+            title="加载失败", content=error_msg,
+            orient=Qt.Orientation.Horizontal, isClosable=True,
+            position=InfoBarPosition.TOP, duration=5000,
+            parent=self._editor,
+        )
+
+    def _cleanup_lyric_thread(self) -> None:
+        """清理歌词解析线程。"""
+        if self._lyric_thread:
+            self._lyric_thread.quit()
+            self._lyric_thread.wait()
+            self._lyric_thread = None
+        if self._lyric_worker:
+            self._lyric_worker.deleteLater()
+            self._lyric_worker = None
+
+    def _apply_lyrics_result(
+        self,
+        sentences: list,
+        is_nicokara: bool,
+        new_singers: list,
+        parse_meta: dict,
+    ) -> None:
+        """将解析结果应用到项目并刷新 UI（同步、主线程执行）。"""
+        # 添加新演唱者
+        for singer in new_singers:
+            self._project.add_singer(singer)
+
+        # ASS Title → project.metadata.title（仅当项目无标题或为默认时覆盖）
+        ass_title = parse_meta.get("title") if parse_meta else None
+        if ass_title and self._project.metadata is not None:
+            cur = (self._project.metadata.title or "").strip()
+            if not cur or cur in ("Untitled", "未命名"):
+                self._project.metadata.title = ass_title
+
+        if new_singers and self._store:
+            self._store.notify("singers")
+
+        if not sentences:
+            InfoBar.warning(
+                title="解析结果为空", content="歌词文件未解析出有效内容",
+                orient=Qt.Orientation.Horizontal, isClosable=True,
+                position=InfoBarPosition.TOP, duration=3000,
+                parent=self._editor,
+            )
+            return
+
+        self._project.sentences.clear()
+        for s in sentences:
+            self._project.sentences.append(s)
+
+        self._editor._reapply_global_offset()
+
+        if self._timing_service:
+            self._timing_service.set_project(self._project)
+        if self._store:
+            self._store.notify("lyrics")
+
+        self._editor.refresh_lyric_display()
+
+        InfoBar.success(
+            title="歌词已加载", content=f"已加载 {len(sentences)} 行歌词",
+            orient=Qt.Orientation.Horizontal, isClosable=True,
+            position=InfoBarPosition.TOP, duration=3000,
+            parent=self._editor,
+        )
+
+        if is_nicokara:
+            self._prompt_nicokara_ruby_choice()
+        elif parse_meta.get("format") == "utaten":
+            self._update_utaten_checkpoints_as_imported()
+        else:
+            self._editor._auto_analyze_rubies(only_noruby=True, auto_detect_chinese=True)
+
     def can_load_from_clipboard(self) -> bool:
         """判断是否可以从剪贴板加载歌词。
 
@@ -492,10 +606,9 @@ class FileLoader:
         return len(self._project.sentences) == 0
 
     def load_lyrics_from_text(self, content: str):
-        """从文本内容加载歌词（用于剪贴板粘贴）。
+        """从文本内容加载歌词（用于剪贴板粘贴），大文件异步解析避免 UI 阻塞。
 
-        Args:
-            content: 歌词文本内容
+        SUG 项目格式（JSON）解析极快，保持同步；其余格式走后台线程。
         """
         if not content or not content.strip():
             InfoBar.warning(
@@ -506,21 +619,146 @@ class FileLoader:
             )
             return
 
-        self._do_load_lyrics(content)
-
-    def load_lyrics(self, path: str):
-        """加载歌词文件（自动检测格式并解析）"""
-        content = read_lyric_file(path)
-        if content is None:
-            InfoBar.error(
-                title="读取失败", content="无法读取歌词文件",
-                orient=Qt.Orientation.Horizontal, isClosable=True,
-                position=InfoBarPosition.TOP, duration=5000,
-                parent=self._editor,
-            )
+        # SUG 项目格式：JSON 解析毫秒级，且需要走 load_project 流程，保持同步
+        from .lyric_loader import detect_lyric_format
+        if detect_lyric_format(content) == "sug":
+            self._load_sug_from_text(content)
             return
 
-        self._do_load_lyrics(content)
+        # 若已有解析正在进行，忽略本次请求
+        if self._lyric_thread is not None:
+            return
+
+        from strange_uta_game.frontend.theme import theme
+        from strange_uta_game.frontend.workers import LyricParseWorker
+
+        # 若没有项目先创建
+        if not self._project:
+            if self._store:
+                from strange_uta_game.backend.application import ProjectService
+                project = ProjectService().create_project()
+                self._store._project = project
+                self._store.notify("project")
+            else:
+                InfoBar.warning(
+                    title="无法加载", content="请先创建或打开一个项目",
+                    orient=Qt.Orientation.Horizontal, isClosable=True,
+                    position=InfoBarPosition.TOP, duration=3000,
+                    parent=self._editor,
+                )
+                return
+
+        # 在主线程预读 settings
+        from strange_uta_game.frontend.settings.app_settings import AppSettings
+        settings = AppSettings()
+        auto_check_flags = settings.get_all().get("auto_check", {})
+        user_dict = settings.load_effective_dictionary()
+        annotate_katakana_with_english = settings.get(
+            "ruby_dictionary.annotate_katakana_with_english", False
+        )
+        software_compensation_ms = settings.get("export.software_compensation_ms", 0)
+
+        default_singer_id = self._project.get_default_singer().id
+        project_singers = list(self._project.singers)
+
+        self._start_lyric_worker(
+            "", content=content, tooltip_hint="正在解析内容...",
+            default_singer_id=default_singer_id,
+            project_singers=project_singers,
+            software_compensation_ms=software_compensation_ms,
+            auto_check_flags=auto_check_flags,
+            user_dict=user_dict,
+            annotate_katakana_with_english=annotate_katakana_with_english,
+        )
+
+    def load_lyrics(self, path: str):
+        """加载歌词文件（异步解析，避免大文件阻塞 UI）"""
+        # 若没有项目先创建（需要 default_singer_id，必须在启动 worker 前完成）
+        if not self._project:
+            if self._store:
+                from strange_uta_game.backend.application import ProjectService
+                project = ProjectService().create_project()
+                self._store._project = project
+                self._store.notify("project")
+            else:
+                InfoBar.warning(
+                    title="无法加载", content="请先创建或打开一个项目",
+                    orient=Qt.Orientation.Horizontal, isClosable=True,
+                    position=InfoBarPosition.TOP, duration=3000,
+                    parent=self._editor,
+                )
+                return
+
+        # 在主线程预读 settings，worker 内不访问任何 Qt 对象
+        from strange_uta_game.frontend.settings.app_settings import AppSettings
+        settings = AppSettings()
+        auto_check_flags = settings.get_all().get("auto_check", {})
+        user_dict = settings.load_effective_dictionary()
+        annotate_katakana_with_english = settings.get(
+            "ruby_dictionary.annotate_katakana_with_english", False
+        )
+        software_compensation_ms = settings.get("export.software_compensation_ms", 0)
+
+        default_singer_id = self._project.get_default_singer().id
+        project_singers = list(self._project.singers)
+
+        self._start_lyric_worker(
+            path, tooltip_hint="正在读取文件...",
+            default_singer_id=default_singer_id,
+            project_singers=project_singers,
+            software_compensation_ms=software_compensation_ms,
+            auto_check_flags=auto_check_flags,
+            user_dict=user_dict,
+            annotate_katakana_with_english=annotate_katakana_with_english,
+        )
+
+    def _start_lyric_worker(
+        self,
+        file_path: str,
+        *,
+        content: str | None = None,
+        tooltip_hint: str = "正在读取文件...",
+        default_singer_id: str,
+        project_singers: list,
+        software_compensation_ms: int,
+        auto_check_flags: dict,
+        user_dict: list,
+        annotate_katakana_with_english: bool,
+    ) -> None:
+        """创建并启动 LyricParseWorker（文件和剪贴板共用入口）。"""
+        from strange_uta_game.frontend.theme import theme
+        from strange_uta_game.frontend.workers import LyricParseWorker
+
+        self._lyric_tooltip = StateToolTip("正在解析歌词", tooltip_hint, self._editor)
+        green = theme.status_complete.name()
+        self._lyric_tooltip.setStyleSheet(f"""
+            StateToolTip {{
+                background-color: {green};
+                border: 1px solid {green};
+                border-radius: 8px;
+            }}
+            StateToolTip QLabel {{
+                color: white;
+            }}
+        """)
+        self._lyric_tooltip.move(self._lyric_tooltip.getSuitablePos())
+        self._lyric_tooltip.show()
+
+        self._lyric_thread = QThread(self._editor)
+        self._lyric_worker = LyricParseWorker(
+            file_path, default_singer_id, project_singers,
+            software_compensation_ms, auto_check_flags,
+            user_dict, annotate_katakana_with_english,
+            content=content,
+        )
+        self._lyric_worker.moveToThread(self._lyric_thread)
+        self._lyric_thread.started.connect(self._lyric_worker.run)
+        self._lyric_worker.progress.connect(self._on_lyric_progress)
+        self._lyric_worker.finished.connect(self._on_lyrics_parsed)
+        self._lyric_worker.error.connect(self._on_lyrics_parse_error)
+        self._lyric_worker.finished.connect(self._cleanup_lyric_thread)
+        self._lyric_worker.error.connect(self._cleanup_lyric_thread)
+        self._lyric_thread.start()
 
     def _do_load_lyrics(self, content: str):
         """歌词加载的核心逻辑（文件和剪贴板共用）"""

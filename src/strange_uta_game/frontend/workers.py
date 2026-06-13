@@ -331,3 +331,80 @@ class LyricReadWorker(QObject):
             self.finished.emit(content)
         except Exception as e:
             self.error.emit(str(e))
+
+
+class LyricParseWorker(QObject):
+    """后台读取并解析歌词文件，避免大文件解析时阻塞 UI 主线程。
+
+    调用方在主线程预先读取 settings 值并传入，worker 内部不接触任何 Qt/UI 对象。
+    Nicokara 元数据同步（_sync_nicokara_metadata_to_settings）延迟到主线程回调中执行。
+    """
+
+    progress = pyqtSignal(str)    # 阶段描述文字，用于更新 StateToolTip
+    finished = pyqtSignal(object) # dict: {sentences, is_nicokara, new_singers, parse_meta}
+    error = pyqtSignal(str)
+
+    def __init__(
+        self,
+        file_path: str,
+        default_singer_id: str,
+        project_singers: list,
+        software_compensation_ms: int,
+        auto_check_flags: dict,
+        user_dict: list,
+        annotate_katakana_with_english: bool,
+        *,
+        content: str | None = None,
+    ):
+        super().__init__()
+        self._file_path = file_path
+        self._content = content  # 非 None 时直接用此内容，跳过文件读取
+        self._default_singer_id = default_singer_id
+        self._project_singers = project_singers
+        self._software_compensation_ms = software_compensation_ms
+        self._auto_check_flags = auto_check_flags
+        self._user_dict = user_dict
+        self._annotate_katakana_with_english = annotate_katakana_with_english
+
+    def run(self) -> None:
+        try:
+            # Utaten 对齐阶段调用 AutoCheckService 可能依赖 WinRT，需初始化 STA apartment。
+            try:
+                from winrt._winrt import STA, init_apartment
+                init_apartment(STA)
+            except Exception:
+                pass
+
+            if self._content is not None:
+                content = self._content
+            else:
+                self.progress.emit("正在读取文件...")
+                path = Path(self._file_path)
+                try:
+                    content = path.read_text(encoding="utf-8")
+                except UnicodeDecodeError:
+                    content = path.read_text(encoding="shift_jis")
+
+            from strange_uta_game.frontend.editor.timing.lyric_loader import (
+                parse_lyric_content,
+            )
+
+            sentences, is_nicokara, new_singers, parse_meta = parse_lyric_content(
+                content,
+                self._default_singer_id,
+                self._project_singers,
+                software_compensation_ms=self._software_compensation_ms,
+                auto_check_flags=self._auto_check_flags,
+                user_dict=self._user_dict,
+                annotate_katakana_with_english=self._annotate_katakana_with_english,
+                skip_settings_sync=True,
+                progress_cb=self.progress.emit,
+            )
+            self.finished.emit({
+                "sentences": sentences,
+                "is_nicokara": is_nicokara,
+                "new_singers": new_singers,
+                "parse_meta": parse_meta,
+            })
+        except Exception as e:
+            self.error.emit(str(e))

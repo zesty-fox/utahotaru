@@ -157,6 +157,10 @@ def _align_utaten_sentences_with_auto_check(
     sentences: list[Sentence],
     *,
     setting_iface=None,
+    auto_check_flags: Optional[dict] = None,
+    user_dict: Optional[list] = None,
+    annotate_katakana_with_english: bool = False,
+    progress_cb=None,
 ) -> None:
     """Align Utaten ruby blocks with the normal SUG auto-check pipeline.
 
@@ -164,34 +168,47 @@ def _align_utaten_sentences_with_auto_check(
     only to decide per-character boundaries, checkpoint counts, and linked-word
     state, so user dictionary entries affect Utaten imports the same way they
     affect normal LRC imports.
+
+    ``auto_check_flags``, ``user_dict``, ``annotate_katakana_with_english`` can be
+    pre-read in the main thread and passed in so this function is safe to call
+    from a background worker without touching Qt objects.
     """
     if not sentences:
         return
 
-    user_dict: list[dict] = []
+    _user_dict: list[dict] = user_dict if user_dict is not None else []
     try:
         from strange_uta_game.backend.application import AutoCheckService
-        from strange_uta_game.frontend.settings.app_settings import AppSettings
 
-        app_settings = (
-            setting_iface.get_settings()
-            if setting_iface is not None and hasattr(setting_iface, "get_settings")
-            else setting_iface
-        ) or AppSettings()
-        auto_check_flags = app_settings.get_all().get("auto_check", {})
-        user_dict = app_settings.load_effective_dictionary()
-        annotate_katakana_with_english = app_settings.get(
-            "ruby_dictionary.annotate_katakana_with_english", False
-        )
+        if auto_check_flags is not None and user_dict is not None:
+            # Pre-read values provided (worker-mode: avoids touching Qt/setting_iface)
+            _flags = auto_check_flags
+            _annotate = annotate_katakana_with_english
+        else:
+            from strange_uta_game.frontend.settings.app_settings import AppSettings
+            app_settings = (
+                setting_iface.get_settings()
+                if setting_iface is not None and hasattr(setting_iface, "get_settings")
+                else setting_iface
+            ) or AppSettings()
+            _flags = app_settings.get_all().get("auto_check", {})
+            _user_dict = app_settings.load_effective_dictionary()
+            _annotate = app_settings.get(
+                "ruby_dictionary.annotate_katakana_with_english", False
+            )
+
         auto_check = AutoCheckService(
-            auto_check_flags=auto_check_flags,
-            user_dictionary=user_dict,
-            annotate_katakana_with_english=annotate_katakana_with_english,
+            auto_check_flags=_flags,
+            user_dictionary=_user_dict,
+            annotate_katakana_with_english=_annotate,
         )
     except Exception:
         auto_check = None
 
-    for sentence in sentences:
+    total = len(sentences)
+    for idx, sentence in enumerate(sentences):
+        if progress_cb and total > 0:
+            progress_cb(f"正在对齐注音 {idx + 1}/{total} 行")
         ranges = _utaten_block_ranges(sentence)
         if not ranges:
             continue
@@ -211,7 +228,7 @@ def _align_utaten_sentences_with_auto_check(
             split_parts: Optional[list[str]] = None
             is_ateji = True
             force_unlinked = False
-            clean_dict_parts = _clean_user_dict_split(word, reading, user_dict)
+            clean_dict_parts = _clean_user_dict_split(word, reading, _user_dict)
             if clean_dict_parts is not None:
                 split_parts = clean_dict_parts
                 is_ateji = False
@@ -369,6 +386,11 @@ def parse_lyric_content(
     software_compensation_ms: int = 0,
     *,
     setting_iface=None,
+    auto_check_flags: Optional[dict] = None,
+    user_dict: Optional[list] = None,
+    annotate_katakana_with_english: bool = False,
+    skip_settings_sync: bool = False,
+    progress_cb=None,
 ) -> Tuple[List[Sentence], bool, List[Singer], dict]:
     """解析歌词内容，返回解析后的句子列表。
 
@@ -416,10 +438,19 @@ def parse_lyric_content(
         raise ValueError("__SUG_PROJECT__")
 
     if fmt == "utaten":
+        if progress_cb:
+            progress_cb("正在解析 UtaTen 格式...")
         parser = UtatenRubyParser()
         parsed_lines = parser.parse(content)
         sentences = parse_to_sentences(parsed_lines, default_singer_id, utaten_format=False)
-        _align_utaten_sentences_with_auto_check(sentences, setting_iface=setting_iface)
+        _align_utaten_sentences_with_auto_check(
+            sentences,
+            setting_iface=setting_iface,
+            auto_check_flags=auto_check_flags,
+            user_dict=user_dict,
+            annotate_katakana_with_english=annotate_katakana_with_english,
+            progress_cb=progress_cb,
+        )
         return _apply_compensation(sentences), False, [], {"format": "utaten"}
 
     # 内联格式（包括 inline 和纯 RLF 文本格式）
@@ -429,6 +460,8 @@ def parse_lyric_content(
 
     # Nicokara 格式
     if fmt == "nicokara":
+        if progress_cb:
+            progress_cb("正在解析 Nicokara 格式...")
         is_nicokara = True
         parser = NicokaraParser()
         result = parser.parse(content)
@@ -471,6 +504,8 @@ def parse_lyric_content(
                 new_singers.append(new_singer)
 
         # 使用 nicokara_result_to_sentences 保留原有注音和时间戳
+        if progress_cb:
+            progress_cb(f"正在转换数据（共 {len(result.lines)} 行）...")
         sentences = nicokara_result_to_sentences(
             result, singer_key_to_id, default_singer_id
         )
@@ -479,14 +514,21 @@ def parse_lyric_content(
         # 覆盖式（每次导入一个 Nicokara 文件即代表用户切换到新项目）。
         # 已知键 (@Title/@Artist/@Album/@TaggingBy/@SilencemSec) 落到对应字段；
         # 其余未知 @ 标签原样收集到 tags["custom"]，导出器 round-trip 时按行回写。
-        _sync_nicokara_metadata_to_settings(
-            result.metadata, setting_iface=setting_iface
-        )
+        if skip_settings_sync:
+            # Worker 模式：延迟到主线程回调中用 setting_iface 同步，避免绕过共享实例。
+            nicokara_meta_out = {"_nicokara_raw_meta": result.metadata}
+        else:
+            _sync_nicokara_metadata_to_settings(
+                result.metadata, setting_iface=setting_iface
+            )
+            nicokara_meta_out = {}
 
-        return _apply_compensation(sentences), is_nicokara, new_singers, {}
+        return _apply_compensation(sentences), is_nicokara, new_singers, nicokara_meta_out
 
     # ASS 格式
     if fmt == "ass":
+        if progress_cb:
+            progress_cb("正在解析 ASS 格式...")
         from strange_uta_game.backend.infrastructure.parsers.ass_parser import (
             ASSParser,
         )
@@ -530,6 +572,8 @@ def parse_lyric_content(
 
     # SRT 格式
     if fmt == "srt":
+        if progress_cb:
+            progress_cb("正在解析 SRT 格式...")
         from strange_uta_game.backend.infrastructure.parsers.srt_parser import (
             SRTParser,
         )
@@ -541,6 +585,8 @@ def parse_lyric_content(
 
     # LRC 格式
     if fmt == "lrc":
+        if progress_cb:
+            progress_cb("正在解析 LRC 格式...")
         lrc_parser = LRCParser()
         parsed_lines = lrc_parser.parse(content)
         sentences = parse_to_sentences(parsed_lines, default_singer_id)
