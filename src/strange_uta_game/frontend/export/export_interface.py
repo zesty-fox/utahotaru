@@ -628,6 +628,33 @@ class ExportInterface(QWidget):
                 return
             self.line_output.setText(output_dir)
 
+        # 导出前提示：仍有未补的"导唱待办"标记时让用户确认
+        needs_guide_marks: list[tuple[int, int]] = [
+            (line_idx, char_idx)
+            for line_idx, s in enumerate(self._project.sentences)
+            for char_idx, c in enumerate(s.characters)
+            if c.needs_guide
+        ]
+        if needs_guide_marks:
+            preview_lines = [
+                f"第 {l + 1} 行 第 {c + 1} 字" for l, c in needs_guide_marks[:10]
+            ]
+            extra = (
+                f"\n...另 {len(needs_guide_marks) - 10} 处"
+                if len(needs_guide_marks) > 10
+                else ""
+            )
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Icon.Warning)
+            msg.setWindowTitle("仍有导唱待办未处理")
+            msg.setText(f"还剩 {len(needs_guide_marks)} 个标记点未添加导唱符。")
+            msg.setInformativeText("\n".join(preview_lines) + extra)
+            btn_continue = msg.addButton("继续导出", QMessageBox.ButtonRole.AcceptRole)
+            msg.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+            msg.exec()
+            if msg.clickedButton() is not btn_continue:
+                return
+
         # 导出前验证
         warnings = self._export_service.validate_before_export(self._project)
         if warnings:

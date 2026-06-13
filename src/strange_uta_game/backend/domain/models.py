@@ -226,6 +226,11 @@ class Character:
     is_rest: bool = False
     singer_id: str = ""
 
+    # 导唱待办标记：用户在此字符前缺一段导唱符的提醒。
+    # 不参与时间戳/ruby 不变式，不推送给 Ruby，不影响导出内容；
+    # 仅用于 KaraokePreview 视觉提示 + 导出前弹窗汇总。
+    needs_guide: bool = field(default=False, compare=False)
+
     # 选中的 checkpoint 索引（全局单选不变量由 Project 层管理；None = 未选中）
     # 不参与 .sug 序列化——选中态是 UI 状态，不跨会话持久化。
     selected_checkpoint_idx: Optional[int] = field(default=None, compare=False)

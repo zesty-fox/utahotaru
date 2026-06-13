@@ -605,6 +605,7 @@ class InsertGuideSymbolDialog(QDialog):
         self._sentence = sentence
         self._char_idx = char_idx
         self._modified = False
+        self._clear_marker_requested = False
 
         # 从 AppSettings 读取记忆的设置
         from strange_uta_game.frontend.settings.settings_interface import AppSettings
@@ -666,6 +667,11 @@ class InsertGuideSymbolDialog(QDialog):
 
         # Buttons
         btn_layout = QHBoxLayout()
+        # 清除导唱标记：仅在当前字符已有 needs_guide 标记时启用
+        self.btn_clear_marker = PushButton("清除导唱标记", self)
+        self.btn_clear_marker.setEnabled(bool(getattr(ch, "needs_guide", False)))
+        self.btn_clear_marker.clicked.connect(self._on_clear_marker)
+        btn_layout.addWidget(self.btn_clear_marker)
         btn_layout.addStretch()
         btn_exec = PrimaryPushButton("执行", self)
         btn_exec.clicked.connect(self._on_execute)
@@ -674,6 +680,18 @@ class InsertGuideSymbolDialog(QDialog):
         btn_close.clicked.connect(self.reject)
         btn_layout.addWidget(btn_close)
         layout.addLayout(btn_layout)
+
+    def _on_clear_marker(self):
+        """点击"清除导唱标记"：设置请求标志并关闭对话框。
+
+        不直接改 Character —— 由调用方统一通过命令系统执行，
+        以保证撤销/重做语义一致。
+        """
+        self._clear_marker_requested = True
+        self.accept()
+
+    def was_clear_marker_requested(self) -> bool:
+        return self._clear_marker_requested
 
     def _on_fill_gap_toggled(self, checked: bool):
         """勾选「补足间隔时间」时禁用手动持续时间输入框"""

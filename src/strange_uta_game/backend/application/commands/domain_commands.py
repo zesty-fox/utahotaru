@@ -186,6 +186,7 @@ class UpdateCharacterCommand(Command):
         "is_rest",
         "linked_to_next",
         "singer_id",
+        "needs_guide",
     }
 
     def __init__(

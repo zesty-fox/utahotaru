@@ -49,6 +49,7 @@ class ShortcutSubInterface(SubSettingInterface):
         ("bulk_change", FIF.EDIT, "批量变更", "打开批量变更对话框", "CTRL+H:short", "CTRL+H:short", "both", None, None, False),
         ("modify_char", FIF.EDIT, "修改所选字符", "打开修改所选字符对话框", "", "", "both", None, None, False),
         ("insert_guide", FIF.ADD, "插入导唱符", "打开插入导唱符对话框", "", "", "both", None, None, False),
+        ("toggle_needs_guide", FIF.PIN, "切换导唱待办", "切换当前字符的导唱待办标记（在字符左上角显示半透明 ✚，提示稍后需要插入导唱符）", "", "", "both", None, None, False),
         ("modify_line", FIF.EDIT, "修改选中行", "打开修改选中行对话框", "", "", "both", None, None, False),
         ("analyze_rubies", FIF.SYNC, "注音分析", "自动分析全部注音", "", "", "both", None, None, False),
         ("analyze_rubies_by_line", FIF.SYNC, "按行注音分析", "仅分析当前行的注音", "", "", "both", None, None, False),

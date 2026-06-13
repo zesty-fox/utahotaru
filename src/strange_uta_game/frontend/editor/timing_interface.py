@@ -297,6 +297,9 @@ class EditorInterface(QWidget):
         self.preview.toggle_sentence_end_requested.connect(
             self._on_toggle_sentence_end_requested
         )
+        self.preview.toggle_needs_guide_requested.connect(
+            self._on_toggle_needs_guide_requested
+        )
         self.preview.auto_scroll_line_changed.connect(
             self._on_auto_scroll_line_changed
         )
@@ -369,6 +372,10 @@ class EditorInterface(QWidget):
         self.lbl_progress = QLabel("行: 0/0 | 进度: 0%")
         self.lbl_progress.setStyleSheet(f"font-size: 12px; color: {theme.text_primary.name()};")
         status.addWidget(self.lbl_progress)
+        # 待添加导唱符计数：项目中所有 needs_guide=True 的字符数
+        self.lbl_needs_guide = QLabel("")
+        self.lbl_needs_guide.setStyleSheet(f"font-size: 12px; color: {theme.accent_warning.name()};")
+        status.addWidget(self.lbl_needs_guide)
         layout.addLayout(status)
 
     def set_timing_service(self, timing_service: TimingService):
@@ -492,6 +499,7 @@ class EditorInterface(QWidget):
             "bulk_change",
             "modify_char",
             "insert_guide",
+            "toggle_needs_guide",
             "modify_line",
             "analyze_rubies",
             "analyze_rubies_by_line",
@@ -538,6 +546,7 @@ class EditorInterface(QWidget):
             "bulk_change": "CTRL+H:short",
             "modify_char": "",
             "insert_guide": "",
+            "toggle_needs_guide": "",
             "modify_line": "",
             "analyze_rubies": "",
             "analyze_rubies_by_line": "",
@@ -681,6 +690,11 @@ class EditorInterface(QWidget):
         checkpoint_markers = settings.get("ui.checkpoint_markers", {})
         if checkpoint_markers:
             self.preview.set_checkpoint_markers(checkpoint_markers)
+        # 应用导唱待办标记
+        self.preview.set_needs_guide_style(
+            settings.get("ui.needs_guide_symbol", "✚"),
+            settings.get("ui.needs_guide_size", 12),
+        )
         # 更新快捷键提示（#6：只保留 9 项核心）
         self._update_shortcut_hint(timing_actions, edit_actions)
         # #7：打轴按钮文字联动 shortcuts.timing_mode.tag_now
@@ -2176,17 +2190,28 @@ class EditorInterface(QWidget):
         self._mini_singer_manager.show_at_cursor()
 
     def _on_insert_guide(self):
-        """打开插入导唱符对话框"""
+        """打开插入导唱符对话框（针对 focus 字符）。
+
+        分支：
+        - focus 字符 check_count==0 或无时间戳 → 转为切换"导唱待办"标记
+          （用户此时没法选时间戳锚点，先标记待办，等打了轴再补）
+        - 否则 → 弹对话框；若对话框中修改了行（插入导唱符），将本次插入
+          与"清除 focus 原字符的 needs_guide 标记"合并进同一个撤销快照
+        """
         if not self._project:
             return
 
-        line_idx = self.preview._current_line_idx
-        char_idx = self.preview._current_char_idx
-
+        line_idx, char_idx = self._resolve_target_char()
         if line_idx < 0 or line_idx >= len(self._project.sentences):
             return
         sentence = self._project.sentences[line_idx]
         if char_idx < 0 or char_idx >= len(sentence.characters):
+            return
+
+        ch = sentence.characters[char_idx]
+        if ch.check_count == 0 or not ch.all_timestamps:
+            # 无时间戳锚点 → 改走切换待办
+            self._toggle_needs_guide_at(line_idx, char_idx)
             return
 
         # 快照 before：InsertGuideSymbolDialog 会原地修改 project.sentences
@@ -2195,7 +2220,22 @@ class EditorInterface(QWidget):
         dialog = InsertGuideSymbolDialog(sentence, char_idx, self)
         dialog.exec()
 
+        # 对话框中点击了"清除导唱标记"：走单独的 toggle 路径，不进入插入分支
+        if dialog.was_clear_marker_requested() and not dialog.was_modified():
+            if ch.needs_guide:
+                self._toggle_needs_guide_at(line_idx, char_idx)
+            return
+
         if dialog.was_modified():
+            # 对话框已插入导唱符 → 顺手清除"原字符"在新位置上的 needs_guide。
+            # 插入后该字符已位于 char_idx + N（N=插入个数），但 sentence.characters
+            # 里的对象引用未变；直接遍历找回该对象即可。
+            orig_obj = ch
+            for new_pos, c in enumerate(sentence.characters):
+                if c is orig_obj:
+                    orig_obj.needs_guide = False
+                    break
+
             # 将本次修改登记为一次 SentenceSnapshotCommand（支持撤销/重做）
             command_manager = None
             if self._timing_service:
@@ -4505,6 +4545,34 @@ class EditorInterface(QWidget):
             ),
         )
 
+    def _on_toggle_needs_guide_requested(self, line_idx: int, char_idx: int):
+        """右键菜单触发：切换指定字符的导唱待办标记。"""
+        self._toggle_needs_guide_at(line_idx, char_idx)
+
+    def _toggle_needs_guide(self):
+        """快捷键触发：切换当前 focus 字符的导唱待办标记。"""
+        if not self._project:
+            return
+        line_idx, char_idx = self._resolve_target_char()
+        if line_idx < 0:
+            return
+        self._toggle_needs_guide_at(line_idx, char_idx)
+
+    def _toggle_needs_guide_at(self, line_idx: int, char_idx: int):
+        if not self._project or line_idx < 0 or line_idx >= len(self._project.sentences):
+            return
+        sentence = self._project.sentences[line_idx]
+        if char_idx < 0 or char_idx >= len(sentence.characters):
+            return
+
+        def _mutate():
+            ch = sentence.characters[char_idx]
+            ch.needs_guide = not ch.needs_guide
+            return line_idx, char_idx, None, "lyrics"
+
+        self._execute_structural_edit("切换导唱待办", _mutate, move_cp=False)
+        self._update_status()
+
     # ==================== 键盘 ====================
 
     def _execute_action(self, action: str, key: int):
@@ -4595,6 +4663,8 @@ class EditorInterface(QWidget):
             self._on_modify_char()
         elif action == "insert_guide":
             self._on_insert_guide()
+        elif action == "toggle_needs_guide":
+            self._toggle_needs_guide()
         elif action == "modify_line":
             self._on_modify_line()
         elif action == "analyze_rubies":
@@ -4624,6 +4694,35 @@ class EditorInterface(QWidget):
         elif action == "merge_line_up":
             self._merge_line_up_at_current()
 
+    def _prompt_if_needs_guide_pending(self) -> bool:
+        """若项目中仍有 needs_guide 标记，弹窗让用户决定是否继续导出。
+
+        Returns:
+            True — 可以继续导出（无标记或用户确认继续）
+            False — 用户取消
+        """
+        if not self._project:
+            return True
+        marks: list[tuple[int, int]] = [
+            (line_idx, char_idx)
+            for line_idx, s in enumerate(self._project.sentences)
+            for char_idx, c in enumerate(s.characters)
+            if c.needs_guide
+        ]
+        if not marks:
+            return True
+        preview = [f"第 {l + 1} 行 第 {c + 1} 字" for l, c in marks[:10]]
+        extra = f"\n...另 {len(marks) - 10} 处" if len(marks) > 10 else ""
+        msg = QMessageBox(self)
+        msg.setIcon(QMessageBox.Icon.Warning)
+        msg.setWindowTitle("仍有导唱待办未处理")
+        msg.setText(f"还剩 {len(marks)} 个标记点未添加导唱符。")
+        msg.setInformativeText("\n".join(preview) + extra)
+        btn_continue = msg.addButton("继续导出", QMessageBox.ButtonRole.AcceptRole)
+        msg.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+        msg.exec()
+        return msg.clickedButton() is btn_continue
+
     def _on_quick_export(self):
         """快捷导出：使用默认导出格式弹出保存对话框并导出。"""
         if not self._project:
@@ -4636,6 +4735,9 @@ class EditorInterface(QWidget):
                 duration=3000,
                 parent=self,
             )
+            return
+
+        if not self._prompt_if_needs_guide_pending():
             return
 
         from strange_uta_game.frontend.settings.app_settings import AppSettings
@@ -5400,6 +5502,8 @@ class EditorInterface(QWidget):
     def _update_status(self):
         if not self._project:
             self.lbl_progress.setText("行: 0/0 | 进度: 0%")
+            if hasattr(self, "lbl_needs_guide"):
+                self.lbl_needs_guide.setText("")
             return
         meaningful_lines = [
             s for s in self._project.sentences
@@ -5409,6 +5513,15 @@ class EditorInterface(QWidget):
         timed = sum(1 for s in meaningful_lines if s.has_timetags)
         pct = int(timed / total * 100) if total > 0 else 0
         self.lbl_progress.setText(f"行: {total} | 已打轴: {timed}/{total} ({pct}%)")
+        # 待添加导唱符计数：>0 显示，=0 隐藏（避免视觉噪音）
+        if hasattr(self, "lbl_needs_guide"):
+            n = sum(
+                1
+                for s in self._project.sentences
+                for c in s.characters
+                if c.needs_guide
+            )
+            self.lbl_needs_guide.setText(f"待添加导唱符：{n}" if n > 0 else "")
 
     def refresh_lyric_display(self):
         self.preview._update_display()

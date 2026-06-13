@@ -148,6 +148,10 @@ class AppSettings:
                 "cp_sentence_end_timed": "⬟",
                 "cp_sentence_end_empty": "⬠",
             },
+            # 导唱待办标记：用户在某字符前需要添加导唱符的提醒
+            # symbol — 显示符号；size — 字号
+            "needs_guide_symbol": "✚",
+            "needs_guide_size": 12,
         },
         "export": {
             "default_format": "Nicokara (带注音)",
@@ -236,6 +240,7 @@ class AppSettings:
                 "bulk_change": "CTRL+H:short",
                 "modify_char": "",
                 "insert_guide": "",
+                "toggle_needs_guide": "",
                 "modify_line": "",
                 "analyze_rubies": "",
                 "delete_rubies_by_type": "",
@@ -278,6 +283,7 @@ class AppSettings:
                 "bulk_change": "CTRL+H:short",
                 "modify_char": "",
                 "insert_guide": "",
+                "toggle_needs_guide": "",
                 "modify_line": "",
                 "analyze_rubies": "",
                 "delete_rubies_by_type": "",

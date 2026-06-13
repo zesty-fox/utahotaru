@@ -242,6 +242,7 @@ class KaraokePreview(QWidget):
     add_checkpoint_requested = pyqtSignal(int, int)
     remove_checkpoint_requested = pyqtSignal(int, int)
     toggle_sentence_end_requested = pyqtSignal(int, int)
+    toggle_needs_guide_requested = pyqtSignal(int, int)  # line_idx, char_idx
     auto_scroll_line_changed = pyqtSignal()
     user_interaction_during_auto_scroll = pyqtSignal()
 
@@ -325,6 +326,12 @@ class KaraokePreview(QWidget):
             "cp_sentence_end_timed": "⬟",
             "cp_sentence_end_empty": "⬠",
         }
+
+        # 导唱待办标记（半透明红色叠加在字符左上角，符号与字号可配置）
+        self._needs_guide_symbol: str = "✚"
+        self._needs_guide_size: int = 12
+        self._font_needs_guide = QFont("Microsoft YaHei", self._needs_guide_size, QFont.Weight.Bold)
+        self._fm_needs_guide = QFontMetrics(self._font_needs_guide)
 
         # 逐句渲染数据缓存（避免每帧重复计算）
         # 每行有自己的版本号，只有数据改变的行才重新计算
@@ -796,6 +803,18 @@ class KaraokePreview(QWidget):
         self._sentence_cache.clear()
         self._line_versions.clear()
         self._global_version += 1
+        self.update()
+
+    def set_needs_guide_style(self, symbol: str, size: int) -> None:
+        """设置导唱待办标记符号与字号。"""
+        symbol = (symbol or "✚").strip() or "✚"
+        size = max(4, min(64, int(size)))
+        if symbol == self._needs_guide_symbol and size == self._needs_guide_size:
+            return
+        self._needs_guide_symbol = symbol
+        self._needs_guide_size = size
+        self._font_needs_guide = QFont("Microsoft YaHei", size, QFont.Weight.Bold)
+        self._fm_needs_guide = QFontMetrics(self._font_needs_guide)
         self.update()
 
     def _update_display(self):
@@ -1294,6 +1313,14 @@ class KaraokePreview(QWidget):
             )
         )
         menu.addAction(toggle_sentence_end_action)
+
+        toggle_needs_guide_action = Action("标记/取消导唱待办", menu)
+        toggle_needs_guide_action.triggered.connect(
+            lambda checked=False: self.toggle_needs_guide_requested.emit(
+                target_line_idx, target_char_idx
+            )
+        )
+        menu.addAction(toggle_needs_guide_action)
         menu.addSeparator()
 
         if multi_line and in_selection:
@@ -2670,6 +2697,25 @@ class KaraokePreview(QWidget):
                     else:
                         painter.setPen(base_color)
                         painter.drawText(int(char_draw_x), int(y_center), ch)
+
+                # 导唱待办标记：在字符本体左上角叠加半透明红色 ✚
+                # 不参与 wipe / 不参与布局，仅做视觉提示；红色取主题 accent_warning + alpha=128
+                _ng_ch = line.characters[char_pos]
+                if _ng_ch.needs_guide:
+                    painter.save()
+                    painter.setFont(self._font_needs_guide)
+                    _ng_color = QColor(theme.accent_warning)
+                    _ng_color.setAlpha(160)
+                    painter.setPen(_ng_color)
+                    # 锚点：字符 ink 区左上角附近。横向贴 char_draw_x；纵向贴 main_fm.ascent() 顶部。
+                    # baseline 算法：top = y_center - main_fm.ascent()，符号 baseline = top + ascent。
+                    _ng_top = int(y_center) - main_fm.ascent()
+                    _ng_baseline = _ng_top + self._fm_needs_guide.ascent()
+                    # 轻微向左偏一点 advance 的一半，让符号坐在字符左上角而非完全压在字符里
+                    _ng_w = self._fm_needs_guide.horizontalAdvance(self._needs_guide_symbol)
+                    _ng_x = int(char_draw_x) - _ng_w // 3
+                    painter.drawText(_ng_x, _ng_baseline, self._needs_guide_symbol)
+                    painter.restore()
 
                 # 当前打轴位置指示线：锚定到整行实际 ink 底部（_line_ink_bottom），
                 # 与字符的 fm.descent() 解耦——所有字符共用同一 y，

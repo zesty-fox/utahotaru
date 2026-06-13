@@ -6,7 +6,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from qfluentwidgets import FluentIcon as FIF, PushButton, SettingCard, SettingCardGroup
 
-from ..cards import ComboSettingCard, DoubleSpinSettingCard, FontSettingCard, SpinSettingCard
+from ..cards import ComboSettingCard, DoubleSpinSettingCard, FontSettingCard, SpinSettingCard, TextSettingCard
 from ..checkpoint_marker_dialog import CheckpointMarkerDialog
 from .base import SubSettingInterface
 
@@ -57,13 +57,20 @@ class UISubInterface(SubSettingInterface):
         self.card_checkpoint_markers.hBoxLayout.addWidget(
             self.btn_cp_markers, 0, Qt.AlignmentFlag.AlignRight)
         self.card_checkpoint_markers.hBoxLayout.addSpacing(16)
+        self.card_needs_guide_symbol = TextSettingCard(FIF.PIN, "导唱待办标记符号",
+            "标记某字符前需要插入导唱符时显示的符号（叠加在字符左上角，红色半透明）",
+            placeholder="✚", max_length=2, parent=g)
+        self.card_needs_guide_size = SpinSettingCard(FIF.FONT_SIZE, "导唱待办标记大小",
+            "导唱待办标记符号的字体像素大小",
+            min_val=4, max_val=64, step=1, suffix=" px", parent=g)
 
         for c in [self.card_theme, self.card_main_font, self.card_ruby_font,
                   self.card_font_size, self.card_current_line_font_size,
                   self.card_ruby_size, self.card_ruby_spacing, self.card_cp_size,
                   self.card_cp_spacing,
                   self.card_line_height_factor, self.card_alignment_margin,
-                  self.card_lyrics_alignment, self.card_checkpoint_markers]:
+                  self.card_lyrics_alignment, self.card_checkpoint_markers,
+                  self.card_needs_guide_symbol, self.card_needs_guide_size]:
             g.addSettingCard(c)
         self.expandLayout.addWidget(g)
 
@@ -92,6 +99,8 @@ class UISubInterface(SubSettingInterface):
         self.card_line_height_factor.value_changed.connect(self._notify_changed)
         self.card_alignment_margin.value_changed.connect(self._notify_changed)
         self.card_lyrics_alignment.index_changed.connect(self._notify_changed)
+        self.card_needs_guide_symbol.value_changed.connect(self._notify_changed)
+        self.card_needs_guide_size.value_changed.connect(self._notify_changed)
 
     def load_settings(self, s):
         self._settings_ref = s
@@ -113,6 +122,8 @@ class UISubInterface(SubSettingInterface):
         self.card_alignment_margin.setValue(s.get("ui.alignment_margin", 168))
         alignment_idx = {"left": 0, "center": 1, "right": 2}.get(s.get("ui.lyrics_alignment", "center"), 1)
         self.card_lyrics_alignment.setCurrentIndex(alignment_idx)
+        self.card_needs_guide_symbol.setValue(s.get("ui.needs_guide_symbol", "✚"))
+        self.card_needs_guide_size.setValue(s.get("ui.needs_guide_size", 12))
 
     def collect_settings(self, s):
         s.set("ui.theme", {0: "auto", 1: "light", 2: "dark"}.get(self.card_theme.currentIndex(), "auto"))
@@ -128,3 +139,6 @@ class UISubInterface(SubSettingInterface):
         s.set("ui.alignment_margin", self.card_alignment_margin.value())
         s.set("ui.lyrics_alignment",
               {0: "left", 1: "center", 2: "right"}.get(self.card_lyrics_alignment.currentIndex(), "center"))
+        sym = (self.card_needs_guide_symbol.value() or "✚").strip() or "✚"
+        s.set("ui.needs_guide_symbol", sym)
+        s.set("ui.needs_guide_size", self.card_needs_guide_size.value())
