@@ -925,6 +925,7 @@ def nicokara_result_to_sentences(
     result: NicokaraParseResult,
     singer_key_to_id: Dict[str, str],
     default_singer_id: str,
+    progress_cb=None,
 ) -> List[Sentence]:
     """将 NicokaraParseResult 转换为 Sentence 对象列表
 
@@ -948,7 +949,19 @@ def nicokara_result_to_sentences(
     #   - 无显式 【svN】 标签的行继承此值；首行无标签 → default
     last_emitted_singer_id: str = default_singer_id
 
-    for parsed in result.lines:
+    # 预计算所有 @Ruby entry 的 reading_parts 和 position_range，在句子循环外执行一次。
+    # 原来每行都重复解析，对 N 条 entry × M 行的文件会产生 N×M 次 regex 调用；
+    # 改为只调用 N 次（主要热点：_parse_reading_with_timestamps 内部含 regex）。
+    precomputed_ruby: List[Tuple] = []
+    for _entry in result.ruby_entries:
+        _reading_parts = _parse_reading_with_timestamps(_entry.reading)
+        _pos_start, _pos_end = _parse_position_range(_entry.positions)
+        precomputed_ruby.append((_entry, _reading_parts, _pos_start, _pos_end))
+
+    _total_lines = len(result.lines)
+    for _line_idx, parsed in enumerate(result.lines):
+        if progress_cb is not None and _total_lines > 0:
+            progress_cb(f"正在转换数据 {_line_idx + 1}/{_total_lines} 行...")
         # 确定行级别演唱者（显式标签 > 继承上一非空行末字符 singer > default）
         if parsed.line_singer_key and parsed.line_singer_key in singer_key_to_id:
             line_singer_id = singer_key_to_id[parsed.line_singer_key]
@@ -1039,7 +1052,7 @@ def nicokara_result_to_sentences(
             last_char.push_to_ruby()
 
         # 应用 @Ruby 注音（基于文本匹配）
-        _apply_ruby_entries(sentence, result.ruby_entries)
+        _apply_precomputed_ruby_entries(sentence, precomputed_ruby)
 
         # 连读 follower 收敛 cc=0（与导出器 body「无 ts → 連読」语义一致）：
         # 凡是「自身没有起始 ts 且没有 ruby」的字符，都是连读到前一字的 follower，
@@ -1073,12 +1086,34 @@ def nicokara_result_to_sentences(
 nicokara_result_to_lyric_lines = nicokara_result_to_sentences
 
 
-def _apply_ruby_entries(sentence: Sentence, ruby_entries: List[NicokaraRubyEntry]):
-    """将 @Ruby 注音条目应用到句子
+def _apply_ruby_entries(sentence: Sentence, ruby_entries: List[NicokaraRubyEntry]) -> None:
+    """将 @Ruby 注音条目应用到句子（公开接口，每次调用按需计算 reading_parts）。
 
-    通过文本匹配找到漢字在行中的位置并添加 Ruby 注音。
-    在新模型中，多字符漢字的 ruby 按字拆分为 per-char Ruby，
-    且每个字符内部按 checkpoint 用 # 分组。
+    外部调用（如测试）使用此函数。批量处理多行时请用 ``_apply_precomputed_ruby_entries``
+    配合在循环外预计算，以避免对每行重复执行 regex。
+    """
+    precomputed: List[Tuple] = []
+    for entry in ruby_entries:
+        pos_start_ms, pos_end_ms = _parse_position_range(entry.positions)
+        precomputed.append((
+            entry,
+            _parse_reading_with_timestamps(entry.reading),
+            pos_start_ms,
+            pos_end_ms,
+        ))
+    _apply_precomputed_ruby_entries(sentence, precomputed)
+
+
+def _apply_precomputed_ruby_entries(
+    sentence: Sentence,
+    precomputed_ruby: List[Tuple],
+) -> None:
+    """将预计算好的 @Ruby 注音条目应用到句子（高性能内部版本）。
+
+    ``precomputed_ruby`` 由调用方在句子循环**外**预计算，格式为
+    ``[(entry, reading_parts, pos_start_ms, pos_end_ms), ...]``，
+    避免对每一行都重复执行 regex（_parse_reading_with_timestamps /
+    _parse_position_range）。
 
     当条目携带位置范围（positions）时，利用字符时间戳精确定位到正确的出现，
     避免同一词组在不同句子/位置有不同读音时被错误匹配。
@@ -1087,12 +1122,11 @@ def _apply_ruby_entries(sentence: Sentence, ruby_entries: List[NicokaraRubyEntry
     源文件手写偏差视为可接受的数据噪声，不做容差回退。
     """
     text = sentence.text
-    for entry in ruby_entries:
-        # 解析 reading 中的时间戳（保留时间戳信息）
-        reading_parts = _parse_reading_with_timestamps(entry.reading)
+    for entry, reading_parts, pos_start_ms, pos_end_ms in precomputed_ruby:
+        # 快速跳过：此句中不含该汉字，无需进入内层循环
+        if entry.kanji not in text:
+            continue
 
-        # 判断是否有位置范围
-        pos_start_ms, pos_end_ms = _parse_position_range(entry.positions)
         has_position_filter = pos_start_ms is not None or pos_end_ms is not None
 
         # 在文本中查找漢字位置：按 text.find 顺序，遇到第一个通过过滤
@@ -1392,6 +1426,11 @@ def _parse_reading_with_timestamps(reading: str) -> List[Tuple[str, int]]:
         [(text, offset_ms), ...] 序列；连续时间戳之间会插入占位符（停顿符）part，
         确保 reading_parts 总数与导出器写入的 mapping 长度一致。
     """
+    # 快速路径：绝大多数 @Ruby entry 的 reading 不含内嵌时间戳，直接返回避免 regex
+    if "[" not in reading:
+        text = reading.replace(",", "")
+        return [(text, 0)] if text else []
+
     from strange_uta_game.backend.domain.models import get_ruby_pause_char
 
     result: List[Tuple[str, int]] = []

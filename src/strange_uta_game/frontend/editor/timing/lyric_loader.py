@@ -504,10 +504,9 @@ def parse_lyric_content(
                 new_singers.append(new_singer)
 
         # 使用 nicokara_result_to_sentences 保留原有注音和时间戳
-        if progress_cb:
-            progress_cb(f"正在转换数据（共 {len(result.lines)} 行）...")
         sentences = nicokara_result_to_sentences(
-            result, singer_key_to_id, default_singer_id
+            result, singer_key_to_id, default_singer_id,
+            progress_cb=progress_cb,
         )
 
         # SHINTA 2025 规格透明性 (差异 K)：把解析到的 @ 元数据写回 AppSettings.nicokara_tags，
