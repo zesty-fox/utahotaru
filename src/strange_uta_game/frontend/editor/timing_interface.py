@@ -3074,6 +3074,7 @@ class EditorInterface(QWidget):
         self._timing_service.clear_timetags_for_current_line()
         self._update_time_tags_display()
         self._update_status()
+        self.preview._update_display()
 
     def _on_line_clicked(self, idx: int):
         # 切换行前，校验上一行的时间戳
