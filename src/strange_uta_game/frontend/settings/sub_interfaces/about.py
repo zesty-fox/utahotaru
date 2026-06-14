@@ -5,9 +5,9 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtCore import Qt, QProcess, QUrl
 from PyQt6.QtGui import QDesktopServices, QFont
-from PyQt6.QtWidgets import QFileDialog, QHBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QFileDialog, QHBoxLayout, QMessageBox, QWidget
 from qfluentwidgets import (
     FluentIcon as FIF,
     InfoBar, InfoBarPosition,
@@ -161,23 +161,62 @@ class AboutSubInterface(SubSettingInterface):
         if not (0 <= idx < len(self._language_codes)):
             return
         new_code = self._language_codes[idx]
-        if new_code == self._settings_ref.get("ui.language", DEFAULT_LANGUAGE.code):
+        old_code = self._settings_ref.get("ui.language", DEFAULT_LANGUAGE.code)
+        if new_code == old_code:
             return
+
         # 即时落盘（绕过外层 dirty 事务）
         self._settings_ref.set("ui.language", new_code)
         self._settings_ref.save()
-        # 立刻应用到运行时 translator（未来 EN/JA 就位时配合 retranslate 体系
-        # 可实现热切换；当前 zh_CN 唯一，apply_language 只是更新单例状态）。
+        # 立刻安装新 translator——之后任何 _new_ tr() 调用会走新语言。
+        # 但 Qt 的 setText(self.tr(...)) 在调用时就把翻译"烧"进了 widget；
+        # 现有标签不会自动刷新。要真正生效必须重启进程或对每个 widget 实现
+        # changeEvent(LanguageChange)→retranslateUi 的样板（工作量巨大）。
+        # 务实做法：问用户是否立即重启进程（QProcess.startDetached 复用
+        # 同一 argv，新进程读 ui.language 起来就是新语言）。
         localization.apply_language(new_code)
-        InfoBar.info(
-            title=self.tr("已切换语言"),
-            content=self.tr("重启软件后界面将完整应用新语言"),
-            orient=Qt.Orientation.Horizontal,
-            isClosable=True,
-            position=InfoBarPosition.TOP,
-            duration=4000,
-            parent=self,
-        )
+
+        msg = QMessageBox(self.window())
+        msg.setIcon(QMessageBox.Icon.Question)
+        msg.setWindowTitle(self.tr("语言已切换"))
+        msg.setText(self.tr(
+            "语言设置已保存。需要重启软件以完整应用新语言。\n是否立即重启？"
+        ))
+        btn_now = msg.addButton(self.tr("立即重启"), QMessageBox.ButtonRole.AcceptRole)
+        msg.addButton(self.tr("稍后"), QMessageBox.ButtonRole.RejectRole)
+        msg.setDefaultButton(btn_now)
+        msg.exec()
+        if msg.clickedButton() is btn_now:
+            self._restart_app()
+
+    def _restart_app(self) -> None:
+        """保存脏数据后重启进程。
+
+        - 项目脏 → 走主窗口的 ``flush_unsaved()`` 写崩溃恢复临时文件，重启后
+          会被原本的 crash-recovery 流程接住，等同"未保存的临时项目"恢复。
+        - 用 ``QProcess.startDetached(executable, argv)`` 启子进程，再
+          ``QApplication.quit()`` 退当前进程——子进程读到最新 config 后从新
+          语言起来。
+        """
+        main = self.window()
+        try:
+            if hasattr(main, "flush_unsaved"):
+                main.flush_unsaved()
+        except Exception:
+            pass
+
+        # 透传当前 sys.argv 给子进程；过滤掉首元素（脚本/exe 路径），由
+        # QProcess 自己拼回去。PyInstaller 打包后 sys.executable 就是
+        # StrangeUtaGame.exe；dev 模式下是 python.exe + main.py。
+        program = sys.executable
+        args = list(sys.argv[1:])
+        if not sys.executable.endswith((".exe", ".EXE")):
+            # dev 模式：python main.py 需要把 main.py 放回 args 首位
+            if sys.argv and not sys.argv[0].endswith(".exe"):
+                args = [sys.argv[0], *args]
+
+        QProcess.startDetached(program, args)
+        QApplication.quit()
 
     def _open_config_dir(self):
         if self._settings_ref is None or self._settings_ref._config_path is None:

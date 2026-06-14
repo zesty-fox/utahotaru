@@ -273,6 +273,9 @@ class SettingsInterface(ScrollArea):
             iface.set_change_callback(self._schedule_auto_save)
             iface.set_silent_save_callback(self._silent_save_setting)
             iface.connect_signals()
+        # aboutInterface 不参与 dirty 自动保存（FFmpeg 路径与语言均即时落盘），
+        # 但仍需 connect_signals 把语言下拉的 index_changed 连到自己的 handler。
+        self.aboutInterface.connect_signals()
 
         # 初始加载设置
         self._load_current_settings()
