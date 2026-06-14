@@ -22,46 +22,48 @@ class UISubInterface(SubSettingInterface):
         self._store = store
 
     def _init_ui(self):
-        g = SettingCardGroup("界面设定", self.scrollWidget)
-        self.card_theme = ComboSettingCard(FIF.BRUSH, "主题",
-            "选择界面主题，或设为自动跟随系统切换", items=["自动", "浅色", "深色"], parent=g)
-        self.card_main_font = FontSettingCard(FIF.FONT, "主文字字体",
-            "卡拉OK预览主文字（当前行/上下文行）字体，取自系统已安装字体；同时用于全文本编辑的字宽统计", parent=g)
-        self.card_ruby_font = FontSettingCard(FIF.FONT, "注音字体",
-            "卡拉OK预览 Ruby 注音字体（节奏点标记字体固定为微软雅黑，不可更改）", parent=g)
-        self.card_font_size = SpinSettingCard(FIF.FONT_SIZE, "基础字体大小",
-            "非当前行的歌词字体像素大小", min_val=1, max_val=99, step=2, suffix=" px", parent=g)
-        self.card_current_line_font_size = SpinSettingCard(FIF.FONT_SIZE, "当前行字体大小",
-            "当前高亮行的字体像素大小（放大效果）", min_val=1, max_val=99, step=2, suffix=" px", parent=g)
-        self.card_ruby_size = SpinSettingCard(FIF.FONT_SIZE, "注音字体大小",
-            "Ruby注音的字体像素大小", min_val=1, max_val=99, step=1, suffix=" px", parent=g)
-        self.card_ruby_spacing = SpinSettingCard(FIF.FONT_SIZE, "注音与主文字间距",
-            "Ruby注音与主文字之间的垂直间距", min_val=0, max_val=99, step=1, suffix=" px", parent=g)
-        self.card_cp_size = SpinSettingCard(FIF.FONT_SIZE, "节奏点标记大小",
-            "Checkpoint节奏点标记的字体像素大小", min_val=1, max_val=99, step=1, suffix=" px", parent=g)
-        self.card_cp_spacing = SpinSettingCard(FIF.FONT_SIZE, "节奏点与主文字间距",
-            "节奏点标记顶端与主文字底部的垂直间距（增大避免大字号时被文字遮挡）",
+        tr = self.tr
+        g = SettingCardGroup(tr("界面设定"), self.scrollWidget)
+        self.card_theme = ComboSettingCard(FIF.BRUSH, tr("主题"),
+            tr("选择界面主题，或设为自动跟随系统切换"),
+            items=[tr("自动"), tr("浅色"), tr("深色")], parent=g)
+        self.card_main_font = FontSettingCard(FIF.FONT, tr("主文字字体"),
+            tr("卡拉OK预览主文字（当前行/上下文行）字体，取自系统已安装字体；同时用于全文本编辑的字宽统计"), parent=g)
+        self.card_ruby_font = FontSettingCard(FIF.FONT, tr("注音字体"),
+            tr("卡拉OK预览 Ruby 注音字体（节奏点标记字体固定为微软雅黑，不可更改）"), parent=g)
+        self.card_font_size = SpinSettingCard(FIF.FONT_SIZE, tr("基础字体大小"),
+            tr("非当前行的歌词字体像素大小"), min_val=1, max_val=99, step=2, suffix=" px", parent=g)
+        self.card_current_line_font_size = SpinSettingCard(FIF.FONT_SIZE, tr("当前行字体大小"),
+            tr("当前高亮行的字体像素大小（放大效果）"), min_val=1, max_val=99, step=2, suffix=" px", parent=g)
+        self.card_ruby_size = SpinSettingCard(FIF.FONT_SIZE, tr("注音字体大小"),
+            tr("Ruby注音的字体像素大小"), min_val=1, max_val=99, step=1, suffix=" px", parent=g)
+        self.card_ruby_spacing = SpinSettingCard(FIF.FONT_SIZE, tr("注音与主文字间距"),
+            tr("Ruby注音与主文字之间的垂直间距"), min_val=0, max_val=99, step=1, suffix=" px", parent=g)
+        self.card_cp_size = SpinSettingCard(FIF.FONT_SIZE, tr("节奏点标记大小"),
+            tr("Checkpoint节奏点标记的字体像素大小"), min_val=1, max_val=99, step=1, suffix=" px", parent=g)
+        self.card_cp_spacing = SpinSettingCard(FIF.FONT_SIZE, tr("节奏点与主文字间距"),
+            tr("节奏点标记顶端与主文字底部的垂直间距（增大避免大字号时被文字遮挡）"),
             min_val=0, max_val=99, step=1, suffix=" px", parent=g)
-        self.card_line_height_factor = DoubleSpinSettingCard(FIF.FONT_SIZE, "行间距系数",
-            "行高 = (当前行字体 + 注音 + 注音间距 + 节奏点)高度 × 系数",
+        self.card_line_height_factor = DoubleSpinSettingCard(FIF.FONT_SIZE, tr("行间距系数"),
+            tr("行高 = (当前行字体 + 注音 + 注音间距 + 节奏点)高度 × 系数"),
             min_val=-1.00, max_val=5.00, step=0.05, decimals=2, suffix=" x", parent=g)
-        self.card_alignment_margin = SpinSettingCard(FIF.FONT_SIZE, "左/右对齐时页边距",
-            "左对齐或右对齐时歌词与窗口边缘的间距", min_val=0, max_val=500, step=4, suffix=" px", parent=g)
-        self.card_lyrics_alignment = ComboSettingCard(FIF.ALIGNMENT, "歌词对齐方式",
-            "卡拉OK预览中歌词文本的水平对齐方式（左对齐时注意行号区域不被覆盖）",
-            items=["左对齐", "居中对齐", "右对齐"], parent=g)
-        self.card_checkpoint_markers = SettingCard(FIF.FONT_SIZE, "Checkpoint 字符设定",
-            "自定义节奏点标记的显示字符（首节奏点 / 后续 / 句尾，已打轴 / 未打轴）", g)
-        self.btn_cp_markers = PushButton("设置字符", self.card_checkpoint_markers)
+        self.card_alignment_margin = SpinSettingCard(FIF.FONT_SIZE, tr("左/右对齐时页边距"),
+            tr("左对齐或右对齐时歌词与窗口边缘的间距"), min_val=0, max_val=500, step=4, suffix=" px", parent=g)
+        self.card_lyrics_alignment = ComboSettingCard(FIF.ALIGNMENT, tr("歌词对齐方式"),
+            tr("卡拉OK预览中歌词文本的水平对齐方式（左对齐时注意行号区域不被覆盖）"),
+            items=[tr("左对齐"), tr("居中对齐"), tr("右对齐")], parent=g)
+        self.card_checkpoint_markers = SettingCard(FIF.FONT_SIZE, tr("Checkpoint 字符设定"),
+            tr("自定义节奏点标记的显示字符（首节奏点 / 后续 / 句尾，已打轴 / 未打轴）"), g)
+        self.btn_cp_markers = PushButton(tr("设置字符"), self.card_checkpoint_markers)
         self.btn_cp_markers.clicked.connect(self._on_open_checkpoint_markers)
         self.card_checkpoint_markers.hBoxLayout.addWidget(
             self.btn_cp_markers, 0, Qt.AlignmentFlag.AlignRight)
         self.card_checkpoint_markers.hBoxLayout.addSpacing(16)
-        self.card_needs_guide_symbol = TextSettingCard(FIF.PIN, "导唱待办标记符号",
-            "标记某字符前需要插入导唱符时显示的符号（叠加在字符左上角，红色半透明）",
+        self.card_needs_guide_symbol = TextSettingCard(FIF.PIN, tr("导唱待办标记符号"),
+            tr("标记某字符前需要插入导唱符时显示的符号（叠加在字符左上角，红色半透明）"),
             placeholder="✚", max_length=2, parent=g)
-        self.card_needs_guide_size = SpinSettingCard(FIF.FONT_SIZE, "导唱待办标记大小",
-            "导唱待办标记符号的字体像素大小",
+        self.card_needs_guide_size = SpinSettingCard(FIF.FONT_SIZE, tr("导唱待办标记大小"),
+            tr("导唱待办标记符号的字体像素大小"),
             min_val=4, max_val=64, step=1, suffix=" px", parent=g)
 
         for c in [self.card_theme, self.card_main_font, self.card_ruby_font,

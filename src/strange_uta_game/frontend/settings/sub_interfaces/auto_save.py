@@ -14,12 +14,13 @@ class AutoSaveSubInterface(SubSettingInterface):
         self._init_ui()
 
     def _init_ui(self):
-        g = SettingCardGroup("自动保存", self.scrollWidget)
-        self.card_auto_save_enabled = SwitchSettingCard(FIF.SAVE, "启用定时自动保存",
-            "定时将项目保存为临时文件，防止闪退丢失数据", parent=g)
-        self.card_auto_save_interval = SpinSettingCard(FIF.HISTORY, "自动保存间隔",
-            "每隔多少分钟自动保存一次（1~60分钟）",
-            min_val=1, max_val=60, step=1, suffix=" 分钟", parent=g)
+        tr = self.tr
+        g = SettingCardGroup(tr("自动保存"), self.scrollWidget)
+        self.card_auto_save_enabled = SwitchSettingCard(FIF.SAVE, tr("启用定时自动保存"),
+            tr("定时将项目保存为临时文件，防止闪退丢失数据"), parent=g)
+        self.card_auto_save_interval = SpinSettingCard(FIF.HISTORY, tr("自动保存间隔"),
+            tr("每隔多少分钟自动保存一次（1~60分钟）"),
+            min_val=1, max_val=60, step=1, suffix=tr(" 分钟"), parent=g)
         g.addSettingCard(self.card_auto_save_enabled)
         g.addSettingCard(self.card_auto_save_interval)
         self.expandLayout.addWidget(g)
