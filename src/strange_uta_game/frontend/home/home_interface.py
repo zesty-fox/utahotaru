@@ -157,16 +157,20 @@ class HomeInterface(QWidget):
             parts = []
             if lyric_files:
                 parts.append(
-                    f"已导入 {len(lyric_files)} 个歌词文件，共 {imported_lines} 行"
+                    self.tr("已导入 {n} 个歌词文件，共 {lines} 行").format(
+                        n=len(lyric_files), lines=imported_lines
+                    )
                 )
             if audio_files:
                 audio_name = Path(audio_files[0]).name
-                suffix = "（已使用第一个音频文件）" if len(audio_files) > 1 else ""
-                parts.append(f"音频: {audio_name}{suffix}")
+                suffix = self.tr("（已使用第一个音频文件）") if len(audio_files) > 1 else ""
+                parts.append(self.tr("音频: {name}{suffix}").format(
+                    name=audio_name, suffix=suffix
+                ))
 
             InfoBar.success(
-                title="导入成功",
-                content="；".join(parts),
+                title=self.tr("导入成功"),
+                content=self.tr("；").join(parts),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -192,7 +196,7 @@ class HomeInterface(QWidget):
         title = LargeTitleLabel("StrangeUtaGame")
         title_layout.addWidget(title)
 
-        subtitle = SubtitleLabel("歌词打轴工具")
+        subtitle = SubtitleLabel(self.tr("歌词打轴工具"))
         title_layout.addWidget(subtitle)
 
         layout.addLayout(title_layout)
@@ -219,15 +223,15 @@ class HomeInterface(QWidget):
         card_layout.setSpacing(20)
 
         # 标题
-        title = TitleLabel("新建项目")
+        title = TitleLabel(self.tr("新建项目"))
         card_layout.addWidget(title)
 
         # 歌词输入区
-        lyric_label = CaptionLabel("歌词文本（支持粘贴或导入 LRC/ASS/SRT/TXT）")
+        lyric_label = CaptionLabel(self.tr("歌词文本（支持粘贴或导入 LRC/ASS/SRT/TXT）"))
         card_layout.addWidget(lyric_label)
 
         self.text_lyrics = TextEdit()
-        self.text_lyrics.setPlaceholderText(
+        self.text_lyrics.setPlaceholderText(self.tr(
             "在此粘贴歌词文本...\n"
             "支持格式：\n"
             "- 普通文本（每行一句）\n"
@@ -236,7 +240,7 @@ class HomeInterface(QWidget):
             "- SRT 字幕格式\n"
             "- KRA 格式\n\n"
             "导入文件将自动填充此区域，创建项目时解析"
-        )
+        ))
         self.text_lyrics.setMinimumHeight(200)
         card_layout.addWidget(self.text_lyrics)
 
@@ -244,12 +248,12 @@ class HomeInterface(QWidget):
         lyric_btn_layout = QHBoxLayout()
         lyric_btn_layout.setSpacing(10)
 
-        self.btn_import_lyric = PushButton("导入歌词文件", self)
+        self.btn_import_lyric = PushButton(self.tr("导入歌词文件"), self)
         self.btn_import_lyric.setIcon(FIF.FOLDER)
         self.btn_import_lyric.clicked.connect(self._on_import_lyric)
         lyric_btn_layout.addWidget(self.btn_import_lyric)
 
-        self.btn_clear_lyric = PushButton("清空", self)
+        self.btn_clear_lyric = PushButton(self.tr("清空"), self)
         self.btn_clear_lyric.setIcon(FIF.DELETE)
         self.btn_clear_lyric.clicked.connect(self._on_clear_lyric)
         lyric_btn_layout.addWidget(self.btn_clear_lyric)
@@ -258,18 +262,18 @@ class HomeInterface(QWidget):
         card_layout.addLayout(lyric_btn_layout)
 
         # 音频选择区
-        audio_label = CaptionLabel("音频文件（打轴需要，可后续添加）")
+        audio_label = CaptionLabel(self.tr("音频文件（打轴需要，可后续添加）"))
         card_layout.addWidget(audio_label)
 
         audio_layout = QHBoxLayout()
         audio_layout.setSpacing(10)
 
         self.line_audio_path = LineEdit()
-        self.line_audio_path.setPlaceholderText("点击右侧按钮选择音频文件...")
+        self.line_audio_path.setPlaceholderText(self.tr("点击右侧按钮选择音频文件..."))
         self.line_audio_path.setReadOnly(True)
         audio_layout.addWidget(self.line_audio_path)
 
-        self.btn_select_audio = PushButton("选择音频", self)
+        self.btn_select_audio = PushButton(self.tr("选择音频"), self)
         self.btn_select_audio.setIcon(FIF.MUSIC)
         self.btn_select_audio.clicked.connect(self._on_select_audio)
         audio_layout.addWidget(self.btn_select_audio)
@@ -277,7 +281,7 @@ class HomeInterface(QWidget):
         card_layout.addLayout(audio_layout)
 
         # 创建按钮
-        self.btn_create = PrimaryPushButton("创建项目", self)
+        self.btn_create = PrimaryPushButton(self.tr("创建项目"), self)
         self.btn_create.setIcon(FIF.ADD)
         self.btn_create.setMinimumHeight(45)
         self.btn_create.clicked.connect(self._on_create_project)
@@ -293,22 +297,22 @@ class HomeInterface(QWidget):
         card_layout.setSpacing(20)
 
         # 标题
-        title = TitleLabel("打开项目")
+        title = TitleLabel(self.tr("打开项目"))
         card_layout.addWidget(title)
 
         # 说明
-        desc = CaptionLabel("打开已有的 .sug 项目文件")
+        desc = CaptionLabel(self.tr("打开已有的 .sug 项目文件"))
         card_layout.addWidget(desc)
 
         # 打开按钮
-        self.btn_open = PrimaryPushButton("打开项目", self)
+        self.btn_open = PrimaryPushButton(self.tr("打开项目"), self)
         self.btn_open.setIcon(FIF.FOLDER)
         self.btn_open.setMinimumHeight(50)
         self.btn_open.clicked.connect(self._on_open_project)
         card_layout.addWidget(self.btn_open)
 
         # 保存按钮
-        self.btn_save = PushButton("保存项目", self)
+        self.btn_save = PushButton(self.tr("保存项目"), self)
         self.btn_save.setIcon(FIF.SAVE)
         self.btn_save.setMinimumHeight(45)
         self.btn_save.setEnabled(False)
@@ -319,7 +323,7 @@ class HomeInterface(QWidget):
         card_layout.addStretch()
 
         # 提示信息
-        tip = CaptionLabel("提示：项目文件不包含音频，请确保音频文件可访问")
+        tip = CaptionLabel(self.tr("提示：项目文件不包含音频，请确保音频文件可访问"))
         tip.setWordWrap(True)
         card_layout.addWidget(tip)
 
@@ -330,9 +334,9 @@ class HomeInterface(QWidget):
         init_dir = self._working_dir()
         file_path, _ = QFileDialog.getOpenFileName(
             self,
-            "选择歌词文件",
+            self.tr("选择歌词文件"),
             init_dir,
-            "歌词文件 (*.lrc *.txt *.kra *.ass *.srt);;所有文件 (*.*)",
+            self.tr("歌词文件 (*.lrc *.txt *.kra *.ass *.srt);;所有文件 (*.*)"),
         )
 
         if file_path:
@@ -353,9 +357,9 @@ class HomeInterface(QWidget):
         init_dir = self._working_dir()
         file_path, _ = QFileDialog.getOpenFileName(
             self,
-            "选择音频或视频文件",
+            self.tr("选择音频或视频文件"),
             init_dir,
-            "音频/视频文件 (*.mp3 *.wav *.flac *.ogg *.mp4 *.mkv *.m4a *.avi *.mov *.wmv *.flv *.webm *.m4v *.mpg *.mpeg *.ts *.3gp *.vob *.mts *.m2ts *.rm *.rmvb *.asf *.f4v *.ogv *.m4b *.aac *.wma *.opus *.ape *.ac3 *.dts);;所有文件 (*.*)",
+            self.tr("音频/视频文件 (*.mp3 *.wav *.flac *.ogg *.mp4 *.mkv *.m4a *.avi *.mov *.wmv *.flv *.webm *.m4v *.mpg *.mpeg *.ts *.3gp *.vob *.mts *.m2ts *.rm *.rmvb *.asf *.f4v *.ogv *.m4b *.aac *.wma *.opus *.ape *.ac3 *.dts);;所有文件 (*.*)"),
         )
 
         if file_path:
@@ -372,8 +376,8 @@ class HomeInterface(QWidget):
 
         if not text:
             InfoBar.warning(
-                title="请输入歌词",
-                content="歌词文本不能为空",
+                title=self.tr("请输入歌词"),
+                content=self.tr("歌词文本不能为空"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -517,7 +521,7 @@ class HomeInterface(QWidget):
                             )
                             if getattr(analyzer, "llm_failed", False):
                                 InfoBar.warning(
-                                    title="LLM 注音失败，已回退本地引擎",
+                                    title=self.tr("LLM 注音失败，已回退本地引擎"),
                                     content=str(getattr(analyzer, "last_error", "") or ""),
                                     orient=Qt.Orientation.Horizontal,
                                     isClosable=True,
@@ -534,7 +538,7 @@ class HomeInterface(QWidget):
 
         except Exception as e:
             InfoBar.error(
-                title="创建失败",
+                title=self.tr("创建失败"),
                 content=str(e),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
@@ -548,9 +552,9 @@ class HomeInterface(QWidget):
         init_dir = self._working_dir()
         file_path, _ = QFileDialog.getOpenFileName(
             self,
-            "打开项目",
+            self.tr("打开项目"),
             init_dir,
-            "StrangeUtaGame 项目 (*.sug);;所有文件 (*.*)",
+            self.tr("StrangeUtaGame 项目 (*.sug);;所有文件 (*.*)"),
         )
 
         if file_path:
@@ -598,8 +602,8 @@ class HomeInterface(QWidget):
 
             if show_feedback:
                 InfoBar.success(
-                    title="导入成功",
-                    content=f"已导入文件内容，共 {line_count} 行",
+                    title=self.tr("导入成功"),
+                    content=self.tr("已导入文件内容，共 {lines} 行").format(lines=line_count),
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
                     position=InfoBarPosition.TOP,
@@ -611,7 +615,7 @@ class HomeInterface(QWidget):
         except Exception as e:
             if show_feedback:
                 InfoBar.error(
-                    title="导入失败",
+                    title=self.tr("导入失败"),
                     content=str(e),
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
@@ -864,8 +868,8 @@ class HomeInterface(QWidget):
         # 检查 FFmpeg 是否可用
         if not is_ffmpeg_available():
             InfoBar.error(
-                title="无法读取视频文件",
-                content="未检测到 FFmpeg，请在「设置 → 关于 → 工具配置」中浏览并设置 FFmpeg 路径。",
+                title=self.tr("无法读取视频文件"),
+                content=self.tr("未检测到 FFmpeg，请在「设置 → 关于 → 工具配置」中浏览并设置 FFmpeg 路径。"),
                 orient=Qt.Orientation.Horizontal, isClosable=True,
                 position=InfoBarPosition.TOP, duration=7000,
                 parent=self,
@@ -873,7 +877,7 @@ class HomeInterface(QWidget):
             return
 
         # 创建状态提示
-        self._state_tooltip = StateToolTip("正在处理视频", "正在检查 FFmpeg 环境...", self)
+        self._state_tooltip = StateToolTip(self.tr("正在处理视频"), self.tr("正在检查 FFmpeg 环境..."), self)
         green = theme.status_complete.name()
         self._state_tooltip.setStyleSheet(f"""
             StateToolTip {{
@@ -915,7 +919,7 @@ class HomeInterface(QWidget):
         """视频提取完成回调"""
         if self._state_tooltip:
             self._state_tooltip.setState(True)
-            self._state_tooltip.setContent("加载完成")
+            self._state_tooltip.setContent(self.tr("加载完成"))
             self._state_tooltip.close()
             self._state_tooltip = None
 
@@ -923,8 +927,8 @@ class HomeInterface(QWidget):
         self._temp_audio_path = temp_path
 
         InfoBar.success(
-            title="音频提取成功",
-            content=f"已从视频中提取音频: {Path(original_path).name}",
+            title=self.tr("音频提取成功"),
+            content=self.tr("已从视频中提取音频: {name}").format(name=Path(original_path).name),
             orient=Qt.Orientation.Horizontal, isClosable=True,
             position=InfoBarPosition.TOP, duration=3000,
             parent=self,
@@ -937,7 +941,7 @@ class HomeInterface(QWidget):
             self._state_tooltip = None
 
         InfoBar.error(
-            title="视频处理失败",
+            title=self.tr("视频处理失败"),
             content=error_msg,
             orient=Qt.Orientation.Horizontal, isClosable=True,
             position=InfoBarPosition.TOP, duration=5000,
@@ -957,7 +961,7 @@ class HomeInterface(QWidget):
         from strange_uta_game.frontend.theme import theme
 
         # 创建状态提示
-        self._state_tooltip = StateToolTip("正在加载项目", "正在解析项目数据...", self)
+        self._state_tooltip = StateToolTip(self.tr("正在加载项目"), self.tr("正在解析项目数据..."), self)
         green = theme.status_complete.name()
         self._state_tooltip.setStyleSheet(f"""
             StateToolTip {{
@@ -993,7 +997,7 @@ class HomeInterface(QWidget):
         """项目加载成功回调"""
         if self._state_tooltip:
             self._state_tooltip.setState(True)
-            self._state_tooltip.setContent("加载完成")
+            self._state_tooltip.setContent(self.tr("加载完成"))
             self._state_tooltip.close()
             self._state_tooltip = None
 
@@ -1006,7 +1010,7 @@ class HomeInterface(QWidget):
             self._state_tooltip = None
 
         InfoBar.error(
-            title="打开失败",
+            title=self.tr("打开失败"),
             content=error_msg,
             orient=Qt.Orientation.Horizontal,
             isClosable=True,

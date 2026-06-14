@@ -186,7 +186,7 @@ class MainWindow(MSFluentWindow):
         # 避免白底白字的灾难性渲染
         self._apply_win10_fallback_bg()
 
-        self.setWindowTitle("StrangeUtaGame - 歌词打轴工具 Bilibili@不会说话的呆轩cc")
+        self.setWindowTitle(self.tr("StrangeUtaGame - 歌词打轴工具 Bilibili@不会说话的呆轩cc"))
         self.setMinimumSize(1200, 800)
         self.resize(1400, 900)
 
@@ -445,8 +445,8 @@ class MainWindow(MSFluentWindow):
         self.switchTo(self.editorInterface)
 
         InfoBar.success(
-            title="项目创建成功",
-            content=f"共 {len(project.sentences)} 行歌词",
+            title=self.tr("项目创建成功"),
+            content=self.tr("共 {n} 行歌词").format(n=len(project.sentences)),
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -463,8 +463,8 @@ class MainWindow(MSFluentWindow):
             self._apply_project_extras(file_path)
 
         InfoBar.success(
-            title="项目打开成功",
-            content=f"共 {len(project.sentences)} 行歌词",
+            title=self.tr("项目打开成功"),
+            content=self.tr("共 {n} 行歌词").format(n=len(project.sentences)),
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -508,8 +508,8 @@ class MainWindow(MSFluentWindow):
 
         if not Path(media_path).exists():
             InfoBar.warning(
-                title="媒体文件未找到",
-                content=f"上次关联的媒体文件不存在：{Path(media_path).name}",
+                title=self.tr("媒体文件未找到"),
+                content=self.tr("上次关联的媒体文件不存在：{name}").format(name=Path(media_path).name),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -530,7 +530,7 @@ class MainWindow(MSFluentWindow):
         from pathlib import Path
         project = self._store.project if self._store else None
         if not project:
-            self.setWindowTitle("StrangeUtaGame - 歌词打轴工具 Bilibili@不会说话的呆轩cc")
+            self.setWindowTitle(self.tr("StrangeUtaGame - 歌词打轴工具 Bilibili@不会说话的呆轩cc"))
             return
         save_path = self._store.save_path if self._store else None
         if save_path and not self._store.is_temp_save_path(save_path):
@@ -624,9 +624,9 @@ class MainWindow(MSFluentWindow):
                 editor.load_audio(audio_path)
 
         InfoBar.success(
-            title="音频引擎已切换",
-            content=("已启用高质量变速（离线预渲染）" if desired is BassTsmEngine
-                     else "已关闭高质量变速（实时变速，可能爆音）"),
+            title=self.tr("音频引擎已切换"),
+            content=(self.tr("已启用高质量变速（离线预渲染）") if desired is BassTsmEngine
+                     else self.tr("已关闭高质量变速（实时变速，可能爆音）")),
             orient=Qt.Orientation.Horizontal, isClosable=True,
             position=InfoBarPosition.TOP, duration=3000, parent=self,
         )
@@ -663,10 +663,10 @@ class MainWindow(MSFluentWindow):
 
         parent = dialog_parent if dialog_parent is not None else self
         msg = QMessageBox(parent)
-        msg.setWindowTitle("恢复未保存的项目")
-        msg.setText("检测到上次异常退出时的未保存项目数据。\n是否加载恢复？")
-        btn_yes = msg.addButton("是", QMessageBox.ButtonRole.AcceptRole)
-        msg.addButton("否", QMessageBox.ButtonRole.RejectRole)
+        msg.setWindowTitle(self.tr("恢复未保存的项目"))
+        msg.setText(self.tr("检测到上次异常退出时的未保存项目数据。\n是否加载恢复？"))
+        btn_yes = msg.addButton(self.tr("是"), QMessageBox.ButtonRole.AcceptRole)
+        msg.addButton(self.tr("否"), QMessageBox.ButtonRole.RejectRole)
         msg.setDefaultButton(btn_yes)
         msg.exec()
         clicked = msg.clickedButton()
@@ -680,8 +680,8 @@ class MainWindow(MSFluentWindow):
                 self._apply_project_extras(temp_path)
                 self.switchTo(self.editorInterface)
                 InfoBar.success(
-                    title="恢复成功",
-                    content=f"已恢复 {len(project.sentences)} 行歌词",
+                    title=self.tr("恢复成功"),
+                    content=self.tr("已恢复 {n} 行歌词").format(n=len(project.sentences)),
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
                     position=InfoBarPosition.TOP,
@@ -693,8 +693,8 @@ class MainWindow(MSFluentWindow):
                 return True
             else:
                 InfoBar.error(
-                    title="恢复失败",
-                    content="无法读取恢复文件，文件可能已损坏",
+                    title=self.tr("恢复失败"),
+                    content=self.tr("无法读取恢复文件，文件可能已损坏"),
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
                     position=InfoBarPosition.TOP,
@@ -788,8 +788,8 @@ class MainWindow(MSFluentWindow):
             # 用户确认更新 → 启动 Updater.exe 并退出
             if not upd_installer.is_updater_available():
                 InfoBar.warning(
-                    title="更新器未就绪",
-                    content="未找到 Updater.exe。请到 GitHub 手动下载完整安装包。",
+                    title=self.tr("更新器未就绪"),
+                    content=self.tr("未找到 Updater.exe。请到 GitHub 手动下载完整安装包。"),
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
                     position=InfoBarPosition.TOP,
@@ -817,8 +817,8 @@ class MainWindow(MSFluentWindow):
             from strange_uta_game.updater.ui.update_card import _LaunchUpdaterWorker
 
             InfoBar.info(
-                title="正在准备更新",
-                content="正在获取最新更新器，请稍候…",
+                title=self.tr("正在准备更新"),
+                content=self.tr("正在获取最新更新器，请稍候…"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=False,
                 position=InfoBarPosition.TOP,
@@ -834,8 +834,8 @@ class MainWindow(MSFluentWindow):
                 lr: _inst.LaunchResult = launch_result  # type: ignore[assignment]
                 if not lr.launched:
                     InfoBar.error(
-                        title="启动 Updater 失败",
-                        content=lr.reason or "未知错误",
+                        title=self.tr("启动 Updater 失败"),
+                        content=lr.reason or self.tr("未知错误"),
                         orient=Qt.Orientation.Horizontal,
                         isClosable=True,
                         position=InfoBarPosition.TOP,
@@ -845,8 +845,8 @@ class MainWindow(MSFluentWindow):
                     return
 
                 InfoBar.success(
-                    title="更新已启动",
-                    content="即将退出应用，由 Updater 完成替换并自动重启…",
+                    title=self.tr("更新已启动"),
+                    content=self.tr("即将退出应用，由 Updater 完成替换并自动重启…"),
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
                     position=InfoBarPosition.TOP,
@@ -907,8 +907,8 @@ class MainWindow(MSFluentWindow):
 
         if not Path(file_path).is_file():
             InfoBar.error(
-                title="无法打开文件",
-                content=f"文件不存在: {file_path}",
+                title=self.tr("无法打开文件"),
+                content=self.tr("文件不存在: {path}").format(path=file_path),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -925,8 +925,8 @@ class MainWindow(MSFluentWindow):
         def _on_success(project: Project, loaded_path: str) -> None:
             self.switchTo(self.editorInterface)
             InfoBar.success(
-                title="项目打开成功",
-                content=f"共 {len(project.sentences)} 行歌词",
+                title=self.tr("项目打开成功"),
+                content=self.tr("共 {n} 行歌词").format(n=len(project.sentences)),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -946,8 +946,8 @@ class MainWindow(MSFluentWindow):
         """全局 Ctrl+S 保存（异步）"""
         if not self._store.project:
             InfoBar.warning(
-                title="无项目",
-                content="请先创建或打开项目",
+                title=self.tr("无项目"),
+                content=self.tr("请先创建或打开项目"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -962,9 +962,9 @@ class MainWindow(MSFluentWindow):
             suggested = self._store.suggested_save_path(".sug")
             path, _ = QFileDialog.getSaveFileName(
                 self,
-                "保存项目",
+                self.tr("保存项目"),
                 suggested,
-                "StrangeUtaGame 项目 (*.sug);;所有文件 (*.*)",
+                self.tr("StrangeUtaGame 项目 (*.sug);;所有文件 (*.*)"),
             )
             if not path:
                 return
@@ -1024,7 +1024,7 @@ class MainWindow(MSFluentWindow):
         self._store.cleanup_temp_files()
 
         InfoBar.success(
-            title="保存成功",
+            title=self.tr("保存成功"),
             content=file_path,
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
@@ -1037,7 +1037,7 @@ class MainWindow(MSFluentWindow):
     def _on_save_error(self, error_msg: str) -> None:
         """保存失败回调"""
         InfoBar.error(
-            title="保存失败",
+            title=self.tr("保存失败"),
             content=error_msg,
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
@@ -1114,11 +1114,11 @@ class MainWindow(MSFluentWindow):
         if self._store.dirty:
             msg = QMessageBox(self)
             msg.setIcon(QMessageBox.Icon.Question)
-            msg.setWindowTitle("未保存的更改")
-            msg.setText("项目有未保存的更改，是否在退出前保存？")
-            save_btn = msg.addButton("保存", QMessageBox.ButtonRole.AcceptRole)
-            discard_btn = msg.addButton("放弃", QMessageBox.ButtonRole.DestructiveRole)
-            cancel_btn = msg.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+            msg.setWindowTitle(self.tr("未保存的更改"))
+            msg.setText(self.tr("项目有未保存的更改，是否在退出前保存？"))
+            save_btn = msg.addButton(self.tr("保存"), QMessageBox.ButtonRole.AcceptRole)
+            discard_btn = msg.addButton(self.tr("放弃"), QMessageBox.ButtonRole.DestructiveRole)
+            cancel_btn = msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
             msg.setDefaultButton(save_btn)
             msg.exec()
             clicked = msg.clickedButton()
@@ -1205,8 +1205,8 @@ class MainWindow(MSFluentWindow):
         """
         if not content or not content.strip():
             InfoBar.warning(
-                title="歌词为空",
-                content="没有可导入的歌词内容",
+                title=self.tr("歌词为空"),
+                content=self.tr("没有可导入的歌词内容"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -1218,8 +1218,8 @@ class MainWindow(MSFluentWindow):
         file_loader = getattr(getattr(self, "editorInterface", None), "_file_loader", None)
         if file_loader is None:
             InfoBar.error(
-                title="无法导入",
-                content="打轴编辑器尚未准备好",
+                title=self.tr("无法导入"),
+                content=self.tr("打轴编辑器尚未准备好"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
