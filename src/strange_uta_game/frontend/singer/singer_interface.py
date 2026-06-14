@@ -329,7 +329,7 @@ class SingerEditDialog(QDialog):
         swatch.mousePressEvent = lambda event, i=idx: self._set_active_split_idx(i)
 
         btn_pick = PushButton(f"颜色 {idx + 1}")
-        btn_pick.setFixedWidth(80)
+        btn_pick.setMinimumWidth(80)
         btn_pick.clicked.connect(lambda _checked, i=idx: self._on_pick_split_color(i))
 
         row_layout.addWidget(swatch)
@@ -446,7 +446,10 @@ class SingerEditDialog(QDialog):
         from PyQt6.QtWidgets import QScrollArea, QGridLayout
 
         panel = QWidget()
-        panel.setFixedWidth(180)
+        # 面板自身的宽度上下限——给"项目已用颜色"标题（本地化后可能是 "Project palette"
+        # / "プロジェクトで使用中の色"）一些喘息空间。
+        panel.setMinimumWidth(180)
+        panel.setMaximumWidth(260)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(8, 0, 0, 0)
         layout.setSpacing(4)
@@ -891,7 +894,9 @@ class SingerColorPreviewPanel(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedWidth(176)
+        # 颜色预览面板宽度上下限；本地化后的标签（如 "Color preview"）需要更宽。
+        self.setMinimumWidth(176)
+        self.setMaximumWidth(260)
         self._setup_ui()
 
     def _setup_ui(self):

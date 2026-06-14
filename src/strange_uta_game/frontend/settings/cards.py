@@ -57,7 +57,9 @@ class SpinSettingCard(SettingCard):
         self.spin.setSingleStep(step)
         if suffix:
             self.spin.setSuffix(suffix)
-        self.spin.setFixedWidth(180)
+        # 用 minimumWidth 而非 fixedWidth：long suffix（如本地化后的 "minutes" / "ミリ秒"）
+        # 或大数值可让控件自然变宽，不会被截断。
+        self.spin.setMinimumWidth(180)
         self.spin.valueChanged.connect(self.value_changed.emit)
         self.hBoxLayout.addWidget(self.spin, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addSpacing(16)
@@ -93,7 +95,7 @@ class DoubleSpinSettingCard(SettingCard):
         self.spin.setDecimals(decimals)
         if suffix:
             self.spin.setSuffix(suffix)
-        self.spin.setFixedWidth(180)
+        self.spin.setMinimumWidth(180)  # 见 SpinSettingCard 同位置注释
         self.spin.valueChanged.connect(self.value_changed.emit)
         self.hBoxLayout.addWidget(self.spin, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addSpacing(16)
@@ -123,7 +125,7 @@ class TextSettingCard(SettingCard):
         self.line_edit = LineEdit(self)
         self.line_edit.setPlaceholderText(placeholder)
         self.line_edit.setMaxLength(max_length)
-        self.line_edit.setFixedWidth(180)
+        self.line_edit.setMinimumWidth(180)
         self.line_edit.textChanged.connect(self.value_changed.emit)
         self.hBoxLayout.addWidget(self.line_edit, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addSpacing(16)
@@ -170,7 +172,9 @@ class ComboSettingCard(SettingCard):
         super().__init__(icon, title, content, parent)
         self.combo = ComboBox(self)
         self.combo.addItems(items)
-        self.combo.setFixedWidth(140)
+        # 用 minimumWidth：英文/日文翻译后的"自动滚动（操作后挂起 6 秒）"等长选项
+        # 在 140px 下会被裁断；让 ComboBox 按内容自然撑开。
+        self.combo.setMinimumWidth(140)
         self.combo.currentIndexChanged.connect(self.index_changed.emit)
         self.hBoxLayout.addWidget(self.combo, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addSpacing(16)
@@ -252,15 +256,15 @@ class BrowseSettingCard(SettingCard):
         super().__init__(icon, title, content, parent)
         self._clearable = clearable
         self.line = LineEdit(self)
-        self.line.setPlaceholderText("未设置")
+        self.line.setPlaceholderText(self.tr("未设置"))
         self.line.setReadOnly(True)
-        self.line.setFixedWidth(200)
+        self.line.setMinimumWidth(200)
         if clearable:
-            self.btn_clear = PushButton("清除", self)
-            self.btn_clear.setFixedWidth(60)
+            self.btn_clear = PushButton(self.tr("清除"), self)
+            self.btn_clear.setMinimumWidth(60)
             self.btn_clear.clicked.connect(self._on_clear)
-        self.btn = PushButton("浏览", self)
-        self.btn.setFixedWidth(60)
+        self.btn = PushButton(self.tr("浏览"), self)
+        self.btn.setMinimumWidth(60)
         self.btn.clicked.connect(self._on_browse)
         self.hBoxLayout.addWidget(self.line, 0, Qt.AlignmentFlag.AlignRight)
         if clearable:
@@ -310,7 +314,7 @@ class _KeyCaptureButton(PushButton):
         self._hold_timer.setSingleShot(True)
         self._hold_timer.setInterval(self.HOLD_THRESHOLD_MS)
         self._hold_timer.timeout.connect(self._on_hold_timeout)
-        self.setFixedWidth(140)
+        self.setMinimumWidth(140)  # 长按键名（如 "ALT+RIGHT:short"）翻译后可能更宽
         self.setFont(QFont("Microsoft YaHei", 9))
         self.clicked.connect(self._start_listening)
 
@@ -654,8 +658,8 @@ class MultiCheckSettingCard(SettingCard):
         self._options = options
         self._selected: list[str] = []
 
-        self.btn = PushButton("编辑", self)
-        self.btn.setFixedWidth(120)
+        self.btn = PushButton(self.tr("编辑"), self)
+        self.btn.setMinimumWidth(120)
         self.btn.clicked.connect(self._on_click)
         self.hBoxLayout.addWidget(self.btn, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addSpacing(16)
@@ -694,7 +698,7 @@ class MultiCheckSettingCard(SettingCard):
 
     def _update_button_text(self):
         """更新按钮显示文本。"""
-        self.btn.setText("编辑")
+        self.btn.setText(self.tr("编辑"))
 
     def setSelectedValues(self, values: list[str]):
         """设置选中的值列表。"""
@@ -736,8 +740,8 @@ class MultiBoolSettingCard(SettingCard):
         self._items = items
         self._values: dict[str, bool] = {key: False for key, _ in items}
 
-        self.btn = PushButton("编辑", self)
-        self.btn.setFixedWidth(120)
+        self.btn = PushButton(self.tr("编辑"), self)
+        self.btn.setMinimumWidth(120)
         self.btn.clicked.connect(self._on_click)
         self.hBoxLayout.addWidget(self.btn, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addSpacing(16)

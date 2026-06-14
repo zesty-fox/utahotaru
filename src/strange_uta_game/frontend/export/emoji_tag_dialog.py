@@ -339,7 +339,7 @@ class EmojiTagDialog(QDialog):
 
         ctrls["zoom_mode"] = ComboBox()
         ctrls["zoom_mode"].addItems(["未指定", "Zoom", "Fix"])
-        ctrls["zoom_mode"].setFixedWidth(96)
+        ctrls["zoom_mode"].setMinimumWidth(96)
         if default_opts["zoom_mode"] == "Fix":
             ctrls["zoom_mode"].setCurrentText("Fix")
         elif default_opts["zoom_mode"] == "Zoom":
@@ -348,7 +348,7 @@ class EmojiTagDialog(QDialog):
         ctrls["zoom_value"] = LineEdit()
         ctrls["zoom_value"].setFont(QFont("Microsoft YaHei", 10))
         ctrls["zoom_value"].setText(str(default_opts["zoom_value"]))
-        ctrls["zoom_value"].setFixedWidth(54)
+        ctrls["zoom_value"].setMinimumWidth(54)
         ctrls["zoom_value"].setPlaceholderText("100")
         ctrls["zoom_value"].setEnabled(default_opts["zoom_mode"] == "Zoom")
 
@@ -371,7 +371,7 @@ class EmojiTagDialog(QDialog):
         ctrls["margin_left"] = LineEdit()
         ctrls["margin_left"].setFont(QFont("Microsoft YaHei", 10))
         ctrls["margin_left"].setText(str(default_opts["margin_left"]))
-        ctrls["margin_left"].setFixedWidth(68)
+        ctrls["margin_left"].setMinimumWidth(68)
         ctrls["margin_left"].setPlaceholderText("0")
         ctrls["margin_left"].setToolTip("MarginLeft：图片左侧留白（像素，允许负值）")
 
@@ -380,7 +380,7 @@ class EmojiTagDialog(QDialog):
         ctrls["margin_right"] = LineEdit()
         ctrls["margin_right"].setFont(QFont("Microsoft YaHei", 10))
         ctrls["margin_right"].setText(str(default_opts["margin_right"]))
-        ctrls["margin_right"].setFixedWidth(68)
+        ctrls["margin_right"].setMinimumWidth(68)
         ctrls["margin_right"].setPlaceholderText("0")
         ctrls["margin_right"].setToolTip("MarginRight：图片右侧留白（像素，允许负值）")
 
@@ -389,7 +389,7 @@ class EmojiTagDialog(QDialog):
         ctrls["margin_bottom"] = LineEdit()
         ctrls["margin_bottom"].setFont(QFont("Microsoft YaHei", 10))
         ctrls["margin_bottom"].setText(str(default_opts["margin_bottom"]))
-        ctrls["margin_bottom"].setFixedWidth(68)
+        ctrls["margin_bottom"].setMinimumWidth(68)
         ctrls["margin_bottom"].setPlaceholderText("0")
         ctrls["margin_bottom"].setToolTip("MarginBottom：图片下方留白（像素，允许负值）")
 
@@ -438,7 +438,7 @@ class EmojiTagDialog(QDialog):
             row1.setSpacing(6)
 
             name_lbl = BodyLabel(singer_name)
-            name_lbl.setFixedWidth(80)
+            name_lbl.setMinimumWidth(80)
             row1.addWidget(name_lbl)
 
             trigger_lbl = BodyLabel("触发")
@@ -448,7 +448,7 @@ class EmojiTagDialog(QDialog):
             trigger_edit.setFont(QFont("Microsoft YaHei", 10))
             trigger_edit.setText(f"【{singer_name}】")
             trigger_edit.setPlaceholderText("必填")
-            trigger_edit.setFixedWidth(110)
+            trigger_edit.setMinimumWidth(110)
             row1.addWidget(trigger_edit)
 
             front_lbl = BodyLabel("前画像")

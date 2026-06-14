@@ -65,8 +65,13 @@ class DictionaryEditDialog(QDialog):
         self._table.setHorizontalHeaderLabels(["启用", "词", "注音(annotated)"])
         header = self._table.horizontalHeader()
         if header is not None:
-            header.setStretchLastSection(True)
+            # 词列按内容自动撑开，注音列拉伸吃满剩余宽度；"启用" 复选框列固定窄宽。
+            from PyQt6.QtWidgets import QHeaderView
+            header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+            header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self._table.setColumnWidth(0, 50)
+        # 列 1 (词) 的最小宽度——内容更短时不至于过窄，长内容自然撑开。
         self._table.setColumnWidth(1, 140)
         self._table.setAlternatingRowColors(True)
         layout.addWidget(self._table)

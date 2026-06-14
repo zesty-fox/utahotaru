@@ -146,7 +146,8 @@ class EditorToolBar(QFrame):
         layout.addWidget(lbl_offset)
         self.edit_offset = QLineEdit(self)
         self.edit_offset.setText("-100")
-        self.edit_offset.setFixedWidth(80)
+        self.edit_offset.setMinimumWidth(80)
+        self.edit_offset.setMaximumWidth(140)  # 限制上限以防输入框喧宾夺主
         self.edit_offset.setFixedHeight(32)
         self.edit_offset.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.edit_offset.setStyleSheet("font-size: 12px;")

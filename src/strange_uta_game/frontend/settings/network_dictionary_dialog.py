@@ -119,7 +119,10 @@ class NetworkSourceEntriesDialog(QDialog):
         self._table.setHorizontalHeaderLabels(["启用", "词", "注音(annotated)"])
         header = self._table.horizontalHeader()
         if header is not None:
-            header.setStretchLastSection(True)
+            from PyQt6.QtWidgets import QHeaderView
+            header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+            header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self._table.setColumnWidth(0, 50)
         self._table.setColumnWidth(1, 140)
         self._table.setAlternatingRowColors(True)
@@ -253,7 +256,13 @@ class NetworkDictionaryDialog(QDialog):
         self._table.setHorizontalHeaderLabels(["启用", "名称", "URL", "条目数", "上次同步"])
         header = self._table.horizontalHeader()
         if header is not None:
-            header.setStretchLastSection(False)
+            from PyQt6.QtWidgets import QHeaderView
+            # 启用 / 条目数 列固定窄宽；名称按内容；URL 吃满剩余；同步时间按内容。
+            header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+            header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+            header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+            header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         self._table.setColumnWidth(0, 50)
         self._table.setColumnWidth(1, 160)
         self._table.setColumnWidth(2, 300)

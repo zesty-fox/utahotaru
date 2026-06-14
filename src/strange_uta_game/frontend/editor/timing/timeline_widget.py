@@ -466,12 +466,14 @@ class TimelineWidget(QWidget):
         self.zoom_slider = QSlider(Qt.Orientation.Horizontal, self)
         self.zoom_slider.setRange(0, 10000)
         self.zoom_slider.setValue(self._zoom_to_slider(50.0))  # 默认50x
-        self.zoom_slider.setFixedWidth(120)
+        # slider 用 minimum 而非 fixed：横幅有富余时让它跟着加宽，便于精确缩放
+        self.zoom_slider.setMinimumWidth(120)
+        self.zoom_slider.setMaximumWidth(220)
         self.zoom_slider.valueChanged.connect(self._on_zoom_slider_changed)
         bottom_layout.addWidget(self.zoom_slider)
 
         self.zoom_label = CaptionLabel("50.0x", self)
-        self.zoom_label.setFixedWidth(40)
+        self.zoom_label.setMinimumWidth(40)
         bottom_layout.addWidget(self.zoom_label)
 
         # 横向滚动条
@@ -483,7 +485,12 @@ class TimelineWidget(QWidget):
 
         # 音频名称标签
         self.lbl_audio_name = CaptionLabel("未加载音频", self)
-        self.lbl_audio_name.setFixedWidth(400)
+        # 音频名很长时（长文件名 + 翻译后的"未加载音频"前缀）让标签可压缩；
+        # 用 maxWidth 限制上限避免吃掉太多 toolbar 空间。
+        self.lbl_audio_name.setMaximumWidth(400)
+        self.lbl_audio_name.setMinimumWidth(120)
+        from PyQt6.QtCore import Qt as _Qt
+        self.lbl_audio_name.setTextInteractionFlags(_Qt.TextInteractionFlag.NoTextInteraction)
         self.lbl_audio_name.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         bottom_layout.addWidget(self.lbl_audio_name)
 

@@ -122,20 +122,24 @@ class TransportBar(QFrame):
         self.slider_speed.setSingleStep(5)
         self.slider_speed.setPageStep(5)
         self.slider_speed.setValue(100)
-        self.slider_speed.setFixedWidth(116)
+        self.slider_speed.setMinimumWidth(116)
+        self.slider_speed.setMaximumWidth(200)
         self.slider_speed.valueChanged.connect(self._on_speed_slider_changed)
         self.slider_speed.sliderPressed.connect(self._on_speed_slider_pressed)
         self.slider_speed.sliderReleased.connect(self._on_speed_slider_released)
         layout.addWidget(self.slider_speed)
 
         self.lbl_speed_value = CaptionLabel("1.00x", self)
-        self.lbl_speed_value.setFixedWidth(44)
+        # "1.00x" 在中文/英文都是 5 字符；用 minimum 防止极端字号下挤压。
+        self.lbl_speed_value.setMinimumWidth(44)
         self.lbl_speed_value.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.lbl_speed_value)
         self._set_speed_label(100)
 
         self.lbl_render = CaptionLabel("", self)
-        self.lbl_render.setFixedWidth(96)
+        # 渲染状态文本：本地化后 "Rendering 50%" / "レンダリング 50%" 都比中文更长。
+        self.lbl_render.setMinimumWidth(96)
+        self.lbl_render.setMaximumWidth(180)
         self.lbl_render.setAlignment(
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
         )
@@ -145,7 +149,8 @@ class TransportBar(QFrame):
         self.slider_volume = WheelSpeedSlider(Qt.Orientation.Horizontal, self, default_value=100)
         self.slider_volume.setRange(0, 100)
         self.slider_volume.setValue(100)
-        self.slider_volume.setFixedWidth(100)
+        self.slider_volume.setMinimumWidth(100)
+        self.slider_volume.setMaximumWidth(180)
         self.slider_volume.valueChanged.connect(self.volume_changed.emit)
         layout.addWidget(self.slider_volume)
 
