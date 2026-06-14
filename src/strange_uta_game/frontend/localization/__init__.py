@@ -22,6 +22,7 @@ from .manager import (
     DEFAULT_LANGUAGE,
     LocalizationManager,
     Language,
+    PSEUDO_LANGUAGE_CODE,
     install_translators,
     localization,
 )
@@ -31,6 +32,7 @@ __all__ = [
     "DEFAULT_LANGUAGE",
     "LocalizationManager",
     "Language",
+    "PSEUDO_LANGUAGE_CODE",
     "install_translators",
     "localization",
 ]

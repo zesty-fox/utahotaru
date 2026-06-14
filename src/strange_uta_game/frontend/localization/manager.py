@@ -30,14 +30,23 @@ class Language:
 
 
 #: 受支持的语言列表。EN/JA 翻译就绪后再追加。
+#:
+#: "pseudo" 是开发用伪语言：所有被 ``tr()`` 包过的字符串显示成 ``⟦原文⟧``，
+#: 没 wrap 的纯中文保留原样。切到 pseudo 可一眼看出哪些字符串还没纳入 i18n。
+#: 它不依赖 .qm 文件——见 :class:`_PseudoTranslator`。
 AVAILABLE_LANGUAGES: Tuple[Language, ...] = (
-    Language(code="zh_CN", native_name="简体中文", qlocale_name="zh_CN"),
+    Language(code="zh_CN",  native_name="简体中文", qlocale_name="zh_CN"),
+    Language(code="pseudo", native_name="⟦pseudo⟧", qlocale_name="C"),
     # Language(code="en_US", native_name="English",  qlocale_name="en_US"),
     # Language(code="ja_JP", native_name="日本語",   qlocale_name="ja_JP"),
 )
 
 
+#: 默认语言（与 ``ui.language`` 默认值一致）。pseudo 不能作默认。
 DEFAULT_LANGUAGE: Language = AVAILABLE_LANGUAGES[0]
+
+
+PSEUDO_LANGUAGE_CODE: str = "pseudo"
 
 
 def language_by_code(code: str) -> Language:
@@ -68,6 +77,40 @@ class _AppTranslator(QTranslator):
         return super().load(str(qm))
 
 
+class _PseudoTranslator(QTranslator):
+    """开发用伪 translator——返回 ``⟦原文⟧``，不需要 .qm 文件。
+
+    用途：切到 pseudo 语言后，所有被 ``tr()`` 包过的字符串自动套上 ``⟦⟧``
+    括号；没 wrap 的硬编码中文保持原样。这样**一眼能看出哪些 UI 字符串还
+    没纳入 i18n**——比对着 git diff 查 wrap 是否齐全可靠得多。
+
+    实现要点：
+
+    - 重写 ``translate`` 而非 ``load``——没有 .qm 可载。
+    - 必须 ``isEmpty() == False``，否则 Qt 不会把这个 translator 计入
+      候选；故 ``isEmpty`` 显式返回 ``False``。Qt 6 的实现里只要
+      ``translate`` 返回非空就视为成功，但安全起见两个钩子都搞定。
+    - n 参数（plural form）暂不处理——pseudo 仅做可视标记，不关心复数。
+    """
+
+    BRACKET_LEFT = "⟦"
+    BRACKET_RIGHT = "⟧"
+
+    def isEmpty(self) -> bool:  # type: ignore[override]
+        return False
+
+    def translate(  # type: ignore[override]
+        self,
+        context: str,
+        sourceText: str,
+        disambiguation: Optional[str] = None,
+        n: int = -1,
+    ) -> str:
+        if not sourceText:
+            return ""
+        return f"{self.BRACKET_LEFT}{sourceText}{self.BRACKET_RIGHT}"
+
+
 class LocalizationManager(QObject):
     """语言状态持有者 + translator 安装/卸载入口。
 
@@ -83,7 +126,8 @@ class LocalizationManager(QObject):
 
     def __init__(self) -> None:
         super().__init__()
-        self._app_translator: Optional[_AppTranslator] = None
+        # pseudo 语言走 _PseudoTranslator，其余走 _AppTranslator——共同基类 QTranslator
+        self._app_translator: Optional[QTranslator] = None
         self._fluent_translator: Optional[QTranslator] = None
         self._current: Language = DEFAULT_LANGUAGE
 
@@ -123,9 +167,15 @@ class LocalizationManager(QObject):
             app.removeTranslator(self._fluent_translator)
             self._fluent_translator = None
 
-        # ── 安装 app translator（源字符串=zh_CN，缺失 .qm 也无碍）──
-        app_tr = _AppTranslator()
-        app_tr.load_language(lang)
+        # ── 安装 app translator ─────────────────────────────────────
+        # pseudo 走自己的可视化分支，其余按 .qm 文件加载（zh_CN 没 .qm 时
+        # 回落到源字符串——本就是简体中文，行为等价）。
+        if lang.code == PSEUDO_LANGUAGE_CODE:
+            app_tr: QTranslator = _PseudoTranslator()
+        else:
+            real = _AppTranslator()
+            real.load_language(lang)
+            app_tr = real
         app.installTranslator(app_tr)
         self._app_translator = app_tr
 
