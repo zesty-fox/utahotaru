@@ -75,7 +75,7 @@ class _ColorSwatch(QLabel):
         self._color = color
         self.setFixedSize(32, 32)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setToolTip(f"点击设置颜色\n{color}")
+        self.setToolTip(self.tr("点击设置颜色\n{color}").format(color=color))
         self._apply_style(False)
 
     def _apply_style(self, hover: bool):
@@ -126,7 +126,7 @@ class SingerEditDialog(QDialog):
         # 分色模式下当前激活的颜色槽位（用于右侧已用颜色面板的赋值目标）
         self._active_split_idx = 0
 
-        self.setWindowTitle("编辑演唱者" if singer else "添加演唱者")
+        self.setWindowTitle(self.tr("编辑演唱者") if singer else self.tr("添加演唱者"))
         self.resize(520, 350)
         self._init_ui()
 
@@ -151,8 +151,8 @@ class SingerEditDialog(QDialog):
         if self._singer:
             self.line_name.setText(self._singer.name)
         else:
-            self.line_name.setPlaceholderText("输入演唱者名称（留空自动编号）...")
-        form.addRow("显示名称:", self.line_name)
+            self.line_name.setPlaceholderText(self.tr("输入演唱者名称（留空自动编号）..."))
+        form.addRow(self.tr("显示名称:"), self.line_name)
 
         # 分组：可编辑下拉，选项来自项目已有分组
         self.combo_group = QComboBox()
@@ -162,21 +162,21 @@ class SingerEditDialog(QDialog):
             self.combo_group.addItem(g)
         current_group = self._singer.group if self._singer else ""
         self.combo_group.setCurrentText(current_group)
-        self.combo_group.lineEdit().setPlaceholderText("留空为默认分组")
-        form.addRow("分组:", self.combo_group)
+        self.combo_group.lineEdit().setPlaceholderText(self.tr("留空为默认分组"))
+        form.addRow(self.tr("分组:"), self.combo_group)
 
         # 从已有演唱者加载颜色（仅在有其他演唱者时显示）
         if self._existing_singers:
-            self._btn_load_color = PushButton("从已有演唱者加载颜色…")
+            self._btn_load_color = PushButton(self.tr("从已有演唱者加载颜色…"))
             self._btn_load_color.clicked.connect(self._on_load_from_singer)
-            form.addRow("颜色来源:", self._btn_load_color)
+            form.addRow(self.tr("颜色来源:"), self._btn_load_color)
 
         # 颜色模式
         mode_widget = QWidget()
         mode_layout = QHBoxLayout(mode_widget)
         mode_layout.setContentsMargins(0, 0, 0, 0)
-        self._rb_solid = QRadioButton("单色")
-        self._rb_split = QRadioButton("分色（最多5色）")
+        self._rb_solid = QRadioButton(self.tr("单色"))
+        self._rb_split = QRadioButton(self.tr("分色（最多5色）"))
         mode_grp = QButtonGroup(self)
         mode_grp.addButton(self._rb_solid, 0)
         mode_grp.addButton(self._rb_split, 1)
@@ -185,7 +185,7 @@ class SingerEditDialog(QDialog):
         mode_layout.addWidget(self._rb_solid)
         mode_layout.addWidget(self._rb_split)
         mode_layout.addStretch()
-        form.addRow("颜色模式:", mode_widget)
+        form.addRow(self.tr("颜色模式:"), mode_widget)
         outer.addLayout(form)
 
         # ── 单色面板 ──
@@ -195,7 +195,7 @@ class SingerEditDialog(QDialog):
         self._lbl_solid_preview = QLabel()
         self._lbl_solid_preview.setFixedSize(40, 28)
         self._refresh_solid_swatch()
-        btn_solid_pick = PushButton("选择颜色...")
+        btn_solid_pick = PushButton(self.tr("选择颜色..."))
         btn_solid_pick.clicked.connect(self._on_pick_solid)
         sp_layout.addWidget(self._lbl_solid_preview)
         sp_layout.addWidget(btn_solid_pick)
@@ -214,12 +214,12 @@ class SingerEditDialog(QDialog):
         self._split_rows_layout.setSpacing(4)
         split_layout.addWidget(self._split_rows_widget)
 
-        self._btn_add_split = PushButton("+ 添加颜色")
+        self._btn_add_split = PushButton(self.tr("+ 添加颜色"))
         self._btn_add_split.clicked.connect(self._on_add_split_color)
         split_layout.addWidget(self._btn_add_split)
 
         # 分色预览条（水平条，从上到下展示各色带）
-        preview_label = QLabel("预览：")
+        preview_label = QLabel(self.tr("预览："))
         split_layout.addWidget(preview_label)
         self._lbl_split_preview = QLabel()
         self._lbl_split_preview.setFixedHeight(36)
@@ -232,7 +232,7 @@ class SingerEditDialog(QDialog):
         self._rebuild_split_rows()
 
         # 默认演唱者
-        self.chk_default = QPushButton("设为默认演唱者")
+        self.chk_default = QPushButton(self.tr("设为默认演唱者"))
         self.chk_default.setCheckable(True)
         if self._singer and self._singer.is_default:
             self.chk_default.setChecked(True)
@@ -242,8 +242,8 @@ class SingerEditDialog(QDialog):
         button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
-        button_box.button(QDialogButtonBox.StandardButton.Ok).setText("确定")
-        button_box.button(QDialogButtonBox.StandardButton.Cancel).setText("取消")
+        button_box.button(QDialogButtonBox.StandardButton.Ok).setText(self.tr("确定"))
+        button_box.button(QDialogButtonBox.StandardButton.Cancel).setText(self.tr("取消"))
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
         outer.addWidget(button_box)
@@ -325,10 +325,10 @@ class SingerEditDialog(QDialog):
         border = f"2px solid {theme.accent_secondary.name()}" if active else "1px solid gray"
         swatch.setStyleSheet(f"background-color: {color}; border: {border};")
         swatch.setCursor(Qt.CursorShape.PointingHandCursor)
-        swatch.setToolTip("点击选中此颜色位，然后从右侧面板选择颜色")
+        swatch.setToolTip(self.tr("点击选中此颜色位，然后从右侧面板选择颜色"))
         swatch.mousePressEvent = lambda event, i=idx: self._set_active_split_idx(i)
 
-        btn_pick = PushButton(f"颜色 {idx + 1}")
+        btn_pick = PushButton(self.tr("颜色 {n}").format(n=idx + 1))
         btn_pick.setMinimumWidth(80)
         btn_pick.clicked.connect(lambda _checked, i=idx: self._on_pick_split_color(i))
 
@@ -348,7 +348,7 @@ class SingerEditDialog(QDialog):
         self._set_active_split_idx(idx)
         all_colors = self._all_split_colors()
         current = all_colors[idx] if idx < len(all_colors) else "#FFFFFF"
-        color = QColorDialog.getColor(QColor(current), self, f"选择颜色 {idx + 1}")
+        color = QColorDialog.getColor(QColor(current), self, self.tr("选择颜色 {n}").format(n=idx + 1))
         if not color.isValid():
             return
         if idx == 0:
@@ -483,7 +483,7 @@ class SingerEditDialog(QDialog):
         grid.setRowStretch(grid.rowCount(), 1)
 
         if not colors:
-            empty_label = QLabel("暂无已用颜色")
+            empty_label = QLabel(self.tr("暂无已用颜色"))
             empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             empty_label.setStyleSheet("color: #888;")
             grid.addWidget(empty_label, 0, 0, 1, cols)
@@ -525,11 +525,11 @@ class BatchGroupDialog(QDialog):
 
     def __init__(self, existing_groups: List[str], parent=None):
         super().__init__(parent)
-        self.setWindowTitle("批量设置分组")
+        self.setWindowTitle(self.tr("批量设置分组"))
         self.resize(320, 130)
 
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("选择或输入分组名称（留空则清除分组）："))
+        layout.addWidget(QLabel(self.tr("选择或输入分组名称（留空则清除分组）：")))
 
         self.combo = QComboBox(self)
         self.combo.setEditable(True)
@@ -542,8 +542,8 @@ class BatchGroupDialog(QDialog):
         button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
-        button_box.button(QDialogButtonBox.StandardButton.Ok).setText("确定")
-        button_box.button(QDialogButtonBox.StandardButton.Cancel).setText("取消")
+        button_box.button(QDialogButtonBox.StandardButton.Ok).setText(self.tr("确定"))
+        button_box.button(QDialogButtonBox.StandardButton.Cancel).setText(self.tr("取消"))
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
         layout.addWidget(button_box)
@@ -562,19 +562,19 @@ class TransferTargetDialog(QDialog):
         parent=None,
     ):
         super().__init__(parent)
-        self.setWindowTitle("选择转移目标")
+        self.setWindowTitle(self.tr("选择转移目标"))
         self.resize(360, 160)
 
         self._candidates = candidates
 
         layout = QVBoxLayout(self)
         layout.addWidget(
-            QLabel("被删除演唱者的歌词将转移到以下演唱者：")
+            QLabel(self.tr("被删除演唱者的歌词将转移到以下演唱者："))
         )
 
         self.combo = QComboBox(self)
         for s in candidates:
-            label = s.name + ("（默认）" if s.is_default else "")
+            label = s.name + (self.tr("（默认）") if s.is_default else "")
             self.combo.addItem(label, s.id)
         if default_id:
             idx = self.combo.findData(default_id)
@@ -585,8 +585,8 @@ class TransferTargetDialog(QDialog):
         button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
-        button_box.button(QDialogButtonBox.StandardButton.Ok).setText("确定")
-        button_box.button(QDialogButtonBox.StandardButton.Cancel).setText("取消")
+        button_box.button(QDialogButtonBox.StandardButton.Ok).setText(self.tr("确定"))
+        button_box.button(QDialogButtonBox.StandardButton.Cancel).setText(self.tr("取消"))
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
         layout.addWidget(button_box)
@@ -600,7 +600,7 @@ class SingerPresetLoadDialog(QDialog):
 
     def __init__(self, presets: list, existing_names: set, app_settings=None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("从软件预设加载演唱者")
+        self.setWindowTitle(self.tr("从软件预设加载演唱者"))
         self.resize(400, 450)
 
         self._presets = presets
@@ -618,19 +618,19 @@ class SingerPresetLoadDialog(QDialog):
 
         # 搜索过滤框
         filter_layout = QHBoxLayout()
-        filter_layout.addWidget(QLabel("过滤:"))
+        filter_layout.addWidget(QLabel(self.tr("过滤:")))
         self.line_filter = LineEdit()
-        self.line_filter.setPlaceholderText("输入名称搜索...")
+        self.line_filter.setPlaceholderText(self.tr("输入名称搜索..."))
         self.line_filter.textChanged.connect(self._apply_filter)
         filter_layout.addWidget(self.line_filter)
 
-        filter_layout.addWidget(QLabel("分组:"))
+        filter_layout.addWidget(QLabel(self.tr("分组:")))
         self.combo_group = QComboBox(self)
-        self.combo_group.addItem("全部分组", "")
+        self.combo_group.addItem(self.tr("全部分组"), "")
         # 从预设中收集所有分组
         groups = sorted(set(p.get("group", "") for p in self._presets if p.get("group", "")))
         if any(not p.get("group", "") for p in self._presets):
-            self.combo_group.addItem("（无分组）", _FILTER_NO_GROUP)
+            self.combo_group.addItem(self.tr("（无分组）"), _FILTER_NO_GROUP)
         for g in groups:
             self.combo_group.addItem(g, g)
         self.combo_group.currentIndexChanged.connect(self._apply_filter)
@@ -648,11 +648,11 @@ class SingerPresetLoadDialog(QDialog):
 
         # 全选/全不选按钮
         select_layout = QHBoxLayout()
-        btn_select_all = PushButton("全选", self)
+        btn_select_all = PushButton(self.tr("全选"), self)
         btn_select_all.clicked.connect(self._on_select_all)
         select_layout.addWidget(btn_select_all)
 
-        btn_deselect_all = PushButton("全不选", self)
+        btn_deselect_all = PushButton(self.tr("全不选"), self)
         btn_deselect_all.clicked.connect(self._on_deselect_all)
         select_layout.addWidget(btn_deselect_all)
 
@@ -667,21 +667,21 @@ class SingerPresetLoadDialog(QDialog):
         button_layout = QHBoxLayout()
         
         # 删除选中演唱者按钮
-        self.btn_delete_selected = PushButton("删除选中演唱者", self)
+        self.btn_delete_selected = PushButton(self.tr("删除选中演唱者"), self)
         self.btn_delete_selected.setIcon(FIF.DELETE)
         self.btn_delete_selected.clicked.connect(self._on_delete_selected)
         button_layout.addWidget(self.btn_delete_selected)
-        
+
         button_layout.addStretch()
-        
+
         # 加载选中按钮
-        btn_load = PushButton("加载选中", self)
+        btn_load = PushButton(self.tr("加载选中"), self)
         btn_load.setIcon(FIF.DOWNLOAD)
         btn_load.clicked.connect(self._on_accept)
         button_layout.addWidget(btn_load)
-        
+
         # 取消按钮
-        btn_cancel = PushButton("取消", self)
+        btn_cancel = PushButton(self.tr("取消"), self)
         btn_cancel.clicked.connect(self.reject)
         button_layout.addWidget(btn_cancel)
         
@@ -693,11 +693,11 @@ class SingerPresetLoadDialog(QDialog):
         self.combo_group.blockSignals(True)
         saved_group = self.combo_group.currentData()
         self.combo_group.clear()
-        self.combo_group.addItem("全部分组", "")
+        self.combo_group.addItem(self.tr("全部分组"), "")
         groups = sorted(set(p.get("group", "") for p in self._presets if p.get("group", "")))
         has_no_group = any(not p.get("group", "") for p in self._presets)
         if has_no_group:
-            self.combo_group.addItem("（无分组）", _FILTER_NO_GROUP)
+            self.combo_group.addItem(self.tr("（无分组）"), _FILTER_NO_GROUP)
         for g in groups:
             self.combo_group.addItem(g, g)
         idx = self.combo_group.findData(saved_group)
@@ -721,7 +721,7 @@ class SingerPresetLoadDialog(QDialog):
 
             item = QListWidgetItem()
             display_name = f"{name} [{group}]" if group else name
-            item.setText(f"{display_name}  (已存在)" if is_existing else display_name)
+            item.setText(self.tr("{name}  (已存在)").format(name=display_name) if is_existing else display_name)
 
             # 颜色图标（支持分色预览）
             item.setIcon(_make_singer_icon(all_colors, 32, 18))
@@ -799,7 +799,7 @@ class SingerPresetLoadDialog(QDialog):
             total += 1
             if item.checkState() == Qt.CheckState.Checked:
                 checked += 1
-        self.lbl_stats.setText(f"已选 {checked}/{total}")
+        self.lbl_stats.setText(self.tr("已选 {checked}/{total}").format(checked=checked, total=total))
 
     def _on_delete_selected(self):
         """删除选中的演唱者预设"""
@@ -813,29 +813,29 @@ class SingerPresetLoadDialog(QDialog):
                     selected_presets.append(preset)
         
         if not selected_presets:
-            InfoBar.warning(title="未选择", content="请至少选择一位演唱者",
+            InfoBar.warning(title=self.tr("未选择"), content=self.tr("请至少选择一位演唱者"),
                             parent=self, duration=2000)
             return
-        
+
         # 二次确认
         names = "、".join(p.get("name", "") for p in selected_presets[:5])
         if len(selected_presets) > 5:
-            names += f" 等 {len(selected_presets)} 位"
-        
+            names += self.tr(" 等 {n} 位").format(n=len(selected_presets))
+
         msg = QMessageBox(self)
-        msg.setWindowTitle("确认删除")
-        msg.setText(f"确定要从预设中删除以下演唱者吗？\n\n{names}\n\n删除后将无法恢复。")
-        btn_yes = msg.addButton("删除", QMessageBox.ButtonRole.AcceptRole)
-        msg.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+        msg.setWindowTitle(self.tr("确认删除"))
+        msg.setText(self.tr("确定要从预设中删除以下演唱者吗？\n\n{names}\n\n删除后将无法恢复。").format(names=names))
+        btn_yes = msg.addButton(self.tr("删除"), QMessageBox.ButtonRole.AcceptRole)
+        msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
         msg.setDefaultButton(btn_yes)
         msg.exec()
-        
+
         if msg.clickedButton() is not btn_yes:
             return
-        
+
         # 从预设中删除选中的演唱者
         if not self._app_settings:
-            InfoBar.error(title="错误", content="无法访问设置",
+            InfoBar.error(title=self.tr("错误"), content=self.tr("无法访问设置"),
                           parent=self, duration=3000)
             return
         
@@ -859,10 +859,12 @@ class SingerPresetLoadDialog(QDialog):
             # 重新填充列表
             self._populate_list()
             
-            InfoBar.success(title="删除成功", content=f"已删除 {len(selected_presets)} 位演唱者预设",
+            InfoBar.success(title=self.tr("删除成功"),
+                            content=self.tr("已删除 {n} 位演唱者预设").format(n=len(selected_presets)),
                             parent=self, duration=2000)
         except Exception as e:
-            InfoBar.error(title="删除失败", content=f"保存预设时出错: {e}",
+            InfoBar.error(title=self.tr("删除失败"),
+                          content=self.tr("保存预设时出错: {err}").format(err=e),
                           parent=self, duration=3000)
 
     def _on_accept(self):
@@ -872,7 +874,7 @@ class SingerPresetLoadDialog(QDialog):
             for i in range(self.list_widget.count())
         )
         if not has_checked:
-            InfoBar.warning(title="未选择", content="请至少选择一位演唱者",
+            InfoBar.warning(title=self.tr("未选择"), content=self.tr("请至少选择一位演唱者"),
                             parent=self, duration=2000)
             return
         self.accept()
@@ -904,7 +906,7 @@ class SingerColorPreviewPanel(QWidget):
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)
 
-        title = QLabel("颜色预览")
+        title = QLabel(self.tr("颜色预览"))
         title.setStyleSheet("font-size: 13px; font-weight: bold; color: #888;")
         layout.addWidget(title)
 
@@ -913,7 +915,7 @@ class SingerColorPreviewPanel(QWidget):
         self._swatch.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._swatch)
 
-        self._name_label = QLabel("未选中")
+        self._name_label = QLabel(self.tr("未选中"))
         self._name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._name_label.setWordWrap(True)
         self._name_label.setStyleSheet("color: #888; font-size: 12px;")
@@ -944,12 +946,12 @@ class SingerColorPreviewPanel(QWidget):
         self._swatch.setPixmap(pixmap)
 
     def set_multiple(self, count: int):
-        self._name_label.setText(f"已选中 {count} 位")
+        self._name_label.setText(self.tr("已选中 {n} 位").format(n=count))
         self._name_label.setStyleSheet("color: #888; font-size: 12px;")
         self._clear_swatch()
 
     def _clear(self):
-        self._name_label.setText("未选中")
+        self._name_label.setText(self.tr("未选中"))
         self._name_label.setStyleSheet("color: #888; font-size: 12px;")
         self._clear_swatch()
 
@@ -987,27 +989,27 @@ class SingerManagerInterface(QWidget):
         layout.setSpacing(12)
 
         # 标题
-        title = QLabel("演唱者管理")
+        title = QLabel(self.tr("演唱者管理"))
         title.setStyleSheet("font-size: 24px; font-weight: bold;")
         layout.addWidget(title)
 
         # 说明
         desc = CaptionLabel(
-            "管理演唱者：双击编辑；Ctrl/Shift 多选可批量操作；拖动可调整顺序。"
+            self.tr("管理演唱者：双击编辑；Ctrl/Shift 多选可批量操作；拖动可调整顺序。")
         )
         layout.addWidget(desc)
 
         # 搜索框 + 分组过滤（常驻）
         search_row = QHBoxLayout()
         self.line_search = LineEdit()
-        self.line_search.setPlaceholderText("搜索演唱者名称...")
+        self.line_search.setPlaceholderText(self.tr("搜索演唱者名称..."))
         self.line_search.setClearButtonEnabled(True)
         self.line_search.textChanged.connect(self._on_search_changed)
         search_row.addWidget(self.line_search)
 
-        search_row.addWidget(QLabel("分组:"))
+        search_row.addWidget(QLabel(self.tr("分组:")))
         self.combo_group_filter = QComboBox(self)
-        self.combo_group_filter.addItem("全部", "")
+        self.combo_group_filter.addItem(self.tr("全部"), "")
         self.combo_group_filter.setMinimumWidth(90)
         self.combo_group_filter.currentIndexChanged.connect(self._on_group_filter_changed)
         search_row.addWidget(self.combo_group_filter)
@@ -1040,18 +1042,18 @@ class SingerManagerInterface(QWidget):
         # ── 第一排按钮：常规操作 ──
         row1 = QHBoxLayout()
 
-        self.btn_add = PrimaryPushButton("添加", self)
+        self.btn_add = PrimaryPushButton(self.tr("添加"), self)
         self.btn_add.setIcon(FIF.ADD)
         self.btn_add.clicked.connect(self._on_add_singer)
         row1.addWidget(self.btn_add)
 
-        self.btn_edit = PushButton("编辑", self)
+        self.btn_edit = PushButton(self.tr("编辑"), self)
         self.btn_edit.setIcon(FIF.EDIT)
         self.btn_edit.clicked.connect(self._on_edit_singer)
         self.btn_edit.setEnabled(False)
         row1.addWidget(self.btn_edit)
 
-        self.btn_delete = PushButton("删除", self)
+        self.btn_delete = PushButton(self.tr("删除"), self)
         self.btn_delete.setIcon(FIF.DELETE)
         self.btn_delete.clicked.connect(self._on_delete_singers)
         self.btn_delete.setEnabled(False)
@@ -1060,7 +1062,7 @@ class SingerManagerInterface(QWidget):
         # 分隔
         row1.addSpacing(10)
 
-        self.btn_set_group = PushButton("设置分组", self)
+        self.btn_set_group = PushButton(self.tr("设置分组"), self)
         self.btn_set_group.setIcon(FIF.TAG)
         self.btn_set_group.clicked.connect(self._on_set_group)
         self.btn_set_group.setEnabled(False)
@@ -1068,13 +1070,13 @@ class SingerManagerInterface(QWidget):
 
         row1.addSpacing(10)
 
-        self.btn_enable = PushButton("启用", self)
+        self.btn_enable = PushButton(self.tr("启用"), self)
         self.btn_enable.setIcon(FIF.ACCEPT)
         self.btn_enable.clicked.connect(lambda: self._on_set_enabled(True))
         self.btn_enable.setEnabled(False)
         row1.addWidget(self.btn_enable)
 
-        self.btn_disable = PushButton("禁用", self)
+        self.btn_disable = PushButton(self.tr("禁用"), self)
         self.btn_disable.setIcon(FIF.CLOSE)
         self.btn_disable.clicked.connect(lambda: self._on_set_enabled(False))
         self.btn_disable.setEnabled(False)
@@ -1086,25 +1088,25 @@ class SingerManagerInterface(QWidget):
         # ── 第二排按钮：顺序调整 ──
         row2 = QHBoxLayout()
 
-        self.btn_top = PushButton("置顶", self)
+        self.btn_top = PushButton(self.tr("置顶"), self)
         self.btn_top.setIcon(FIF.UP)
         self.btn_top.clicked.connect(lambda: self._on_move("top"))
         self.btn_top.setEnabled(False)
         row2.addWidget(self.btn_top)
 
-        self.btn_up = PushButton("上移", self)
+        self.btn_up = PushButton(self.tr("上移"), self)
         self.btn_up.setIcon(FIF.UP)
         self.btn_up.clicked.connect(lambda: self._on_move("up"))
         self.btn_up.setEnabled(False)
         row2.addWidget(self.btn_up)
 
-        self.btn_down = PushButton("下移", self)
+        self.btn_down = PushButton(self.tr("下移"), self)
         self.btn_down.setIcon(FIF.DOWN)
         self.btn_down.clicked.connect(lambda: self._on_move("down"))
         self.btn_down.setEnabled(False)
         row2.addWidget(self.btn_down)
 
-        self.btn_bottom = PushButton("置底", self)
+        self.btn_bottom = PushButton(self.tr("置底"), self)
         self.btn_bottom.setIcon(FIF.DOWN)
         self.btn_bottom.clicked.connect(lambda: self._on_move("bottom"))
         self.btn_bottom.setEnabled(False)
@@ -1113,17 +1115,17 @@ class SingerManagerInterface(QWidget):
         row2.addSpacing(20)
 
         # 预设按钮挪到这一排尾部
-        self.btn_save_preset = PushButton("保存为软件预设", self)
+        self.btn_save_preset = PushButton(self.tr("保存为软件预设"), self)
         self.btn_save_preset.setIcon(FIF.SAVE)
         self.btn_save_preset.setToolTip(
-            "将当前演唱者列表保存到软件设置，每次启动自动加载"
+            self.tr("将当前演唱者列表保存到软件设置，每次启动自动加载")
         )
         self.btn_save_preset.clicked.connect(self._on_save_preset)
         row2.addWidget(self.btn_save_preset)
 
-        self.btn_load_preset = PushButton("从软件预设加载", self)
+        self.btn_load_preset = PushButton(self.tr("从软件预设加载"), self)
         self.btn_load_preset.setIcon(FIF.DOWNLOAD)
-        self.btn_load_preset.setToolTip("从软件设置中加载已保存的演唱者预设到当前项目")
+        self.btn_load_preset.setToolTip(self.tr("从软件设置中加载已保存的演唱者预设到当前项目"))
         self.btn_load_preset.clicked.connect(self._on_load_preset)
         row2.addWidget(self.btn_load_preset)
 
@@ -1131,7 +1133,7 @@ class SingerManagerInterface(QWidget):
         layout.addLayout(row2)
 
         # 统计信息
-        self.lbl_stats = CaptionLabel("共 0 位演唱者")
+        self.lbl_stats = CaptionLabel(self.tr("共 0 位演唱者"))
         layout.addWidget(self.lbl_stats)
 
     # ==================== 数据接入 ====================
@@ -1177,9 +1179,9 @@ class SingerManagerInterface(QWidget):
                 has_no_group = any(not s.group for s in self._project.singers)
                 current_group = self._group_filter
                 self.combo_group_filter.clear()
-                self.combo_group_filter.addItem("全部", "")
+                self.combo_group_filter.addItem(self.tr("全部"), "")
                 if has_no_group:
-                    self.combo_group_filter.addItem("（无分组）", _FILTER_NO_GROUP)
+                    self.combo_group_filter.addItem(self.tr("（无分组）"), _FILTER_NO_GROUP)
                 for g in all_groups:
                     self.combo_group_filter.addItem(g, g)
                 idx = self.combo_group_filter.findData(current_group)
@@ -1191,7 +1193,7 @@ class SingerManagerInterface(QWidget):
             self.list_singers.clear()
 
             if not self._project:
-                self.lbl_stats.setText("未加载项目")
+                self.lbl_stats.setText(self.tr("未加载项目"))
                 self._update_button_state()
                 return
 
@@ -1259,13 +1261,13 @@ class SingerManagerInterface(QWidget):
             # 更新统计
             total = len(self._project.singers)
             enabled = sum(1 for s in self._project.singers if s.enabled)
-            stats_text = f"共 {total} 位演唱者（{enabled} 位启用）"
+            stats_text = self.tr("共 {total} 位演唱者（{enabled} 位启用）").format(total=total, enabled=enabled)
             selected_count = len(self.list_singers.selectedItems())
             if selected_count > 0:
-                stats_text += f" — 已选中 {selected_count} 位"
+                stats_text += self.tr(" — 已选中 {n} 位").format(n=selected_count)
             visible = self.list_singers.count()
             if filter_lower or self._group_filter:
-                stats_text += f"  [过滤中：{visible} 项可见]"
+                stats_text += self.tr("  [过滤中：{n} 项可见]").format(n=visible)
             self.lbl_stats.setText(stats_text)
         finally:
             self._suppress_reorder_signal = False
@@ -1328,12 +1330,12 @@ class SingerManagerInterface(QWidget):
         if self._project:
             total = len(self._project.singers)
             enabled = sum(1 for s in self._project.singers if s.enabled)
-            stats_text = f"共 {total} 位演唱者（{enabled} 位启用）"
+            stats_text = self.tr("共 {total} 位演唱者（{enabled} 位启用）").format(total=total, enabled=enabled)
             selected_count = len(self._selected_ids)
             if selected_count > 0:
-                stats_text += f" — 已选中 {selected_count} 位"
+                stats_text += self.tr(" — 已选中 {n} 位").format(n=selected_count)
             if self._filter_text.strip() or self._group_filter:
-                stats_text += f"  [过滤中：{self.list_singers.count()} 项可见]"
+                stats_text += self.tr("  [过滤中：{n} 项可见]").format(n=self.list_singers.count())
             self.lbl_stats.setText(stats_text)
 
     def _update_button_state(self):
@@ -1465,9 +1467,10 @@ class SingerManagerInterface(QWidget):
                 self._singer_service.set_default_singer(singer.id)
 
             self._notify_singers_changed()
-            self._info("添加成功", f"已添加演唱者: {singer.name}")
+            self._info(self.tr("添加成功"),
+                       self.tr("已添加演唱者: {name}").format(name=singer.name))
         except Exception as e:
-            self._error("添加失败", str(e))
+            self._error(self.tr("添加失败"), str(e))
 
     def _on_edit_singer(self):
         selected_ids = self._get_selected_singer_ids()
@@ -1509,9 +1512,10 @@ class SingerManagerInterface(QWidget):
                 self._singer_service.change_singer_group(singer.id, new_group)
 
             self._notify_singers_changed()
-            self._info("修改成功", f"已更新演唱者: {singer.name}")
+            self._info(self.tr("修改成功"),
+                       self.tr("已更新演唱者: {name}").format(name=singer.name))
         except Exception as e:
-            self._error("修改失败", str(e))
+            self._error(self.tr("修改失败"), str(e))
 
     # ==================== 批量删除 ====================
 
@@ -1525,7 +1529,7 @@ class SingerManagerInterface(QWidget):
 
         total = len(self._project.singers)
         if total - len(selected_ids) < 1:
-            self._warn("无法删除", "必须至少保留一个演唱者")
+            self._warn(self.tr("无法删除"), self.tr("必须至少保留一个演唱者"))
             return
 
         selected_singers = [self._project.get_singer(sid) for sid in selected_ids]
@@ -1536,7 +1540,7 @@ class SingerManagerInterface(QWidget):
             s for s in self._project.singers if s.id not in set(selected_ids)
         ]
         if not candidates:
-            self._warn("无法删除", "没有可用的转移目标")
+            self._warn(self.tr("无法删除"), self.tr("没有可用的转移目标"))
             return
 
         # 弹窗选择转移目标
@@ -1551,15 +1555,15 @@ class SingerManagerInterface(QWidget):
         # 简要确认信息
         names = "、".join(s.name for s in selected_singers[:5])
         if len(selected_singers) > 5:
-            names += f" 等 {len(selected_singers)} 位"
+            names += self.tr(" 等 {n} 位").format(n=len(selected_singers))
         msg = QMessageBox(self)
-        msg.setWindowTitle("确认批量删除")
-        msg.setText(
-            f"确定要删除 {len(selected_singers)} 位演唱者吗？\n\n{names}\n\n"
-            "这些演唱者的歌词将转移到你下一步选择的演唱者。"
-        )
-        btn_yes = msg.addButton("继续", QMessageBox.ButtonRole.AcceptRole)
-        msg.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+        msg.setWindowTitle(self.tr("确认批量删除"))
+        msg.setText(self.tr(
+            "确定要删除 {n} 位演唱者吗？\n\n{names}\n\n"
+            "这些演唱者的歌词将转移到你下一步选择的演唱者."
+        ).format(n=len(selected_singers), names=names))
+        btn_yes = msg.addButton(self.tr("继续"), QMessageBox.ButtonRole.AcceptRole)
+        msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
         msg.setDefaultButton(btn_yes)
         msg.exec()
         if msg.clickedButton() is not btn_yes:
@@ -1573,11 +1577,12 @@ class SingerManagerInterface(QWidget):
 
         ok = self._singer_service.batch_remove_singers(selected_ids, transfer_to)
         if not ok:
-            self._error("删除失败", "请检查转移目标是否有效")
+            self._error(self.tr("删除失败"), self.tr("请检查转移目标是否有效"))
             return
 
         self._notify_singers_changed()
-        self._info("删除成功", f"已删除 {len(selected_singers)} 位演唱者")
+        self._info(self.tr("删除成功"),
+                   self.tr("已删除 {n} 位演唱者").format(n=len(selected_singers)))
 
     # ==================== 批量启用/禁用 ====================
 
@@ -1588,13 +1593,15 @@ class SingerManagerInterface(QWidget):
         ok = self._singer_service.batch_set_enabled(selected_ids, enabled)
         if not ok:
             self._error(
-                "操作失败", "部分演唱者状态未能更新" if not enabled else "部分演唱者未能启用"
+                self.tr("操作失败"),
+                self.tr("部分演唱者状态未能更新") if not enabled else self.tr("部分演唱者未能启用"),
             )
             return
         self._notify_singers_changed()
         self._info(
-            "完成",
-            f"已{'启用' if enabled else '禁用'} {len(selected_ids)} 位演唱者",
+            self.tr("完成"),
+            (self.tr("已启用 {n} 位演唱者") if enabled else self.tr("已禁用 {n} 位演唱者")
+             ).format(n=len(selected_ids)),
         )
 
     # ==================== 批量设置分组 ====================
@@ -1614,12 +1621,14 @@ class SingerManagerInterface(QWidget):
             for sid in selected_ids
         )
         if not ok:
-            self._error("操作失败", "部分演唱者分组未能更新")
+            self._error(self.tr("操作失败"), self.tr("部分演唱者分组未能更新"))
             return
 
         self._notify_singers_changed()
-        label = f"「{new_group}」" if new_group else "（无分组）"
-        self._info("完成", f"已将 {len(selected_ids)} 位演唱者设为分组 {label}")
+        label = f"「{new_group}」" if new_group else self.tr("（无分组）")
+        self._info(self.tr("完成"),
+                   self.tr("已将 {n} 位演唱者设为分组 {label}").format(
+                       n=len(selected_ids), label=label))
 
     # ==================== 顺序调整（按钮） ====================
 
@@ -1642,7 +1651,7 @@ class SingerManagerInterface(QWidget):
         预设中有但本次项目未使用的保留。新更新的预设放在顶部。
         """
         if not self._project or not self._project.singers:
-            self._warn("无法保存", "当前没有演唱者可保存")
+            self._warn(self.tr("无法保存"), self.tr("当前没有演唱者可保存"))
             return
 
         from strange_uta_game.frontend.settings.settings_interface import AppSettings
@@ -1687,13 +1696,14 @@ class SingerManagerInterface(QWidget):
         app_settings.save_singer_presets(merged)
 
         self._info(
-            "保存成功", f"已保存 {len(new_presets)} 位演唱者预设到软件设置"
+            self.tr("保存成功"),
+            self.tr("已保存 {n} 位演唱者预设到软件设置").format(n=len(new_presets)),
         )
 
     def _on_load_preset(self):
         """从软件全局设置加载演唱者预设到当前项目（弹窗多选）"""
         if not self._project or not self._singer_service:
-            self._warn("未加载项目", "请先打开或创建一个项目")
+            self._warn(self.tr("未加载项目"), self.tr("请先打开或创建一个项目"))
             return
 
         from strange_uta_game.frontend.settings.settings_interface import AppSettings
@@ -1702,7 +1712,7 @@ class SingerManagerInterface(QWidget):
         presets = app_settings.load_singer_presets()
 
         if not presets:
-            self._warn("无预设", "软件中没有保存的演唱者预设，请先保存")
+            self._warn(self.tr("无预设"), self.tr("软件中没有保存的演唱者预设，请先保存"))
             return
 
         existing_names = {s.name for s in self._project.singers}
@@ -1755,7 +1765,8 @@ class SingerManagerInterface(QWidget):
         self._notify_singers_changed()
 
         if added > 0:
-            self._info("加载成功", f"已从预设加载 {added} 位新演唱者")
+            self._info(self.tr("加载成功"),
+                       self.tr("已从预设加载 {n} 位新演唱者").format(n=added))
 
     # ==================== 工具方法 ====================
 
