@@ -11,9 +11,13 @@ from __future__ import annotations
 
 from typing import List, Optional, Tuple
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QCoreApplication
 from PyQt6.QtGui import QDesktopServices, QFont
 from PyQt6.QtCore import QUrl
+
+
+def _tr(s: str) -> str:
+    return QCoreApplication.translate("UpdaterUI", s)
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 from qfluentwidgets import (
     BodyLabel,
@@ -62,22 +66,25 @@ class UpdateAvailableDialog(MessageBoxBase):
         all_releases: List[LatestRelease],
     ):
         # 主体内容容器（MessageBoxBase 的 viewLayout 是 QVBoxLayout）
-        title = TitleLabel("发现新版本", self)
+        title = TitleLabel(_tr("发现新版本"), self)
         self.viewLayout.addWidget(title)
 
         sub = SubtitleLabel(f"v{release.version}", self)
         self.viewLayout.addWidget(sub)
 
+        unknown_date = _tr("未知日期")
         meta_line = BodyLabel(
-            f"当前版本 v{local_version}　|　"
-            f"发布于 {release.published_at[:10] or '未知日期'}",
+            _tr("当前版本 v{local}　|　发布于 {date}").format(
+                local=local_version,
+                date=release.published_at[:10] or unknown_date,
+            ),
             self,
         )
         meta_line.setStyleSheet("color: #888;")
         self.viewLayout.addWidget(meta_line)
 
         if source_label:
-            src_line = BodyLabel(f"下载源：{source_label}", self)
+            src_line = BodyLabel(_tr("下载源：{label}").format(label=source_label), self)
             src_line.setStyleSheet("color: #888;")
             self.viewLayout.addWidget(src_line)
 
@@ -86,7 +93,7 @@ class UpdateAvailableDialog(MessageBoxBase):
         # 代码块等绝大多数 GFM 语法，零额外依赖。
         # 跨版本更新时（all_releases 包含多个版本）拼合所有中间版本的 changelog，
         # 每段以版本号和发布日期作为二级标题，让用户看到完整的变更历史。
-        changelog_label = BodyLabel("更新内容：", self)
+        changelog_label = BodyLabel(_tr("更新内容："), self)
         self.viewLayout.addWidget(changelog_label)
 
         body_view = TextEdit(self)
@@ -98,7 +105,7 @@ class UpdateAvailableDialog(MessageBoxBase):
         if len(all_releases) > 1:
             sections: List[str] = []
             for rel in all_releases:
-                date = rel.published_at[:10] if rel.published_at else "未知日期"
+                date = rel.published_at[:10] if rel.published_at else unknown_date
                 header = f"## v{rel.version}（{date}）"
                 body = rel.body.strip()
                 sections.append(f"{header}\n\n{body}" if body else header)
@@ -112,20 +119,20 @@ class UpdateAvailableDialog(MessageBoxBase):
             except Exception:
                 body_view.setPlainText(body_text)
         else:
-            body_view.setPlainText("（发布说明为空）")
+            body_view.setPlainText(_tr("（发布说明为空）"))
         self.viewLayout.addWidget(body_view)
 
         # 链接到 release 页面
         if release.html_url:
-            link = HyperlinkButton(release.html_url, "在浏览器中查看完整发布说明", self)
+            link = HyperlinkButton(release.html_url, _tr("在浏览器中查看完整发布说明"), self)
             link.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(release.html_url)))
             self.viewLayout.addWidget(link)
 
         # 替换 MessageBoxBase 默认的 yes/cancel 按钮
-        self.yesButton.setText("立即更新")
-        self.cancelButton.setText("稍后再说")
+        self.yesButton.setText(_tr("立即更新"))
+        self.cancelButton.setText(_tr("稍后再说"))
         # 增加"跳过此版本"按钮
-        self.skip_btn = PushButton("跳过此版本", self.buttonGroup)
+        self.skip_btn = PushButton(_tr("跳过此版本"), self.buttonGroup)
         self.skip_btn.clicked.connect(self._on_skip_clicked)
         # 把跳过按钮加到 buttonLayout 最左侧，作为"次要"操作
         self.buttonLayout.insertWidget(0, self.skip_btn)
@@ -163,7 +170,7 @@ class UpdateCheckErrorDialog(MessageBoxBase):
         self._build_ui(message, attempts or [])
 
     def _build_ui(self, message: str, attempts: List[Tuple[str, str, str]]):
-        title = TitleLabel("检查更新失败", self)
+        title = TitleLabel(_tr("检查更新失败"), self)
         self.viewLayout.addWidget(title)
 
         msg_label = BodyLabel(message, self)
@@ -171,7 +178,7 @@ class UpdateCheckErrorDialog(MessageBoxBase):
         self.viewLayout.addWidget(msg_label)
 
         if attempts:
-            sub = BodyLabel("源尝试记录：", self)
+            sub = BodyLabel(_tr("源尝试记录："), self)
             self.viewLayout.addWidget(sub)
             detail = TextEdit(self)
             detail.setReadOnly(True)
@@ -186,6 +193,6 @@ class UpdateCheckErrorDialog(MessageBoxBase):
             detail.setPlainText("\n".join(lines))
             self.viewLayout.addWidget(detail)
 
-        self.yesButton.setText("我知道了")
+        self.yesButton.setText(_tr("我知道了"))
         self.cancelButton.hide()
         self.setMinimumWidth(480)

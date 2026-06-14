@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, List, Optional
 
-from PyQt6.QtCore import Qt, QThread, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QCoreApplication, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QWidget
 from qfluentwidgets import (
@@ -27,6 +27,13 @@ from qfluentwidgets import (
     SpinBox,
     SwitchButton,
 )
+
+
+def _tr(s: str) -> str:
+    """模块级 tr 别名——本文件混合了 SettingCard 子类（构造时调 super.__init__
+    需要 title/content）与自由函数（无 self），统一用 QCoreApplication.translate
+    走 "UpdaterUI" context。"""
+    return QCoreApplication.translate("UpdaterUI", s)
 
 from ...__version__ import __version__
 from .. import installer
@@ -55,8 +62,8 @@ class _StartupCheckCard(SettingCard):
     def __init__(self, parent=None):
         super().__init__(
             FIF.SYNC,
-            "启动时检查更新",
-            "应用启动后在后台轻量检查 GitHub Release，发现新版本时弹窗提示",
+            _tr("启动时检查更新"),
+            _tr("应用启动后在后台轻量检查 GitHub Release，发现新版本时弹窗提示"),
             parent,
         )
         self.switch = SwitchButton(self)
@@ -70,15 +77,16 @@ class _CheckIntervalCard(SettingCard):
     def __init__(self, parent=None):
         super().__init__(
             FIF.HISTORY,
-            "启动检查间隔",
-            "距上次检查不足该时长时，启动期不再发起请求（手动检查不受限）",
+            _tr("启动检查间隔"),
+            _tr("距上次检查不足该时长时，启动期不再发起请求（手动检查不受限）"),
             parent,
         )
         self.spin = SpinBox(self)
         self.spin.setRange(0, 168)  # 0~7 天
         self.spin.setSingleStep(1)
-        self.spin.setSuffix(" 小时")
-        self.spin.setFixedWidth(160)
+        self.spin.setSuffix(_tr(" 小时"))
+        # 防止 locale "hours" 字符串撑爆固定宽度
+        self.spin.setMinimumWidth(160)
         self.hBoxLayout.addWidget(self.spin, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addSpacing(16)
 
@@ -89,11 +97,11 @@ class _SourceOrderCard(SettingCard):
     def __init__(self, parent=None):
         super().__init__(
             FIF.PALETTE,
-            "更新源优先级",
-            "（尚未读取）",
+            _tr("更新源优先级"),
+            _tr("（尚未读取）"),
             parent,
         )
-        self.btn_edit = PushButton("编辑顺序", self)
+        self.btn_edit = PushButton(_tr("编辑顺序"), self)
         self.btn_edit.setFont(QFont("Microsoft YaHei", 10))
         self.btn_edit.setMinimumWidth(110)
         self.hBoxLayout.addWidget(self.btn_edit, 0, Qt.AlignmentFlag.AlignRight)
@@ -124,11 +132,11 @@ class _CheckNowCard(SettingCard):
     def __init__(self, parent=None):
         super().__init__(
             FIF.UPDATE,
-            "立即检查更新",
-            "立即从所选源拉取最新发布信息（不受启动检查间隔限制）",
+            _tr("立即检查更新"),
+            _tr("立即从所选源拉取最新发布信息（不受启动检查间隔限制）"),
             parent,
         )
-        self.btn = PushButton("检查更新", self)
+        self.btn = PushButton(_tr("检查更新"), self)
         self.btn.setFont(QFont("Microsoft YaHei", 10))
         self.btn.setMinimumWidth(120)
         self.hBoxLayout.addWidget(self.btn, 0, Qt.AlignmentFlag.AlignRight)
@@ -141,7 +149,7 @@ class _CheckNowCard(SettingCard):
 def attach_update_group(settings_interface: "SettingsInterface") -> None:
     """把"应用更新"分组追加到设置界面（位于"关于"之前）。"""
     parent = settings_interface
-    group = SettingCardGroup("应用更新", parent.scrollWidget)
+    group = SettingCardGroup(_tr("应用更新"), parent.scrollWidget)
 
     startup_card = _StartupCheckCard(group)
     interval_card = _CheckIntervalCard(group)
@@ -236,7 +244,7 @@ def refresh_about_version(settings_interface: "SettingsInterface") -> None:
 def _trigger_manual_check(parent: "SettingsInterface", btn: PushButton) -> None:
     """用户在设置里手动点击「检查更新」时的入口。"""
     btn.setEnabled(False)
-    btn.setText("检查中...")
+    btn.setText(_tr("检查中..."))
 
     settings = UpdaterSettings.load(parent.get_settings())
     # 手动检查：跳过启动期防抖
@@ -245,11 +253,11 @@ def _trigger_manual_check(parent: "SettingsInterface", btn: PushButton) -> None:
     def _on_done(result_obj: object):
         result: CheckResult = result_obj  # type: ignore[assignment]
         btn.setEnabled(True)
-        btn.setText("检查更新")
+        btn.setText(_tr("检查更新"))
 
         if not result.ok:
             dlg = UpdateCheckErrorDialog(
-                result.error or "未知错误",
+                result.error or _tr("未知错误"),
                 attempts=[(a[0], a[1], a[2]) for a in result.attempts],
                 parent=parent,
             )
@@ -258,8 +266,8 @@ def _trigger_manual_check(parent: "SettingsInterface", btn: PushButton) -> None:
 
         if not result.has_update or result.release is None:
             InfoBar.success(
-                title="已是最新版本",
-                content=f"当前版本 v{__version__} 已是最新",
+                title=_tr("已是最新版本"),
+                content=_tr("当前版本 v{version} 已是最新").format(version=__version__),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -317,8 +325,10 @@ def _show_update_dialog(parent: "SettingsInterface", result: CheckResult) -> Non
         cur.skipped_version = release.version
         cur.save(parent.get_settings())
         InfoBar.info(
-            title="已跳过此版本",
-            content=f"未来不再为 v{release.version} 提示。重新检测可重新启用。",
+            title=_tr("已跳过此版本"),
+            content=_tr("未来不再为 v{version} 提示。重新检测可重新启用。").format(
+                version=release.version
+            ),
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -333,8 +343,8 @@ def _show_update_dialog(parent: "SettingsInterface", result: CheckResult) -> Non
     # 用户点击立即更新 —— 启动 Updater.exe 并退出应用
     if not installer.is_updater_available():
         InfoBar.error(
-            title="更新器未就绪",
-            content="缺少 Updater.exe。请到 GitHub Release 手动下载最新版本。",
+            title=_tr("更新器未就绪"),
+            content=_tr("缺少 Updater.exe。请到 GitHub Release 手动下载最新版本。"),
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -365,8 +375,8 @@ def _show_update_dialog(parent: "SettingsInterface", result: CheckResult) -> Non
     # 立即给用户反馈，然后在后台线程完成"自更新 Updater + 启动"
     # （_update_updater_from_remote 有网络请求，同步调用会冻结 UI 数秒）
     _prep_infobar = InfoBar.success(
-        title="正在准备更新",
-        content="正在获取最新更新器，请稍候…",
+        title=_tr("正在准备更新"),
+        content=_tr("正在获取最新更新器，请稍候…"),
         orient=Qt.Orientation.Horizontal,
         isClosable=False,
         position=InfoBarPosition.TOP,
@@ -395,8 +405,8 @@ def _show_update_dialog(parent: "SettingsInterface", result: CheckResult) -> Non
         lr: _inst.LaunchResult = launch_result  # type: ignore[assignment]
         if not lr.launched:
             InfoBar.error(
-                title="无法启动 Updater",
-                content=lr.reason or "未知错误",
+                title=_tr("无法启动 Updater"),
+                content=lr.reason or _tr("未知错误"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -406,8 +416,8 @@ def _show_update_dialog(parent: "SettingsInterface", result: CheckResult) -> Non
             return
 
         InfoBar.success(
-            title="更新已启动",
-            content="即将退出当前应用，由 Updater 完成替换并自动重启…",
+            title=_tr("更新已启动"),
+            content=_tr("即将退出当前应用，由 Updater 完成替换并自动重启…"),
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,

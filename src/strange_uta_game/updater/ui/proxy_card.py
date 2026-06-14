@@ -14,8 +14,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QCoreApplication
 from PyQt6.QtGui import QFont
+
+
+def _tr(s: str) -> str:
+    """模块级 tr 别名，统一 "UpdaterUI" context。"""
+    return QCoreApplication.translate("UpdaterUI", s)
 from PyQt6.QtWidgets import QWidget
 from qfluentwidgets import (
     BodyLabel,
@@ -45,7 +50,12 @@ if TYPE_CHECKING:
 # Mode 与下拉框 index 的双向映射
 _MODE_TO_INDEX = {"off": 0, "system": 1, "auto": 2, "manual": 3}
 _INDEX_TO_MODE = {v: k for k, v in _MODE_TO_INDEX.items()}
+# 源串保留中文供 tr 扫描；显示时统一 _tr() 翻译
 _MODE_LABELS = ["关闭代理", "使用系统代理", "自动检测代理", "手动指定地址"]
+
+
+def _mode_labels_translated() -> list[str]:
+    return [_tr(s) for s in _MODE_LABELS]
 
 
 class _ProxyModeCard(SettingCard):
@@ -54,13 +64,14 @@ class _ProxyModeCard(SettingCard):
     def __init__(self, parent=None):
         super().__init__(
             FIF.GLOBE,
-            "代理模式",
-            "访问 GitHub 时是否经过代理；自动检测会探测常用本地代理端口",
+            _tr("代理模式"),
+            _tr("访问 GitHub 时是否经过代理；自动检测会探测常用本地代理端口"),
             parent,
         )
         self.combo = ComboBox(self)
-        self.combo.addItems(_MODE_LABELS)
-        self.combo.setFixedWidth(180)
+        self.combo.addItems(_mode_labels_translated())
+        # 翻译后选项长度可能变化（"自动检测代理" → "Auto-detect proxy"）
+        self.combo.setMinimumWidth(180)
         self.hBoxLayout.addWidget(self.combo, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addSpacing(16)
 
@@ -71,13 +82,13 @@ class _ProxyManualCard(SettingCard):
     def __init__(self, parent=None):
         super().__init__(
             FIF.LINK,
-            "手动代理地址",
-            "例如 http://127.0.0.1:7890 ；仅在选择「手动指定地址」时生效",
+            _tr("手动代理地址"),
+            _tr("例如 http://127.0.0.1:7890 ；仅在选择「手动指定地址」时生效"),
             parent,
         )
         self.edit = LineEdit(self)
         self.edit.setPlaceholderText("http://127.0.0.1:port")
-        self.edit.setFixedWidth(260)
+        self.edit.setMinimumWidth(260)
         self.hBoxLayout.addWidget(self.edit, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addSpacing(16)
 
@@ -95,13 +106,13 @@ class _ProxyStatusCard(SettingCard):
     def __init__(self, parent=None):
         super().__init__(
             FIF.WIFI,
-            "当前生效代理",
-            "（尚未检测）",
+            _tr("当前生效代理"),
+            _tr("（尚未检测）"),
             parent,
         )
-        self.btn_detect = PushButton("自动检测", self)
+        self.btn_detect = PushButton(_tr("自动检测"), self)
         self.btn_detect.setFont(QFont("Microsoft YaHei", 10))
-        self.btn_test = PushButton("测试连通性", self)
+        self.btn_test = PushButton(_tr("测试连通性"), self)
         self.btn_test.setFont(QFont("Microsoft YaHei", 10))
         self.hBoxLayout.addWidget(self.btn_detect, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addWidget(self.btn_test, 0, Qt.AlignmentFlag.AlignRight)
@@ -123,7 +134,7 @@ def attach_proxy_group(settings_interface: "SettingsInterface") -> None:
     通过 ``settings_interface.expandLayout.addWidget`` 添加；不修改其它已有控件。
     """
     parent = settings_interface
-    group = SettingCardGroup("网络与代理（更新源）", parent.scrollWidget)
+    group = SettingCardGroup(_tr("网络与代理（更新源）"), parent.scrollWidget)
     mode_card = _ProxyModeCard(group)
     manual_card = _ProxyManualCard(group)
     status_card = _ProxyStatusCard(group)
@@ -171,8 +182,10 @@ def attach_proxy_group(settings_interface: "SettingsInterface") -> None:
             mode_card.combo.setCurrentIndex(_MODE_TO_INDEX["manual"])
             _save_and_refresh()
             InfoBar.success(
-                title="检测成功",
-                content=f"已使用代理 {info.url}（来源：{info.source}）",
+                title=_tr("检测成功"),
+                content=_tr("已使用代理 {url}（来源：{source}）").format(
+                    url=info.url, source=info.source
+                ),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -182,8 +195,10 @@ def attach_proxy_group(settings_interface: "SettingsInterface") -> None:
         else:
             ports_hint = ", ".join(str(p) for p in COMMON_PROXY_PORTS[:6])
             InfoBar.warning(
-                title="未检测到代理",
-                content=f"未发现系统代理，也未在常用端口（{ports_hint} 等）发现监听",
+                title=_tr("未检测到代理"),
+                content=_tr("未发现系统代理，也未在常用端口（{ports} 等）发现监听").format(
+                    ports=ports_hint
+                ),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -215,16 +230,17 @@ def _update_status(
 
     # 真正生效（含 mode=off：明确"已关闭"也算"用户已做出选择"）
     if mode == "off":
-        card.set_state("已关闭代理 —— 应用将直接访问网络。", is_active=True)
+        card.set_state(_tr("已关闭代理 —— 应用将直接访问网络。"), is_active=True)
         return
 
     if info and info.is_valid:
         # 同时提示来源（system / scan / manual）便于排查
-        src_label = {"system": "系统代理", "scan": "自动检测", "manual": "手动指定"}.get(
-            info.source, info.source or "未知"
-        )
+        _src_map = {"system": _tr("系统代理"), "scan": _tr("自动检测"), "manual": _tr("手动指定")}
+        src_label = _src_map.get(info.source, info.source or _tr("未知"))
         card.set_state(
-            f"{info.url}　已生效（{_mode_label(mode)} · 来源：{src_label}）",
+            _tr("{url}　已生效（{mode} · 来源：{source}）").format(
+                url=info.url, mode=_mode_label(mode), source=src_label,
+            ),
             is_active=True,
         )
         return
@@ -234,12 +250,12 @@ def _update_status(
         # 主动尝试扫描一次本地端口，帮用户判断是不是该切到 auto 模式
         scan_hint = _build_scan_hint()
         if scan_hint:
-            tip = (
-                f"Windows 系统代理未启用，但 {scan_hint}。"
+            tip = _tr(
+                "Windows 系统代理未启用，但 {hint}。"
                 "建议切换为「自动检测代理」或「手动指定地址」。"
-            )
+            ).format(hint=scan_hint)
         else:
-            tip = (
+            tip = _tr(
                 "Windows 系统代理未启用，本机也未发现常用代理端口监听。"
                 "若你的代理软件正在运行，请改用「手动指定地址」。"
             )
@@ -248,7 +264,7 @@ def _update_status(
 
     if mode == "auto":
         card.set_state(
-            "自动检测未发现可用代理。如确有代理在运行，请改用「手动指定地址」。",
+            _tr("自动检测未发现可用代理。如确有代理在运行，请改用「手动指定地址」。"),
             is_active=False,
         )
         return
@@ -256,21 +272,21 @@ def _update_status(
     if mode == "manual":
         if not manual_url.strip():
             card.set_state(
-                "尚未填写手动代理地址，例如 http://127.0.0.1:7897",
+                _tr("尚未填写手动代理地址，例如 http://127.0.0.1:7897"),
                 is_active=False,
             )
         else:
             card.set_state(
-                f"手动地址 {manual_url!r} 无效，请检查协议与端口。",
+                _tr("手动地址 {url!r} 无效，请检查协议与端口。").format(url=manual_url),
                 is_active=False,
             )
         return
 
-    card.set_state("未启用代理", is_active=False)
+    card.set_state(_tr("未启用代理"), is_active=False)
 
 
 def _mode_label(mode: str) -> str:
-    return _MODE_LABELS[_MODE_TO_INDEX.get(mode, 0)]
+    return _tr(_MODE_LABELS[_MODE_TO_INDEX.get(mode, 0)])
 
 
 def _build_scan_hint() -> str:
@@ -280,7 +296,7 @@ def _build_scan_hint() -> str:
     if not found:
         return ""
     head = ", ".join(str(p) for p in found[:3])
-    return f"在本机端口 {head} 上检测到代理监听"
+    return _tr("在本机端口 {ports} 上检测到代理监听").format(ports=head)
 
 
 def _test_connectivity(parent: QWidget, card: _ProxyStatusCard) -> None:
@@ -288,7 +304,7 @@ def _test_connectivity(parent: QWidget, card: _ProxyStatusCard) -> None:
     s = UpdaterSettings.load()
     _info, proxies = resolve_proxy(s.proxy_mode, s.proxy_manual_url)
     card.btn_test.setEnabled(False)
-    card.btn_test.setText("测试中...")
+    card.btn_test.setText(_tr("测试中..."))
     try:
         result = http_client.get_json(
             "https://api.github.com/zen",
@@ -297,12 +313,12 @@ def _test_connectivity(parent: QWidget, card: _ProxyStatusCard) -> None:
         )
     finally:
         card.btn_test.setEnabled(True)
-        card.btn_test.setText("测试连通性")
+        card.btn_test.setText(_tr("测试连通性"))
 
     if result.ok or result.status == 200:
         InfoBar.success(
-            title="连通成功",
-            content="GitHub API 可达",
+            title=_tr("连通成功"),
+            content=_tr("GitHub API 可达"),
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -311,7 +327,7 @@ def _test_connectivity(parent: QWidget, card: _ProxyStatusCard) -> None:
         )
     else:
         InfoBar.error(
-            title="连通失败",
+            title=_tr("连通失败"),
             content=result.error or f"HTTP {result.status}",
             orient=Qt.Orientation.Horizontal,
             isClosable=True,

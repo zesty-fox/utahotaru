@@ -11,8 +11,12 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QCoreApplication
 from PyQt6.QtGui import QFont
+
+
+def _tr(s: str) -> str:
+    return QCoreApplication.translate("UpdaterUI", s)
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QHBoxLayout,
@@ -61,12 +65,12 @@ class SourceOrderDialog(MessageBoxBase):
     # ── UI ──
 
     def _build_ui(self) -> None:
-        title = TitleLabel("调整更新源优先级", self)
+        title = TitleLabel(_tr("调整更新源优先级"), self)
         self.viewLayout.addWidget(title)
 
         hint = BodyLabel(
-            "按顺序尝试，前一项失败时自动降级到下一项。\n"
-            "你可以拖动条目，或选中条目后用右侧 ↑/↓ 按钮调整。",
+            _tr("按顺序尝试，前一项失败时自动降级到下一项。\n"
+                "你可以拖动条目，或选中条目后用右侧 ↑/↓ 按钮调整。"),
             self,
         )
         hint.setWordWrap(True)
@@ -98,15 +102,15 @@ class SourceOrderDialog(MessageBoxBase):
         btn_col_layout = QVBoxLayout(btn_col)
         btn_col_layout.setContentsMargins(0, 0, 0, 0)
         btn_col_layout.setSpacing(6)
-        self.btn_up = PushButton("↑ 上移", btn_col)
+        self.btn_up = PushButton(_tr("↑ 上移"), btn_col)
         self.btn_up.setFont(QFont("Microsoft YaHei", 10))
         self.btn_up.clicked.connect(self._on_up)
         btn_col_layout.addWidget(self.btn_up)
-        self.btn_down = PushButton("↓ 下移", btn_col)
+        self.btn_down = PushButton(_tr("↓ 下移"), btn_col)
         self.btn_down.setFont(QFont("Microsoft YaHei", 10))
         self.btn_down.clicked.connect(self._on_down)
         btn_col_layout.addWidget(self.btn_down)
-        self.btn_reset = PushButton("恢复默认", btn_col)
+        self.btn_reset = PushButton(_tr("恢复默认"), btn_col)
         self.btn_reset.setFont(QFont("Microsoft YaHei", 10))
         self.btn_reset.clicked.connect(self._on_reset)
         btn_col_layout.addWidget(self.btn_reset)
@@ -116,8 +120,8 @@ class SourceOrderDialog(MessageBoxBase):
         self.viewLayout.addWidget(body)
 
         # 底部 yes/cancel
-        self.yesButton.setText("确定")
-        self.cancelButton.setText("取消")
+        self.yesButton.setText(_tr("确定"))
+        self.cancelButton.setText(_tr("取消"))
 
         self.setMinimumWidth(520)
 
