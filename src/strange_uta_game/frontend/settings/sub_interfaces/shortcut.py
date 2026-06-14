@@ -103,13 +103,18 @@ class ShortcutSubInterface(SubSettingInterface):
 
     @staticmethod
     def _make_tag_html(scope: str, title: str, colors: dict) -> str:
-        """生成带颜色标签前缀的 HTML 标题字符串。"""
+        """生成带颜色标签前缀的 HTML 标题字符串。
+
+        scope 标签 ``[通用]/[打轴]/[编辑]`` 通过 QCoreApplication.translate 走
+        翻译表——本方法是 ``@staticmethod``，无 ``self.tr``。"""
+        from PyQt6.QtCore import QCoreApplication
+        _tr = lambda s: QCoreApplication.translate("ShortcutSubInterface", s)
         _map = {
-            "both":         (colors["both"],   "[通用]"),
-            "timing_only":  (colors["timing"], "[打轴]"),
-            "edit_only":    (colors["edit"],   "[编辑]"),
-            "split_timing": (colors["timing"], "[打轴]"),
-            "split_edit":   (colors["edit"],   "[编辑]"),
+            "both":         (colors["both"],   _tr("[通用]")),
+            "timing_only":  (colors["timing"], _tr("[打轴]")),
+            "edit_only":    (colors["edit"],   _tr("[编辑]")),
+            "split_timing": (colors["timing"], _tr("[打轴]")),
+            "split_edit":   (colors["edit"],   _tr("[编辑]")),
         }
         if scope in _map:
             color, tag = _map[scope]
@@ -119,40 +124,44 @@ class ShortcutSubInterface(SubSettingInterface):
     def _refresh_tag_colors(self):
         """主题变化时重新为所有快捷键卡片标题应用正确的颜色标签。"""
         colors = self._tag_colors()
+        tr = self.tr
         for row in self._SHORTCUT_ACTIONS:
             key, _, title, _, _, _, scope, _, _, _ = row
+            translated = tr(title)
             if scope == "both":
                 card = self._shortcut_cards["timing_mode"].get(key)
                 if card:
-                    card.setTitle(self._make_tag_html("both", title, colors))
+                    card.setTitle(self._make_tag_html("both", translated, colors))
             elif scope == "timing_only":
                 card = self._shortcut_cards["timing_mode"].get(key)
                 if card:
-                    card.setTitle(self._make_tag_html("timing_only", title, colors))
+                    card.setTitle(self._make_tag_html("timing_only", translated, colors))
             elif scope == "edit_only":
                 card = self._shortcut_cards["edit_mode"].get(key)
                 if card:
-                    card.setTitle(self._make_tag_html("edit_only", title, colors))
+                    card.setTitle(self._make_tag_html("edit_only", translated, colors))
             elif scope == "split":
                 card_t = self._shortcut_cards["timing_mode"].get(key)
                 if card_t:
-                    card_t.setTitle(self._make_tag_html("split_timing", title, colors))
+                    card_t.setTitle(self._make_tag_html("split_timing", translated, colors))
                 card_e = self._shortcut_cards["edit_mode"].get(key)
                 if card_e:
-                    card_e.setTitle(self._make_tag_html("split_edit", title, colors))
+                    card_e.setTitle(self._make_tag_html("split_edit", translated, colors))
 
     def _init_ui(self):
         colors = self._tag_colors()
+        tr = self.tr
 
-        group = SettingCardGroup("快捷键", self.scrollWidget)
+        group = SettingCardGroup(tr("快捷键"), self.scrollWidget)
 
         def _wrap(t, s):
-            return self._make_tag_html(s, t, colors)
+            # 类级常量里的 title 是源字符串；显示前过一遍 tr() 走翻译表
+            return self._make_tag_html(s, tr(t), colors)
 
         for row in self._SHORTCUT_ACTIONS:
             key, icon, title, content, dt, de, scope, tc, ec, ro = row
             if scope == "both":
-                card = ShortcutSettingCard(icon, "", content, dt, parent=group)
+                card = ShortcutSettingCard(icon, "", tr(content), dt, parent=group)
                 card.setTitle(_wrap(title, "both"))
                 if ro: card.setReadOnly(True)
                 self._shortcut_cards["timing_mode"][key] = card
@@ -161,7 +170,7 @@ class ShortcutSubInterface(SubSettingInterface):
                 if not ro:
                     card.value_changed.connect(lambda v, c=card: self._on_shortcut_changed(c, v))
             elif scope == "timing_only":
-                card = ShortcutSettingCard(icon, "", content, dt, parent=group)
+                card = ShortcutSettingCard(icon, "", tr(content), dt, parent=group)
                 card.setTitle(_wrap(title, "timing_only"))
                 if ro: card.setReadOnly(True)
                 self._shortcut_cards["timing_mode"][key] = card
@@ -169,7 +178,7 @@ class ShortcutSubInterface(SubSettingInterface):
                 if not ro:
                     card.value_changed.connect(lambda v, c=card: self._on_shortcut_changed(c, v))
             elif scope == "edit_only":
-                card = ShortcutSettingCard(icon, "", content, de, parent=group)
+                card = ShortcutSettingCard(icon, "", tr(content), de, parent=group)
                 card.setTitle(_wrap(title, "edit_only"))
                 if ro: card.setReadOnly(True)
                 self._shortcut_cards["edit_mode"][key] = card
@@ -177,8 +186,8 @@ class ShortcutSubInterface(SubSettingInterface):
                 if not ro:
                     card.value_changed.connect(lambda v, c=card: self._on_shortcut_changed(c, v))
             elif scope == "split":
-                ct = tc or content
-                ce = ec or content
+                ct = tr(tc) if tc else tr(content)
+                ce = tr(ec) if ec else tr(content)
                 card_t = ShortcutSettingCard(icon, "", ct, dt, parent=group)
                 card_t.setTitle(_wrap(title, "split_timing"))
                 if ro: card_t.setReadOnly(True)
@@ -216,9 +225,12 @@ class ShortcutSubInterface(SubSettingInterface):
             else:
                 new_pairs.append((k.upper(), "short"))
 
-        action_titles = {a[0]: a[2] for a in self._SHORTCUT_ACTIONS}
+        tr = self.tr
+        # action title 走翻译表，冲突提示里也用翻译版本
+        action_titles = {a[0]: tr(a[2]) for a in self._SHORTCUT_ACTIONS}
 
-        for mode_key, mode_label in self._SHORTCUT_MODES:
+        for mode_key, mode_label_raw in self._SHORTCUT_MODES:
+            mode_label = tr(mode_label_raw)
             mode_actions = self._shortcut_cards[mode_key]
             if not any(card is changed_card for card in mode_actions.values()):
                 continue
@@ -239,10 +251,15 @@ class ShortcutSubInterface(SubSettingInterface):
                             for btn in [changed_card.btn_key1, changed_card.btn_key2]:
                                 if btn.get_key().strip().upper() == nk and btn.get_trigger_type() == nt:
                                     btn.restore_original_key()
-                            trigger_label = "长按" if nt == "long" else "短按"
+                            trigger_label = tr("长按") if nt == "long" else tr("短按")
                             InfoBar.warning(
-                                title="快捷键冲突",
-                                content=f"[{mode_label}]「{action_titles[action_key]}」已占用{trigger_label}按键 {nk}",
+                                title=tr("快捷键冲突"),
+                                content=tr("[{mode}]「{action}」已占用{trigger}按键 {key}").format(
+                                    mode=mode_label,
+                                    action=action_titles[action_key],
+                                    trigger=trigger_label,
+                                    key=nk,
+                                ),
                                 orient=Qt.Orientation.Horizontal,
                                 isClosable=True,
                                 position=InfoBarPosition.TOP,
