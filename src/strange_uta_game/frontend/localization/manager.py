@@ -4,9 +4,46 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
-from PyQt6.QtCore import QCoreApplication, QLocale, QObject, QTranslator, pyqtSignal
+from PyQt6.QtCore import QCoreApplication, QLocale, QTranslator
+
+
+class _Signal:
+    """轻量 signal-like。
+
+    LocalizationManager 是**模块级单例**，import 时就构造，远早于 QApplication
+    存在；如果继承 QObject + pyqtSignal，会引发"无 parent 的 QObject 被 Qt
+    跨 qapp 生命周期回收，下次访问得 RuntimeError: C++ object deleted"。
+    所以用纯 Python 实现 connect / disconnect / emit，规避 Qt 生命周期。
+    """
+
+    __slots__ = ("_slots",)
+
+    def __init__(self) -> None:
+        self._slots: List[Callable] = []
+
+    def connect(self, slot: Callable) -> Callable:
+        if slot not in self._slots:
+            self._slots.append(slot)
+        return slot  # 与 pyqtSignal.connect 返回值兼容
+
+    def disconnect(self, slot: Callable) -> None:
+        try:
+            self._slots.remove(slot)
+        except ValueError:
+            pass
+
+    def emit(self, *args) -> None:
+        for slot in list(self._slots):
+            try:
+                slot(*args)
+            except Exception:
+                # 单个 slot 抛错不影响其他订阅者
+                import logging
+                logging.getLogger(__name__).warning(
+                    "language_changed slot raised", exc_info=True
+                )
 
 
 @dataclass(frozen=True)
@@ -111,7 +148,7 @@ class _PseudoTranslator(QTranslator):
         return f"{self.BRACKET_LEFT}{sourceText}{self.BRACKET_RIGHT}"
 
 
-class LocalizationManager(QObject):
+class LocalizationManager:
     """语言状态持有者 + translator 安装/卸载入口。
 
     生命周期：
@@ -120,12 +157,12 @@ class LocalizationManager(QObject):
         - 用户在「设置 → 关于」切换语言：UI 调用 :meth:`apply_language`，
           然后弹出"重启生效"提示（Qt 的运行时翻译切换需要每个 widget 主动
           响应 ``LanguageChange`` 事件，本期不做，按"重启"对待）。
+
+    本类**不继承 QObject**——见 :class:`_Signal` 的注释。
     """
 
-    language_changed = pyqtSignal(str)  # 发出新 code
-
     def __init__(self) -> None:
-        super().__init__()
+        self.language_changed = _Signal()
         # pseudo 语言走 _PseudoTranslator，其余走 _AppTranslator——共同基类 QTranslator
         self._app_translator: Optional[QTranslator] = None
         self._fluent_translator: Optional[QTranslator] = None

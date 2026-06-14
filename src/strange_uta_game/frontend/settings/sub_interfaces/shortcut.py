@@ -7,11 +7,17 @@ _on_shortcut_changed 与原始 SettingsInterface 逻辑完全一致：
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QCoreApplication
 from qfluentwidgets import FluentIcon as FIF, InfoBar, InfoBarPosition, SettingCardGroup
 
 from ..cards import ShortcutSettingCard
 from .base import SubSettingInterface
+
+
+def _tr(s: str) -> str:
+    """模块级 tr 别名——_on_shortcut_changed 的单测用 SimpleNamespace 替身，
+    没法 self.tr；走 QCoreApplication.translate 不依赖 self。"""
+    return QCoreApplication.translate("ShortcutSubInterface", s)
 
 
 class ShortcutSubInterface(SubSettingInterface):
@@ -225,12 +231,13 @@ class ShortcutSubInterface(SubSettingInterface):
             else:
                 new_pairs.append((k.upper(), "short"))
 
-        tr = self.tr
-        # action title 走翻译表，冲突提示里也用翻译版本
-        action_titles = {a[0]: tr(a[2]) for a in self._SHORTCUT_ACTIONS}
+        # action title 走翻译表，冲突提示里也用翻译版本。用模块级 _tr 而非
+        # self.tr：_on_shortcut_changed 单测用 SimpleNamespace 替身调用本函数，
+        # SimpleNamespace 没有 .tr 方法。
+        action_titles = {a[0]: _tr(a[2]) for a in self._SHORTCUT_ACTIONS}
 
         for mode_key, mode_label_raw in self._SHORTCUT_MODES:
-            mode_label = tr(mode_label_raw)
+            mode_label = _tr(mode_label_raw)
             mode_actions = self._shortcut_cards[mode_key]
             if not any(card is changed_card for card in mode_actions.values()):
                 continue
@@ -251,10 +258,10 @@ class ShortcutSubInterface(SubSettingInterface):
                             for btn in [changed_card.btn_key1, changed_card.btn_key2]:
                                 if btn.get_key().strip().upper() == nk and btn.get_trigger_type() == nt:
                                     btn.restore_original_key()
-                            trigger_label = tr("长按") if nt == "long" else tr("短按")
+                            trigger_label = _tr("长按") if nt == "long" else _tr("短按")
                             InfoBar.warning(
-                                title=tr("快捷键冲突"),
-                                content=tr("[{mode}]「{action}」已占用{trigger}按键 {key}").format(
+                                title=_tr("快捷键冲突"),
+                                content=_tr("[{mode}]「{action}」已占用{trigger}按键 {key}").format(
                                     mode=mode_label,
                                     action=action_titles[action_key],
                                     trigger=trigger_label,
