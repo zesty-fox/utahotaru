@@ -49,6 +49,13 @@ from strange_uta_game.frontend.settings.app_settings import AppSettings
 
 # 从配置文件读取主题设置并应用
 settings = AppSettings()
+
+# 安装翻译器（必须在创建任何 widget 之前）。
+# 见 src/strange_uta_game/frontend/localization/__init__.py 关于两个 translator
+# (app + qfluentwidgets) 并行安装的设计说明。
+from strange_uta_game.frontend.localization import install_translators
+install_translators(settings.get("ui.language", "zh_CN"))
+
 theme_value = settings.get("ui.theme", "auto")
 from strange_uta_game.frontend.theme import ThemeMode
 mode_map = {
