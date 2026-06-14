@@ -97,7 +97,7 @@ class CalibrationDialog(QDialog):
         self._latest_offset_ms: Optional[float] = None
         self._click_audio = self._generate_click()
 
-        self.setWindowTitle("Offset 校准")
+        self.setWindowTitle(self.tr("Offset 校准"))
         self.setModal(True)
         self.resize(880, 420)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -111,9 +111,9 @@ class CalibrationDialog(QDialog):
 
         left_layout = QVBoxLayout()
         left_layout.setSpacing(4)
-        self.lbl_latest = QLabel("最近偏移: -- ms", self)
+        self.lbl_latest = QLabel(self.tr("最近偏移: -- ms"), self)
         self.lbl_latest.setFont(QFont("Microsoft YaHei", 10))
-        self.lbl_average = QLabel("平均偏移: -- ms", self)
+        self.lbl_average = QLabel(self.tr("平均偏移: -- ms"), self)
         self.lbl_average.setFont(QFont("Microsoft YaHei", 10))
         left_layout.addWidget(self.lbl_latest)
         left_layout.addWidget(self.lbl_average)
@@ -122,17 +122,17 @@ class CalibrationDialog(QDialog):
 
         right_layout = QHBoxLayout()
         right_layout.setSpacing(8)
-        self.lbl_bpm = QLabel("节拍 BPM", self)
+        self.lbl_bpm = QLabel(self.tr("节拍 BPM"), self)
         self.lbl_bpm.setFont(QFont("Microsoft YaHei", 10))
         self.spin_bpm = SpinBox(self)
         self.spin_bpm.setRange(60, 240)
         self.spin_bpm.setValue(self._bpm)
         self.spin_bpm.setSuffix(" BPM")
-        self.spin_bpm.setFixedWidth(130)
+        self.spin_bpm.setMinimumWidth(130)
         self.spin_bpm.setFont(QFont("Microsoft YaHei", 10))
-        self.btn_reset = PushButton("重置", self)
+        self.btn_reset = PushButton(self.tr("重置"), self)
         self.btn_reset.setFont(QFont("Microsoft YaHei", 10))
-        self.btn_apply = PushButton("应用", self)
+        self.btn_apply = PushButton(self.tr("应用"), self)
         self.btn_apply.setFont(QFont("Microsoft YaHei", 10))
 
         right_layout.addWidget(self.lbl_bpm)
@@ -147,7 +147,7 @@ class CalibrationDialog(QDialog):
         root.addWidget(self.canvas)
 
         self.lbl_hint = QLabel(
-            "按空格键跟拍，可持续任意次数，关闭窗口前都会保持运行", self
+            self.tr("按空格键跟拍，可持续任意次数，关闭窗口前都会保持运行"), self
         )
         self.lbl_hint.setFont(QFont("Microsoft YaHei", 9))
         root.addWidget(self.lbl_hint)
@@ -354,10 +354,10 @@ class CalibrationDialog(QDialog):
 
     def _update_offset_labels(self):
         average = self._filtered_average_offset_ms()
-        self.lbl_latest.setText(
-            f"最近偏移: {self._format_offset_text(self._latest_offset_ms)}"
-        )
-        self.lbl_average.setText(f"平均偏移: {self._format_offset_text(average)}")
+        self.lbl_latest.setText(self.tr("最近偏移: {value}").format(
+            value=self._format_offset_text(self._latest_offset_ms)))
+        self.lbl_average.setText(self.tr("平均偏移: {value}").format(
+            value=self._format_offset_text(average)))
 
     def _on_reset(self):
         self._tap_offsets_ms.clear()
@@ -370,8 +370,8 @@ class CalibrationDialog(QDialog):
         applied_offset = round(average) if average is not None else 0
         self._settings_interface.card_offset.setValue(applied_offset)
         InfoBar.success(
-            title="校准完成",
-            content=f"已应用 Offset：{applied_offset:+d} ms",
+            title=self.tr("校准完成"),
+            content=self.tr("已应用 Offset：{offset:+d} ms").format(offset=applied_offset),
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,

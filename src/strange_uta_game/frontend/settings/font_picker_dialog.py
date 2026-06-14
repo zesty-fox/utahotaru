@@ -81,14 +81,16 @@ class FontPickerDialog(MessageBoxBase):
             family = dlg.selected_family()  # 返回 Qt 可用的族名
     """
 
-    def __init__(self, current: str = "", title: str = "选择字体", parent=None):
+    def __init__(self, current: str = "", title: str = "", parent=None):
         super().__init__(parent)
         self._selected = current or ""
         self._entries = self._build_entries()  # [(family, display, search)]
 
-        self.titleLabel = SubtitleLabel(title, self)
+        # title 默认走 tr("选择字体")——参数为空时取本地化默认；调用方传入自定义
+        # 标题（如带前缀）时使用原值。
+        self.titleLabel = SubtitleLabel(title or self.tr("选择字体"), self)
         self.searchEdit = SearchLineEdit(self)
-        self.searchEdit.setPlaceholderText("输入字体名称过滤（支持中/日/韩文名）…")
+        self.searchEdit.setPlaceholderText(self.tr("输入字体名称过滤（支持中/日/韩文名）…"))
         self.searchEdit.setClearButtonEnabled(True)
         self.listWidget = ListWidget(self)
         self.listWidget.setMinimumHeight(380)
@@ -101,8 +103,8 @@ class FontPickerDialog(MessageBoxBase):
         self.viewLayout.addWidget(self.hintLabel)
         self.widget.setMinimumWidth(460)
 
-        self.yesButton.setText("选用")
-        self.cancelButton.setText("取消")
+        self.yesButton.setText(self.tr("选用"))
+        self.cancelButton.setText(self.tr("取消"))
 
         self._populate(self._entries)
         self._select_family(self._selected)

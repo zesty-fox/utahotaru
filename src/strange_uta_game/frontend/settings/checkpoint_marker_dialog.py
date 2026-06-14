@@ -37,7 +37,7 @@ class CheckpointMarkerDialog(QDialog):
 
     def __init__(self, current: dict[str, str] | None = None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Checkpoint 字符设定")
+        self.setWindowTitle(self.tr("Checkpoint 字符设定"))
         self.setMinimumWidth(320)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint)
 
@@ -52,8 +52,8 @@ class CheckpointMarkerDialog(QDialog):
         # 表头
         header = QHBoxLayout()
         header.addStretch()
-        header.addWidget(QLabel("已打轴"))
-        header.addWidget(QLabel("未打轴"))
+        header.addWidget(QLabel(self.tr("已打轴")))
+        header.addWidget(QLabel(self.tr("未打轴")))
         root.addLayout(header)
 
         # 三行
@@ -61,11 +61,11 @@ class CheckpointMarkerDialog(QDialog):
         grid.setHorizontalSpacing(12)
         grid.setVerticalSpacing(8)
         for row, (_, label, timed_key, empty_key) in enumerate(_LAYOUT):
-            grid.addWidget(QLabel(label), row, 0)
+            grid.addWidget(QLabel(self.tr(label)), row, 0)
             for col, key in enumerate((timed_key, empty_key), start=1):
                 edit = QLineEdit(markers.get(key, DEFAULT_MARKERS[key]))
                 edit.setMaxLength(4)
-                edit.setFixedWidth(48)
+                edit.setMinimumWidth(48)
                 edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 grid.addWidget(edit, row, col)
                 self._edits[key] = edit
@@ -73,14 +73,14 @@ class CheckpointMarkerDialog(QDialog):
 
         # 按钮行
         btn_row = QHBoxLayout()
-        btn_reset = PushButton("恢复默认")
+        btn_reset = PushButton(self.tr("恢复默认"))
         btn_reset.clicked.connect(self._reset)
         btn_row.addWidget(btn_reset)
         btn_row.addStretch()
-        btn_ok = PushButton("确定")
+        btn_ok = PushButton(self.tr("确定"))
         btn_ok.setDefault(True)
         btn_ok.clicked.connect(self.accept)
-        btn_cancel = PushButton("取消")
+        btn_cancel = PushButton(self.tr("取消"))
         btn_cancel.clicked.connect(self.reject)
         btn_row.addWidget(btn_ok)
         btn_row.addWidget(btn_cancel)

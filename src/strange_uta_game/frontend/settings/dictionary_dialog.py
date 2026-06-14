@@ -39,7 +39,7 @@ class DictionaryEditDialog(QDialog):
 
     def __init__(self, entries: list, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("读音词典")
+        self.setWindowTitle(self.tr("读音词典"))
         self.setMinimumSize(560, 480)
         self._entries = [dict(e) for e in entries]  # 深拷贝
 
@@ -47,22 +47,22 @@ class DictionaryEditDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(12)
 
-        title = QLabel("读音词典")
+        title = QLabel(self.tr("读音词典"))
         title.setFont(QFont("Microsoft YaHei", 14))
         layout.addWidget(title)
 
-        desc = QLabel(
+        desc = QLabel(self.tr(
             "设置固定读音的词汇。词典中的词将以子串严格匹配方式覆盖自动注音（最高优先级）。\n"
             "优先级从上到下递减，新添加的词条默认在顶部（最高优先级）。\n"
             "注音格式：{原文||段1,段2,...}（块内 | 分 mora、, 分字符；空段=无 ruby）。\n"
             "示例：{微笑||ほほ,え}ん  /  {大冒険||だ|い,ぼ|う,け|ん}"
-        )
+        ))
         desc.setFont(QFont("Microsoft YaHei", 10))
         desc.setWordWrap(True)
         layout.addWidget(desc)
 
         self._table = QTableWidget(0, 3, self)
-        self._table.setHorizontalHeaderLabels(["启用", "词", "注音(annotated)"])
+        self._table.setHorizontalHeaderLabels([self.tr("启用"), self.tr("词"), self.tr("注音(annotated)")])
         header = self._table.horizontalHeader()
         if header is not None:
             # 词列按内容自动撑开，注音列拉伸吃满剩余宽度；"启用" 复选框列固定窄宽。
@@ -86,15 +86,15 @@ class DictionaryEditDialog(QDialog):
 
         # 按钮行
         btn_row = QHBoxLayout()
-        btn_add = PushButton("添加", self)
+        btn_add = PushButton(self.tr("添加"), self)
         btn_add.clicked.connect(self._on_add)
-        btn_del = PushButton("删除选中", self)
+        btn_del = PushButton(self.tr("删除选中"), self)
         btn_del.clicked.connect(self._on_delete)
-        btn_up = PushButton("上移", self)
+        btn_up = PushButton(self.tr("上移"), self)
         btn_up.clicked.connect(self._on_move_up)
-        btn_down = PushButton("下移", self)
+        btn_down = PushButton(self.tr("下移"), self)
         btn_down.clicked.connect(self._on_move_down)
-        btn_import = PushButton("导入RL字典", self)
+        btn_import = PushButton(self.tr("导入RL字典"), self)
         btn_import.clicked.connect(self._on_import_rl)
         btn_row.addWidget(btn_add)
         btn_row.addWidget(btn_del)
@@ -106,9 +106,9 @@ class DictionaryEditDialog(QDialog):
 
         # 确定/取消
         ok_row = QHBoxLayout()
-        btn_ok = PrimaryPushButton("确定", self)
+        btn_ok = PrimaryPushButton(self.tr("确定"), self)
         btn_ok.clicked.connect(self._on_accept)
-        btn_cancel = PushButton("取消", self)
+        btn_cancel = PushButton(self.tr("取消"), self)
         btn_cancel.clicked.connect(self.reject)
         ok_row.addStretch()
         ok_row.addWidget(btn_ok)
@@ -186,7 +186,8 @@ class DictionaryEditDialog(QDialog):
     def _on_import_rl(self):
         """导入 RL 字典文件。"""
         path, _ = QFileDialog.getOpenFileName(
-            self, "选择RL字典文件", "", "文本文件 (*.txt);;所有文件 (*)"
+            self, self.tr("选择RL字典文件"), "",
+            self.tr("文本文件 (*.txt);;所有文件 (*)")
         )
         if not path:
             return
@@ -195,7 +196,7 @@ class DictionaryEditDialog(QDialog):
             text = read_rl_dictionary_file(path)
         except Exception as e:
             InfoBar.warning(
-                title="读取失败",
+                title=self.tr("读取失败"),
                 content=str(e),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
@@ -208,8 +209,8 @@ class DictionaryEditDialog(QDialog):
         new_entries = _parse_rl_dictionary(text)
         if not new_entries:
             InfoBar.warning(
-                title="导入失败",
-                content="未找到有效的词典条目",
+                title=self.tr("导入失败"),
+                content=self.tr("未找到有效的词典条目"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -242,8 +243,10 @@ class DictionaryEditDialog(QDialog):
 
         self._table.scrollToTop()
         InfoBar.success(
-            title="导入完成",
-            content=f"新增 {added} 条，跳过重复 {skipped} 条（共 {len(new_entries)} 条，新增条目已置顶）",
+            title=self.tr("导入完成"),
+            content=self.tr("新增 {added} 条，跳过重复 {skipped} 条（共 {total} 条，新增条目已置顶）").format(
+                added=added, skipped=skipped, total=len(new_entries)
+            ),
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -287,13 +290,13 @@ class DictionaryEditDialog(QDialog):
         bad_rows = self._validate_entries()
         if bad_rows:
             preview = ", ".join(str(r + 1) for r in bad_rows[:5])
-            more = "" if len(bad_rows) <= 5 else f" 等 {len(bad_rows)} 行"
+            more = "" if len(bad_rows) <= 5 else self.tr(" 等 {n} 行").format(n=len(bad_rows))
             InfoBar.warning(
-                title="注音格式异常",
-                content=(
-                    f"第 {preview}{more} 行的注音不符合 annotated 格式或 raw_text 与词不一致；"
+                title=self.tr("注音格式异常"),
+                content=self.tr(
+                    "第 {rows}{more} 行的注音不符合 annotated 格式或 raw_text 与词不一致；"
                     "这些行在匹配时可能被忽略。仍可保存。"
-                ),
+                ).format(rows=preview, more=more),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,

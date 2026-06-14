@@ -24,7 +24,7 @@ class NicokaraTagsDialog(QDialog):
 
     def __init__(self, tag_data: dict, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Nicokara 标签设置")
+        self.setWindowTitle(self.tr("Nicokara 标签设置"))
         self.setMinimumWidth(500)
 
         screen = parent.screen() if parent else QApplication.primaryScreen()
@@ -35,7 +35,7 @@ class NicokaraTagsDialog(QDialog):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(14)
 
-        title = QLabel("Nicokara 标签设置")
+        title = QLabel(self.tr("Nicokara 标签设置"))
         title.setFont(QFont("Microsoft YaHei", 14))
         layout.addWidget(title)
 
@@ -56,7 +56,7 @@ class NicokaraTagsDialog(QDialog):
             row = QHBoxLayout()
             lbl = QLabel(label_text)
             lbl.setFont(QFont("Microsoft YaHei", 10))
-            lbl.setFixedWidth(150)
+            lbl.setMinimumWidth(150)
             edit = LineEdit()
             edit.setFont(QFont("Microsoft YaHei", 10))
             row.addWidget(lbl)
@@ -64,16 +64,16 @@ class NicokaraTagsDialog(QDialog):
             form_layout.addLayout(row)
             return edit
 
-        self._edit_title = _row("@Title（歌曲名）")
-        self._edit_artist = _row("@Artist（演唱者）")
-        self._edit_album = _row("@Album（专辑名）")
-        self._edit_tagging_by = _row("@TaggingBy（打轴者）")
+        self._edit_title = _row(self.tr("@Title（歌曲名）"))
+        self._edit_artist = _row(self.tr("@Artist（演唱者）"))
+        self._edit_album = _row(self.tr("@Album（专辑名）"))
+        self._edit_tagging_by = _row(self.tr("@TaggingBy（打轴者）"))
 
         # @SilencemSec — SpinBox
         silence_row = QHBoxLayout()
-        silence_lbl = QLabel("@SilencemSec（静音）")
+        silence_lbl = QLabel(self.tr("@SilencemSec（静音）"))
         silence_lbl.setFont(QFont("Microsoft YaHei", 10))
-        silence_lbl.setFixedWidth(150)
+        silence_lbl.setMinimumWidth(150)
 
         self._spin_silence = SpinBox()
         self._spin_silence.setRange(0, 99999)
@@ -86,7 +86,7 @@ class NicokaraTagsDialog(QDialog):
         scroll_layout.addLayout(form_layout)
 
         # @Custom 动态列表
-        custom_lbl = QLabel("@Custom（自定义标签）")
+        custom_lbl = QLabel(self.tr("@Custom（自定义标签）"))
         custom_lbl.setFont(QFont("Microsoft YaHei", 10))
         scroll_layout.addWidget(custom_lbl)
 
@@ -96,7 +96,7 @@ class NicokaraTagsDialog(QDialog):
         scroll_layout.addLayout(self._custom_container)
 
         custom_btn_row = QHBoxLayout()
-        btn_add_custom = PushButton("添加自定义行", self)
+        btn_add_custom = PushButton(self.tr("添加自定义行"), self)
         btn_add_custom.setFont(QFont("Microsoft YaHei", 10))
         btn_add_custom.clicked.connect(self._on_add_custom)
         custom_btn_row.addWidget(btn_add_custom)
@@ -118,9 +118,9 @@ class NicokaraTagsDialog(QDialog):
 
         # 确定/取消
         ok_row = QHBoxLayout()
-        btn_ok = PrimaryPushButton("确定", self)
+        btn_ok = PrimaryPushButton(self.tr("确定"), self)
         btn_ok.clicked.connect(self.accept)
-        btn_cancel = PushButton("取消", self)
+        btn_cancel = PushButton(self.tr("取消"), self)
         btn_cancel.clicked.connect(self.reject)
         ok_row.addStretch()
         ok_row.addWidget(btn_ok)
@@ -130,7 +130,7 @@ class NicokaraTagsDialog(QDialog):
     def _on_add_custom(self, value: str = ""):
         edit = LineEdit()
         edit.setFont(QFont("Microsoft YaHei", 10))
-        edit.setPlaceholderText("自定义标签内容，例：@MyTag=value")
+        edit.setPlaceholderText(self.tr("自定义标签内容，例：@MyTag=value"))
         if value:
             edit.setText(value)
         self._custom_list.append(edit)

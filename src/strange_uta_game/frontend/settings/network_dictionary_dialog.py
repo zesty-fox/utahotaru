@@ -95,7 +95,7 @@ class NetworkSourceEntriesDialog(QDialog):
 
     def __init__(self, source_name: str, entries: List[Dict[str, Any]], parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"网络词典条目 - {source_name}")
+        self.setWindowTitle(self.tr("网络词典条目 - {name}").format(name=source_name))
         self.setMinimumSize(640, 480)
         self._entries: List[Dict[str, Any]] = [dict(e) for e in (entries or [])]
 
@@ -103,20 +103,20 @@ class NetworkSourceEntriesDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(12)
 
-        title = QLabel(f"网络词典条目（{source_name}）")
+        title = QLabel(self.tr("网络词典条目（{name}）").format(name=source_name))
         title.setFont(QFont("Microsoft YaHei", 14))
         layout.addWidget(title)
 
-        desc = QLabel(
+        desc = QLabel(self.tr(
             "拉取后的 entries 在此处直接编辑。顺序自顶向下递减优先级；新增条目默认置顶。\n"
             "注音格式：{原文||段1,段2,...}（块内 | 分 mora、, 分字符；空段=无 ruby）。"
-        )
+        ))
         desc.setFont(QFont("Microsoft YaHei", 10))
         desc.setWordWrap(True)
         layout.addWidget(desc)
 
         self._table = QTableWidget(0, 3, self)
-        self._table.setHorizontalHeaderLabels(["启用", "词", "注音(annotated)"])
+        self._table.setHorizontalHeaderLabels([self.tr("启用"), self.tr("词"), self.tr("注音(annotated)")])
         header = self._table.horizontalHeader()
         if header is not None:
             from PyQt6.QtWidgets import QHeaderView
@@ -133,10 +133,10 @@ class NetworkSourceEntriesDialog(QDialog):
 
         btn_row = QHBoxLayout()
         for label, slot in [
-            ("添加", self._on_add),
-            ("删除选中", self._on_delete),
-            ("上移", lambda: self._move(-1)),
-            ("下移", lambda: self._move(+1)),
+            (self.tr("添加"), self._on_add),
+            (self.tr("删除选中"), self._on_delete),
+            (self.tr("上移"), lambda: self._move(-1)),
+            (self.tr("下移"), lambda: self._move(+1)),
         ]:
             btn = PushButton(label, self)
             btn.clicked.connect(slot)
@@ -145,9 +145,9 @@ class NetworkSourceEntriesDialog(QDialog):
         layout.addLayout(btn_row)
 
         ok_row = QHBoxLayout()
-        btn_ok = PrimaryPushButton("确定", self)
+        btn_ok = PrimaryPushButton(self.tr("确定"), self)
         btn_ok.clicked.connect(self.accept)
-        btn_cancel = PushButton("取消", self)
+        btn_cancel = PushButton(self.tr("取消"), self)
         btn_cancel.clicked.connect(self.reject)
         ok_row.addStretch()
         ok_row.addWidget(btn_ok)
@@ -224,7 +224,7 @@ class NetworkDictionaryDialog(QDialog):
 
     def __init__(self, doc: Dict[str, Any], cache_path: str = "", parent=None):
         super().__init__(parent)
-        self.setWindowTitle("网络读音词典")
+        self.setWindowTitle(self.tr("网络读音词典"))
         self.setMinimumSize(760, 600)
         self._doc: Dict[str, Any] = json.loads(json.dumps(doc))
         self._cache_path = cache_path
@@ -237,14 +237,15 @@ class NetworkDictionaryDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(12)
 
-        title = QLabel("网络读音词典")
+        title = QLabel(self.tr("网络读音词典"))
         title.setFont(QFont("Microsoft YaHei", 14))
         layout.addWidget(title)
 
         desc_lines = [
-            "lookup 时按下方「字典源优先级」自顶向下遍历，每源内自顶向下首个命中即停。",
-            f"条目缓存文件：{cache_path}" if cache_path else "条目缓存：network_dictionary.json（与 config.json 同目录）",
-            "总开关「启用网络词典」位于设置卡片，本对话框仅编辑源列表与条目。",
+            self.tr("lookup 时按下方「字典源优先级」自顶向下遍历，每源内自顶向下首个命中即停。"),
+            self.tr("条目缓存文件：{path}").format(path=cache_path) if cache_path
+                else self.tr("条目缓存：network_dictionary.json（与 config.json 同目录）"),
+            self.tr("总开关「启用网络词典」位于设置卡片，本对话框仅编辑源列表与条目。"),
         ]
         desc = QLabel("\n".join(desc_lines))
         desc.setFont(QFont("Microsoft YaHei", 10))
@@ -253,7 +254,9 @@ class NetworkDictionaryDialog(QDialog):
 
         # 源表格
         self._table = QTableWidget(0, 5, self)
-        self._table.setHorizontalHeaderLabels(["启用", "名称", "URL", "条目数", "上次同步"])
+        self._table.setHorizontalHeaderLabels([
+            self.tr("启用"), self.tr("名称"), "URL", self.tr("条目数"), self.tr("上次同步"),
+        ])
         header = self._table.horizontalHeader()
         if header is not None:
             from PyQt6.QtWidgets import QHeaderView
@@ -272,13 +275,13 @@ class NetworkDictionaryDialog(QDialog):
         # 操作按钮
         btn_row = QHBoxLayout()
         for label, slot in [
-            ("刷新所有启用源", self._on_fetch_all_enabled),
-            ("查看/编辑条目", self._on_edit_entries),
-            ("从文件导入到所选", self._on_import_file),
-            ("添加源", self._on_add_source),
-            ("删除源", self._on_remove_source),
-            ("源上移", lambda: self._on_move_source(-1)),
-            ("源下移", lambda: self._on_move_source(+1)),
+            (self.tr("刷新所有启用源"), self._on_fetch_all_enabled),
+            (self.tr("查看/编辑条目"), self._on_edit_entries),
+            (self.tr("从文件导入到所选"), self._on_import_file),
+            (self.tr("添加源"), self._on_add_source),
+            (self.tr("删除源"), self._on_remove_source),
+            (self.tr("源上移"), lambda: self._on_move_source(-1)),
+            (self.tr("源下移"), lambda: self._on_move_source(+1)),
         ]:
             btn = PushButton(label, self)
             btn.clicked.connect(slot)
@@ -291,9 +294,9 @@ class NetworkDictionaryDialog(QDialog):
 
         # OK / Cancel
         ok_row = QHBoxLayout()
-        btn_ok = PrimaryPushButton("确定", self)
+        btn_ok = PrimaryPushButton(self.tr("确定"), self)
         btn_ok.clicked.connect(self._on_accept)
-        btn_cancel = PushButton("取消", self)
+        btn_cancel = PushButton(self.tr("取消"), self)
         btn_cancel.clicked.connect(self.reject)
         ok_row.addStretch()
         ok_row.addWidget(btn_ok)
@@ -362,10 +365,10 @@ class NetworkDictionaryDialog(QDialog):
         sources = self._doc.get("sources") or []
         targets = [s for s in sources if s.get("enabled") and (s.get("url") or "").strip()]
         if not targets:
-            self._warn("没有启用且 URL 非空的源")
+            self._warn(self.tr("没有启用且 URL 非空的源"))
             return
         if getattr(self, "_fetch_thread", None) is not None and self._fetch_thread.isRunning():
-            self._warn("已有拉取任务在进行中")
+            self._warn(self.tr("已有拉取任务在进行中"))
             return
 
         # 找到"刷新所有启用源"按钮以禁用（按 sender 取，不依赖具体引用）
@@ -392,8 +395,8 @@ class NetworkDictionaryDialog(QDialog):
         self._fetch_thread.start()
 
         InfoBar.success(
-            title="开始拉取",
-            content=f"后台同步 {len(targets)} 个源中...",
+            title=self.tr("开始拉取"),
+            content=self.tr("后台同步 {n} 个源中...").format(n=len(targets)),
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -425,14 +428,14 @@ class NetworkDictionaryDialog(QDialog):
         self._fetch_worker = None
         self._fetch_thread = None
 
-        summary = "; ".join(ok_msgs) if ok_msgs else "(均失败)"
+        summary = "; ".join(ok_msgs) if ok_msgs else self.tr("(均失败)")
         if fail_msgs:
-            summary += "  |  失败: " + "; ".join(fail_msgs)
+            summary += self.tr("  |  失败: ") + "; ".join(fail_msgs)
         if fail_msgs and not ok_msgs:
             self._warn(summary)
         else:
             InfoBar.success(
-                title="刷新完成",
+                title=self.tr("刷新完成"),
                 content=summary,
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
@@ -445,7 +448,7 @@ class NetworkDictionaryDialog(QDialog):
         self._collect_table_into_doc()
         idx = self._selected_source_index()
         if idx < 0:
-            self._warn("请先在表格中选择一个网络源")
+            self._warn(self.tr("请先在表格中选择一个网络源"))
             return
         src = self._doc["sources"][idx]
         dialog = NetworkSourceEntriesDialog(src.get("name", src["id"]), src.get("entries", []), self)
@@ -458,20 +461,20 @@ class NetworkDictionaryDialog(QDialog):
         self._collect_table_into_doc()
         idx = self._selected_source_index()
         if idx < 0:
-            self._warn("请先选中一个网络源")
+            self._warn(self.tr("请先选中一个网络源"))
             return
         path, _ = QFileDialog.getOpenFileName(
             self,
-            "选择 RL 兼容字典文件",
+            self.tr("选择 RL 兼容字典文件"),
             "",
-            "RL 字典 (*.txt *.hsp *.ini);;所有文件 (*)",
+            self.tr("RL 字典 (*.txt *.hsp *.ini);;所有文件 (*)"),
         )
         if not path:
             return
         try:
             entries = import_file_to_entries(path)
         except Exception as e:
-            self._warn(f"导入失败：{e}")
+            self._warn(self.tr("导入失败：{err}").format(err=e))
             return
         src = self._doc["sources"][idx]
         src["entries"] = entries
@@ -481,10 +484,10 @@ class NetworkDictionaryDialog(QDialog):
 
     def _on_add_source(self) -> None:
         self._collect_table_into_doc()
-        name, ok = QInputDialog.getText(self, "添加源", "源名称：")
+        name, ok = QInputDialog.getText(self, self.tr("添加源"), self.tr("源名称："))
         if not ok or not name.strip():
             return
-        url, ok = QInputDialog.getText(self, "添加源", "源 URL（RL kakuteiyominet.php 兼容）：")
+        url, ok = QInputDialog.getText(self, self.tr("添加源"), self.tr("源 URL（RL kakuteiyominet.php 兼容）："))
         if not ok:
             return
         base = "".join(c if c.isalnum() else "_" for c in name.strip())[:24] or "src"
@@ -508,10 +511,11 @@ class NetworkDictionaryDialog(QDialog):
             return
         src = self._doc["sources"][idx]
         if src.get("builtin"):
-            self._warn("内置预设不可删除（可在表格里关闭其启用开关）")
+            self._warn(self.tr("内置预设不可删除（可在表格里关闭其启用开关）"))
             return
         if (
-            QMessageBox.question(self, "确认", f"删除源 {src.get('name', '')}？")
+            QMessageBox.question(self, self.tr("确认"),
+                                 self.tr("删除源 {name}？").format(name=src.get('name', '')))
             != QMessageBox.StandardButton.Yes
         ):
             return
@@ -541,7 +545,7 @@ class NetworkDictionaryDialog(QDialog):
 
     def _warn(self, msg: str) -> None:
         InfoBar.warning(
-            title="提示",
+            title=self.tr("提示"),
             content=msg,
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
