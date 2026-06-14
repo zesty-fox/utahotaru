@@ -143,7 +143,7 @@ class SettingsInterface(ScrollArea):
         self.vBoxLayout = QVBoxLayout(self.scrollWidget)
 
         # 标题
-        self.settingLabel = QLabel("设置", self)
+        self.settingLabel = QLabel(self.tr("设置"), self)
         self.settingLabel.setObjectName("settingLabel")
         self._update_setting_label_style()  # 应用初始颜色（含主题颜色）
 
@@ -203,9 +203,10 @@ class SettingsInterface(ScrollArea):
         self.vBoxLayout.addWidget(self.pivot)
 
         for key, text in self._tab_config:
+            # 类级 TAB_CONFIG 保留中文源串供测试引用，显示时统一 tr()
             self.pivot.addItem(
                 routeKey=key,
-                text=text,
+                text=self.tr(text),
                 onClick=lambda checked, k=key: self._on_tab_changed(k),
             )
 
@@ -409,7 +410,7 @@ class SettingsInterface(ScrollArea):
         if self._store is not None:
             self._store.notify("settings")
         InfoBar.success(
-            title="设置已保存", content="所有设置已保存到配置文件",
+            title=self.tr("设置已保存"), content=self.tr("所有设置已保存到配置文件"),
             orient=Qt.Orientation.Horizontal, isClosable=True,
             position=InfoBarPosition.TOP, duration=3000, parent=self,
         )
@@ -417,10 +418,10 @@ class SettingsInterface(ScrollArea):
     def _reset_settings(self):
         from PyQt6.QtWidgets import QMessageBox
         msg = QMessageBox(self)
-        msg.setWindowTitle("确认重置")
-        msg.setText("确定要将所有设置重置为默认值吗？\n这将覆盖您当前的设置（用户词典和演唱者预设不受影响）。")
-        btn_yes = msg.addButton("是", QMessageBox.ButtonRole.AcceptRole)
-        msg.addButton("否", QMessageBox.ButtonRole.RejectRole)
+        msg.setWindowTitle(self.tr("确认重置"))
+        msg.setText(self.tr("确定要将所有设置重置为默认值吗？\n这将覆盖您当前的设置（用户词典和演唱者预设不受影响）。"))
+        btn_yes = msg.addButton(self.tr("是"), QMessageBox.ButtonRole.AcceptRole)
+        msg.addButton(self.tr("否"), QMessageBox.ButtonRole.RejectRole)
         msg.setDefaultButton(btn_yes)
         msg.exec()
         if msg.clickedButton() is btn_yes:
@@ -434,10 +435,10 @@ class SettingsInterface(ScrollArea):
                         self._settings._config_path.unlink()
                     self._settings = AppSettings()
                 self._load_current_settings()
-                InfoBar.success(title="设置已重置", content="所有设置已恢复为默认值",
+                InfoBar.success(title=self.tr("设置已重置"), content=self.tr("所有设置已恢复为默认值"),
                     orient=Qt.Orientation.Horizontal, isClosable=True,
                     position=InfoBarPosition.TOP, duration=3000, parent=self)
             except Exception as e:
-                InfoBar.error(title="重置失败", content=str(e),
+                InfoBar.error(title=self.tr("重置失败"), content=str(e),
                     orient=Qt.Orientation.Horizontal, isClosable=True,
                     position=InfoBarPosition.TOP, duration=5000, parent=self)

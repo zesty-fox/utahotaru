@@ -53,17 +53,17 @@ class RubyMismatchDialog(QDialog):
 
     def __init__(self, detail: dict, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("注音分段不匹配")
+        self.setWindowTitle(self.tr("注音分段不匹配"))
         self.resize(640, 500)
         self._action: str = "cancel"
 
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
 
-        desc = QLabel(
+        desc = QLabel(self.tr(
             "以下字符的注音分段数量与节奏点数量不匹配。\n"
             "可选择自动均分方案修复后继续导出，或忽略继续导出。"
-        )
+        ))
         desc.setWordWrap(True)
         layout.addWidget(desc)
 
@@ -75,10 +75,10 @@ class RubyMismatchDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(8)
 
-        self.btn_char = PrimaryPushButton("按字符均分并导出", self)
-        self.btn_mora = PrimaryPushButton("按mora均分并导出", self)
-        self.btn_ignore = PushButton("忽略并继续导出", self)
-        self.btn_cancel = PushButton("取消", self)
+        self.btn_char = PrimaryPushButton(self.tr("按字符均分并导出"), self)
+        self.btn_mora = PrimaryPushButton(self.tr("按mora均分并导出"), self)
+        self.btn_ignore = PushButton(self.tr("忽略并继续导出"), self)
+        self.btn_cancel = PushButton(self.tr("取消"), self)
 
         self.btn_char.clicked.connect(lambda: self._set_action("char"))
         self.btn_mora.clicked.connect(lambda: self._set_action("mora"))
@@ -94,19 +94,19 @@ class RubyMismatchDialog(QDialog):
     def _build_preview_content(self, detail: dict) -> None:
         lines: list[str] = []
         lines.append("=" * 50)
-        lines.append("【不匹配列表】")
+        lines.append(self.tr("【不匹配列表】"))
         lines.append("=" * 50)
         for line in detail.get("mismatch_lines", []):
             lines.append(f"  {line}")
         lines.append("")
         lines.append("=" * 50)
-        lines.append("【按字符均分预览】")
+        lines.append(self.tr("【按字符均分预览】"))
         lines.append("=" * 50)
         for line in detail.get("char_preview_lines", []):
             lines.append(f"  {line}")
         lines.append("")
         lines.append("=" * 50)
-        lines.append("【按mora均分预览】")
+        lines.append(self.tr("【按mora均分预览】"))
         lines.append("=" * 50)
         for line in detail.get("mora_preview_lines", []):
             lines.append(f"  {line}")
@@ -135,10 +135,10 @@ class ExportInterface(QWidget):
         layout.setSpacing(20)
 
         # 标题（保存为实例变量，防止 Python GC 清出 WeakKeyDictionary 导致主题失效）
-        self.title_label = TitleLabel("导出")
+        self.title_label = TitleLabel(self.tr("导出"))
         layout.addWidget(self.title_label)
 
-        desc = CaptionLabel("将项目导出为多种歌词格式")
+        desc = CaptionLabel(self.tr("将项目导出为多种歌词格式"))
         layout.addWidget(desc)
 
         # 格式选择
@@ -151,7 +151,7 @@ class ExportInterface(QWidget):
         left_layout.setContentsMargins(20, 20, 20, 20)
         left_layout.setSpacing(10)
 
-        left_label = SubtitleLabel("选择导出格式")
+        left_label = SubtitleLabel(self.tr("选择导出格式"))
         left_layout.addWidget(left_label)
 
         self.format_list = QListWidget()
@@ -166,27 +166,27 @@ class ExportInterface(QWidget):
         right_layout.setContentsMargins(20, 20, 20, 20)
         right_layout.setSpacing(15)
 
-        right_label = SubtitleLabel("导出设置")
+        right_label = SubtitleLabel(self.tr("导出设置"))
         right_layout.addWidget(right_label)
 
         # 输出路径
-        path_label = CaptionLabel("输出路径")
+        path_label = CaptionLabel(self.tr("输出路径"))
         right_layout.addWidget(path_label)
 
         path_row = QHBoxLayout()
         self.line_output = LineEdit()
-        self.line_output.setPlaceholderText("选择导出目录...")
+        self.line_output.setPlaceholderText(self.tr("选择导出目录..."))
         self.line_output.setReadOnly(True)
         path_row.addWidget(self.line_output)
 
-        btn_browse = PushButton("浏览...", self)
+        btn_browse = PushButton(self.tr("浏览..."), self)
         btn_browse.setIcon(FIF.FOLDER)
         btn_browse.clicked.connect(self._on_browse)
         path_row.addWidget(btn_browse)
         right_layout.addLayout(path_row)
 
         # 文件名
-        fname_label = CaptionLabel("文件名（不含扩展名）")
+        fname_label = CaptionLabel(self.tr("文件名（不含扩展名）"))
         right_layout.addWidget(fname_label)
 
         self.line_filename = LineEdit()
@@ -194,18 +194,18 @@ class ExportInterface(QWidget):
         right_layout.addWidget(self.line_filename)
 
         # Nicokara 标签设置按钮（仅 Nicokara 格式显示）
-        self.btn_tags = PushButton("Nicokara 标签设置...", self)
+        self.btn_tags = PushButton(self.tr("Nicokara 标签设置..."), self)
         self.btn_tags.setIcon(FIF.TAG)
         self.btn_tags.clicked.connect(self._on_nicokara_tags)
         self.btn_tags.hide()
         right_layout.addWidget(self.btn_tags)
 
         # 演唱者选择区域（仅 Nicokara 格式显示）
-        self._singer_group = QGroupBox("演唱者过滤")
+        self._singer_group = QGroupBox(self.tr("演唱者过滤"))
         singer_group_layout = QVBoxLayout(self._singer_group)
         singer_group_layout.setSpacing(6)
 
-        singer_hint = CaptionLabel("勾选要导出的演唱者（不勾选则导出全部）")
+        singer_hint = CaptionLabel(self.tr("勾选要导出的演唱者（不勾选则导出全部）"))
         singer_group_layout.addWidget(singer_hint)
 
         self._singer_checkboxes: list[CheckBox] = []
@@ -229,15 +229,15 @@ class ExportInterface(QWidget):
         self._singer_checkbox_widget.setAutoFillBackground(False)
         singer_group_layout.addWidget(self._singer_scroll_area)
 
-        self._chk_insert_singer_tags = CheckBox("在演唱者切换处插入【演唱者名】标签")
+        self._chk_insert_singer_tags = CheckBox(self.tr("在演唱者切换处插入【演唱者名】标签"))
         self._chk_insert_singer_tags.setToolTip(
-            "导出时，当演唱者发生变化，在字符前自动插入演唱者名称标签"
+            self.tr("导出时，当演唱者发生变化，在字符前自动插入演唱者名称标签")
         )
         self._chk_insert_singer_tags.hide()
 
-        self._chk_insert_singer_each_line = CheckBox("->每行行首都插入演唱者")
+        self._chk_insert_singer_each_line = CheckBox(self.tr("->每行行首都插入演唱者"))
         self._chk_insert_singer_each_line.setToolTip(
-            "每一行开头都插入演唱者名称标签（需先启用「在演唱者切换处插入标签」）"
+            self.tr("每一行开头都插入演唱者名称标签（需先启用「在演唱者切换处插入标签」）")
         )
         self._chk_insert_singer_each_line.setEnabled(False)
         self._chk_insert_singer_each_line.hide()
@@ -246,9 +246,9 @@ class ExportInterface(QWidget):
         )
 
         # 分色标签设置助手按钮（仅 Nicokara 格式显示，紧接「插入演唱者标签」之后）
-        self._btn_emoji_config = PushButton("分色标签设置助手...", self)
+        self._btn_emoji_config = PushButton(self.tr("分色标签设置助手..."), self)
         self._btn_emoji_config.setToolTip(
-            "为每位演唱者配置 @Emoji 分色标签，配置后自动写入 Nicokara 标签的自定义字段"
+            self.tr("为每位演唱者配置 @Emoji 分色标签，配置后自动写入 Nicokara 标签的自定义字段")
         )
         self._btn_emoji_config.clicked.connect(self._on_emoji_config)
         self._btn_emoji_config.hide()
@@ -262,7 +262,7 @@ class ExportInterface(QWidget):
         right_layout.addStretch()
 
         # 导出按钮
-        self.btn_export = PrimaryPushButton("导出", self)
+        self.btn_export = PrimaryPushButton(self.tr("导出"), self)
         self.btn_export.setIcon(FIF.SHARE)
         self.btn_export.setMinimumHeight(45)
         self.btn_export.clicked.connect(self._on_export)
@@ -526,7 +526,7 @@ class ExportInterface(QWidget):
             default_dir = self._store.working_dir
         if not default_dir:
             default_dir = settings.get("export.last_export_dir", "")
-        path = QFileDialog.getExistingDirectory(self, "选择导出目录", default_dir)
+        path = QFileDialog.getExistingDirectory(self, self.tr("选择导出目录"), default_dir)
         if path:
             self.line_output.setText(path)
 
@@ -552,8 +552,8 @@ class ExportInterface(QWidget):
 
         if not self._project:
             InfoBar.warning(
-                title="无项目",
-                content="请先创建或打开项目",
+                title=self.tr("无项目"),
+                content=self.tr("请先创建或打开项目"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -573,8 +573,8 @@ class ExportInterface(QWidget):
 
         if not singer_list:
             InfoBar.warning(
-                title="无演唱者",
-                content="项目中没有可用的演唱者",
+                title=self.tr("无演唱者"),
+                content=self.tr("项目中没有可用的演唱者"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -591,8 +591,8 @@ class ExportInterface(QWidget):
     def _on_export(self):
         if not self._project:
             InfoBar.warning(
-                title="无项目",
-                content="请先创建或打开项目",
+                title=self.tr("无项目"),
+                content=self.tr("请先创建或打开项目"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -604,8 +604,8 @@ class ExportInterface(QWidget):
         selected = self.format_list.currentItem()
         if not selected:
             InfoBar.warning(
-                title="未选择格式",
-                content="请选择导出格式",
+                title=self.tr("未选择格式"),
+                content=self.tr("请选择导出格式"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -623,7 +623,7 @@ class ExportInterface(QWidget):
                 default_dir = self._store.working_dir
             if not default_dir:
                 default_dir = settings.get("export.last_export_dir", "")
-            output_dir = QFileDialog.getExistingDirectory(self, "选择导出目录", default_dir)
+            output_dir = QFileDialog.getExistingDirectory(self, self.tr("选择导出目录"), default_dir)
             if not output_dir:
                 return
             self.line_output.setText(output_dir)
@@ -637,20 +637,21 @@ class ExportInterface(QWidget):
         ]
         if needs_guide_marks:
             preview_lines = [
-                f"第 {l + 1} 行 第 {c + 1} 字" for l, c in needs_guide_marks[:10]
+                self.tr("第 {line} 行 第 {char} 字").format(line=l + 1, char=c + 1)
+                for l, c in needs_guide_marks[:10]
             ]
             extra = (
-                f"\n...另 {len(needs_guide_marks) - 10} 处"
+                self.tr("\n...另 {n} 处").format(n=len(needs_guide_marks) - 10)
                 if len(needs_guide_marks) > 10
                 else ""
             )
             msg = QMessageBox(self)
             msg.setIcon(QMessageBox.Icon.Warning)
-            msg.setWindowTitle("仍有导唱待办未处理")
-            msg.setText(f"还剩 {len(needs_guide_marks)} 个标记点未添加导唱符。")
+            msg.setWindowTitle(self.tr("仍有导唱待办未处理"))
+            msg.setText(self.tr("还剩 {n} 个标记点未添加导唱符。").format(n=len(needs_guide_marks)))
             msg.setInformativeText("\n".join(preview_lines) + extra)
-            btn_continue = msg.addButton("继续导出", QMessageBox.ButtonRole.AcceptRole)
-            msg.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+            btn_continue = msg.addButton(self.tr("继续导出"), QMessageBox.ButtonRole.AcceptRole)
+            msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
             msg.exec()
             if msg.clickedButton() is not btn_continue:
                 return
@@ -659,7 +660,7 @@ class ExportInterface(QWidget):
         warnings = self._export_service.validate_before_export(self._project)
         if warnings:
             InfoBar.warning(
-                title="导出提醒",
+                title=self.tr("导出提醒"),
                 content="\n".join(warnings[:3]),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
@@ -738,7 +739,7 @@ class ExportInterface(QWidget):
             settings.save()
 
             InfoBar.success(
-                title="导出成功",
+                title=self.tr("导出成功"),
                 content=result.file_path,
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
@@ -748,8 +749,8 @@ class ExportInterface(QWidget):
             )
         else:
             InfoBar.error(
-                title="导出失败",
-                content=result.error_message or "未知错误",
+                title=self.tr("导出失败"),
+                content=result.error_message or self.tr("未知错误"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,

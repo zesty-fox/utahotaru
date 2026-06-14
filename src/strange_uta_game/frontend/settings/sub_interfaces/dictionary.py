@@ -72,21 +72,21 @@ class PriorityOrderDialog(QDialog):
         parent=None,
     ):
         super().__init__(parent)
-        self.setWindowTitle("字典源优先级")
+        self.setWindowTitle(self.tr("字典源优先级"))
         self.setMinimumSize(420, 360)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(12)
 
-        title = QLabel("字典源优先级")
+        title = QLabel(self.tr("字典源优先级"))
         title.setFont(QFont("Microsoft YaHei", 14))
         layout.addWidget(title)
 
-        desc = QLabel(
+        desc = QLabel(self.tr(
             "lookup 时按下方顺序自顶向下遍历各字典源，每源内按 entries 自顶向下首个命中即停。\n"
             "📒 本地词典 sentinel 代表 dictionary.json；其他项对应网络源。"
-        )
+        ))
         desc.setFont(QFont("Microsoft YaHei", 10))
         desc.setWordWrap(True)
         layout.addWidget(desc)
@@ -116,9 +116,9 @@ class PriorityOrderDialog(QDialog):
             self._list.setCurrentRow(0)
 
         btn_row = QHBoxLayout()
-        btn_up = PushButton("上移", self)
+        btn_up = PushButton(self.tr("上移"), self)
         btn_up.clicked.connect(lambda: self._move(-1))
-        btn_dn = PushButton("下移", self)
+        btn_dn = PushButton(self.tr("下移"), self)
         btn_dn.clicked.connect(lambda: self._move(+1))
         btn_row.addWidget(btn_up)
         btn_row.addWidget(btn_dn)
@@ -126,9 +126,9 @@ class PriorityOrderDialog(QDialog):
         layout.addLayout(btn_row)
 
         ok_row = QHBoxLayout()
-        btn_ok = PrimaryPushButton("确定", self)
+        btn_ok = PrimaryPushButton(self.tr("确定"), self)
         btn_ok.clicked.connect(self.accept)
-        btn_cancel = PushButton("取消", self)
+        btn_cancel = PushButton(self.tr("取消"), self)
         btn_cancel.clicked.connect(self.reject)
         ok_row.addStretch()
         ok_row.addWidget(btn_ok)
@@ -160,12 +160,13 @@ class DictionarySubInterface(SubSettingInterface):
         self._init_ui()
 
     def _init_ui(self):
-        g = SettingCardGroup("读音词典", self.scrollWidget)
+        tr = self.tr
+        g = SettingCardGroup(tr("读音词典"), self.scrollWidget)
 
         # 1. 本地词典
-        dict_card = SettingCard(FIF.DICTIONARY, "自定义读音",
-            "固定特定词汇的注音读法（最长匹配优先）", g)
-        self.btn_open_dict = PushButton("编辑词典", dict_card)
+        dict_card = SettingCard(FIF.DICTIONARY, tr("自定义读音"),
+            tr("固定特定词汇的注音读法（最长匹配优先）"), g)
+        self.btn_open_dict = PushButton(tr("编辑词典"), dict_card)
         self.btn_open_dict.setFont(QFont("Microsoft YaHei", 10))
         self.btn_open_dict.clicked.connect(self._on_open_dictionary)
         dict_card.hBoxLayout.addWidget(self.btn_open_dict, 0, Qt.AlignmentFlag.AlignRight)
@@ -174,14 +175,14 @@ class DictionarySubInterface(SubSettingInterface):
 
         # 2. 网络词典总开关
         self.card_network_enabled = SwitchSettingCard(
-            FIF.CLOUD, "启用网络词典",
-            "开启后注音时叠加网络词典源的条目（按优先级链）；关闭则仅使用本地词典。",
+            FIF.CLOUD, tr("启用网络词典"),
+            tr("开启后注音时叠加网络词典源的条目（按优先级链）；关闭则仅使用本地词典。"),
             parent=g)
 
         # 3. 网络词典管理
-        net_card = SettingCard(FIF.CLOUD_DOWNLOAD, "网络词典管理",
-            "管理网络词典源（含 RL 官方 )，可添加自定义 URL、查看条目", g)
-        self.btn_open_net = PushButton("管理网络词典", net_card)
+        net_card = SettingCard(FIF.CLOUD_DOWNLOAD, tr("网络词典管理"),
+            tr("管理网络词典源（含 RL 官方 )，可添加自定义 URL、查看条目"), g)
+        self.btn_open_net = PushButton(tr("管理网络词典"), net_card)
         self.btn_open_net.setFont(QFont("Microsoft YaHei", 10))
         self.btn_open_net.clicked.connect(self._on_open_network_dictionary)
         net_card.hBoxLayout.addWidget(self.btn_open_net, 0, Qt.AlignmentFlag.AlignRight)
@@ -190,24 +191,24 @@ class DictionarySubInterface(SubSettingInterface):
 
         # 3b. 网络源自动更新开关
         self.card_auto_update_enabled = SwitchSettingCard(
-            FIF.SYNC, "启用网络源自动更新",
-            "应用启动时检查所有启用的网络源是否到期，到期则后台自动拉取",
+            FIF.SYNC, tr("启用网络源自动更新"),
+            tr("应用启动时检查所有启用的网络源是否到期，到期则后台自动拉取"),
             parent=g)
 
         # 3c. 自动更新间隔（LineEdit 数字输入 + ComboBox 内嵌到 SettingCard）
-        interval_card = SettingCard(FIF.DATE_TIME, "网络源自动更新间隔",
-            "距上次自动同步超过此间隔后，下次启动触发后台拉取", g)
+        interval_card = SettingCard(FIF.DATE_TIME, tr("网络源自动更新间隔"),
+            tr("距上次自动同步超过此间隔后，下次启动触发后台拉取"), g)
         self._interval_edit = LineEdit(interval_card)
-        self._interval_edit.setFixedWidth(120)
-        self._interval_edit.setPlaceholderText("数值")
+        self._interval_edit.setMinimumWidth(120)
+        self._interval_edit.setPlaceholderText(tr("数值"))
         self._interval_edit.setValidator(QIntValidator(1, 9999, self._interval_edit))
         self._interval_edit.setClearButtonEnabled(False)
         self._interval_combo = ComboBox(interval_card)
         # 显示文本 ↔ 内部 unit key
-        self._UNIT_LABELS = [("周", "week"), ("天", "day"), ("小时", "hour")]
+        self._UNIT_LABELS = [(tr("周"), "week"), (tr("天"), "day"), (tr("小时"), "hour")]
         for label, _key in self._UNIT_LABELS:
             self._interval_combo.addItem(label)
-        self._interval_combo.setFixedWidth(90)
+        self._interval_combo.setMinimumWidth(90)
         interval_card.hBoxLayout.addWidget(self._interval_edit, 0, Qt.AlignmentFlag.AlignRight)
         interval_card.hBoxLayout.addSpacing(8)
         interval_card.hBoxLayout.addWidget(self._interval_combo, 0, Qt.AlignmentFlag.AlignRight)
@@ -215,9 +216,9 @@ class DictionarySubInterface(SubSettingInterface):
         self.interval_card = interval_card
 
         # 4. 字典源优先级（按钮卡片 → 打开 PriorityOrderDialog）
-        prio_card = SettingCard(FIF.ALIGNMENT, "字典源优先级",
-            "调整本地词典与各网络源的全局优先级（自顶向下递减）", g)
-        self.btn_open_prio = PushButton("编辑优先级", prio_card)
+        prio_card = SettingCard(FIF.ALIGNMENT, tr("字典源优先级"),
+            tr("调整本地词典与各网络源的全局优先级（自顶向下递减）"), g)
+        self.btn_open_prio = PushButton(tr("编辑优先级"), prio_card)
         self.btn_open_prio.setFont(QFont("Microsoft YaHei", 10))
         self.btn_open_prio.clicked.connect(self._on_open_priority_order)
         prio_card.hBoxLayout.addWidget(self.btn_open_prio, 0, Qt.AlignmentFlag.AlignRight)
@@ -226,8 +227,8 @@ class DictionarySubInterface(SubSettingInterface):
 
         # 5. 片假名标注英文开关
         self.card_annotate_katakana_with_english = SwitchSettingCard(
-            FIF.LANGUAGE, "根据用户词典给片假名标注英文",
-            "开启后，用户词典中纯片假名词条或读音为英文的词条将被应用；关闭时拦截这类词条",
+            FIF.LANGUAGE, tr("根据用户词典给片假名标注英文"),
+            tr("开启后，用户词典中纯片假名词条或读音为英文的词条将被应用；关闭时拦截这类词条"),
             parent=g)
 
         g.addSettingCard(self.dict_card)
@@ -243,39 +244,40 @@ class DictionarySubInterface(SubSettingInterface):
 
     def _init_llm_ui(self):
         """LLM 注音设置组。"""
-        g = SettingCardGroup("LLM 注音", self.scrollWidget)
+        tr = self.tr
+        g = SettingCardGroup(tr("LLM 注音"), self.scrollWidget)
 
         # 1. 总开关
         self.card_llm_enabled = SwitchSettingCard(
-            FIF.ROBOT, "启用 LLM 注音",
-            "开启后注音改用 LLM（整首一次发送、保留上下文），跳过 WinRT/Sudachi/pykakasi；"
-            "请求失败时自动回退本地引擎。",
+            FIF.ROBOT, tr("启用 LLM 注音"),
+            tr("开启后注音改用 LLM（整首一次发送、保留上下文），跳过 WinRT/Sudachi/pykakasi；"
+               "请求失败时自动回退本地引擎。"),
             parent=g)
 
         # 2. 接口格式
-        provider_card = SettingCard(FIF.GLOBE, "接口格式",
-            "选择服务商的接口形态：Chat Completions 覆盖大多数（含本地 Ollama/LM Studio）；"
-            "Anthropic 用 /v1/messages；Responses 用 /v1/responses（OpenAI 新接口）", g)
+        provider_card = SettingCard(FIF.GLOBE, tr("接口格式"),
+            tr("选择服务商的接口形态：Chat Completions 覆盖大多数（含本地 Ollama/LM Studio）；"
+               "Anthropic 用 /v1/messages；Responses 用 /v1/responses（OpenAI 新接口）"), g)
         self._llm_provider_combo = ComboBox(provider_card)
-        # 显示文本 ↔ 内部 key（与 LLMRubyConfig.api_format 对应）
+        # 显示文本 ↔ 内部 key（与 LLMRubyConfig.api_format 对应）。第一项含中文，走 tr()
         self._LLM_PROVIDERS = [
-            ("OpenAI Chat Completions（兼容）", "openai"),
+            (tr("OpenAI Chat Completions（兼容）"), "openai"),
             ("Anthropic Messages", "anthropic"),
             ("OpenAI Responses", "responses"),
         ]
         for label, _key in self._LLM_PROVIDERS:
             self._llm_provider_combo.addItem(label)
-        self._llm_provider_combo.setFixedWidth(240)
+        self._llm_provider_combo.setMinimumWidth(240)
         provider_card.hBoxLayout.addWidget(self._llm_provider_combo, 0, Qt.AlignmentFlag.AlignRight)
         provider_card.hBoxLayout.addSpacing(16)
         self.provider_card = provider_card
 
         # 3. Base URL
-        base_card = SettingCard(FIF.LINK, "API 地址 (Base URL)",
-            "如 https://api.openai.com/v1（自动补 /chat/completions）；填完整端点也可，"
-            "末尾加 # 表示按字面 URL 使用不再追加路径", g)
+        base_card = SettingCard(FIF.LINK, tr("API 地址 (Base URL)"),
+            tr("如 https://api.openai.com/v1（自动补 /chat/completions）；填完整端点也可，"
+               "末尾加 # 表示按字面 URL 使用不再追加路径"), g)
         self._llm_base_edit = LineEdit(base_card)
-        self._llm_base_edit.setFixedWidth(320)
+        self._llm_base_edit.setMinimumWidth(320)
         self._llm_base_edit.setPlaceholderText("https://api.openai.com/v1")
         self._llm_base_edit.setClearButtonEnabled(True)
         base_card.hBoxLayout.addWidget(self._llm_base_edit, 0, Qt.AlignmentFlag.AlignRight)
@@ -284,9 +286,9 @@ class DictionarySubInterface(SubSettingInterface):
 
         # 4. API Key（密码回显）
         key_card = SettingCard(FIF.VPN, "API Key",
-            "仅保存在本地 config.json（明文）；默认留空", g)
+            tr("仅保存在本地 config.json（明文）；默认留空"), g)
         self._llm_key_edit = LineEdit(key_card)
-        self._llm_key_edit.setFixedWidth(320)
+        self._llm_key_edit.setMinimumWidth(320)
         self._llm_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self._llm_key_edit.setPlaceholderText("sk-...")
         self._llm_key_edit.setClearButtonEnabled(True)
@@ -295,10 +297,10 @@ class DictionarySubInterface(SubSettingInterface):
         self.key_card = key_card
 
         # 5. 模型
-        model_card = SettingCard(FIF.TAG, "模型 (Model)",
-            "如 gpt-4o-mini、deepseek-chat、claude-3-5-haiku-latest", g)
+        model_card = SettingCard(FIF.TAG, tr("模型 (Model)"),
+            tr("如 gpt-4o-mini、deepseek-chat、claude-3-5-haiku-latest"), g)
         self._llm_model_edit = LineEdit(model_card)
-        self._llm_model_edit.setFixedWidth(320)
+        self._llm_model_edit.setMinimumWidth(320)
         self._llm_model_edit.setPlaceholderText("gpt-4o-mini")
         self._llm_model_edit.setClearButtonEnabled(True)
         model_card.hBoxLayout.addWidget(self._llm_model_edit, 0, Qt.AlignmentFlag.AlignRight)
@@ -306,9 +308,9 @@ class DictionarySubInterface(SubSettingInterface):
         self.model_card = model_card
 
         # 6. 测试连通性
-        test_card = SettingCard(FIF.CONNECT, "测试连通性",
-            "用当前配置对一行示例发起注音请求，验证地址/Key/模型是否可用", g)
-        self.btn_llm_test = PushButton("测试", test_card)
+        test_card = SettingCard(FIF.CONNECT, tr("测试连通性"),
+            tr("用当前配置对一行示例发起注音请求，验证地址/Key/模型是否可用"), g)
+        self.btn_llm_test = PushButton(tr("测试"), test_card)
         self.btn_llm_test.setFont(QFont("Microsoft YaHei", 10))
         self.btn_llm_test.clicked.connect(self._on_llm_test)
         test_card.hBoxLayout.addWidget(self.btn_llm_test, 0, Qt.AlignmentFlag.AlignRight)
@@ -317,8 +319,8 @@ class DictionarySubInterface(SubSettingInterface):
 
         # 7. LLM 注音时应用用户词典
         self.card_llm_apply_dict = SwitchSettingCard(
-            FIF.DICTIONARY, "LLM 注音时应用用户词典",
-            "开启后即便使用 LLM 注音，用户词典条目仍以最高优先级覆盖；关闭则完全以 LLM 结果为准",
+            FIF.DICTIONARY, tr("LLM 注音时应用用户词典"),
+            tr("开启后即便使用 LLM 注音，用户词典条目仍以最高优先级覆盖；关闭则完全以 LLM 结果为准"),
             parent=g)
 
         g.addSettingCard(self.card_llm_enabled)
@@ -439,14 +441,14 @@ class DictionarySubInterface(SubSettingInterface):
         cfg = LLMRubyConfig.from_settings(self._settings_ref)
         if not cfg.is_complete():
             InfoBar.warning(
-                title="连接信息不完整",
-                content="请先填写 Base URL、API Key 与模型",
+                title=self.tr("连接信息不完整"),
+                content=self.tr("请先填写 Base URL、API Key 与模型"),
                 orient=Qt.Orientation.Horizontal, isClosable=True,
                 position=InfoBarPosition.TOP, duration=3000, parent=self)
             return
 
         self.btn_llm_test.setEnabled(False)
-        self.btn_llm_test.setText("测试中…")
+        self.btn_llm_test.setText(self.tr("测试中…"))
 
         worker = LLMTestWorker(cfg, proxies=_resolve_proxies(self._settings_ref))
         thread = QThread(self)
@@ -457,15 +459,15 @@ class DictionarySubInterface(SubSettingInterface):
 
         def _on_finished(ok: bool, msg: str) -> None:
             self.btn_llm_test.setEnabled(True)
-            self.btn_llm_test.setText("测试")
+            self.btn_llm_test.setText(self.tr("测试"))
             if ok:
                 InfoBar.success(
-                    title="连接成功", content=msg,
+                    title=self.tr("连接成功"), content=msg,
                     orient=Qt.Orientation.Horizontal, isClosable=True,
                     position=InfoBarPosition.TOP, duration=4000, parent=self)
             else:
                 InfoBar.warning(
-                    title="连接失败", content=msg,
+                    title=self.tr("连接失败"), content=msg,
                     orient=Qt.Orientation.Horizontal, isClosable=True,
                     position=InfoBarPosition.TOP, duration=6000, parent=self)
             thread.quit()

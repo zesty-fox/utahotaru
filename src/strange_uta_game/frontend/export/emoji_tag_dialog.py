@@ -265,7 +265,7 @@ class EmojiTagDialog(QDialog):
         parent: Optional[QWidget] = None,
     ):
         super().__init__(parent)
-        self.setWindowTitle("分色标签设置助手")
+        self.setWindowTitle(self.tr("分色标签设置助手"))
         self.setMinimumWidth(820)
         self.setMinimumHeight(300)
 
@@ -284,14 +284,14 @@ class EmojiTagDialog(QDialog):
         layout.setContentsMargins(24, 24, 24, 16)
         layout.setSpacing(12)
 
-        title = SubtitleLabel("分色标签设置助手")
+        title = SubtitleLabel(self.tr("分色标签设置助手"))
         layout.addWidget(title)
 
-        desc = CaptionLabel(
+        desc = CaptionLabel(self.tr(
             "为每位演唱者配置 @Emoji 标签。触发字符与正文中的【演唱者名】对应。\n"
             "後画像留空时，表示与前画像相同（无擦除效果）。\n"
             "缩放默认 100%（与字幕等大）；Zoom 可指定 10%~500% 比例；Fix 保持原图尺寸。"
-        )
+        ))
         desc.setWordWrap(True)
         layout.addWidget(desc)
 
@@ -312,11 +312,11 @@ class EmojiTagDialog(QDialog):
         # 确定/取消
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        btn_ok = PrimaryPushButton("应用并保存", self)
+        btn_ok = PrimaryPushButton(self.tr("应用并保存"), self)
         btn_ok.clicked.connect(self._on_accept)
-        btn_copy = PushButton("将首行参数复制到其他行", self)
+        btn_copy = PushButton(self.tr("将首行参数复制到其他行"), self)
         btn_copy.clicked.connect(self._copy_first_row_params)
-        btn_cancel = PushButton("取消", self)
+        btn_cancel = PushButton(self.tr("取消"), self)
         btn_cancel.clicked.connect(self.reject)
         btn_row.addWidget(btn_ok)
         btn_row.addWidget(btn_copy)
@@ -338,6 +338,9 @@ class EmojiTagDialog(QDialog):
         ctrls: Dict[str, Any] = {}
 
         ctrls["zoom_mode"] = ComboBox()
+        # "未指定" 是显示标签；同时是 _on_accept 里 "zoom_mode_text != '未指定'" 的
+        # 判断常量。tr 后内部判断也得用 tr 版，否则切语言后判定恒为不等。
+        # 为避免该耦合，这里保留中文 sentinel；UI 上的"未指定"暂不本地化。
         ctrls["zoom_mode"].addItems(["未指定", "Zoom", "Fix"])
         ctrls["zoom_mode"].setMinimumWidth(96)
         if default_opts["zoom_mode"] == "Fix":
@@ -364,7 +367,7 @@ class EmojiTagDialog(QDialog):
         ctrls["forcewipedecor"] = CheckBox("ForceWipeDecor")
         ctrls["forcewipedecor"].setChecked(default_opts["forcewipedecor"])
 
-        ctrls["margin_lbl"] = BodyLabel("余白")
+        ctrls["margin_lbl"] = BodyLabel(self.tr("余白"))
 
         ctrls["margin_left_lbl"] = BodyLabel("L")
 
@@ -373,7 +376,7 @@ class EmojiTagDialog(QDialog):
         ctrls["margin_left"].setText(str(default_opts["margin_left"]))
         ctrls["margin_left"].setMinimumWidth(68)
         ctrls["margin_left"].setPlaceholderText("0")
-        ctrls["margin_left"].setToolTip("MarginLeft：图片左侧留白（像素，允许负值）")
+        ctrls["margin_left"].setToolTip(self.tr("MarginLeft：图片左侧留白（像素，允许负值）"))
 
         ctrls["margin_right_lbl"] = BodyLabel("R")
 
@@ -382,7 +385,7 @@ class EmojiTagDialog(QDialog):
         ctrls["margin_right"].setText(str(default_opts["margin_right"]))
         ctrls["margin_right"].setMinimumWidth(68)
         ctrls["margin_right"].setPlaceholderText("0")
-        ctrls["margin_right"].setToolTip("MarginRight：图片右侧留白（像素，允许负值）")
+        ctrls["margin_right"].setToolTip(self.tr("MarginRight：图片右侧留白（像素，允许负值）"))
 
         ctrls["margin_bottom_lbl"] = BodyLabel("B")
 
@@ -391,7 +394,7 @@ class EmojiTagDialog(QDialog):
         ctrls["margin_bottom"].setText(str(default_opts["margin_bottom"]))
         ctrls["margin_bottom"].setMinimumWidth(68)
         ctrls["margin_bottom"].setPlaceholderText("0")
-        ctrls["margin_bottom"].setToolTip("MarginBottom：图片下方留白（像素，允许负值）")
+        ctrls["margin_bottom"].setToolTip(self.tr("MarginBottom：图片下方留白（像素，允许负值）"))
 
         return ctrls
 
@@ -441,34 +444,34 @@ class EmojiTagDialog(QDialog):
             name_lbl.setMinimumWidth(80)
             row1.addWidget(name_lbl)
 
-            trigger_lbl = BodyLabel("触发")
+            trigger_lbl = BodyLabel(self.tr("触发"))
             row1.addWidget(trigger_lbl)
 
             trigger_edit = LineEdit()
             trigger_edit.setFont(QFont("Microsoft YaHei", 10))
             trigger_edit.setText(f"【{singer_name}】")
-            trigger_edit.setPlaceholderText("必填")
+            trigger_edit.setPlaceholderText(self.tr("必填"))
             trigger_edit.setMinimumWidth(110)
             row1.addWidget(trigger_edit)
 
-            front_lbl = BodyLabel("前画像")
-            front_lbl.setToolTip("擦除前图片文件名（可留空）")
+            front_lbl = BodyLabel(self.tr("前画像"))
+            front_lbl.setToolTip(self.tr("擦除前图片文件名（可留空）"))
             row1.addWidget(front_lbl)
 
             front_edit = LineEdit()
             front_edit.setFont(QFont("Microsoft YaHei", 10))
             front_edit.setText(default_front)
-            front_edit.setPlaceholderText("可留空")
+            front_edit.setPlaceholderText(self.tr("可留空"))
             row1.addWidget(front_edit, stretch=2)
 
-            back_lbl = BodyLabel("後画像")
-            back_lbl.setToolTip("擦除后图片文件名（可省略；留空=与前画像相同）")
+            back_lbl = BodyLabel(self.tr("後画像"))
+            back_lbl.setToolTip(self.tr("擦除后图片文件名（可省略；留空=与前画像相同）"))
             row1.addWidget(back_lbl)
 
             back_edit = LineEdit()
             back_edit.setFont(QFont("Microsoft YaHei", 10))
             back_edit.setText(default_back)
-            back_edit.setPlaceholderText("留空=同前画像")
+            back_edit.setPlaceholderText(self.tr("留空=同前画像"))
             row1.addWidget(back_edit, stretch=2)
 
             card_layout.addLayout(row1)
