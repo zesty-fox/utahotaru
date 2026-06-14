@@ -16,6 +16,12 @@ from qfluentwidgets import (
 )
 
 from strange_uta_game.__version__ import __version__ as _app_version
+from strange_uta_game.frontend.localization import (
+    AVAILABLE_LANGUAGES,
+    DEFAULT_LANGUAGE,
+    localization,
+)
+from ..cards import ComboSettingCard
 from .base import SubSettingInterface
 
 
@@ -26,7 +32,22 @@ class AboutSubInterface(SubSettingInterface):
         self._init_ui()
 
     def _init_ui(self):
-        self.about_group = SettingCardGroup("关于", self.scrollWidget)
+        # ── 语言设置 ────────────────────────────────────────────
+        # 当前仅注册简体中文 (zh_CN)；之后 EN/JA 翻译完成后扩展
+        # AVAILABLE_LANGUAGES 即可，本卡片自动出现新选项。
+        self.language_group = SettingCardGroup(self.tr("语言"), self.scrollWidget)
+        self._language_codes = [lang.code for lang in AVAILABLE_LANGUAGES]
+        self._language_card = ComboSettingCard(
+            FIF.LANGUAGE,
+            self.tr("界面语言"),
+            self.tr("切换 UI 显示语言，更改后需重启软件生效"),
+            [lang.native_name for lang in AVAILABLE_LANGUAGES],
+            self.language_group,
+        )
+        self.language_group.addSettingCard(self._language_card)
+        self.expandLayout.addWidget(self.language_group)
+
+        self.about_group = SettingCardGroup(self.tr("关于"), self.scrollWidget)
 
         about_card = SettingCard(FIF.INFO, "StrangeUtaGame - 歌词打轴软件",
             f"版本 v{_app_version}  |  由 RhythmicaLyrics 启发", self.about_group)
@@ -96,11 +117,28 @@ class AboutSubInterface(SubSettingInterface):
         self.expandLayout.addWidget(btn_widget)
 
     def connect_signals(self):
-        pass  # 按钮回调由外层连接
+        # 语言切换由本子页面自己处理（即时落盘 + 重启提示），不冒泡到外层
+        # "保存设置" 流程——避免与其它即时生效的设置混在同一个 dirty 事务里。
+        self._language_card.index_changed.connect(self._on_language_changed)
+        # 其它按钮回调由外层连接
 
     def load_settings(self, s):
         self._settings_ref = s
         embedded = getattr(s, "_provider", None) is not None
+
+        # ── 语言卡：embedded 下隐藏（语言归宿主独占，与主题同理，见 EMBEDDING.md §5）
+        # standalone 下同步当前选项；embedded 下完全不显示，避免与宿主语言冲突。
+        self.language_group.setVisible(not embedded)
+        if not embedded:
+            current_code = s.get("ui.language", DEFAULT_LANGUAGE.code)
+            try:
+                idx = self._language_codes.index(current_code)
+            except ValueError:
+                idx = 0
+            # blockSignals 防止 load 阶段误触发"语言改变"提示
+            self._language_card.combo.blockSignals(True)
+            self._language_card.setCurrentIndex(idx)
+            self._language_card.combo.blockSignals(False)
         # embedded 模式下配置走宿主存储，没有"配置文件目录"概念：
         # 隐藏整张「配置文件位置」卡片，并避免 setContent(str(None)) 显示 "None"。
         self._path_card.setVisible(not embedded)
@@ -111,7 +149,35 @@ class AboutSubInterface(SubSettingInterface):
         self._update_ffmpeg_label(ffmpeg_path)
 
     def collect_settings(self, s):
-        pass  # 关于页的 FFmpeg 路径在浏览/清除时即时保存，无需在此收集
+        pass  # 关于页的 FFmpeg 路径与语言均在切换时即时保存，无需在此收集
+
+    def _on_language_changed(self, idx: int):
+        if self._settings_ref is None:
+            return
+        # embedded 下卡片本应隐藏，但万一别处程序化触发了 index_changed，
+        # 仍然直接返回——SUG 在 embedded 下绝不写自己的语言或调 translator。
+        if getattr(self._settings_ref, "_provider", None) is not None:
+            return
+        if not (0 <= idx < len(self._language_codes)):
+            return
+        new_code = self._language_codes[idx]
+        if new_code == self._settings_ref.get("ui.language", DEFAULT_LANGUAGE.code):
+            return
+        # 即时落盘（绕过外层 dirty 事务）
+        self._settings_ref.set("ui.language", new_code)
+        self._settings_ref.save()
+        # 立刻应用到运行时 translator（未来 EN/JA 就位时配合 retranslate 体系
+        # 可实现热切换；当前 zh_CN 唯一，apply_language 只是更新单例状态）。
+        localization.apply_language(new_code)
+        InfoBar.info(
+            title=self.tr("已切换语言"),
+            content=self.tr("重启软件后界面将完整应用新语言"),
+            orient=Qt.Orientation.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=4000,
+            parent=self,
+        )
 
     def _open_config_dir(self):
         if self._settings_ref is None or self._settings_ref._config_path is None:

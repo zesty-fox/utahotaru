@@ -144,6 +144,8 @@ class TestEmbeddedUIContract:
         about.load_settings(embedded_settings)
         assert about._path_card.isHidden()
         assert about.tools_group.isHidden()
+        # 语言归宿主独占（与主题同理，见 EMBEDDING.md §5）
+        assert about.language_group.isHidden()
 
     def test_visible_in_standalone(self, qapp):
         about = self._make_about(qapp)
@@ -155,6 +157,34 @@ class TestEmbeddedUIContract:
         about.load_settings(standalone_settings)
         assert not about._path_card.isHidden()
         assert not about.tools_group.isHidden()
+        # standalone 红线：语言卡必须可见
+        assert not about.language_group.isHidden()
+
+    def test_language_change_noop_in_embedded(self, qapp):
+        """即使 embedded 下程序化触发了语言变更信号，SUG 也不应改 ui.language
+        或调 localization.apply_language —— 否则会污染宿主语言态。"""
+        from strange_uta_game.frontend.localization import localization
+
+        about = self._make_about(qapp)
+        captured = {"set": [], "save": 0}
+        embedded_settings = SimpleNamespace(
+            _provider=object(),
+            _config_path=None,
+            get=lambda k, d=None: d,
+            set=lambda k, v: captured["set"].append((k, v)),
+            save=lambda: captured.update(save=captured["save"] + 1),
+        )
+        about.load_settings(embedded_settings)
+        before_code = localization.current_code
+
+        # 直接调内部 handler 模拟"宿主或代码以某种方式触发了 index_changed"
+        about._on_language_changed(0)
+
+        assert captured["set"] == [], "embedded 下不得写 ui.language"
+        assert captured["save"] == 0, "embedded 下不得 save"
+        assert localization.current_code == before_code, (
+            "embedded 下 SUG 不得改全局 LocalizationManager"
+        )
 
     def test_dead_buttons_no_crash_in_embedded(self, qapp):
         about = self._make_about(qapp)
