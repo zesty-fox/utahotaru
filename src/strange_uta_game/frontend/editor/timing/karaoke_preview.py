@@ -1223,7 +1223,7 @@ class KaraokePreview(QWidget):
 
         if multi_line and in_selection:
             _dl_sl, _dl_sc, _dl_el, _dl_ec = norm_sel
-            delete_action = Action("删除字符", menu)
+            delete_action = Action(self.tr("删除字符"), menu)
             delete_action.triggered.connect(
                 lambda checked=False: self._emit_multi_line_action(
                     "delete", _dl_sl, _dl_sc, _dl_el, _dl_ec
@@ -1231,7 +1231,7 @@ class KaraokePreview(QWidget):
             )
             menu.addAction(delete_action)
         else:
-            delete_action = Action("删除字符", menu)
+            delete_action = Action(self.tr("删除字符"), menu)
             delete_action.triggered.connect(
                 lambda checked=False: self.delete_chars_requested.emit(
                     target_line_idx, delete_start, delete_end
@@ -1239,7 +1239,7 @@ class KaraokePreview(QWidget):
             )
             menu.addAction(delete_action)
 
-        delete_timestamp = Action("删除当前时间戳并回滚", menu)
+        delete_timestamp = Action(self.tr("删除当前时间戳并回滚"), menu)
         delete_timestamp.triggered.connect(
             lambda checked=False: self.delete_timestamp_requested.emit(
                 target_line_idx, target_char_idx
@@ -1247,7 +1247,7 @@ class KaraokePreview(QWidget):
         )
         menu.addAction(delete_timestamp)
 
-        insert_space_before_action = Action("在此前插入空格", menu)
+        insert_space_before_action = Action(self.tr("在此前插入空格"), menu)
         insert_space_before_action.triggered.connect(
             lambda checked=False: self.insert_space_before_requested.emit(
                 target_line_idx, target_char_idx
@@ -1255,7 +1255,7 @@ class KaraokePreview(QWidget):
         )
         menu.addAction(insert_space_before_action)
 
-        insert_space_after_action = Action("在此后插入空格", menu)
+        insert_space_after_action = Action(self.tr("在此后插入空格"), menu)
         insert_space_after_action.triggered.connect(
             lambda checked=False: self.insert_space_after_requested.emit(
                 target_line_idx, target_char_idx
@@ -1264,33 +1264,33 @@ class KaraokePreview(QWidget):
         menu.addAction(insert_space_after_action)
         menu.addSeparator()
 
-        merge_up_action = Action("合并上一行", menu)
+        merge_up_action = Action(self.tr("合并上一行"), menu)
         merge_up_action.setEnabled(target_line_idx > 0)
         merge_up_action.triggered.connect(
             lambda checked=False: self.merge_line_up_requested.emit(target_line_idx)
         )
         menu.addAction(merge_up_action)
 
-        delete_line_action = Action("删除本行", menu)
+        delete_line_action = Action(self.tr("删除本行"), menu)
         delete_line_action.triggered.connect(
             lambda checked=False: self.delete_line_requested.emit(target_line_idx)
         )
         menu.addAction(delete_line_action)
 
-        insert_blank_line_before_action = Action("在此前插入空行", menu)
+        insert_blank_line_before_action = Action(self.tr("在此前插入空行"), menu)
         insert_blank_line_before_action.triggered.connect(
             lambda checked=False: self.insert_blank_line_before_requested.emit(target_line_idx)
         )
         menu.addAction(insert_blank_line_before_action)
 
-        insert_blank_line_after_action = Action("在此后插入空行", menu)
+        insert_blank_line_after_action = Action(self.tr("在此后插入空行"), menu)
         insert_blank_line_after_action.triggered.connect(
             lambda checked=False: self.insert_blank_line_requested.emit(target_line_idx)
         )
         menu.addAction(insert_blank_line_after_action)
         menu.addSeparator()
 
-        add_checkpoint_action = Action("增加节奏点", menu)
+        add_checkpoint_action = Action(self.tr("增加节奏点"), menu)
         add_checkpoint_action.triggered.connect(
             lambda checked=False: self.add_checkpoint_requested.emit(
                 target_line_idx, target_char_idx
@@ -1298,7 +1298,7 @@ class KaraokePreview(QWidget):
         )
         menu.addAction(add_checkpoint_action)
 
-        remove_checkpoint_action = Action("减少节奏点", menu)
+        remove_checkpoint_action = Action(self.tr("减少节奏点"), menu)
         remove_checkpoint_action.triggered.connect(
             lambda checked=False: self.remove_checkpoint_requested.emit(
                 target_line_idx, target_char_idx
@@ -1306,7 +1306,7 @@ class KaraokePreview(QWidget):
         )
         menu.addAction(remove_checkpoint_action)
 
-        toggle_sentence_end_action = Action("设置/取消句尾", menu)
+        toggle_sentence_end_action = Action(self.tr("设置/取消句尾"), menu)
         toggle_sentence_end_action.triggered.connect(
             lambda checked=False: self.toggle_sentence_end_requested.emit(
                 target_line_idx, target_char_idx
@@ -1314,7 +1314,7 @@ class KaraokePreview(QWidget):
         )
         menu.addAction(toggle_sentence_end_action)
 
-        toggle_needs_guide_action = Action("标记/取消导唱待办", menu)
+        toggle_needs_guide_action = Action(self.tr("标记/取消导唱待办"), menu)
         toggle_needs_guide_action.triggered.connect(
             lambda checked=False: self.toggle_needs_guide_requested.emit(
                 target_line_idx, target_char_idx
@@ -1325,9 +1325,9 @@ class KaraokePreview(QWidget):
 
         if multi_line and in_selection:
             _dl_sl, _dl_sc, _dl_el, _dl_ec = norm_sel
-            singer_menu = RoundMenu("设置演唱者", self)
+            singer_menu = RoundMenu(self.tr("设置演唱者"), self)
             default_singer = self._project.get_default_singer()
-            default_action = Action("默认演唱者", singer_menu)
+            default_action = Action(self.tr("默认演唱者"), singer_menu)
             default_action.triggered.connect(
                 lambda checked=False: self._emit_multi_line_action(
                     "singer", _dl_sl, _dl_sc, _dl_el, _dl_ec, singer_id=default_singer.id
@@ -1347,9 +1347,9 @@ class KaraokePreview(QWidget):
         else:
             singer_start = delete_start if in_selection else target_char_idx
             singer_end = delete_end - 1 if in_selection else target_char_idx
-            singer_menu = RoundMenu("设置演唱者", self)
+            singer_menu = RoundMenu(self.tr("设置演唱者"), self)
             default_singer = self._project.get_default_singer()
-            default_action = Action("默认演唱者", singer_menu)
+            default_action = Action(self.tr("默认演唱者"), singer_menu)
             default_action.triggered.connect(
                 lambda checked=False: self.singer_change_requested.emit(
                     target_line_idx, singer_start, singer_end, default_singer.id

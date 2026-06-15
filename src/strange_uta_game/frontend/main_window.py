@@ -56,6 +56,20 @@ class MainWindow(MSFluentWindow):
         # 直接以 0xC0000409 stack-buffer-overrun 崩掉（已实测）。
         self._embedded = embedded
         self._settings_provider = settings_provider
+
+        # 翻译器安装：必须在 super().__init__() 与任何 widget 构造之前——
+        # 否则首次构造的 widget 用源串渲染，再依赖 LanguageChange 事件二次
+        # 刷新，时序上既慢又脆（被 retranslate 漏到的字符串就永远是源串）。
+        # embedded 模式语言由宿主独占（见 EMBEDDING.md §5），不自行装载。
+        if not self._embedded:
+            from strange_uta_game.frontend.settings.app_settings import AppSettings
+            from strange_uta_game.frontend.localization import install_translators
+            try:
+                _lang = AppSettings().get("ui.language", "zh_CN")
+            except Exception:
+                _lang = "zh_CN"
+            install_translators(_lang)
+
         super().__init__()
 
         if self._embedded and self._settings_provider is not None:

@@ -360,7 +360,10 @@ class ExportInterface(QWidget):
         self.format_list.clear()
         formats = self._export_service.get_available_formats()
         for fmt in formats:
-            item = QListWidgetItem(f"{fmt['name']} ({fmt['extension']})")
+            # name 是 config.json 里的 key（如 "LRC (增强型)"），不能改写；
+            # 列表里只翻译显示文本，UserRole 仍存原 name 供保存/查询用。
+            display = f"{self.tr(fmt['name'])} ({fmt['extension']})"
+            item = QListWidgetItem(display)
             item.setData(Qt.ItemDataRole.UserRole, fmt["name"])
             self.format_list.addItem(item)
         if self.format_list.count() > 0:

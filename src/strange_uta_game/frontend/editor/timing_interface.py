@@ -5833,7 +5833,11 @@ class EditorInterface(QWidget):
         total = len(meaningful_lines)
         timed = sum(1 for s in meaningful_lines if s.has_timetags)
         pct = int(timed / total * 100) if total > 0 else 0
-        self.lbl_progress.setText(f"行: {total} | 已打轴: {timed}/{total} ({pct}%)")
+        self.lbl_progress.setText(
+            self.tr("行: {total} | 已打轴: {timed}/{total_again} ({pct}%)").format(
+                total=total, timed=timed, total_again=total, pct=pct
+            )
+        )
         # 待添加导唱符计数：>0 显示，=0 隐藏（避免视觉噪音）
         if hasattr(self, "lbl_needs_guide"):
             n = sum(
@@ -5842,7 +5846,9 @@ class EditorInterface(QWidget):
                 for c in s.characters
                 if c.needs_guide
             )
-            self.lbl_needs_guide.setText(f"待添加导唱符：{n}" if n > 0 else "")
+            self.lbl_needs_guide.setText(
+                self.tr("待添加导唱符：{n}").format(n=n) if n > 0 else ""
+            )
 
     def refresh_lyric_display(self):
         self.preview._update_display()

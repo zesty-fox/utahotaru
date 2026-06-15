@@ -49,25 +49,25 @@ class AboutSubInterface(SubSettingInterface):
 
         self.about_group = SettingCardGroup(self.tr("关于"), self.scrollWidget)
 
-        about_card = SettingCard(FIF.INFO, self.tr("StrangeUtaGame - 歌词打轴软件"),
+        self._about_card = SettingCard(FIF.INFO, self.tr("StrangeUtaGame - 歌词打轴软件"),
             self.tr("版本 v{ver}  |  由 RhythmicaLyrics 启发").format(ver=_app_version),
             self.about_group)
-        self.about_group.addSettingCard(about_card)
+        self.about_group.addSettingCard(self._about_card)
 
-        link_card = SettingCard(FIF.GITHUB, "GitHub",
+        self._link_card = SettingCard(FIF.GITHUB, "GitHub",
             "https://github.com/karaoke-studio/StrangeUtaGame", self.about_group)
-        self.about_group.addSettingCard(link_card)
+        self.about_group.addSettingCard(self._link_card)
 
         self._path_card = SettingCard(FIF.FOLDER, self.tr("配置文件位置"),
             self.tr("（未加载）"), self.about_group)
-        btn_open = PushButton(self.tr("打开目录"), self._path_card)
-        btn_open.setFont(QFont("Microsoft YaHei", 10))
-        btn_open.clicked.connect(self._open_config_dir)
-        btn_change = PushButton(self.tr("更改位置"), self._path_card)
-        btn_change.setFont(QFont("Microsoft YaHei", 10))
-        btn_change.clicked.connect(self._change_config_dir)
-        self._path_card.hBoxLayout.addWidget(btn_open, 0, Qt.AlignmentFlag.AlignRight)
-        self._path_card.hBoxLayout.addWidget(btn_change, 0, Qt.AlignmentFlag.AlignRight)
+        self._btn_open_dir = PushButton(self.tr("打开目录"), self._path_card)
+        self._btn_open_dir.setFont(QFont("Microsoft YaHei", 10))
+        self._btn_open_dir.clicked.connect(self._open_config_dir)
+        self._btn_change_dir = PushButton(self.tr("更改位置"), self._path_card)
+        self._btn_change_dir.setFont(QFont("Microsoft YaHei", 10))
+        self._btn_change_dir.clicked.connect(self._change_config_dir)
+        self._path_card.hBoxLayout.addWidget(self._btn_open_dir, 0, Qt.AlignmentFlag.AlignRight)
+        self._path_card.hBoxLayout.addWidget(self._btn_change_dir, 0, Qt.AlignmentFlag.AlignRight)
         self._path_card.hBoxLayout.addSpacing(16)
         self.about_group.addSettingCard(self._path_card)
 
@@ -82,15 +82,15 @@ class AboutSubInterface(SubSettingInterface):
         self._ffmpeg_path_label.setFont(QFont("Microsoft YaHei", 9))
         self._ffmpeg_path_label.setEnabled(False)
         self._ffmpeg_path_label.setMaximumWidth(260)
-        btn_browse_ffmpeg = PushButton(self.tr("浏览"), self._ffmpeg_card)
-        btn_browse_ffmpeg.setFont(QFont("Microsoft YaHei", 10))
-        btn_browse_ffmpeg.clicked.connect(self._browse_ffmpeg)
-        btn_clear_ffmpeg = PushButton(self.tr("清除"), self._ffmpeg_card)
-        btn_clear_ffmpeg.setFont(QFont("Microsoft YaHei", 10))
-        btn_clear_ffmpeg.clicked.connect(self._clear_ffmpeg_path)
+        self._btn_browse_ffmpeg = PushButton(self.tr("浏览"), self._ffmpeg_card)
+        self._btn_browse_ffmpeg.setFont(QFont("Microsoft YaHei", 10))
+        self._btn_browse_ffmpeg.clicked.connect(self._browse_ffmpeg)
+        self._btn_clear_ffmpeg = PushButton(self.tr("清除"), self._ffmpeg_card)
+        self._btn_clear_ffmpeg.setFont(QFont("Microsoft YaHei", 10))
+        self._btn_clear_ffmpeg.clicked.connect(self._clear_ffmpeg_path)
         self._ffmpeg_card.hBoxLayout.addWidget(self._ffmpeg_path_label, 0, Qt.AlignmentFlag.AlignRight)
-        self._ffmpeg_card.hBoxLayout.addWidget(btn_browse_ffmpeg, 0, Qt.AlignmentFlag.AlignRight)
-        self._ffmpeg_card.hBoxLayout.addWidget(btn_clear_ffmpeg, 0, Qt.AlignmentFlag.AlignRight)
+        self._ffmpeg_card.hBoxLayout.addWidget(self._btn_browse_ffmpeg, 0, Qt.AlignmentFlag.AlignRight)
+        self._ffmpeg_card.hBoxLayout.addWidget(self._btn_clear_ffmpeg, 0, Qt.AlignmentFlag.AlignRight)
         if sys.platform == "win32":
             self._btn_install_ffmpeg = PrimaryPushButton(self.tr("一键安装"), self._ffmpeg_card)
             self._btn_install_ffmpeg.setFont(QFont("Microsoft YaHei", 10))
@@ -189,8 +189,80 @@ class AboutSubInterface(SubSettingInterface):
             parent=self,
         )
 
-    # changeEvent / _rebuild_for_language_change 由 SubSettingInterface 基类
-    # 统一处理（清 expandLayout → _init_ui → load_settings → connect_signals）。
+    def _rebuild_for_language_change(self) -> None:
+        """改成精准 retranslate，不再 setWidget(new) 重建 scrollWidget。
+
+        rebuild 路径在本页面会丢失"关于"组与底部按钮（疑似 ExpandLayout 在
+        滚动区域中途 addWidget 时序与 setWidget 销毁旧 widget 的析构顺序冲突，
+        体现为切语言后整个 about_group + 重置按钮消失）。
+        改成对每个被 tr 包过的可见字符串单独 setText/setContent，绕过整段
+        rebuild——不需要保留滚动位置/焦点的副作用，也更接近 Qt 期待的 i18n
+        流程。
+        """
+        # SettingCardGroup 标题
+        if hasattr(self, "language_group"):
+            self.language_group.titleLabel.setText(self.tr("语言"))
+        if hasattr(self, "about_group"):
+            self.about_group.titleLabel.setText(self.tr("关于"))
+        if hasattr(self, "tools_group"):
+            self.tools_group.titleLabel.setText(self.tr("工具配置"))
+
+        # 各 SettingCard 标题 + 副标题
+        if hasattr(self, "_language_card"):
+            self._language_card.titleLabel.setText(self.tr("界面语言"))
+            self._language_card.contentLabel.setText(
+                self.tr("切换 UI 显示语言，更改后需重启软件生效")
+            )
+        if hasattr(self, "_about_card"):
+            self._about_card.titleLabel.setText(self.tr("StrangeUtaGame - 歌词打轴软件"))
+            self._about_card.contentLabel.setText(
+                self.tr("版本 v{ver}  |  由 RhythmicaLyrics 启发").format(ver=_app_version)
+            )
+        if hasattr(self, "_path_card"):
+            self._path_card.titleLabel.setText(self.tr("配置文件位置"))
+            # contentLabel 在 load_settings 中已被设为实际路径，不在这里覆盖
+        if hasattr(self, "_ffmpeg_card"):
+            self._ffmpeg_card.titleLabel.setText(self.tr("FFmpeg 路径"))
+            self._ffmpeg_card.contentLabel.setText(
+                self.tr("用于加载视频文件时提取音频（留空则使用系统环境变量）")
+            )
+
+        # 按钮
+        if hasattr(self, "_btn_open_dir"):
+            self._btn_open_dir.setText(self.tr("打开目录"))
+        if hasattr(self, "_btn_change_dir"):
+            self._btn_change_dir.setText(self.tr("更改位置"))
+        if hasattr(self, "_btn_browse_ffmpeg"):
+            self._btn_browse_ffmpeg.setText(self.tr("浏览"))
+        if hasattr(self, "_btn_clear_ffmpeg"):
+            self._btn_clear_ffmpeg.setText(self.tr("清除"))
+        if hasattr(self, "_btn_install_ffmpeg"):
+            self._btn_install_ffmpeg.setText(self.tr("一键安装"))
+        if hasattr(self, "btn_save"):
+            self.btn_save.setText(self.tr("保存设置"))
+        if hasattr(self, "btn_reset"):
+            self.btn_reset.setText(self.tr("重置为默认设置"))
+
+        # FFmpeg label：未设路径时显示「（使用环境变量）」
+        if (
+            hasattr(self, "_ffmpeg_path_label")
+            and self._settings_ref is not None
+        ):
+            path = self._settings_ref.get("tools.ffmpeg_path", "") or ""
+            if not path:
+                self._ffmpeg_path_label.setText(self.tr("（使用环境变量）"))
+
+        # 语言下拉项（native_name 是源数据，不走 tr——但 ComboSettingCard
+        # 内部的"当前值"显示需要刷新一下）
+        if hasattr(self, "_language_card") and self._settings_ref is not None:
+            current_code = self._settings_ref.get("ui.language", DEFAULT_LANGUAGE.code)
+            try:
+                idx = self._language_codes.index(current_code)
+            except ValueError:
+                idx = 0
+            self._language_card.combo.blockSignals(True)
+            self._language_card.setCurrentIndex(idx)
+            self._language_card.combo.blockSignals(False)
 
     def _open_config_dir(self):
         if self._settings_ref is None or self._settings_ref._config_path is None:

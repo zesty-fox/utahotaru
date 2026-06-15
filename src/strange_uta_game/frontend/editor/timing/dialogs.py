@@ -1207,7 +1207,9 @@ class SetSingerByLineDialog(QDialog):
 
         # 行列表表格
         self.table = QTableWidget(len(sentences), 4, self)
-        self.table.setHorizontalHeaderLabels(["选择", "行号", "歌词内容", "当前演唱者"])
+        self.table.setHorizontalHeaderLabels([
+            self.tr("选择"), self.tr("行号"), self.tr("歌词内容"), self.tr("当前演唱者"),
+        ])
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setColumnWidth(0, 50)
         self.table.setColumnWidth(1, 60)
@@ -1235,7 +1237,7 @@ class SetSingerByLineDialog(QDialog):
             self.table.setItem(idx, 1, line_num_item)
 
             # 歌词内容（只读）
-            text = sentence.text if sentence.characters else "(空行)"
+            text = sentence.text if sentence.characters else self.tr("(空行)")
             text_item = QTableWidgetItem(text)
             self.table.setItem(idx, 2, text_item)
 
