@@ -61,7 +61,7 @@ class VideoExtractWorker(QObject):
                 extract_audio,
             )
 
-            self.progress.emit("正在提取音频...", 0.0)
+            self.progress.emit(self.tr("正在提取音频..."), 0.0)
             temp_path = extract_audio(self._file_path, progress_cb=self.progress.emit)
 
             self._engine.stop()
@@ -88,7 +88,7 @@ class VideoExtractOnlyWorker(QObject):
                 extract_audio,
             )
 
-            self.progress.emit("正在提取音频...", 0.0)
+            self.progress.emit(self.tr("正在提取音频..."), 0.0)
             temp_path = extract_audio(self._file_path, progress_cb=self.progress.emit)
             self.finished.emit(temp_path)
         except Exception as e:
@@ -378,7 +378,7 @@ class LyricParseWorker(QObject):
             if self._content is not None:
                 content = self._content
             else:
-                self.progress.emit("正在读取文件...")
+                self.progress.emit(self.tr("正在读取文件..."))
                 path = Path(self._file_path)
                 try:
                     content = path.read_text(encoding="utf-8")

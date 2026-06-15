@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QMessageBox,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QRect, QSize
+from PyQt6.QtCore import Qt, pyqtSignal, QRect, QSize, QEvent
 from PyQt6.QtGui import (
     QColor,
     QFont,
@@ -385,14 +385,14 @@ class DeleteRubyByTypeDialog(QDialog):
             initial_types: 初始选中的类型名称列表（config 格式），如 ["hiragana", "katakana_hiragana_ruby"]
         """
         super().__init__(parent)
-        self.setWindowTitle("按类型删除注音")
+        self.setWindowTitle(self.tr("按类型删除注音"))
         self.resize(320, 400)
         self.setFont(QFont("Microsoft YaHei", 10))
 
         layout = QVBoxLayout(self)
         layout.setSpacing(8)
 
-        lbl = QLabel("选择要删除注音的字符类型：")
+        lbl = QLabel(self.tr("选择要删除注音的字符类型："))
         lbl.setStyleSheet("font-weight: bold;")
         layout.addWidget(lbl)
 
@@ -404,7 +404,8 @@ class DeleteRubyByTypeDialog(QDialog):
 
         self._checkboxes: list[tuple] = []
         for char_type, label in self._TYPE_LABELS:
-            cb = QCheckBox(label, self)
+            # _TYPE_LABELS 是类属性，label 含中文源串；显示时 tr 翻译
+            cb = QCheckBox(self.tr(label), self)
             cb.setChecked(char_type in default_set)
             layout.addWidget(cb)
             self._checkboxes.append((char_type, cb))
@@ -412,9 +413,9 @@ class DeleteRubyByTypeDialog(QDialog):
         layout.addStretch()
 
         btn_layout = QHBoxLayout()
-        btn_ok = PrimaryPushButton("删除选中类型", self)
+        btn_ok = PrimaryPushButton(self.tr("删除选中类型"), self)
         btn_ok.clicked.connect(self.accept)
-        btn_cancel = PushButton("取消", self)
+        btn_cancel = PushButton(self.tr("取消"), self)
         btn_cancel.clicked.connect(self.reject)
         btn_layout.addStretch()
         btn_layout.addWidget(btn_ok)
@@ -452,41 +453,41 @@ class RubyInterface(QWidget):
         layout.setContentsMargins(20, 16, 20, 16)
         layout.setSpacing(8)
 
-        # 标题
-        title = QLabel("全文本编辑")
-        title.setStyleSheet("font-size: 22px; font-weight: bold;")
-        title_tip = CaptionLabel("（编辑后点「应用更改」写回；行号对应歌词行，时间轴随文本保留）")
+        # 标题（存为实例属性以便 retranslate）
+        self._lbl_title = QLabel(self.tr("全文本编辑"))
+        self._lbl_title.setStyleSheet("font-size: 22px; font-weight: bold;")
+        self._lbl_title_tip = CaptionLabel(self.tr("（编辑后点「应用更改」写回；行号对应歌词行，时间轴随文本保留）"))
         title_layout = QHBoxLayout()
-        title_layout.addWidget(title)
-        title_layout.addWidget(title_tip)
+        title_layout.addWidget(self._lbl_title)
+        title_layout.addWidget(self._lbl_title_tip)
         title_layout.addStretch()
         layout.addLayout(title_layout)
 
         # 说明（功能 + 格式，简洁）
-        desc = CaptionLabel(
+        self._lbl_desc = CaptionLabel(self.tr(
             "逐行编辑整篇歌词。格式：{原文||读音} 为注音块，"
             "注音块中`|` 分 RubyPart、`,` 分字；时间戳在字前 [分:秒.厘秒]（空=[T]），"
             "句尾 [>…] 贴在字后，演唱者切换用 【名】。"
-        )
-        desc.setWordWrap(True)
-        layout.addWidget(desc)
+        ))
+        self._lbl_desc.setWordWrap(True)
+        layout.addWidget(self._lbl_desc)
 
         # 批量操作按钮
         batch_layout = QHBoxLayout()
 
-        self.btn_auto_all = PushButton("自动分析全部注音", self)
+        self.btn_auto_all = PushButton(self.tr("自动分析全部注音"), self)
         self.btn_auto_all.setIcon(FIF.SYNC)
         self.btn_auto_all.clicked.connect(self._on_auto_analyze_all)
         self.btn_auto_all.setEnabled(False)
         batch_layout.addWidget(self.btn_auto_all)
 
-        self.btn_delete_by_type = PushButton("按类型删除注音", self)
+        self.btn_delete_by_type = PushButton(self.tr("按类型删除注音"), self)
         self.btn_delete_by_type.setIcon(FIF.DELETE)
         self.btn_delete_by_type.clicked.connect(self._on_delete_rubies_by_type)
         self.btn_delete_by_type.setEnabled(False)
         batch_layout.addWidget(self.btn_delete_by_type)
 
-        self.btn_update_cp = PushButton("更新节奏点", self)
+        self.btn_update_cp = PushButton(self.tr("更新节奏点"), self)
         self.btn_update_cp.setIcon(FIF.UPDATE)
         self.btn_update_cp.clicked.connect(self._on_update_checkpoints)
         self.btn_update_cp.setEnabled(False)
@@ -501,7 +502,8 @@ class RubyInterface(QWidget):
         _saved_show_ch = _settings.get("fulltext_editor.show_ch_width", True)
         self._ch_width_font = _settings.get("ui.main_font", "Microsoft YaHei")
 
-        batch_layout.addWidget(CaptionLabel("字号"))
+        self._lbl_font_size = CaptionLabel(self.tr("字号"))
+        batch_layout.addWidget(self._lbl_font_size)
         self.spin_font = SpinBox(self)
         self.spin_font.setRange(8, 48)
         self.spin_font.setValue(_saved_font_size)
@@ -510,7 +512,8 @@ class RubyInterface(QWidget):
         batch_layout.addWidget(self.spin_font)
 
         batch_layout.addSpacing(12)
-        batch_layout.addWidget(CaptionLabel("字宽统计"))
+        self._lbl_ch_width = CaptionLabel(self.tr("字宽统计"))
+        batch_layout.addWidget(self._lbl_ch_width)
         self.switch_ch_width = SwitchButton(self)
         self.switch_ch_width.setChecked(_saved_show_ch)
         self.switch_ch_width.setMinimumWidth(50)
@@ -528,10 +531,10 @@ class RubyInterface(QWidget):
         # 全文本编辑器（带行号栏 + 语法着色，Alt+滚轮缩放字体）
         self.text_edit = LineNumberPlainTextEdit()
         self.text_edit.setFont(QFont("Microsoft YaHei", 12))
-        self.text_edit.setPlaceholderText(
+        self.text_edit.setPlaceholderText(self.tr(
             "加载项目后，歌词将以带时间戳的注音格式显示在此处...\n"
             "示例: {大冒険||[00:01.00]だ|[00:01.20]い,...}"
-        )
+        ))
         self.text_edit.setMinimumHeight(300)
         self._highlighter = _TimedFormatHighlighter(self.text_edit.document())
         # 实时高亮光标所在行
@@ -551,24 +554,24 @@ class RubyInterface(QWidget):
         # 底部栏：左下角信息，右下角 应用更改 / 还原 / 关闭
         action_layout = QHBoxLayout()
 
-        self.lbl_stats = CaptionLabel("共 0 行，0 个注音")
+        self.lbl_stats = CaptionLabel(self.tr("共 {lines} 行，{rubies} 个注音").format(lines=0, rubies=0))
         action_layout.addWidget(self.lbl_stats)
 
         action_layout.addStretch()
 
-        self.btn_apply = PrimaryPushButton("应用更改", self)
+        self.btn_apply = PrimaryPushButton(self.tr("应用更改"), self)
         self.btn_apply.setIcon(FIF.ACCEPT)
         self.btn_apply.clicked.connect(self._on_apply_changes)
         self.btn_apply.setEnabled(False)
         action_layout.addWidget(self.btn_apply)
 
-        self.btn_revert = PushButton("还原", self)
+        self.btn_revert = PushButton(self.tr("还原"), self)
         self.btn_revert.setIcon(FIF.CANCEL)
         self.btn_revert.clicked.connect(self._on_revert)
         self.btn_revert.setEnabled(False)
         action_layout.addWidget(self.btn_revert)
 
-        self.btn_close = PushButton("关闭", self)
+        self.btn_close = PushButton(self.tr("关闭"), self)
         self.btn_close.setIcon(FIF.CLOSE)
         self.btn_close.clicked.connect(self.close_requested.emit)
         action_layout.addWidget(self.btn_close)
@@ -740,13 +743,23 @@ class RubyInterface(QWidget):
         """更新字宽统计字体提示。effective_family 为实际测量所用字体族。"""
         if effective_family and effective_family != self._ch_width_font:
             # 所选字体缺少全角参考字形，已回退测量
-            self.lbl_ch_font.setText(f"字宽字体：{self._ch_width_font} → {effective_family}")
+            self.lbl_ch_font.setText(
+                self.tr("字宽字体：{src} → {eff}").format(
+                    src=self._ch_width_font, eff=effective_family
+                )
+            )
             self.lbl_ch_font.setToolTip(
-                f"所选字体「{self._ch_width_font}」缺少全角参考字形，字宽改用「{effective_family}」测量"
+                self.tr(
+                    "所选字体「{src}」缺少全角参考字形，字宽改用「{eff}」测量"
+                ).format(src=self._ch_width_font, eff=effective_family)
             )
         else:
-            self.lbl_ch_font.setText(f"字宽字体：{effective_family}")
-            self.lbl_ch_font.setToolTip("字宽统计跟随卡拉OK主文字字体（设置 › 界面设定 › 主文字字体）")
+            self.lbl_ch_font.setText(
+                self.tr("字宽字体：{eff}").format(eff=effective_family)
+            )
+            self.lbl_ch_font.setToolTip(
+                self.tr("字宽统计跟随卡拉OK主文字字体（设置 › 界面设定 › 主文字字体）")
+            )
 
     def _on_ch_width_toggled(self, checked: bool):
         self.text_edit.set_show_ch_width(checked)
@@ -775,7 +788,9 @@ class RubyInterface(QWidget):
             self._update_stats()
         else:
             self.text_edit.setPlainText("")
-            self.lbl_stats.setText("共 0 行，0 个注音")
+            self.lbl_stats.setText(
+                self.tr("共 {lines} 行，{rubies} 个注音").format(lines=0, rubies=0)
+            )
 
     def _global_offset(self) -> int:
         """全局偏移（项目优先，回退设置）——编解码时用它使显示与打轴一致。"""
@@ -838,13 +853,19 @@ class RubyInterface(QWidget):
     def _update_stats(self):
         """更新统计标签"""
         if not self._project:
-            self.lbl_stats.setText("共 0 行，0 个注音")
+            self.lbl_stats.setText(
+                self.tr("共 {lines} 行，{rubies} 个注音").format(lines=0, rubies=0)
+            )
             return
 
         total = sum(
             sum(1 for c in s.characters if c.ruby) for s in self._project.sentences
         )
-        self.lbl_stats.setText(f"共 {len(self._project.sentences)} 行，{total} 个注音")
+        self.lbl_stats.setText(
+            self.tr("共 {lines} 行，{rubies} 个注音").format(
+                lines=len(self._project.sentences), rubies=total
+            )
+        )
 
     def _create_auto_check_service(self):
         """创建带设置的自动检查服务"""
@@ -902,17 +923,17 @@ class RubyInterface(QWidget):
 
         # 三选项对话框
         msg = QMessageBox(self)
-        msg.setWindowTitle("自动分析全部注音")
-        msg.setText("请选择分析范围：")
-        msg.setInformativeText(
+        msg.setWindowTitle(self.tr("自动分析全部注音"))
+        msg.setText(self.tr("请选择分析范围："))
+        msg.setInformativeText(self.tr(
             "「全部重新分析」会覆盖现有注音。\n"
             "「仅分析未注音字符」会保留已有的人工/字典注音。"
-        )
-        btn_all = msg.addButton("全部重新分析", QMessageBox.ButtonRole.DestructiveRole)
+        ))
+        btn_all = msg.addButton(self.tr("全部重新分析"), QMessageBox.ButtonRole.DestructiveRole)
         btn_only_noruby = msg.addButton(
-            "仅分析未注音字符", QMessageBox.ButtonRole.AcceptRole
+            self.tr("仅分析未注音字符"), QMessageBox.ButtonRole.AcceptRole
         )
-        btn_cancel = msg.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+        btn_cancel = msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
         msg.setDefaultButton(btn_only_noruby)
         msg.exec()
 
@@ -940,7 +961,7 @@ class RubyInterface(QWidget):
             _analyzer = getattr(auto_check, "_analyzer", None)
             if getattr(_analyzer, "llm_failed", False):
                 InfoBar.warning(
-                    title="LLM 注音失败，已回退本地引擎",
+                    title=self.tr("LLM 注音失败，已回退本地引擎"),
                     content=str(getattr(_analyzer, "last_error", "") or ""),
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
@@ -949,8 +970,10 @@ class RubyInterface(QWidget):
                     parent=self,
                 )
             InfoBar.success(
-                title="分析完成",
-                content=f"已为 {len(self._project.sentences)} 行自动分析注音并更新节奏点",
+                title=self.tr("分析完成"),
+                content=self.tr("已为 {lines} 行自动分析注音并更新节奏点").format(
+                    lines=len(self._project.sentences)
+                ),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -959,7 +982,7 @@ class RubyInterface(QWidget):
             )
         except Exception as e:
             InfoBar.warning(
-                title="注音分析失败",
+                title=self.tr("注音分析失败"),
                 content=str(e),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
@@ -1041,8 +1064,15 @@ class RubyInterface(QWidget):
             self._store.notify("rubies")
 
         InfoBar.success(
-            title="删除完成",
-            content=f"已删除 {removed} 个注音（类型: {', '.join(label for ct, label in DeleteRubyByTypeDialog._TYPE_LABELS if ct in selected)}）",
+            title=self.tr("删除完成"),
+            content=self.tr("已删除 {count} 个注音（类型: {types}）").format(
+                count=removed,
+                types=", ".join(
+                    self.tr(label)
+                    for ct, label in DeleteRubyByTypeDialog._TYPE_LABELS
+                    if ct in selected
+                ),
+            ),
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -1069,8 +1099,10 @@ class RubyInterface(QWidget):
                 self._store.notify("checkpoints")
 
             InfoBar.success(
-                title="更新完成",
-                content=f"已根据注音更新 {len(self._project.sentences)} 行的节奏点",
+                title=self.tr("更新完成"),
+                content=self.tr("已根据注音更新 {lines} 行的节奏点").format(
+                    lines=len(self._project.sentences)
+                ),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -1079,7 +1111,7 @@ class RubyInterface(QWidget):
             )
         except Exception as e:
             InfoBar.warning(
-                title="更新失败",
+                title=self.tr("更新失败"),
                 content=str(e),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
@@ -1130,7 +1162,7 @@ class RubyInterface(QWidget):
                     offset_ms=offset,
                 )
             except Exception as e:
-                parse_errors.append(f"第 {i + 1} 行: {e}")
+                parse_errors.append(self.tr("第 {n} 行: {err}").format(n=i + 1, err=e))
                 chars = []
             # 行级 singer：取首字符 singer，空行沿用 inherited
             if chars and chars[0].singer_id:
@@ -1141,7 +1173,7 @@ class RubyInterface(QWidget):
 
         if parse_errors:
             InfoBar.warning(
-                title="部分行解析失败",
+                title=self.tr("部分行解析失败"),
                 content="\n".join(parse_errors[:3]),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
@@ -1164,8 +1196,10 @@ class RubyInterface(QWidget):
         self._update_stats()
 
         InfoBar.success(
-            title="应用成功",
-            content=f"已更新 {len(self._project.sentences)} 行",
+            title=self.tr("应用成功"),
+            content=self.tr("已更新 {lines} 行").format(
+                lines=len(self._project.sentences)
+            ),
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -1173,13 +1207,69 @@ class RubyInterface(QWidget):
             parent=self,
         )
 
+    def changeEvent(self, event):
+        # 全文本编辑器有大量状态（文本内容/高亮器/字号/字宽统计），不做整体
+        # 重建——只针对可见字符串精准 retranslate，避免编辑中丢失内容。
+        if event.type() == QEvent.Type.LanguageChange:
+            self._retranslate_ui()
+        super().changeEvent(event)
+
+    def _retranslate_ui(self):
+        """语言切换：刷新所有可见字符串（不重建 UI）。"""
+        # 标题区
+        if hasattr(self, "_lbl_title"):
+            self._lbl_title.setText(self.tr("全文本编辑"))
+        if hasattr(self, "_lbl_title_tip"):
+            self._lbl_title_tip.setText(self.tr("（编辑后点「应用更改」写回；行号对应歌词行，时间轴随文本保留）"))
+        if hasattr(self, "_lbl_desc"):
+            self._lbl_desc.setText(self.tr(
+                "逐行编辑整篇歌词。格式：{原文||读音} 为注音块，"
+                "注音块中`|` 分 RubyPart、`,` 分字；时间戳在字前 [分:秒.厘秒]（空=[T]），"
+                "句尾 [>…] 贴在字后，演唱者切换用 【名】。"
+            ))
+        if hasattr(self, "_lbl_font_size"):
+            self._lbl_font_size.setText(self.tr("字号"))
+        if hasattr(self, "_lbl_ch_width"):
+            self._lbl_ch_width.setText(self.tr("字宽统计"))
+        # 按钮
+        if hasattr(self, "btn_auto_all"):
+            self.btn_auto_all.setText(self.tr("自动分析全部注音"))
+        if hasattr(self, "btn_delete_by_type"):
+            self.btn_delete_by_type.setText(self.tr("按类型删除注音"))
+        if hasattr(self, "btn_update_cp"):
+            self.btn_update_cp.setText(self.tr("更新节奏点"))
+        if hasattr(self, "btn_apply"):
+            self.btn_apply.setText(self.tr("应用更改"))
+        if hasattr(self, "btn_revert"):
+            self.btn_revert.setText(self.tr("还原"))
+        if hasattr(self, "btn_close"):
+            self.btn_close.setText(self.tr("关闭"))
+        # 文本框 placeholder
+        if hasattr(self, "text_edit"):
+            self.text_edit.setPlaceholderText(self.tr(
+                "加载项目后，歌词将以带时间戳的注音格式显示在此处...\n"
+                "示例: {大冒険||[00:01.00]だ|[00:01.20]い,...}"
+            ))
+        # 统计标签
+        try:
+            self._update_stats()
+        except Exception:
+            pass
+        # 字宽字体提示——若已有 effective_family，则刷新；否则跳过
+        try:
+            if hasattr(self, "lbl_ch_font") and hasattr(self, "text_edit"):
+                effective = self.text_edit.set_ch_width_font(self._ch_width_font)
+                self._update_ch_font_label(effective)
+        except Exception:
+            pass
+
     def _on_revert(self):
         """还原编辑器内容为项目当前状态"""
         self._refresh_display()
 
         InfoBar.info(
-            title="已还原",
-            content="编辑器内容已还原为项目当前状态",
+            title=self.tr("已还原"),
+            content=self.tr("编辑器内容已还原为项目当前状态"),
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -1198,7 +1288,7 @@ class FullTextEditDialog(QDialog):
 
     def __init__(self, store, parent=None, current_line: int = 0, current_char: int = 0):
         super().__init__(parent)
-        self.setWindowTitle("全文本编辑")
+        self.setWindowTitle(self.tr("全文本编辑"))
         # 支持最大化/全屏（QDialog 默认无最大化按钮）
         self.setWindowFlags(
             self.windowFlags()
@@ -1225,3 +1315,8 @@ class FullTextEditDialog(QDialog):
 
         # 进入时定位到当前行的当前字符（高亮该行、光标落在该字符），并滚到视口顶部
         self.interface.focus_line(current_line, current_char)
+
+    def changeEvent(self, event):
+        if event.type() == QEvent.Type.LanguageChange:
+            self.setWindowTitle(self.tr("全文本编辑"))
+        super().changeEvent(event)
