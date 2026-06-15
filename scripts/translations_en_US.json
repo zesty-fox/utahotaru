@@ -1152,5 +1152,16 @@
   "选择目录": "Choose directory",
   "开启后无爆音，但倍速切换可能有延迟，且需占用 .cache 进行离线预渲染；关闭后占用较小、切换即时，但可能会有爆音。默认开启。": "When ON, no audio clipping, but speed switching may have latency and requires .cache for offline pre-rendering. When OFF, smaller .cache usage and instant switching, but possible clipping. Default ON.",
   "开启后注音改用 LLM（整首一次发送、保留上下文），跳过 WinRT/Sudachi/pykakasi；请求失败时自动回退本地引擎。": "When ON, ruby generation uses LLM (full lyrics sent at once with context). Skips WinRT/Sudachi/pykakasi. On failure, falls back to local engine.",
-  "选择服务商的接口形态：Chat Completions 覆盖大多数（含本地 Ollama/LM Studio）；Anthropic 用 /v1/messages；Responses 用 /v1/responses（OpenAI 新接口）": "Choose provider API format: Chat Completions covers most cases (incl. local Ollama/LM Studio). Anthropic uses /v1/messages. Responses uses /v1/responses (OpenAI new API)."
+  "选择服务商的接口形态：Chat Completions 覆盖大多数（含本地 Ollama/LM Studio）；Anthropic 用 /v1/messages；Responses 用 /v1/responses（OpenAI 新接口）": "Choose provider API format: Chat Completions covers most cases (incl. local Ollama/LM Studio). Anthropic uses /v1/messages. Responses uses /v1/responses (OpenAI new API).",
+  "预览指引方式": "Preview guide style",
+  "设置预览指引中上一个/正在/下一个字群的透明度和开关": "Set opacity and toggle for previous/current/next character groups in the preview guide",
+  "设置指引": "Configure guide",
+  "设置播放打轴时当前行光标前后字群的透明度与是否显示：\n上一个打的字（高透明度提示已完成）/ 正在打的字（当前进度）/\n下一个要打的字（低透明度预告）。": "Configure the opacity and visibility of character groups around the cursor on the current line during timing playback:\nPrevious group (higher opacity for completed) / Current group (in progress) /\nNext group (low opacity preview).",
+  "键值名": "Key name",
+  "透明度": "Opacity",
+  "启用/关闭": "Enable/Disable",
+  "上一个打的字": "Previous group",
+  "正在打的字": "Current group",
+  "下一个要打的字": "Next group",
+  "打轴播放时在当前行以光标为锚用过渡色提示上一个/正在/下一个打的字；具体透明度与开关可在下方「预览指引方式」中自定义": "During timing playback, use the cursor as anchor on the current line with gradient color to indicate previous/current/next characters; opacity and toggles are customizable in 'Preview guide style' below"
 }

@@ -791,6 +791,15 @@ class EditorInterface(QWidget):
         # 应用走字预览指引开关
         preview_guide = settings.get("timing.preview_guide_enabled", False)
         self.preview.set_preview_guide_enabled(preview_guide)
+        # 应用走字预览指引逐群设置
+        self.preview.set_preview_guide_config(
+            prev_alpha=settings.get("timing.preview_guide_prev_alpha", 80) / 100.0,
+            curr_alpha=settings.get("timing.preview_guide_curr_alpha", 50) / 100.0,
+            next_alpha=settings.get("timing.preview_guide_next_alpha", 20) / 100.0,
+            prev_enabled=settings.get("timing.preview_guide_prev_enabled", True),
+            curr_enabled=settings.get("timing.preview_guide_curr_enabled", True),
+            next_enabled=settings.get("timing.preview_guide_next_enabled", True),
+        )
         # 应用滚动模式（设置页修改后同步到按钮和 preview）
         scroll_mode = settings.get("timing.scroll_mode", "auto")
         if scroll_mode != self._scroll_mode:

@@ -8,12 +8,14 @@ from qfluentwidgets import FluentIcon as FIF, PushButton, SettingCard, SettingCa
 
 from ..calibration_dialog import CalibrationDialog
 from ..cards import ComboSettingCard, SpinSettingCard, SwitchSettingCard
+from ..preview_guide_dialog import PreviewGuideDialog
 from .base import SubSettingInterface
 
 
 class TimingSubInterface(SubSettingInterface):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._settings_ref = None
         self._calibration_dialog = None
         self._init_ui()
 
@@ -52,9 +54,19 @@ class TimingSubInterface(SubSettingInterface):
             content_source="关闭单击字符/节奏点延迟后跳转到目标行的功能（双击跳转不受影响）")
         self.card_preview_guide = self._tr_register(
             SwitchSettingCard(FIF.VIEW, tr("打轴预览指引"),
-                tr("打轴播放时在当前行以光标为锚用过渡色提示：上一个打的字(80%) / 正在打的字(50%) / 下一个要打的字(20%)"), parent=g),
+                tr("打轴播放时在当前行以光标为锚用过渡色提示上一个/正在/下一个打的字；具体透明度与开关可在下方「预览指引方式」中自定义"), parent=g),
             title_source="打轴预览指引",
-            content_source="打轴播放时在当前行以光标为锚用过渡色提示：上一个打的字(80%) / 正在打的字(50%) / 下一个要打的字(20%)")
+            content_source="打轴播放时在当前行以光标为锚用过渡色提示上一个/正在/下一个打的字；具体透明度与开关可在下方「预览指引方式」中自定义")
+        self.card_preview_guide_style = self._tr_register(
+            SettingCard(FIF.PALETTE, tr("预览指引方式"),
+                tr("设置预览指引中上一个/正在/下一个字群的透明度和开关"), g),
+            title_source="预览指引方式",
+            content_source="设置预览指引中上一个/正在/下一个字群的透明度和开关")
+        self.btn_guide_style = PushButton(tr("设置指引"), self.card_preview_guide_style)
+        self._tr_register_text(self.btn_guide_style, "setText", "设置指引")
+        self.btn_guide_style.clicked.connect(self._open_preview_guide_dialog)
+        self.card_preview_guide_style.hBoxLayout.addWidget(self.btn_guide_style, 0, Qt.AlignmentFlag.AlignRight)
+        self.card_preview_guide_style.hBoxLayout.addSpacing(16)
         self.card_keysound = self._tr_register(
             SwitchSettingCard(FIF.MUSIC, tr("按键音"),
                 tr("打轴时按下按键播放按下音、抬起句尾按键播放抬起音"), parent=g),
@@ -72,6 +84,7 @@ class TimingSubInterface(SubSettingInterface):
         self.card_keysound_style.set_item_sources(["默认", "osu", "街机风", "金属感"])
         for c in [self.card_offset, self.card_speed_correction, self.card_export_offset,
                   self.card_timing_step, self.card_disable_click_jump, self.card_preview_guide,
+                  self.card_preview_guide_style,
                   self.card_keysound, self.card_keysound_volume, self.card_keysound_style]:
             g.addSettingCard(c)
         self.expandLayout.addWidget(g)
@@ -92,6 +105,29 @@ class TimingSubInterface(SubSettingInterface):
         cal_card.hBoxLayout.addSpacing(16)
         cg.addSettingCard(cal_card)
         self.expandLayout.addWidget(cg)
+
+    def _open_preview_guide_dialog(self):
+        if self._settings_ref is None:
+            return
+        current = {
+            "prev_alpha": self._settings_ref.get("timing.preview_guide_prev_alpha", 80),
+            "curr_alpha": self._settings_ref.get("timing.preview_guide_curr_alpha", 50),
+            "next_alpha": self._settings_ref.get("timing.preview_guide_next_alpha", 20),
+            "prev_enabled": self._settings_ref.get("timing.preview_guide_prev_enabled", True),
+            "curr_enabled": self._settings_ref.get("timing.preview_guide_curr_enabled", True),
+            "next_enabled": self._settings_ref.get("timing.preview_guide_next_enabled", True),
+        }
+        dialog = PreviewGuideDialog(current, self)
+        if dialog.exec() == PreviewGuideDialog.DialogCode.Accepted:
+            cfg = dialog.get_guide_config()
+            self._settings_ref.set("timing.preview_guide_prev_alpha", int(cfg["prev_alpha"]))
+            self._settings_ref.set("timing.preview_guide_curr_alpha", int(cfg["curr_alpha"]))
+            self._settings_ref.set("timing.preview_guide_next_alpha", int(cfg["next_alpha"]))
+            self._settings_ref.set("timing.preview_guide_prev_enabled", bool(cfg["prev_enabled"]))
+            self._settings_ref.set("timing.preview_guide_curr_enabled", bool(cfg["curr_enabled"]))
+            self._settings_ref.set("timing.preview_guide_next_enabled", bool(cfg["next_enabled"]))
+            self._settings_ref.save()
+            self._notify_changed()
 
     def _open_calibration_dialog(self):
         self._calibration_dialog = CalibrationDialog(self)
@@ -119,6 +155,7 @@ class TimingSubInterface(SubSettingInterface):
     _STYLE_KEYS = ["default", "osu", "arcade", "sci"]
 
     def load_settings(self, s):
+        self._settings_ref = s
         self.card_offset.setValue(s.get("timing.tag_offset_ms", -230))
         self.card_speed_correction.setValue(s.get("timing.speed_correction", 80))
         self.card_export_offset.setValue(s.get("export.offset_ms", 0))

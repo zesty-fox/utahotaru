@@ -340,6 +340,12 @@ class KaraokePreview(QWidget):
         self._global_version: int = 0  # 全局版本号，用于字体变化等全局刷新
         self._is_playing: bool = False
         self._preview_guide_enabled: bool = False  # 走字预览指引（仅播放打轴时光标所在行生效）
+        self._guide_prev_alpha: float = 0.8       # 上一个打的字透明度
+        self._guide_curr_alpha: float = 0.5       # 正在打的字透明度
+        self._guide_next_alpha: float = 0.2       # 下一个要打的字透明度
+        self._guide_prev_enabled: bool = True
+        self._guide_curr_enabled: bool = True
+        self._guide_next_enabled: bool = True
         self._auto_scroll_enabled: bool = True  # 自动滚动开关，特殊场景可关闭
         self._auto_scroll_suspended: bool = False  # 用户交互后挂起自动滚动
         self._scroll_mode: str = "auto"  # auto / always / never
@@ -452,6 +458,24 @@ class KaraokePreview(QWidget):
     def set_preview_guide_enabled(self, enabled: bool):
         """设置走字预览指引开关（播放打轴时当前行用过渡色提示打轴进度）。"""
         self._preview_guide_enabled = bool(enabled)
+        self.update()
+
+    def set_preview_guide_config(
+        self,
+        prev_alpha: float,
+        curr_alpha: float,
+        next_alpha: float,
+        prev_enabled: bool,
+        curr_enabled: bool,
+        next_enabled: bool,
+    ):
+        """设置走字预览指引的逐群透明度和开关。"""
+        self._guide_prev_alpha = float(prev_alpha)
+        self._guide_curr_alpha = float(curr_alpha)
+        self._guide_next_alpha = float(next_alpha)
+        self._guide_prev_enabled = bool(prev_enabled)
+        self._guide_curr_enabled = bool(curr_enabled)
+        self._guide_next_enabled = bool(next_enabled)
         self.update()
 
     def set_auto_scroll_enabled(self, enabled: bool):
@@ -2011,13 +2035,8 @@ class KaraokePreview(QWidget):
         ``check_count == 0``（无 cc，不单独打轴）字符并入该字群——即"上一个打的字
         与当前打的字之间不需要打的字"会被组合进同一个字群。
 
-        再按光标所在字群相对位置上色（分色由 ``_draw_split_text`` 负责）：
-
-          - 光标所在字群        = 正在打的字 → 0.5（无时间戳、走不了字，主动上色）
-          - 紧邻的上一个字群    = 上一个打的字 → 0.8（避免"已完成"误解）
-          - 紧邻的下一个字群    = 下一个要打的字 → 0.2
-
-        其余字符不返回（保持正常着色/走字）。
+        再按光标所在字群相对位置上色（分色由 ``_draw_split_text`` 负责），
+        透明度由用户自定义的 ``set_preview_guide_config`` 提供。
         """
         groups: list[list[int]] = []
         char_to_group: dict[int, int] = {}
@@ -2035,19 +2054,19 @@ class KaraokePreview(QWidget):
         if not groups:
             return {}
 
-        # 光标定位到字群：越界时 clamp 到行内有效范围
         ci_clamped = max(0, min(cursor_idx, len(characters) - 1))
         cur_gi = char_to_group.get(ci_clamped, 0)
 
         alpha: dict[int, float] = {}
-        for ci in groups[cur_gi]:
-            alpha[ci] = 0.5
-        if cur_gi - 1 >= 0:
+        if self._guide_curr_enabled:
+            for ci in groups[cur_gi]:
+                alpha[ci] = self._guide_curr_alpha
+        if self._guide_prev_enabled and cur_gi - 1 >= 0:
             for ci in groups[cur_gi - 1]:
-                alpha[ci] = 0.8
-        if cur_gi + 1 < len(groups):
+                alpha[ci] = self._guide_prev_alpha
+        if self._guide_next_enabled and cur_gi + 1 < len(groups):
             for ci in groups[cur_gi + 1]:
-                alpha[ci] = 0.2
+                alpha[ci] = self._guide_next_alpha
         return alpha
 
     # ---- 绘制 ----
