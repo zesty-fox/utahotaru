@@ -109,9 +109,66 @@ class _AppTranslator(QTranslator):
     def load_language(self, lang: Language) -> bool:
         qm = _translations_dir() / f"app.{lang.qlocale_name}.qm"
         if not qm.exists():
-            # 未构建 .qm 时返回 False，但调用方可继续——源字符串会原样显示。
             return False
         return super().load(str(qm))
+
+
+class _FallbackTranslator(QTranslator):
+    """跨上下文回退：``self._editor.tr("X")`` 这类"借用别人 tr 入口"的
+    调用，Qt 会按 ``self._editor`` 的 *class* 查上下文，而我方抽取器
+    按 *enclosing class* 归类——两者不一致时主翻译器命中失败。本类无
+    视 context，按 source 单键查表。
+
+    加载方式：从同名 .ts 解析出 ``{source: translation}``。**安装顺序**：
+    必须在 ``_AppTranslator`` **之后**安装，Qt 才会先查主翻译器、失败
+    再回退到本类。
+    """
+
+    _source_fallback: dict[str, str] = {}
+
+    def isEmpty(self) -> bool:  # type: ignore[override]
+        return not self._source_fallback
+
+    def load_from_ts(self, lang: Language) -> bool:
+        ts_path = _translations_dir() / f"app.{lang.qlocale_name}.ts"
+        self._source_fallback = self._build(ts_path)
+        return bool(self._source_fallback)
+
+    @staticmethod
+    def _build(ts_path: Path) -> dict[str, str]:
+        if not ts_path.exists():
+            return {}
+        try:
+            import xml.etree.ElementTree as ET
+            tree = ET.parse(ts_path)
+        except Exception:
+            return {}
+        out: dict[str, str] = {}
+        for ctx in tree.getroot().findall("context"):
+            for msg in ctx.findall("message"):
+                src_el = msg.find("source")
+                tr_el = msg.find("translation")
+                if src_el is None or src_el.text is None:
+                    continue
+                if tr_el is None or tr_el.get("type") == "unfinished":
+                    continue
+                tr = tr_el.text or ""
+                if not tr:
+                    continue
+                out.setdefault(src_el.text, tr)
+        return out
+
+    def translate(  # type: ignore[override]
+        self,
+        context: str,
+        sourceText: str,
+        disambiguation: Optional[str] = None,
+        n: int = -1,
+    ) -> str:
+        # 关键：未命中时返回 sourceText（**不能**返回空串）。Qt 的
+        # 翻译器链一旦有任何一个 isEmpty=False 的 translator，源串
+        # 回退就不再生效——返回空串会让最终 tr 结果直接是空串。
+        return self._source_fallback.get(sourceText, sourceText)
 
 
 class _PseudoTranslator(QTranslator):
@@ -166,6 +223,7 @@ class LocalizationManager:
         # pseudo 语言走 _PseudoTranslator，其余走 _AppTranslator——共同基类 QTranslator
         self._app_translator: Optional[QTranslator] = None
         self._fluent_translator: Optional[QTranslator] = None
+        self._fallback_translator: Optional[QTranslator] = None
         self._current: Language = DEFAULT_LANGUAGE
 
     @property
@@ -203,6 +261,18 @@ class LocalizationManager:
         if self._fluent_translator is not None:
             app.removeTranslator(self._fluent_translator)
             self._fluent_translator = None
+        if self._fallback_translator is not None:
+            app.removeTranslator(self._fallback_translator)
+            self._fallback_translator = None
+
+        # ── 安装 fallback translator（先装，Qt 按 LIFO 倒序查找，
+        # fallback 作为兜底**最后**才被检查）─────────────────────────
+        # pseudo 模式无需 fallback——_PseudoTranslator 永远返回 ⟦原文⟧
+        if lang.code != PSEUDO_LANGUAGE_CODE:
+            fb = _FallbackTranslator()
+            if fb.load_from_ts(lang):
+                app.installTranslator(fb)
+                self._fallback_translator = fb
 
         # ── 安装 app translator ─────────────────────────────────────
         # pseudo 走自己的可视化分支，其余按 .qm 文件加载（zh_CN 没 .qm 时
