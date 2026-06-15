@@ -152,7 +152,7 @@ class FileLoader:
         if not is_ffmpeg_available():
             InfoBar.error(
                 title=self._editor.tr("无法读取视频文件"),
-                content=self._editor.tr("未检测到 FFmpeg，请在「设置 → 关于&语言 → 工具配置」中浏览并设置 FFmpeg 路径。"),
+                content=self._editor.tr("未检测到 FFmpeg，请在「设置 → 关于/语言 → 工具配置」中浏览并设置 FFmpeg 路径。"),
                 orient=Qt.Orientation.Horizontal, isClosable=True,
                 position=InfoBarPosition.TOP, duration=7000,
                 parent=self._editor,

@@ -129,7 +129,7 @@ class _ProxyStatusCard(SettingCard):
 
 
 def attach_proxy_group(settings_interface: "SettingsInterface") -> None:
-    """把"网络与代理"分组追加到设置界面（位于"关于&语言"之前）。
+    """把"网络与代理"分组追加到设置界面（位于"关于/语言"之前）。
 
     通过 ``settings_interface.expandLayout.addWidget`` 添加；不修改其它已有控件。
     """

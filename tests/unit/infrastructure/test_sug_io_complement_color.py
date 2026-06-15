@@ -1,4 +1,4 @@
-"""sug_parser 关于&语言 complement_color 的序列化 / 向后兼容测试（Issue #9 第十六批）。"""
+"""sug_parser 关于/语言 complement_color 的序列化 / 向后兼容测试（Issue #9 第十六批）。"""
 
 import json
 import tempfile

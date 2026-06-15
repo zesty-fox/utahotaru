@@ -14,7 +14,7 @@
 - noWinIME:  ``StrangeUtaGame-noWinIME-v{version}.zip``
 - mac:       ``StrangeUtaGame-mac-v{version}.zip``
 
-更新器（``strange_uta_game.updater``）与设置-关于&语言卡片均从此处读取版本号。
+更新器（``strange_uta_game.updater``）与设置-关于/语言卡片均从此处读取版本号。
 请始终使用 :class:`Version`（``packaging.version`` 兼容的语义版本字符串）。
 """
 

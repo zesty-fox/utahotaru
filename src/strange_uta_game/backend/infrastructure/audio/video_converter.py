@@ -1,7 +1,7 @@
 """视频音频提取模块。
 
 使用 FFmpeg 命令行从视频/音频文件中提取音频，压缩为 MP3 临时文件。
-FFmpeg 路径优先使用用户在「设置-关于&语言」中配置的路径，未配置则使用环境变量。
+FFmpeg 路径优先使用用户在「设置-关于/语言」中配置的路径，未配置则使用环境变量。
 """
 
 from __future__ import annotations
@@ -57,7 +57,7 @@ def is_video_file(file_path: str) -> bool:
 def get_ffmpeg_path() -> str:
     """获取 FFmpeg 可执行文件路径。
 
-    优先使用用户在「设置-关于&语言」中配置的路径，若未配置则返回 'ffmpeg'（依赖环境变量）。
+    优先使用用户在「设置-关于/语言」中配置的路径，若未配置则返回 'ffmpeg'（依赖环境变量）。
     """
     try:
         from strange_uta_game.frontend.settings.app_settings import AppSettings
@@ -109,7 +109,7 @@ def extract_audio(video_path: str, progress_cb: Optional[LoadProgressCallback] =
 
     if not is_ffmpeg_available():
         raise RuntimeError(
-            "当前环境未检测到 FFmpeg，请在「设置 → 关于&语言」中配置 FFmpeg 可执行文件路径。"
+            "当前环境未检测到 FFmpeg，请在「设置 → 关于/语言」中配置 FFmpeg 可执行文件路径。"
         )
 
     clear_extracted_cache()
@@ -146,7 +146,7 @@ def extract_audio(video_path: str, progress_cb: Optional[LoadProgressCallback] =
         raise RuntimeError("FFmpeg 提取超时（超过 10 分钟）")
     except FileNotFoundError:
         raise RuntimeError(
-            f"找不到 FFmpeg 可执行文件: {ffmpeg}，请在「设置 → 关于&语言」中重新配置路径。"
+            f"找不到 FFmpeg 可执行文件: {ffmpeg}，请在「设置 → 关于/语言」中重新配置路径。"
         )
 
     if result.returncode != 0:
