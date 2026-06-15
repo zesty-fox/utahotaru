@@ -877,9 +877,7 @@ class TimingService:
         UI 层在音频加载完成后以实际滑块上下限调用，确保只派发范围内的任务。
         若引擎不支持预渲染则静默忽略。
         """
-        fn = getattr(self._audio_engine, "prewarm_speeds", None)
-        if fn is not None:
-            fn(speed_min=speed_min, speed_max=speed_max)
+        return
 
     def swap_audio_engine(self, new_engine: IAudioEngine) -> None:
         """运行时替换音频引擎（用于切换"高质量变速"开关）。
