@@ -94,7 +94,7 @@ class AppSettings:
             "timing_adjust_step_ms": 10,
             "disable_click_jump": False,
             "preview_guide_enabled": False,
-            "preview_guide_prev_alpha": 80,
+            "preview_guide_prev_alpha": 100,
             "preview_guide_curr_alpha": 50,
             "preview_guide_next_alpha": 20,
             "preview_guide_prev_enabled": True,

@@ -340,7 +340,7 @@ class KaraokePreview(QWidget):
         self._global_version: int = 0  # 全局版本号，用于字体变化等全局刷新
         self._is_playing: bool = False
         self._preview_guide_enabled: bool = False  # 走字预览指引（仅播放打轴时光标所在行生效）
-        self._guide_prev_alpha: float = 0.8       # 上一个打的字透明度
+        self._guide_prev_alpha: float = 1.0       # 上一个打的字透明度
         self._guide_curr_alpha: float = 0.5       # 正在打的字透明度
         self._guide_next_alpha: float = 0.2       # 下一个要打的字透明度
         self._guide_prev_enabled: bool = True

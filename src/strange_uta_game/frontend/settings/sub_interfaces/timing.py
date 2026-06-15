@@ -110,7 +110,7 @@ class TimingSubInterface(SubSettingInterface):
         if self._settings_ref is None:
             return
         current = {
-            "prev_alpha": self._settings_ref.get("timing.preview_guide_prev_alpha", 80),
+            "prev_alpha": self._settings_ref.get("timing.preview_guide_prev_alpha", 100),
             "curr_alpha": self._settings_ref.get("timing.preview_guide_curr_alpha", 50),
             "next_alpha": self._settings_ref.get("timing.preview_guide_next_alpha", 20),
             "prev_enabled": self._settings_ref.get("timing.preview_guide_prev_enabled", True),

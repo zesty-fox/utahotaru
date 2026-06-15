@@ -793,7 +793,7 @@ class EditorInterface(QWidget):
         self.preview.set_preview_guide_enabled(preview_guide)
         # 应用走字预览指引逐群设置
         self.preview.set_preview_guide_config(
-            prev_alpha=settings.get("timing.preview_guide_prev_alpha", 80) / 100.0,
+            prev_alpha=settings.get("timing.preview_guide_prev_alpha", 100) / 100.0,
             curr_alpha=settings.get("timing.preview_guide_curr_alpha", 50) / 100.0,
             next_alpha=settings.get("timing.preview_guide_next_alpha", 20) / 100.0,
             prev_enabled=settings.get("timing.preview_guide_prev_enabled", True),
