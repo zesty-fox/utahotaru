@@ -1231,13 +1231,14 @@ class SingerManagerInterface(QWidget):
                 item = QListWidgetItem()
 
                 # 显示格式: [后台编号] 名称 (分组) [默认] (已禁用)
-                display_text = singer.name
+                # 默认占位名 "未命名" 走 tr() 翻译，其他演唱者名是用户输入的本地化无关数据。
+                display_text = self.tr("未命名") if singer.name == "未命名" else singer.name
                 if singer.group:
                     display_text += f" ({singer.group})"
                 if singer.is_default:
-                    display_text += " [默认]"
+                    display_text += self.tr(" [默认]")
                 if not singer.enabled:
-                    display_text += " (已禁用)"
+                    display_text += self.tr(" (已禁用)")
 
                 item.setText(display_text)
 

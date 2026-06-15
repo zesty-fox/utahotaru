@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QPoint, Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, QPoint, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QMouseEvent, QWheelEvent
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel
 from qfluentwidgets import (
@@ -86,6 +86,23 @@ class TransportBar(QFrame):
         self._speed_dragging = False
         self.setFixedHeight(56)
         self._init_ui()
+
+    def changeEvent(self, event):
+        """切语言时拆掉重建——只是几个 slider + label，状态都在 self._* 实例变量上保留。"""
+        if event.type() == QEvent.Type.LanguageChange:
+            from strange_uta_game.frontend.localization import detach_layout_for_rebuild
+            saved = {
+                "duration": self._duration_ms,
+                "current": self._current_ms,
+                "playing": self._is_playing,
+            }
+            detach_layout_for_rebuild(self)
+            self._init_ui()
+            # 还原显示状态
+            self.set_duration(saved["duration"])
+            self.set_position(saved["current"])
+            self.set_playing(saved["playing"])
+        super().changeEvent(event)
 
     def _init_ui(self):
         layout = QHBoxLayout(self)

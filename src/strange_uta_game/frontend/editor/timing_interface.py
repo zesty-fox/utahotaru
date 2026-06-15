@@ -142,6 +142,66 @@ class EditorInterface(QWidget):
         self._file_loader = FileLoader(self)
         self._mini_singer_manager: Optional[MiniSingerManager] = None
         self._init_ui()
+
+    def changeEvent(self, event):
+        """切语言时刷新可见 labels/buttons——本 widget 持有音频引擎等重状态，
+        不能整体 rebuild。改成精确 retranslate：每个文本独立 setText 一遍。"""
+        if event.type() == QEvent.Type.LanguageChange:
+            self._retranslate_visible_labels()
+        super().changeEvent(event)
+
+    def _retranslate_visible_labels(self) -> None:
+        """切语言后重新设置所有自有控件的可见文本。
+
+        toolbar / transport / timeline 是独立子 widget，自己有 changeEvent；
+        本方法只处理 EditorInterface 直接持有的 labels 与 buttons。
+        """
+        if hasattr(self, "btn_clear_tags"):
+            self.btn_clear_tags.setText(self.tr("清除当前行时间戳"))
+        if hasattr(self, "btn_scroll_mode"):
+            self.btn_scroll_mode.setToolTip(self.tr(
+                "切换歌词预览滚动模式：\n"
+                "自动滚动 — 操作后挂起 6 秒自动恢复\n"
+                "始终滚动 — 始终跟随播放位置\n"
+                "不滚动 — 完全停用自动滚动"
+            ))
+        # _SCROLL_MODE_LABELS 是类属性，含中文 key——读时走 tr。直接刷新当前文本：
+        if hasattr(self, "btn_scroll_mode") and hasattr(self, "_scroll_mode"):
+            try:
+                self._sync_scroll_mode()
+            except Exception:
+                pass
+        # 模式/状态/行信息：相应 helper 重新设值
+        try:
+            self._update_mode_indicator()
+        except Exception:
+            pass
+        try:
+            self._update_line_info()
+        except Exception:
+            pass
+        try:
+            self._update_status()
+        except Exception:
+            pass
+        # 快捷键提示：用最近一次缓存的快捷键映射重新渲染
+        if hasattr(self, "_shortcut_actions_timing"):
+            try:
+                self._update_shortcut_hint(
+                    self._shortcut_actions_timing,
+                    getattr(self, "_shortcut_actions_edit", None),
+                )
+            except Exception:
+                pass
+        # 打轴按钮文字：保留按键名后缀
+        if hasattr(self, "btn_tag") and self._settings_loaded:
+            try:
+                actions = getattr(self, "_shortcut_actions_timing", {})
+                tag_key_raw = actions.get("tag_now", "Space") if actions else "Space"
+                tag_first = tag_key_raw.split(",")[0].split(":")[0].strip() if tag_key_raw else "Space"
+                self.btn_tag.setText(self.tr("打轴 ({key})").format(key=tag_first))
+            except Exception:
+                pass
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAcceptDrops(True)
         self._bind_callback_signals()
@@ -5535,7 +5595,8 @@ class EditorInterface(QWidget):
 
     def _sync_scroll_mode(self):
         """将当前 _scroll_mode 同步到按钮文字、颜色和 preview。"""
-        self.btn_scroll_mode.setText(self._SCROLL_MODE_LABELS.get(self._scroll_mode, "自动滚动"))
+        # 源串保留中文供 tr 扫描；显示时 tr() 翻译
+        self.btn_scroll_mode.setText(self.tr(self._SCROLL_MODE_LABELS.get(self._scroll_mode, "自动滚动")))
         self._update_scroll_mode_btn_style()
         self.preview.set_scroll_mode(self._scroll_mode)
         # 切换到 always / auto 时：重置挂起状态并立刻滚动到当前播放行

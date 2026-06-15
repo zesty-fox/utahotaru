@@ -445,6 +445,24 @@ class TimelineWidget(QWidget):
         self._zoom_enabled = True
         self._init_ui()
 
+    def changeEvent(self, event):
+        """切语言时精确 retranslate——本 widget 持有 waveform 缓存，不能整体 rebuild。"""
+        from PyQt6.QtCore import QEvent as _QEvent
+        if event.type() == _QEvent.Type.LanguageChange:
+            if hasattr(self, "switch_waveform"):
+                self.switch_waveform.setToolTip(self.tr("波形显示"))
+            # 音频名标签：仅当显示的是默认占位"未加载音频"时刷新；
+            # 否则用户已加载了具体文件，文件名不翻译。
+            if hasattr(self, "lbl_audio_name"):
+                cur = self.lbl_audio_name.text()
+                if not cur or cur in ("未加载音频",) or cur.startswith("⟦"):
+                    # ⟦未加载音频⟧ 形态（pseudo）也属于占位，重新 tr 拿到新语言版本
+                    self.lbl_audio_name.setText(self.tr("未加载音频"))
+            # WaveformDisplay 的绘制 placeholder 自带 self.tr，自动跟随
+            if hasattr(self, "waveform_display"):
+                self.waveform_display.update()
+        super().changeEvent(event)
+
     def _init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)

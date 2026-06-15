@@ -139,7 +139,7 @@ class ExportInterface(QWidget):
                 "fmt_row": self.format_list.currentRow() if hasattr(self, "format_list") else -1,
             }
             detach_layout_for_rebuild(self)
-            self._init_ui()
+            self._init_ui()  # _init_ui 内部已会调 _populate_formats，无需再调
             # 还原用户输入
             if hasattr(self, "line_output"):
                 self.line_output.setText(saved["output"])
@@ -150,11 +150,7 @@ class ExportInterface(QWidget):
                     self.format_list.setCurrentRow(saved["fmt_row"])
                 except Exception:
                     pass
-            # 重新填充演唱者列表 + 格式 dropdown
-            try:
-                self._populate_formats()
-            except Exception:
-                pass
+            # 重新填充演唱者列表（_init_ui 不负责，仅在 set_store 时被调）
             if hasattr(self, "_store") and self._store is not None:
                 try:
                     self._refresh_singer_checkboxes()
@@ -360,6 +356,8 @@ class ExportInterface(QWidget):
 
     def _populate_formats(self):
         """填充格式列表"""
+        # 必须先 clear——changeEvent 重建后会再次调，不清会双份
+        self.format_list.clear()
         formats = self._export_service.get_available_formats()
         for fmt in formats:
             item = QListWidgetItem(f"{fmt['name']} ({fmt['extension']})")
