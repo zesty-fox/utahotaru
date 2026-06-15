@@ -569,21 +569,30 @@ class ShortcutSettingCard(SettingCard):
         key1 = keys[0] if len(keys) >= 1 else default_key
         key2 = keys[1] if len(keys) >= 2 else ""
 
-        self.btn_key1 = _KeyCaptureButton("点击设置", self)
+        # btn_key1/btn_key2 的初始占位文本：set_key("") 后 _update_display 会
+        # 调 self.tr("未设置") 覆盖。这里给 QPushButton 的初始 text 用 tr 兜底，
+        # 防 set_key 路径之外的边角场景显示英文/源串。
+        self.btn_key1 = _KeyCaptureButton(self.tr("点击设置"), self)
         self.btn_key1.set_key(key1)
-        self.btn_key2 = _KeyCaptureButton("点击设置", self)
+        self.btn_key2 = _KeyCaptureButton(self.tr("点击设置"), self)
         self.btn_key2.set_key(key2)
 
-        lbl_or = QLabel("或", self)
-        lbl_or.setFont(QFont("Microsoft YaHei", 9))
+        self._lbl_or = QLabel(self.tr("或"), self)
+        self._lbl_or.setFont(QFont("Microsoft YaHei", 9))
 
         self.btn_key1.key_captured.connect(lambda k: self._on_key_changed(self.btn_key1, k))
         self.btn_key2.key_captured.connect(lambda k: self._on_key_changed(self.btn_key2, k))
 
         self.hBoxLayout.addWidget(self.btn_key1, 0, Qt.AlignmentFlag.AlignRight)
-        self.hBoxLayout.addWidget(lbl_or, 0, Qt.AlignmentFlag.AlignRight)
+        self.hBoxLayout.addWidget(self._lbl_or, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addWidget(self.btn_key2, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addSpacing(16)
+
+    def changeEvent(self, event):
+        from PyQt6.QtCore import QEvent as _QEvent
+        if event.type() == _QEvent.Type.LanguageChange and hasattr(self, "_lbl_or"):
+            self._lbl_or.setText(self.tr("或"))
+        super().changeEvent(event)
 
     def _on_key_changed(self, btn: _KeyCaptureButton, key_name: str):
         self.value_changed.emit(self.value())
