@@ -101,7 +101,7 @@ class AboutSubInterface(SubSettingInterface):
         self.expandLayout.addWidget(self.about_group)
         self.expandLayout.addWidget(self.tools_group)
 
-        # 保存/重置按钮
+        # 保存/重置/KS导入按钮
         btn_widget = QWidget(self.scrollWidget)
         btn_widget.setMinimumHeight(60)
         btn_layout = QHBoxLayout(btn_widget)
@@ -110,10 +110,14 @@ class AboutSubInterface(SubSettingInterface):
         self.btn_save.setIcon(FIF.SAVE)
         self.btn_save.setMinimumHeight(36)
         self.btn_save.hide()
+        self.btn_import_ks = PushButton(self.tr("从KS配置导入"), btn_widget)
+        self.btn_import_ks.setIcon(FIF.DOWNLOAD)
+        self.btn_import_ks.setMinimumHeight(36)
         self.btn_reset = PushButton(self.tr("重置为默认设置"), btn_widget)
         self.btn_reset.setIcon(FIF.DELETE)
         self.btn_reset.setMinimumHeight(36)
         # btn_save 保留属性供外层 signal 连接，但不在 UI 中显示
+        btn_layout.addWidget(self.btn_import_ks)
         btn_layout.addWidget(self.btn_reset)
         btn_layout.addStretch()
         self.expandLayout.addWidget(btn_widget)
@@ -147,6 +151,7 @@ class AboutSubInterface(SubSettingInterface):
         if not embedded:
             self._path_card.setContent(str(s._config_path))
         self.tools_group.setVisible(not embedded)
+        self.btn_import_ks.setVisible(not embedded)
         ffmpeg_path = s.get("tools.ffmpeg_path", "")
         self._update_ffmpeg_label(ffmpeg_path)
 
@@ -242,6 +247,8 @@ class AboutSubInterface(SubSettingInterface):
             self.btn_save.setText(self.tr("保存设置"))
         if hasattr(self, "btn_reset"):
             self.btn_reset.setText(self.tr("重置为默认设置"))
+        if hasattr(self, "btn_import_ks"):
+            self.btn_import_ks.setText(self.tr("从KS配置导入"))
 
         # FFmpeg label：未设路径时显示「（使用环境变量）」
         if (

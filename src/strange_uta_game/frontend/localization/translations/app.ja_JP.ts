@@ -4,45 +4,51 @@
     <name>AboutSubInterface</name>
     <message>
         <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="77" />
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="225" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="230" />
         <source>FFmpeg 路径</source>
         <translation>FFmpeg パス</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="366" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="373" />
         <source>FFmpeg 路径已保存</source>
         <translation>FFmpeg パスを保存しました</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="370" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="377" />
         <source>FFmpeg 路径已清除</source>
         <translation>FFmpeg パスをクリアしました</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="393" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="400" />
         <source>ShellExecute 返回 {ret}，请检查是否拒绝了 UAC 提权。</source>
         <translation>ShellExecute が {ret} を返しました。UAC 昇格を拒否していないかご確認ください。</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="52" />
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="217" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="222" />
         <source>StrangeUtaGame - 歌词打轴软件</source>
         <translation>StrangeUtaGame - 歌詞タイミングソフト</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="95" />
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="240" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="245" />
         <source>一键安装</source>
         <translation>ワンクリックインストール</translation>
     </message>
     <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="113" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="251" />
+        <source>从KS配置导入</source>
+        <translation>KS設定からインポート</translation>
+    </message>
+    <message>
         <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="109" />
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="242" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="247" />
         <source>保存设置</source>
         <translation>設定を保存</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="206" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="211" />
         <source>关于</source>
         <translation>情報</translation>
     </message>
@@ -53,155 +59,155 @@
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="43" />
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="214" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="219" />
         <source>切换 UI 显示语言，更改后需重启软件生效</source>
         <translation>UI 表示言語を切り替え。変更後はソフトを再起動してください</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="346" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="353" />
         <source>可执行文件 (ffmpeg.exe ffmpeg);;所有文件 (*.*)</source>
         <translation>実行ファイル (ffmpeg.exe ffmpeg);;すべてのファイル (*.*)</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="400" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="407" />
         <source>安装完成后，重启软件即可通过环境变量自动使用，或点击「浏览」手动指定路径。</source>
         <translation>インストール完了後、ソフトを再起動すれば環境変数から自動利用可能。もしくは「参照」から手動でパス指定もできます。</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="371" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="378" />
         <source>将使用系统环境变量中的 ffmpeg</source>
         <translation>システム環境変数の ffmpeg を使用します</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="75" />
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="208" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="213" />
         <source>工具配置</source>
         <translation>ツール設定</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="399" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="406" />
         <source>已请求管理员权限启动 FFmpeg 安装</source>
         <translation>管理者権限で FFmpeg インストールを起動しました</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="184" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="189" />
         <source>当前页已应用新语言；部分页面（编辑器/导出/演唱者管理）会在重新打开后刷新</source>
         <translation>現在のページに新しい言語を適用しました。一部のページ（エディタ/書き出し/歌手管理）は再オープン後に反映されます</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="63" />
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="232" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="237" />
         <source>打开目录</source>
         <translation>ディレクトリを開く</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="295" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="302" />
         <source>无法写入重定向文件: {err}</source>
         <translation>リダイレクトファイルを書き込めません: {err}</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="392" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="399" />
         <source>无法启动安装</source>
         <translation>インストールを起動できません</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="66" />
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="234" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="239" />
         <source>更改位置</source>
         <translation>場所を変更</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="294" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="301" />
         <source>更改失败</source>
         <translation>変更に失敗しました</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="85" />
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="236" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="241" />
         <source>浏览</source>
         <translation>参照</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="88" />
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="238" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="243" />
         <source>清除</source>
         <translation>クリア</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="53" />
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="219" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="224" />
         <source>版本 v{ver}  |  由 RhythmicaLyrics 启发</source>
         <translation>バージョン v{ver}  |  RhythmicaLyrics に着想</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="78" />
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="227" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="232" />
         <source>用于加载视频文件时提取音频（留空则使用系统环境变量）</source>
         <translation>動画ファイル読み込み時の音声抽出に使用（空欄ならシステム環境変数を使用）</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="42" />
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="212" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="217" />
         <source>界面语言</source>
         <translation>インターフェース言語</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="38" />
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="204" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="209" />
         <source>语言</source>
         <translation>言語</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="183" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="188" />
         <source>语言已切换</source>
         <translation>言語を切り替えました</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="314" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="321" />
         <source>请手动复制配置文件: {err}</source>
         <translation>設定ファイルを手動でコピーしてください: {err}</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="345" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="352" />
         <source>选择 FFmpeg 可执行文件</source>
         <translation>FFmpeg 実行ファイルを選択</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="276" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="283" />
         <source>选择配置文件存储目录</source>
         <translation>設定ファイル保存先を選択</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="323" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="330" />
         <source>配置位置已更改</source>
         <translation>設定位置を変更しました</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="313" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="320" />
         <source>配置复制失败</source>
         <translation>設定のコピーに失敗しました</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="61" />
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="222" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="227" />
         <source>配置文件位置</source>
         <translation>設定ファイル位置</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="324" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="331" />
         <source>配置文件将保存到: {path}</source>
         <translation>設定ファイルは次へ保存されます: {path}</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="113" />
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="244" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="116" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="249" />
         <source>重置为默认设置</source>
         <translation>デフォルトにリセット</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="81" />
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="253" />
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="334" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="260" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/about.py" line="341" />
         <source>（使用环境变量）</source>
         <translation>（環境変数を使用）</translation>
     </message>
@@ -5267,105 +5273,256 @@ OFF にすると .cache 占有が小さく、切替も即時ですが、音割�
 <context>
     <name>SettingsInterface</name>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="299" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="302" />
         <source>AutoCheck</source>
         <translation>AutoCheck</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="305" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="740" />
+        <source>KS 配置文件中未找到 SUG 相关的设置数据</source>
+        <translation>KS設定ファイルにSUG関連の設定データが見つかりません</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="600" />
+        <source>KS 配置文件格式不正确</source>
+        <translation>KS設定ファイルの形式が正しくありません</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="532" />
+        <source>不支持</source>
+        <translation>非対応</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="613" />
+        <source>主设置</source>
+        <translation>メイン設定</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="717" />
+        <source>保存失败</source>
+        <translation>保存に失敗しました</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="308" />
         <source>关于/语言</source>
         <translation>情報/言語</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="456" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="571" />
+        <source>取消</source>
+        <translation>キャンセル</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="459" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="554" />
         <source>否</source>
         <translation>いいえ</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="302" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="730" />
+        <source>导入成功</source>
+        <translation>インポートしました</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="305" />
         <source>导出</source>
         <translation>書き出し</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="303" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="533" />
+        <source>嵌入模式下不支持从 KS 配置导入</source>
+        <translation>埋め込みモードではKS設定のインポートは非対応です</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="731" />
+        <source>已从 KS 配置导入: {items}</source>
+        <translation>KS設定からインポートしました: {items}</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="306" />
         <source>快捷键</source>
         <translation>ショートカット</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="445" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="578" />
+        <source>所有文件 (*.*)</source>
+        <translation>すべてのファイル (*.*)</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="448" />
         <source>所有设置已保存到配置文件</source>
         <translation>すべての設定を設定ファイルに保存しました</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="470" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="473" />
         <source>所有设置已恢复为默认值</source>
         <translation>すべての設定をデフォルトに戻しました</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="297" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="300" />
         <source>打轴</source>
         <translation>タグ</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="455" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="739" />
+        <source>无数据可导入</source>
+        <translation>インポート可能なデータがありません</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="591" />
+        <source>无法读取 KS 配置文件: {err}</source>
+        <translation>KS設定ファイルを読み取れません: {err}</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="458" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="553" />
         <source>是</source>
         <translation>はい</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="296" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="710" />
+        <source>更新器设置</source>
+        <translation>アップデーター設定</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="565" />
+        <source>未找到 KS 配置</source>
+        <translation>KS設定が見つかりません</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="566" />
+        <source>未能自动找到 Karaoke Studio 的 settings.json。
+
+是否手动选择文件？</source>
+        <translation>Karaoke Studio の settings.json を自動検出できませんでした。
+
+手動でファイルを選択しますか？</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="599" />
+        <source>格式错误</source>
+        <translation>フォーマットエラー</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="570" />
+        <source>浏览</source>
+        <translation>参照</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="671" />
+        <source>演唱者预设</source>
+        <translation>歌手プリセット</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="299" />
         <source>演奏控制</source>
         <translation>再生制御</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="301" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="642" />
+        <source>用户词典</source>
+        <translation>ユーザー辞書</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="304" />
         <source>界面</source>
         <translation>インターフェース</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="454" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="685" />
+        <source>界面主题</source>
+        <translation>UIテーマ</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="542" />
+        <source>确定要从前 Karaoke Studio 的 settings.json 导入配置吗？
+
+将从 KS 配置中提取以下内容并合并到当前 SUG 配置：
+  - 主设置（播放、打轴、界面、快捷键等）
+  - 用户词典
+  - 演唱者预设
+  - 网络词典缓存
+  - 界面主题
+  - 更新器设置
+
+KS 来源的配置将优先覆盖同名设置。</source>
+        <translation>Karaoke Studio の settings.json から設定をインポートしますか？
+
+以下の項目を現在のSUG設定にマージします：
+  - メイン設定（再生、タイミング、UI、ショートカット等）
+  - ユーザー辞書
+  - 歌手プリセット
+  - ネット辞書キャッシュ
+  - UIテーマ
+  - アップデーター設定
+
+KS側の設定が優先されます。</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="457" />
         <source>确定要将所有设置重置为默认值吗？
 这将覆盖您当前的设置（用户词典和演唱者预设不受影响）。</source>
         <translation>すべての設定をデフォルトに戻しますか？
 現在の設定が上書きされます（ユーザー辞書と歌手プリセットは影響を受けません）。</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="453" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="541" />
+        <source>确认导入</source>
+        <translation>インポート確認</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="456" />
         <source>确认重置</source>
         <translation>リセット確認</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="304" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="307" />
         <source>网络</source>
         <translation>ネットワーク</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="298" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="679" />
+        <source>网络词典缓存</source>
+        <translation>ネット辞書キャッシュ</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="301" />
         <source>自动保存</source>
         <translation>自動保存</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="146" />
-        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="311" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="148" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="314" />
         <source>设置</source>
         <translation>設定</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="445" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="448" />
         <source>设置已保存</source>
         <translation>設定を保存しました</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="470" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="473" />
         <source>设置已重置</source>
         <translation>設定をリセットしました</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="300" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="590" />
+        <source>读取失败</source>
+        <translation>読み込みに失敗しました</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="303" />
         <source>读音词典</source>
         <translation>読み辞書</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="474" />
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="577" />
+        <source>选择 KS settings.json</source>
+        <translation>KS settings.json を選択</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/settings_interface.py" line="477" />
         <source>重置失败</source>
         <translation>リセットに失敗しました</translation>
     </message>

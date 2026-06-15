@@ -19,6 +19,8 @@ re-export（向后兼容原有 import 路径）
 
 from __future__ import annotations
 
+import json
+import os
 import sys
 from pathlib import Path
 
@@ -258,9 +260,10 @@ class SettingsInterface(ScrollArea):
         if self._store is not None:
             self.uiInterface.set_store(self._store)
 
-        # 连接保存/重置按钮
+        # 连接保存/重置/KS导入按钮
         self.aboutInterface.btn_save.clicked.connect(self._on_save)
         self.aboutInterface.btn_reset.clicked.connect(self._reset_settings)
+        self.aboutInterface.btn_import_ks.clicked.connect(self._import_from_ks_settings)
 
         # 让每个子页面把控件变更信号连到各自的 _notify_changed，
         # 再通过 set_change_callback 冒泡到 _schedule_auto_save。
@@ -474,3 +477,276 @@ class SettingsInterface(ScrollArea):
                 InfoBar.error(title=self.tr("重置失败"), content=str(e),
                     orient=Qt.Orientation.Horizontal, isClosable=True,
                     position=InfoBarPosition.TOP, duration=5000, parent=self)
+
+    # ── KS 配置导入 ──────────────────────────────────────────────────
+
+    @staticmethod
+    def _find_ks_settings_path() -> Optional[Path]:
+        """按 Karaoke Studio 的路径解析逻辑查找 settings.json。
+
+        优先级（与 KS 保持一致）：
+        1. ``KARAOKE_STUDIO_SETTINGS_DIR`` 环境变量（绝对优先）
+        2. ``%APPDATA%/{app_name}/settings.json``（Windows）
+        3. ``$XDG_CONFIG_HOME/{app_name_lower}/settings.json``（Linux XDG）
+        4. ``~/.config/{app_name_lower}/settings.json``（Linux fallback）
+
+        其中 ``app_name`` 默认 ``"Karaoke Studio"``，可由
+        ``KARAOKE_STUDIO_SETTINGS_APP_NAME`` 覆盖。
+        同时尝试 ``"Karaoke Helper"``（旧版）和 ``"Karaoke Studio Dev"``（开发版）。
+        """
+        candidates: list[Path] = []
+
+        settings_dir_env = os.getenv("KARAOKE_STUDIO_SETTINGS_DIR")
+        if settings_dir_env:
+            candidates.append(Path(settings_dir_env).expanduser() / "settings.json")
+
+        app_name = os.getenv("KARAOKE_STUDIO_SETTINGS_APP_NAME", "Karaoke Studio").strip() or "Karaoke Studio"
+
+        for name in (app_name, "Karaoke Helper", "Karaoke Studio Dev"):
+            appdata = os.getenv("APPDATA")
+            if os.name == "nt" and appdata:
+                candidates.append(Path(appdata) / name / "settings.json")
+
+            config_home = os.getenv("XDG_CONFIG_HOME")
+            name_lower = name.lower().replace(" ", "-")
+            if config_home:
+                candidates.append(Path(config_home) / name_lower / "settings.json")
+            candidates.append(Path.home() / ".config" / name_lower / "settings.json")
+
+        for p in candidates:
+            if p.is_file():
+                return p
+        return None
+
+    def _import_from_ks_settings(self):
+        """从 Karaoke Studio 的 settings.json 导入 SUG 相关配置。
+
+        覆盖规则：KS 来源的同名字段优先，字典/演唱者按 word/name 合并（存在则替换，否则追加），
+        网络词典缓存整体覆盖。
+        """
+        from PyQt6.QtWidgets import QMessageBox
+
+        # 仅 standalone 模式支持 KS 导入
+        if self._embedded:
+            InfoBar.info(
+                title=self.tr("不支持"),
+                content=self.tr("嵌入模式下不支持从 KS 配置导入"),
+                orient=Qt.Orientation.Horizontal, isClosable=True,
+                position=InfoBarPosition.TOP, duration=3000, parent=self,
+            )
+            return
+
+        # 确认对话框
+        msg = QMessageBox(self)
+        msg.setWindowTitle(self.tr("确认导入"))
+        msg.setText(self.tr(
+            "确定要从前 Karaoke Studio 的 settings.json 导入配置吗？\n\n"
+            "将从 KS 配置中提取以下内容并合并到当前 SUG 配置：\n"
+            "  - 主设置（播放、打轴、界面、快捷键等）\n"
+            "  - 用户词典\n"
+            "  - 演唱者预设\n"
+            "  - 网络词典缓存\n"
+            "  - 界面主题\n"
+            "  - 更新器设置\n\n"
+            "KS 来源的配置将优先覆盖同名设置。"
+        ))
+        btn_yes = msg.addButton(self.tr("是"), QMessageBox.ButtonRole.AcceptRole)
+        msg.addButton(self.tr("否"), QMessageBox.ButtonRole.RejectRole)
+        msg.setDefaultButton(btn_yes)
+        msg.exec()
+        if msg.clickedButton() is not btn_yes:
+            return
+
+        # 查找 KS settings.json
+        ks_path = self._find_ks_settings_path()
+        if ks_path is None:
+            # 自动查找失败，让用户手动选择
+            choice = QMessageBox(self)
+            choice.setWindowTitle(self.tr("未找到 KS 配置"))
+            choice.setText(self.tr(
+                "未能自动找到 Karaoke Studio 的 settings.json。\n\n"
+                "是否手动选择文件？"
+            ))
+            btn_browse = choice.addButton(self.tr("浏览"), QMessageBox.ButtonRole.AcceptRole)
+            choice.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
+            choice.exec()
+            if choice.clickedButton() is not btn_browse:
+                return
+            from PyQt6.QtWidgets import QFileDialog
+            ks_path_str, _ = QFileDialog.getOpenFileName(
+                self, self.tr("选择 KS settings.json"), "",
+                "JSON (*.json);;" + self.tr("所有文件 (*.*)"),
+            )
+            if not ks_path_str:
+                return
+            ks_path = Path(ks_path_str)
+
+        # 读取并解析 KS settings.json
+        try:
+            with open(ks_path, "r", encoding="utf-8") as f:
+                ks_config = json.load(f)
+        except Exception as e:
+            InfoBar.error(
+                title=self.tr("读取失败"),
+                content=self.tr("无法读取 KS 配置文件: {err}").format(err=e),
+                orient=Qt.Orientation.Horizontal, isClosable=True,
+                position=InfoBarPosition.TOP, duration=5000, parent=self,
+            )
+            return
+
+        if not isinstance(ks_config, dict):
+            InfoBar.error(
+                title=self.tr("格式错误"),
+                content=self.tr("KS 配置文件格式不正确"),
+                orient=Qt.Orientation.Horizontal, isClosable=True,
+                position=InfoBarPosition.TOP, duration=5000, parent=self,
+            )
+            return
+
+        s = self._settings
+        imported_items: list[str] = []
+
+        # ── 1. 主配置 (lyrics_timing) ──
+        ks_lt = ks_config.get("lyrics_timing")
+        if isinstance(ks_lt, dict) and ks_lt:
+            _deep_merge_dict(s._settings, ks_lt)
+            imported_items.append(self.tr("主设置"))
+
+        # ── 2. 用户词典 (lyrics_timing_dictionary) ──
+        # 合并规则：(word, reading) 双键匹配——同 word 同 reading → 覆盖；
+        # 同 word 不同 reading → 视为新词条置顶；新 word → 置顶。
+        ks_dict = ks_config.get("lyrics_timing_dictionary")
+        if isinstance(ks_dict, list) and ks_dict:
+            current_dict = s.load_dictionary()
+            wr_index: dict[tuple, int] = {}
+            for i, entry in enumerate(current_dict):
+                w = (entry.get("word") or "").strip()
+                r = (entry.get("reading") or "").strip()
+                if w:
+                    wr_index[(w, r)] = i
+            seen_new: set[tuple] = set()
+            to_prepend: list = []
+            for ks_entry in ks_dict:
+                w = (ks_entry.get("word") or "").strip()
+                r = (ks_entry.get("reading") or "").strip()
+                if not w:
+                    continue
+                key = (w, r)
+                if key in wr_index:
+                    current_dict[wr_index[key]] = ks_entry
+                elif key not in seen_new:
+                    seen_new.add(key)
+                    to_prepend.append(ks_entry)
+            current_dict = to_prepend + current_dict
+            s.save_dictionary(current_dict)
+            imported_items.append(self.tr("用户词典"))
+
+        # ── 3. 演唱者预设 (lyrics_timing_singers) ──
+        # 合并规则：(name, group) 双键匹配——同 name 同 group → 覆盖；
+        # 同 name 不同 group → 视为新条目置顶；新 name → 置顶。
+        ks_singers = ks_config.get("lyrics_timing_singers")
+        if isinstance(ks_singers, list) and ks_singers:
+            current_singers = s.load_singer_presets()
+            ng_index: dict[tuple, int] = {}
+            for i, entry in enumerate(current_singers):
+                n = (entry.get("name") or "").strip()
+                g = (entry.get("group") or "").strip()
+                if n:
+                    ng_index[(n, g)] = i
+            seen_new_singers: set[tuple] = set()
+            to_prepend_singers: list = []
+            for ks_entry in ks_singers:
+                n = (ks_entry.get("name") or "").strip()
+                g = (ks_entry.get("group") or "").strip()
+                if not n:
+                    continue
+                key = (n, g)
+                if key in ng_index:
+                    current_singers[ng_index[key]] = ks_entry
+                elif key not in seen_new_singers:
+                    seen_new_singers.add(key)
+                    to_prepend_singers.append(ks_entry)
+            current_singers = to_prepend_singers + current_singers
+            s.save_singer_presets(current_singers)
+            imported_items.append(self.tr("演唱者预设"))
+
+        # ── 4. 网络词典缓存 (lyrics_timing_network_dictionary) ──
+        ks_net = ks_config.get("lyrics_timing_network_dictionary")
+        if isinstance(ks_net, dict) and ks_net and s._network_dict_path is not None:
+            # 整体覆盖缓存文件
+            from copy import deepcopy
+            s._save_json(s._network_dict_path, deepcopy(ks_net))
+            imported_items.append(self.tr("网络词典缓存"))
+
+        # ── 5. 界面主题 (ui_theme) ──
+        ks_theme = ks_config.get("ui_theme")
+        if isinstance(ks_theme, str) and ks_theme in ("auto", "light", "dark"):
+            s.set("ui.theme", ks_theme)
+            imported_items.append(self.tr("界面主题"))
+
+        # ── 6. 更新器设置 (updater) ──
+        ks_updater = ks_config.get("updater")
+        if isinstance(ks_updater, dict):
+            updated_updater = False
+            for key in ("enabled", "check_on_startup"):
+                if key in ks_updater:
+                    s.set(f"updater.{key}", ks_updater[key])
+                    updated_updater = True
+            if "min_check_interval_hours" in ks_updater:
+                s.set("updater.min_check_interval_hours", int(ks_updater["min_check_interval_hours"]))
+                updated_updater = True
+            if "source_order" in ks_updater:
+                s.set("updater.source_order", list(ks_updater["source_order"]))
+                updated_updater = True
+            ks_proxy = ks_updater.get("proxy")
+            if isinstance(ks_proxy, dict):
+                if "mode" in ks_proxy:
+                    s.set("updater.proxy.mode", str(ks_proxy["mode"]))
+                    updated_updater = True
+                if "manual_url" in ks_proxy:
+                    s.set("updater.proxy.manual_url", str(ks_proxy["manual_url"]))
+                    updated_updater = True
+            if updated_updater:
+                imported_items.append(self.tr("更新器设置"))
+
+        # ── 保存并刷新 ──
+        try:
+            s.save()
+        except Exception as e:
+            InfoBar.warning(
+                title=self.tr("保存失败"),
+                content=str(e),
+                orient=Qt.Orientation.Horizontal, isClosable=True,
+                position=InfoBarPosition.TOP, duration=5000, parent=self,
+            )
+            return
+
+        # 重新加载 UI
+        self._load_current_settings()
+        self._apply_theme_setting()
+
+        if imported_items:
+            InfoBar.success(
+                title=self.tr("导入成功"),
+                content=self.tr("已从 KS 配置导入: {items}").format(
+                    items=", ".join(imported_items),
+                ),
+                orient=Qt.Orientation.Horizontal, isClosable=True,
+                position=InfoBarPosition.TOP, duration=5000, parent=self,
+            )
+        else:
+            InfoBar.info(
+                title=self.tr("无数据可导入"),
+                content=self.tr("KS 配置文件中未找到 SUG 相关的设置数据"),
+                orient=Qt.Orientation.Horizontal, isClosable=True,
+                position=InfoBarPosition.TOP, duration=4000, parent=self,
+            )
+
+
+def _deep_merge_dict(base: dict, override: dict) -> None:
+    """递归深度合并 override 到 base（override 优先）。"""
+    for key, value in override.items():
+        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+            _deep_merge_dict(base[key], value)
+        else:
+            base[key] = value
