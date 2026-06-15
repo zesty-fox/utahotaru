@@ -451,6 +451,10 @@ class TimelineWidget(QWidget):
         if event.type() == _QEvent.Type.LanguageChange:
             if hasattr(self, "switch_waveform"):
                 self.switch_waveform.setToolTip(self.tr("波形显示"))
+                # SwitchButton 的 On/Off 文本：本来由 FluentTranslator 处理，但
+                # pseudo 模式下需要我们的 tr 接管才能显示 ⟦⟧。
+                self.switch_waveform.setOnText(self.tr("开"))
+                self.switch_waveform.setOffText(self.tr("关"))
             # 音频名标签：仅当显示的是默认占位"未加载音频"时刷新；
             # 否则用户已加载了具体文件，文件名不翻译。
             if hasattr(self, "lbl_audio_name"):
@@ -516,6 +520,10 @@ class TimelineWidget(QWidget):
         self.switch_waveform = SwitchButton(self)
         self.switch_waveform.setChecked(True)
         self.switch_waveform.setMinimumWidth(50)
+        # 显式覆盖默认 "On"/"Off"——qfluentwidgets 的 FluentTranslator 不一定能
+        # 覆盖到 SUG 当前语言（且 pseudo 模式下要让 ⟦⟧ 可视化）。
+        self.switch_waveform.setOnText(self.tr("开"))
+        self.switch_waveform.setOffText(self.tr("关"))
         self.switch_waveform.setToolTip(self.tr("波形显示"))
         self.switch_waveform.checkedChanged.connect(self._on_waveform_visibility_changed)
         bottom_layout.addWidget(self.switch_waveform)
@@ -537,7 +545,7 @@ class TimelineWidget(QWidget):
 
     def clear_audio_data(self):
         self.waveform_display.clear_audio_data()
-        self.lbl_audio_name.setText("未加载音频")
+        self.lbl_audio_name.setText(self.tr("未加载音频"))
 
     def set_audio_name(self, name: str):
         """设置音频文件名称显示"""

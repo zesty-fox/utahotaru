@@ -517,6 +517,8 @@ class RubyInterface(QWidget):
         self.switch_ch_width = SwitchButton(self)
         self.switch_ch_width.setChecked(_saved_show_ch)
         self.switch_ch_width.setMinimumWidth(50)
+        self.switch_ch_width.setOnText(self.tr("开"))
+        self.switch_ch_width.setOffText(self.tr("关"))
         self.switch_ch_width.checkedChanged.connect(self._on_ch_width_toggled)
         batch_layout.addWidget(self.switch_ch_width)
 
@@ -1231,6 +1233,9 @@ class RubyInterface(QWidget):
             self._lbl_font_size.setText(self.tr("字号"))
         if hasattr(self, "_lbl_ch_width"):
             self._lbl_ch_width.setText(self.tr("字宽统计"))
+        if hasattr(self, "switch_ch_width"):
+            self.switch_ch_width.setOnText(self.tr("开"))
+            self.switch_ch_width.setOffText(self.tr("关"))
         # 按钮
         if hasattr(self, "btn_auto_all"):
             self.btn_auto_all.setText(self.tr("自动分析全部注音"))

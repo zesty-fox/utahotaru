@@ -145,9 +145,19 @@ class SwitchSettingCard(SettingCard):
     def __init__(self, icon, title: str, content: str, parent=None):
         super().__init__(icon, title, content, parent)
         self.switch = SwitchButton(self)
+        # 显式覆盖默认 "On"/"Off"——pseudo 模式靠 self.tr 才能可视化 ⟦⟧。
+        self.switch.setOnText(self.tr("开"))
+        self.switch.setOffText(self.tr("关"))
         self.switch.checkedChanged.connect(self.checked_changed.emit)
         self.hBoxLayout.addWidget(self.switch, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addSpacing(16)
+
+    def changeEvent(self, event):
+        from PyQt6.QtCore import QEvent as _QEvent
+        if event.type() == _QEvent.Type.LanguageChange and hasattr(self, "switch"):
+            self.switch.setOnText(self.tr("开"))
+            self.switch.setOffText(self.tr("关"))
+        super().changeEvent(event)
 
     def setChecked(self, checked: bool):
         self.switch.setChecked(checked)
