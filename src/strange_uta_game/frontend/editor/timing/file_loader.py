@@ -104,8 +104,8 @@ class FileLoader:
             return
         init_dir = self._store.working_dir if self._store else ""
         path, _ = QFileDialog.getOpenFileName(
-            self._editor, "打开项目", init_dir,
-            "StrangeUtaGame 项目 (*.sug);;所有文件 (*.*)",
+            self._editor, self._editor.tr("打开项目"), init_dir,
+            self._editor.tr("StrangeUtaGame 项目 (*.sug);;所有文件 (*.*)"),
         )
         if path:
             self._save_last_dir(path)
@@ -115,8 +115,8 @@ class FileLoader:
         """弹出文件选择框加载音频或视频"""
         init_dir = self._store.working_dir if self._store else ""
         path, _ = QFileDialog.getOpenFileName(
-            self._editor, "选择音频或视频文件", init_dir,
-            "音频/视频文件 (*.mp3 *.wav *.flac *.ogg *.mp4 *.mkv *.m4a *.avi *.mov *.wmv *.flv *.webm *.m4v *.mpg *.mpeg *.ts *.3gp *.vob *.mts *.m2ts *.rm *.rmvb *.asf *.f4v *.ogv *.m4b *.aac *.wma *.opus *.ape *.ac3 *.dts);;所有文件 (*.*)",
+            self._editor, self._editor.tr("选择音频或视频文件"), init_dir,
+            self._editor.tr("音频/视频文件 (*.mp3 *.wav *.flac *.ogg *.mp4 *.mkv *.m4a *.avi *.mov *.wmv *.flv *.webm *.m4v *.mpg *.mpeg *.ts *.3gp *.vob *.mts *.m2ts *.rm *.rmvb *.asf *.f4v *.ogv *.m4b *.aac *.wma *.opus *.ape *.ac3 *.dts);;所有文件 (*.*)"),
         )
         if path:
             if is_video_file(path):
@@ -129,7 +129,7 @@ class FileLoader:
         """弹出文件选择框加载歌词"""
         if not self._project:
             InfoBar.warning(
-                title="无法加载", content="请先创建或打开一个项目",
+                title=self._editor.tr("无法加载"), content=self._editor.tr("请先创建或打开一个项目"),
                 orient=Qt.Orientation.Horizontal, isClosable=True,
                 position=InfoBarPosition.TOP, duration=3000,
                 parent=self._editor,
@@ -137,8 +137,8 @@ class FileLoader:
             return
         init_dir = self._store.working_dir if self._store else ""
         path, _ = QFileDialog.getOpenFileName(
-            self._editor, "选择歌词文件", init_dir,
-            "歌词文件 (*.lrc *.txt *.kra);;所有文件 (*.*)",
+            self._editor, self._editor.tr("选择歌词文件"), init_dir,
+            self._editor.tr("歌词文件 (*.lrc *.txt *.kra);;所有文件 (*.*)"),
         )
         if path:
             self.load_lyrics(path)
@@ -151,8 +151,8 @@ class FileLoader:
         # 检查 FFmpeg 是否可用
         if not is_ffmpeg_available():
             InfoBar.error(
-                title="无法读取视频文件",
-                content="未检测到 FFmpeg，请在「设置 → 关于 → 工具配置」中浏览并设置 FFmpeg 路径。",
+                title=self._editor.tr("无法读取视频文件"),
+                content=self._editor.tr("未检测到 FFmpeg，请在「设置 → 关于 → 工具配置」中浏览并设置 FFmpeg 路径。"),
                 orient=Qt.Orientation.Horizontal, isClosable=True,
                 position=InfoBarPosition.TOP, duration=7000,
                 parent=self._editor,
@@ -160,7 +160,7 @@ class FileLoader:
             return
 
         # 创建状态提示
-        self._state_tooltip = StateToolTip("正在处理视频", "正在检查 FFmpeg 环境...", self._editor)
+        self._state_tooltip = StateToolTip(self._editor.tr("正在处理视频"), self._editor.tr("正在检查 FFmpeg 环境..."), self._editor)
         green = theme.status_complete.name()
         self._state_tooltip.setStyleSheet(f"""
             StateToolTip {{
@@ -203,7 +203,7 @@ class FileLoader:
         """视频提取+加载完成的回调"""
         if self._state_tooltip:
             self._state_tooltip.setState(True)
-            self._state_tooltip.setContent("加载完成")
+            self._state_tooltip.setContent(self._editor.tr("加载完成"))
             self._state_tooltip.close()
             self._state_tooltip = None
 
@@ -261,7 +261,7 @@ class FileLoader:
         self._save_last_dir(original_path)
 
         InfoBar.success(
-            title="音频已加载",
+            title=self._editor.tr("音频已加载"),
             content=Path(original_path).name,
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
@@ -280,7 +280,7 @@ class FileLoader:
             self._state_tooltip = None
 
         InfoBar.error(
-            title="视频处理失败",
+            title=self._editor.tr("视频处理失败"),
             content=error_msg,
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
@@ -314,11 +314,11 @@ class FileLoader:
         # 检查是否有未保存的更改
         if store and store.dirty:
             msg = QMessageBox(self._editor)
-            msg.setWindowTitle("保存当前项目")
-            msg.setText("当前项目有未保存的更改，是否保存？")
-            btn_save = msg.addButton("保存", QMessageBox.ButtonRole.AcceptRole)
-            btn_discard = msg.addButton("放弃", QMessageBox.ButtonRole.DestructiveRole)
-            msg.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+            msg.setWindowTitle(self._editor.tr("保存当前项目"))
+            msg.setText(self._editor.tr("当前项目有未保存的更改，是否保存？"))
+            btn_save = msg.addButton(self._editor.tr("保存"), QMessageBox.ButtonRole.AcceptRole)
+            btn_discard = msg.addButton(self._editor.tr("放弃"), QMessageBox.ButtonRole.DestructiveRole)
+            msg.addButton(self._editor.tr("取消"), QMessageBox.ButtonRole.RejectRole)
             msg.setDefaultButton(btn_save)
             msg.exec()
             clicked = msg.clickedButton()
@@ -340,7 +340,7 @@ class FileLoader:
         from strange_uta_game.frontend.theme import theme
 
         # 创建状态提示
-        self._state_tooltip = StateToolTip("正在加载项目", "正在解析项目数据...", self._editor)
+        self._state_tooltip = StateToolTip(self._editor.tr("正在加载项目"), self._editor.tr("正在解析项目数据..."), self._editor)
         green = theme.status_complete.name()
         self._state_tooltip.setStyleSheet(f"""
             StateToolTip {{
@@ -378,7 +378,7 @@ class FileLoader:
         """项目加载完成的回调"""
         if self._state_tooltip:
             self._state_tooltip.setState(True)
-            self._state_tooltip.setContent("加载完成")
+            self._state_tooltip.setContent(self._editor.tr("加载完成"))
             self._state_tooltip.close()
             self._state_tooltip = None
 
@@ -426,8 +426,8 @@ class FileLoader:
 
         if not Path(media_path).exists():
             InfoBar.warning(
-                title="媒体文件未找到",
-                content=f"上次关联的媒体文件不存在：{Path(media_path).name}",
+                title=self._editor.tr("媒体文件未找到"),
+                content=self._editor.tr("上次关联的媒体文件不存在：{name}").format(name=Path(media_path).name),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -470,7 +470,7 @@ class FileLoader:
             self._state_tooltip = None
 
         InfoBar.error(
-            title="打开失败", content=error_msg,
+            title=self._editor.tr("打开失败"), content=error_msg,
             orient=Qt.Orientation.Horizontal, isClosable=True,
             position=InfoBarPosition.TOP, duration=5000,
             parent=self._editor,
@@ -495,7 +495,7 @@ class FileLoader:
         """歌词解析完成的回调（主线程）。"""
         if self._lyric_tooltip:
             self._lyric_tooltip.setState(True)
-            self._lyric_tooltip.setContent("解析完成")
+            self._lyric_tooltip.setContent(self._editor.tr("解析完成"))
             self._lyric_tooltip.close()
             self._lyric_tooltip = None
 
@@ -522,7 +522,7 @@ class FileLoader:
             self._lyric_tooltip = None
 
         InfoBar.error(
-            title="加载失败", content=error_msg,
+            title=self._editor.tr("加载失败"), content=error_msg,
             orient=Qt.Orientation.Horizontal, isClosable=True,
             position=InfoBarPosition.TOP, duration=5000,
             parent=self._editor,
@@ -562,7 +562,7 @@ class FileLoader:
 
         if not sentences:
             InfoBar.warning(
-                title="解析结果为空", content="歌词文件未解析出有效内容",
+                title=self._editor.tr("解析结果为空"), content=self._editor.tr("歌词文件未解析出有效内容"),
                 orient=Qt.Orientation.Horizontal, isClosable=True,
                 position=InfoBarPosition.TOP, duration=3000,
                 parent=self._editor,
@@ -583,7 +583,8 @@ class FileLoader:
         self._editor.refresh_lyric_display()
 
         InfoBar.success(
-            title="歌词已加载", content=f"已加载 {len(sentences)} 行歌词",
+            title=self._editor.tr("歌词已加载"),
+            content=self._editor.tr("已加载 {n} 行歌词").format(n=len(sentences)),
             orient=Qt.Orientation.Horizontal, isClosable=True,
             position=InfoBarPosition.TOP, duration=3000,
             parent=self._editor,
@@ -612,7 +613,7 @@ class FileLoader:
         """
         if not content or not content.strip():
             InfoBar.warning(
-                title="剪贴板为空", content="剪贴板中没有文本内容",
+                title=self._editor.tr("剪贴板为空"), content=self._editor.tr("剪贴板中没有文本内容"),
                 orient=Qt.Orientation.Horizontal, isClosable=True,
                 position=InfoBarPosition.TOP, duration=3000,
                 parent=self._editor,
@@ -641,7 +642,7 @@ class FileLoader:
                 self._store.notify("project")
             else:
                 InfoBar.warning(
-                    title="无法加载", content="请先创建或打开一个项目",
+                    title=self._editor.tr("无法加载"), content=self._editor.tr("请先创建或打开一个项目"),
                     orient=Qt.Orientation.Horizontal, isClosable=True,
                     position=InfoBarPosition.TOP, duration=3000,
                     parent=self._editor,
@@ -662,7 +663,7 @@ class FileLoader:
         project_singers = list(self._project.singers)
 
         self._start_lyric_worker(
-            "", content=content, tooltip_hint="正在解析内容...",
+            "", content=content, tooltip_hint=self._editor.tr("正在解析内容..."),
             default_singer_id=default_singer_id,
             project_singers=project_singers,
             software_compensation_ms=software_compensation_ms,
@@ -682,7 +683,7 @@ class FileLoader:
                 self._store.notify("project")
             else:
                 InfoBar.warning(
-                    title="无法加载", content="请先创建或打开一个项目",
+                    title=self._editor.tr("无法加载"), content=self._editor.tr("请先创建或打开一个项目"),
                     orient=Qt.Orientation.Horizontal, isClosable=True,
                     position=InfoBarPosition.TOP, duration=3000,
                     parent=self._editor,
@@ -703,7 +704,7 @@ class FileLoader:
         project_singers = list(self._project.singers)
 
         self._start_lyric_worker(
-            path, tooltip_hint="正在读取文件...",
+            path, tooltip_hint=self._editor.tr("正在读取文件..."),
             default_singer_id=default_singer_id,
             project_singers=project_singers,
             software_compensation_ms=software_compensation_ms,
@@ -729,7 +730,7 @@ class FileLoader:
         from strange_uta_game.frontend.theme import theme
         from strange_uta_game.frontend.workers import LyricParseWorker
 
-        self._lyric_tooltip = StateToolTip("正在解析歌词", tooltip_hint, self._editor)
+        self._lyric_tooltip = StateToolTip(self._editor.tr("正在解析歌词"), tooltip_hint, self._editor)
         green = theme.status_complete.name()
         self._lyric_tooltip.setStyleSheet(f"""
             StateToolTip {{
@@ -774,7 +775,7 @@ class FileLoader:
                     self._store.notify("project")
                 else:
                     InfoBar.warning(
-                        title="无法加载", content="请先创建或打开一个项目",
+                        title=self._editor.tr("无法加载"), content=self._editor.tr("请先创建或打开一个项目"),
                         orient=Qt.Orientation.Horizontal, isClosable=True,
                         position=InfoBarPosition.TOP, duration=3000,
                         parent=self._editor,
@@ -835,7 +836,8 @@ class FileLoader:
             self._editor.refresh_lyric_display()
 
             InfoBar.success(
-                title="歌词已加载", content=f"已加载 {len(sentences)} 行歌词",
+                title=self._editor.tr("歌词已加载"),
+            content=self._editor.tr("已加载 {n} 行歌词").format(n=len(sentences)),
                 orient=Qt.Orientation.Horizontal, isClosable=True,
                 position=InfoBarPosition.TOP, duration=3000,
                 parent=self._editor,
@@ -855,14 +857,14 @@ class FileLoader:
                 self._load_sug_from_text(content)
             else:
                 InfoBar.error(
-                    title="加载失败", content=str(e),
+                    title=self._editor.tr("加载失败"), content=str(e),
                     orient=Qt.Orientation.Horizontal, isClosable=True,
                     position=InfoBarPosition.TOP, duration=5000,
                     parent=self._editor,
                 )
         except Exception as e:
             InfoBar.error(
-                title="加载失败", content=str(e),
+                title=self._editor.tr("加载失败"), content=str(e),
                 orient=Qt.Orientation.Horizontal, isClosable=True,
                 position=InfoBarPosition.TOP, duration=5000,
                 parent=self._editor,
@@ -906,14 +908,16 @@ class FileLoader:
             self._apply_nicokara_tags_from_data(data)
 
             InfoBar.success(
-                title="项目已加载", content="从剪贴板加载了 SUG 项目（保存时需选择路径）",
+                title=self._editor.tr("项目已加载"),
+                content=self._editor.tr("从剪贴板加载了 SUG 项目（保存时需选择路径）"),
                 orient=Qt.Orientation.Horizontal, isClosable=True,
                 position=InfoBarPosition.TOP, duration=3000,
                 parent=self._editor,
             )
         except Exception as e:
             InfoBar.error(
-                title="加载失败", content=f"解析 SUG 项目失败: {e}",
+                title=self._editor.tr("加载失败"),
+                content=self._editor.tr("解析 SUG 项目失败: {err}").format(err=e),
                 orient=Qt.Orientation.Horizontal, isClosable=True,
                 position=InfoBarPosition.TOP, duration=5000,
                 parent=self._editor,
@@ -922,16 +926,16 @@ class FileLoader:
     def _prompt_nicokara_ruby_choice(self):
         """Nicokara 格式注音处理弹窗（三选一）"""
         msg = QMessageBox(self._editor)
-        msg.setWindowTitle("Nicokara 格式检测")
-        msg.setText("检测到 Nicokara 格式歌词（已包含注音）。")
-        msg.setInformativeText(
+        msg.setWindowTitle(self._editor.tr("Nicokara 格式检测"))
+        msg.setText(self._editor.tr("检测到 Nicokara 格式歌词（已包含注音）。"))
+        msg.setInformativeText(self._editor.tr(
             "「保留原有注音」使用文件中的 @Ruby 注音。\n"
             "「全部重新分析」清除原有注音，使用自动分析。\n"
             "「仅分析未注音字符」保留已有注音，补充缺失的。"
-        )
-        btn_keep = msg.addButton("保留原有注音", QMessageBox.ButtonRole.AcceptRole)
-        btn_all = msg.addButton("全部重新分析", QMessageBox.ButtonRole.DestructiveRole)
-        btn_only_noruby = msg.addButton("仅分析未注音字符", QMessageBox.ButtonRole.ActionRole)
+        ))
+        btn_keep = msg.addButton(self._editor.tr("保留原有注音"), QMessageBox.ButtonRole.AcceptRole)
+        btn_all = msg.addButton(self._editor.tr("全部重新分析"), QMessageBox.ButtonRole.DestructiveRole)
+        btn_only_noruby = msg.addButton(self._editor.tr("仅分析未注音字符"), QMessageBox.ButtonRole.ActionRole)
         msg.setDefaultButton(btn_keep)
         msg.exec()
 

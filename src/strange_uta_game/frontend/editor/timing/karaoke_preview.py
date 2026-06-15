@@ -2079,7 +2079,8 @@ class KaraokePreview(QWidget):
         if not self._project or not self._project.sentences:
             painter.setPen(theme.text_hint)
             painter.drawText(
-                self.rect(), Qt.AlignmentFlag.AlignCenter, "请拖入sug项目或者歌词文件或ctrl+v粘贴剪贴板上的歌词文件"
+                self.rect(), Qt.AlignmentFlag.AlignCenter,
+                self.tr("请拖入sug项目或者歌词文件或ctrl+v粘贴剪贴板上的歌词文件")
             )
             painter.end()
             return

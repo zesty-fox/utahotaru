@@ -116,7 +116,7 @@ class TransportBar(QFrame):
         self.slider_progress.sliderReleased.connect(self._on_seek)
         layout.addWidget(self.slider_progress, stretch=1)
 
-        layout.addWidget(CaptionLabel("速度"))
+        layout.addWidget(CaptionLabel(self.tr("速度")))
         self.slider_speed = WheelSpeedSlider(Qt.Orientation.Horizontal, self, default_value=100)
         self.slider_speed.setRange(50, 100)
         self.slider_speed.setSingleStep(5)
@@ -145,7 +145,7 @@ class TransportBar(QFrame):
         )
         layout.addWidget(self.lbl_render)
 
-        layout.addWidget(CaptionLabel("音量"))
+        layout.addWidget(CaptionLabel(self.tr("音量")))
         self.slider_volume = WheelSpeedSlider(Qt.Orientation.Horizontal, self, default_value=100)
         self.slider_volume.setRange(0, 100)
         self.slider_volume.setValue(100)

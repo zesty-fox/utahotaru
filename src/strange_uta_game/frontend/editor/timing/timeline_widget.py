@@ -235,7 +235,7 @@ class WaveformDisplay(QWidget):
         if self._duration_ms <= 0:
             painter.setPen(theme.text_hint)
             painter.drawText(
-                self.rect(), Qt.AlignmentFlag.AlignCenter, "请加载音频文件"
+                self.rect(), Qt.AlignmentFlag.AlignCenter, self.tr("请加载音频文件")
             )
             return
 
@@ -484,7 +484,7 @@ class TimelineWidget(QWidget):
         bottom_layout.addWidget(self.scroll_bar, stretch=1)
 
         # 音频名称标签
-        self.lbl_audio_name = CaptionLabel("未加载音频", self)
+        self.lbl_audio_name = CaptionLabel(self.tr("未加载音频"), self)
         # 音频名很长时（长文件名 + 翻译后的"未加载音频"前缀）让标签可压缩；
         # 用 maxWidth 限制上限避免吃掉太多 toolbar 空间。
         self.lbl_audio_name.setMaximumWidth(400)
@@ -498,7 +498,7 @@ class TimelineWidget(QWidget):
         self.switch_waveform = SwitchButton(self)
         self.switch_waveform.setChecked(True)
         self.switch_waveform.setMinimumWidth(50)
-        self.switch_waveform.setToolTip("波形显示")
+        self.switch_waveform.setToolTip(self.tr("波形显示"))
         self.switch_waveform.checkedChanged.connect(self._on_waveform_visibility_changed)
         bottom_layout.addWidget(self.switch_waveform)
 

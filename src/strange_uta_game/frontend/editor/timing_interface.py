@@ -317,7 +317,7 @@ class EditorInterface(QWidget):
         bottom.setSpacing(10)
 
         # 左下角模式指示器（#8：区分音乐播放/暂停模式）
-        self.lbl_mode = QLabel("模式：编辑")
+        self.lbl_mode = QLabel(self.tr("模式：编辑"))
         self.lbl_mode.setStyleSheet(
             "font-size: 12px; padding: 2px 8px; border-radius: 4px;"
             "background-color: #e0e0e0; color: #444;"
@@ -362,16 +362,16 @@ class EditorInterface(QWidget):
         # 布局：[播放状态] <stretch> [当前行/字符/时间戳] <stretch> [总体进度]
         status = QHBoxLayout()
         status.setContentsMargins(5, 2, 5, 2)
-        self.lbl_status = QLabel("就绪")
+        self.lbl_status = QLabel(self.tr("就绪"))
         self.lbl_status.setStyleSheet(f"font-size: 12px; color: {theme.text_primary.name()};")
         status.addWidget(self.lbl_status)
         status.addStretch()
         # 行号/字符/时间戳信息（#5：从打轴栏移到此处，与播放状态一同显示）
-        self.lbl_line_info = QLabel("当前行: -")
+        self.lbl_line_info = QLabel(self.tr("当前行: -"))
         self.lbl_line_info.setStyleSheet(f"font-size: 12px; color: {theme.text_primary.name()};")
         status.addWidget(self.lbl_line_info)
         status.addStretch()
-        self.lbl_progress = QLabel("行: 0/0 | 进度: 0%")
+        self.lbl_progress = QLabel(self.tr("行: 0/0 | 进度: 0%"))
         self.lbl_progress.setStyleSheet(f"font-size: 12px; color: {theme.text_primary.name()};")
         status.addWidget(self.lbl_progress)
         # 待添加导唱符计数：项目中所有 needs_guide=True 的字符数
@@ -703,7 +703,7 @@ class EditorInterface(QWidget):
         tag_key_raw = timing_actions.get("tag_now", "Space")
         tag_first = tag_key_raw.split(",")[0].split(":")[0].strip() if tag_key_raw else "Space"
         if hasattr(self, "btn_tag"):
-            self.btn_tag.setText(f"打轴 ({tag_first})")
+            self.btn_tag.setText(self.tr("打轴 ({key})").format(key=tag_first))
         # #8：同步模式指示器（首次应用设置时刷新）
         self._update_mode_indicator()
         # 应用禁用单击跳转设置
@@ -742,15 +742,15 @@ class EditorInterface(QWidget):
         按当前模式（播放中=打轴模式，否则=编辑模式）取快捷键文本。
         """
         action_labels = [
-            ("play_pause", "播放"),
-            ("stop", "停止"),
-            ("seek_back", "后退"),
-            ("seek_forward", "前进"),
-            ("speed_down", "减速"),
-            ("speed_up", "加速"),
-            ("add_checkpoint", "加节奏点"),
-            ("remove_checkpoint", "减节奏点"),
-            ("toggle_line_end", "句尾"),
+            ("play_pause", self.tr("播放")),
+            ("stop", self.tr("停止")),
+            ("seek_back", self.tr("后退")),
+            ("seek_forward", self.tr("前进")),
+            ("speed_down", self.tr("减速")),
+            ("speed_up", self.tr("加速")),
+            ("add_checkpoint", self.tr("加节奏点")),
+            ("remove_checkpoint", self.tr("减节奏点")),
+            ("toggle_line_end", self.tr("句尾")),
         ]
         playing = bool(self._timing_service and self._timing_service.is_playing())
         active = timing_actions if playing else (edit_actions or timing_actions)
@@ -761,7 +761,7 @@ class EditorInterface(QWidget):
                 first_key = key.split(",")[0].split(":")[0].strip()
                 if first_key:
                     parts.append(f"{first_key}{label}")
-        parts.append("Alt+→ 切换字内节奏点")
+        parts.append(self.tr("Alt+→ 切换字内节奏点"))
         if hasattr(self, "lbl_shortcut_hint"):
             self.lbl_shortcut_hint.setText(" ".join(parts))
         # 缓存以便模式切换时再次调用（无需重读设置）

@@ -127,7 +127,7 @@ class DictCandidateDialog(QDialog):
 
     def __init__(self, word: str, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("查询候补字典")
+        self.setWindowTitle(self.tr("查询候补字典"))
         self.setMinimumSize(480, 360)
         self._word = (word or "").strip()
         self._candidates = query_dict_candidates(self._word)
@@ -137,20 +137,20 @@ class DictCandidateDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(12)
 
-        title = QLabel(f"候补字典 — 「{self._word}」")
+        title = QLabel(self.tr("候补字典 — 「{word}」").format(word=self._word))
         title.setFont(QFont("Microsoft YaHei", 14))
         layout.addWidget(title)
 
-        desc = QLabel(
+        desc = QLabel(self.tr(
             "列出词典中与所选原文**完全匹配**的条目（本地 + 启用网络源，按优先级）。\n"
             "双击条目或选中后点「应用」，将按该条目的格式（RubyPart / 节奏点 / 连词）填充并执行。"
-        )
+        ))
         desc.setFont(QFont("Microsoft YaHei", 10))
         desc.setWordWrap(True)
         layout.addWidget(desc)
 
         self._table = QTableWidget(0, 2, self)
-        self._table.setHorizontalHeaderLabels(["词", "注音(annotated)"])
+        self._table.setHorizontalHeaderLabels([self.tr("词"), self.tr("注音(annotated)")])
         header = self._table.horizontalHeader()
         if header is not None:
             header.setStretchLastSection(True)
@@ -169,17 +169,17 @@ class DictCandidateDialog(QDialog):
         if self._candidates:
             self._table.selectRow(0)
         else:
-            empty = QLabel("（词典中没有完全匹配的条目）")
+            empty = QLabel(self.tr("（词典中没有完全匹配的条目）"))
             empty.setFont(QFont("Microsoft YaHei", 10))
             layout.addWidget(empty)
 
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        self.btn_apply = PrimaryPushButton("应用", self)
+        self.btn_apply = PrimaryPushButton(self.tr("应用"), self)
         self.btn_apply.clicked.connect(self._on_apply)
         self.btn_apply.setEnabled(bool(self._candidates))
         btn_row.addWidget(self.btn_apply)
-        btn_cancel = PushButton("取消", self)
+        btn_cancel = PushButton(self.tr("取消"), self)
         btn_cancel.clicked.connect(self.reject)
         btn_row.addWidget(btn_cancel)
         layout.addLayout(btn_row)
