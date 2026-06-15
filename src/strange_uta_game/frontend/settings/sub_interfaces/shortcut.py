@@ -159,6 +159,8 @@ class ShortcutSubInterface(SubSettingInterface):
         tr = self.tr
 
         group = SettingCardGroup(tr("快捷键"), self.scrollWidget)
+        self._group = group
+        self._tr_register(group, title_source="快捷键")
 
         def _wrap(t, s):
             # 类级常量里的 title 是源字符串；显示前过一遍 tr() 走翻译表
@@ -214,6 +216,34 @@ class ShortcutSubInterface(SubSettingInterface):
     # connect_signals 不需要额外操作，信号已在 _init_ui 中连接
     def connect_signals(self):
         pass
+
+    def _rebuild_for_language_change(self) -> None:
+        """快捷键页：基类登记的 group title 由 super 处理；这里再把每张卡的
+        title (HTML)/content 按当前语言重刷一遍——title 走 _refresh_tag_colors
+        （它已经 tr 标题 + 重新拼 HTML），content 走 contentLabel.setText。"""
+        super()._rebuild_for_language_change()
+        try:
+            self._refresh_tag_colors()
+        except Exception:
+            pass
+        tr = self.tr
+        for row in self._SHORTCUT_ACTIONS:
+            key, _, _, content, _, _, scope, tc, ec, _ = row
+            if scope in ("both", "timing_only"):
+                card = self._shortcut_cards["timing_mode"].get(key)
+                if card is not None and hasattr(card, "contentLabel"):
+                    card.contentLabel.setText(tr(content))
+            if scope in ("both", "edit_only"):
+                card = self._shortcut_cards["edit_mode"].get(key)
+                if card is not None and hasattr(card, "contentLabel"):
+                    card.contentLabel.setText(tr(content))
+            if scope == "split":
+                card_t = self._shortcut_cards["timing_mode"].get(key)
+                if card_t is not None and hasattr(card_t, "contentLabel"):
+                    card_t.contentLabel.setText(tr(tc) if tc else tr(content))
+                card_e = self._shortcut_cards["edit_mode"].get(key)
+                if card_e is not None and hasattr(card_e, "contentLabel"):
+                    card_e.contentLabel.setText(tr(ec) if ec else tr(content))
 
     def _on_shortcut_changed(self, changed_card: ShortcutSettingCard, new_value: str):
         """冲突检测，无冲突则通知外层保存。"""

@@ -21,49 +21,68 @@ class AutoCheckSubInterface(SubSettingInterface):
     def _init_ui(self):
         tr = self.tr
         # 第二位标签是显示给用户的；左侧 key 是 config.json 里持久化的，**不能** tr()。
+        # Group 标题是 "Auto Check"（产品名），不走 tr。
         g = SettingCardGroup("Auto Check", self.scrollWidget)
-        self.card_checkpoint_chars = MultiBoolSettingCard(
-            FIF.MUSIC, tr("节奏点字符类型"), tr("选择哪些字符类型自动生成节奏点"),
-            items=[
-                ("hiragana", tr("ひらがな（平假名）")), ("katakana", tr("カタカナ（片假名）")),
-                ("kanji", tr("漢字（汉字）")), ("alphabet", tr("アルファベット（英文字母）")),
-                ("digit", tr("数字")), ("symbol", tr("記号（符号）")),
-                ("space", tr("空格")),
-                ("space_after_japanese", tr("  ↳日语后空格check")),
-                ("space_after_alphabet", tr("  ↳字母后空格check")),
-                ("space_after_symbol", tr("  ↳符号/数字后空格check")),
-            ], parent=g)
-        self.card_check_rules = MultiBoolSettingCard(
-            FIF.SETTING, tr("check 规则"), tr("选择启用哪些自动节奏点规则"),
-            items=[
-                ("check_n", tr("「ん/ン」check")), ("check_sokuon", tr("促音check")),
-                ("check_long_vowel", tr("长音符号check")), ("small_kana", tr("小写假名check")),
-                ("check_parentheses", tr("括号内文字check")), ("checkpoint_on_punctuation", tr("标点参与节奏点")),
-                ("check_empty_lines", tr("空行check")), ("check_line_start", tr("行首check")),
-                ("check_line_end", tr("行尾check")),
-                ("check_space_as_line_end", tr("空格视为句尾")),
-                ("check_english_word_end", tr("英文单词结尾句尾")),
-                ("english_syllable_check", tr("按音节Check英文单词")),
-            ], parent=g)
-        self.card_auto_on_load = SwitchSettingCard(FIF.ACCEPT, tr("读取时自动check"),
-            tr("导入文本后自动执行check分析"), parent=g)
-        self.card_chinese_lyrics_detection = SwitchSettingCard(FIF.LANGUAGE, tr("中文歌词检测"),
-            tr("加载歌词时，若未检测到日文假名则自动切换为中文模式（汉字每字一个节奏点，跳过日文注音）"),
-            parent=g)
-        self.card_romanize_ruby = SwitchSettingCard(FIF.LANGUAGE, tr("罗马音注音"),
-            tr("需重新执行自动注音以生效"),
-            parent=g)
-        self.card_delete_ruby_types = MultiCheckSettingCard(
-            FIF.DELETE, tr("自动删除注音"), tr("自动注音完成后，自动删除指定类型的注音"),
-            options=[
-                ("hiragana", tr("ひらがな（平假名）")),
-                ("katakana_hiragana_ruby", tr("カタカナ（片假名・注音为平假名）")),
-                ("katakana_english_ruby", tr("カタカナ（片假名・注音含有英文）")),
-                ("kanji", tr("漢字（汉字）")), ("alphabet", tr("アルファベット（英文字母）")),
-                ("number", tr("数字")), ("symbol", tr("記号（符号）")),
-                ("long_vowel", tr("長音符号（ー、～等）")), ("sokuon", tr("促音（っ/ッ）")),
-                ("other", tr("その他（♪等特殊符号）")), ("space", tr("空格")),
-            ], parent=g)
+        self.card_checkpoint_chars = self._tr_register(
+            MultiBoolSettingCard(
+                FIF.MUSIC, tr("节奏点字符类型"), tr("选择哪些字符类型自动生成节奏点"),
+                items=[
+                    ("hiragana", tr("ひらがな（平假名）")), ("katakana", tr("カタカナ（片假名）")),
+                    ("kanji", tr("漢字（汉字）")), ("alphabet", tr("アルファベット（英文字母）")),
+                    ("digit", tr("数字")), ("symbol", tr("記号（符号）")),
+                    ("space", tr("空格")),
+                    ("space_after_japanese", tr("  ↳日语后空格check")),
+                    ("space_after_alphabet", tr("  ↳字母后空格check")),
+                    ("space_after_symbol", tr("  ↳符号/数字后空格check")),
+                ], parent=g),
+            title_source="节奏点字符类型",
+            content_source="选择哪些字符类型自动生成节奏点")
+        self.card_check_rules = self._tr_register(
+            MultiBoolSettingCard(
+                FIF.SETTING, tr("check 规则"), tr("选择启用哪些自动节奏点规则"),
+                items=[
+                    ("check_n", tr("「ん/ン」check")), ("check_sokuon", tr("促音check")),
+                    ("check_long_vowel", tr("长音符号check")), ("small_kana", tr("小写假名check")),
+                    ("check_parentheses", tr("括号内文字check")), ("checkpoint_on_punctuation", tr("标点参与节奏点")),
+                    ("check_empty_lines", tr("空行check")), ("check_line_start", tr("行首check")),
+                    ("check_line_end", tr("行尾check")),
+                    ("check_space_as_line_end", tr("空格视为句尾")),
+                    ("check_english_word_end", tr("英文单词结尾句尾")),
+                    ("english_syllable_check", tr("按音节Check英文单词")),
+                ], parent=g),
+            title_source="check 规则",
+            content_source="选择启用哪些自动节奏点规则")
+        self.card_auto_on_load = self._tr_register(
+            SwitchSettingCard(FIF.ACCEPT, tr("读取时自动check"),
+                tr("导入文本后自动执行check分析"), parent=g),
+            title_source="读取时自动check",
+            content_source="导入文本后自动执行check分析")
+        self.card_chinese_lyrics_detection = self._tr_register(
+            SwitchSettingCard(FIF.LANGUAGE, tr("中文歌词检测"),
+                tr("加载歌词时，若未检测到日文假名则自动切换为中文模式（汉字每字一个节奏点，跳过日文注音）"),
+                parent=g),
+            title_source="中文歌词检测",
+            content_source="加载歌词时，若未检测到日文假名则自动切换为中文模式（汉字每字一个节奏点，跳过日文注音）")
+        self.card_romanize_ruby = self._tr_register(
+            SwitchSettingCard(FIF.LANGUAGE, tr("罗马音注音"),
+                tr("需重新执行自动注音以生效"),
+                parent=g),
+            title_source="罗马音注音",
+            content_source="需重新执行自动注音以生效")
+        self.card_delete_ruby_types = self._tr_register(
+            MultiCheckSettingCard(
+                FIF.DELETE, tr("自动删除注音"), tr("自动注音完成后，自动删除指定类型的注音"),
+                options=[
+                    ("hiragana", tr("ひらがな（平假名）")),
+                    ("katakana_hiragana_ruby", tr("カタカナ（片假名・注音为平假名）")),
+                    ("katakana_english_ruby", tr("カタカナ（片假名・注音含有英文）")),
+                    ("kanji", tr("漢字（汉字）")), ("alphabet", tr("アルファベット（英文字母）")),
+                    ("number", tr("数字")), ("symbol", tr("記号（符号）")),
+                    ("long_vowel", tr("長音符号（ー、～等）")), ("sokuon", tr("促音（っ/ッ）")),
+                    ("other", tr("その他（♪等特殊符号）")), ("space", tr("空格")),
+                ], parent=g),
+            title_source="自动删除注音",
+            content_source="自动注音完成后，自动删除指定类型的注音")
         for c in [self.card_checkpoint_chars, self.card_check_rules,
                   self.card_auto_on_load, self.card_chinese_lyrics_detection,
                   self.card_romanize_ruby, self.card_delete_ruby_types]:

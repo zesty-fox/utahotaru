@@ -36,6 +36,13 @@ class SubSettingInterface(ScrollArea):
         self._change_callback: Optional[Callable] = None
         self._silent_save_callback: Optional[Callable[[str, Any], None]] = None
 
+        # 精准 retranslate 注册表。每项 (widget, title_src, content_src, suffix_src)。
+        # 子类在 _init_ui 内调用 _tr_register/_tr_register_text 登记需要随语言刷新
+        # 的控件；_rebuild_for_language_change 直接遍历这张表 setText/setSuffix，
+        # 不再 setWidget 替换 scrollWidget（详见 about.py 上踩的坑）。
+        self._tr_registry: list = []
+        self._tr_text_registry: list = []
+
         self.scrollWidget = QWidget()
         self.expandLayout = ExpandLayout(self.scrollWidget)
 
@@ -85,62 +92,64 @@ class SubSettingInterface(ScrollArea):
     def collect_settings(self, settings) -> None:
         """从 UI 控件读取值写入 AppSettings。子类实现。"""
 
-    # ── 热更新：Qt 自动派发 LanguageChange 时重建本子页面 ────────────
+    # ── 精准 retranslate 注册 API ───────────────────────────────────
+
+    def _tr_register(
+        self,
+        widget,
+        title_source: Optional[str] = None,
+        content_source: Optional[str] = None,
+        suffix_source: Optional[str] = None,
+    ):
+        """登记一个 SettingCard/SettingCardGroup，便于语言切换时刷新文本。
+
+        ``title_source``/``content_source`` 是**未翻译**的源字符串——切语言时
+        基类自动 ``self.tr(...)`` 重新翻译并 ``setText``；构造控件时仍需
+        显式传入 ``self.tr(...)`` 后的值（保证首次渲染就正确）。
+
+        Args:
+            widget: 必须暴露 ``titleLabel`` / ``contentLabel`` 之一；带
+                ``spin`` 子控件（``SpinSettingCard``）可附带 ``suffix_source``。
+        """
+        self._tr_registry.append((widget, title_source, content_source, suffix_source))
+        return widget
+
+    def _tr_register_text(self, widget, attr: str, source: str):
+        """登记普通文本控件：(widget, attr_name, source) → ``setattr`` 风格回放。
+
+        - ``attr`` 通常是 ``"setText"`` / ``"setPlaceholderText"`` /
+          ``"setToolTip"``，即在 widget 上调用 ``getattr(widget, attr)(tr(source))``。
+        """
+        self._tr_text_registry.append((widget, attr, source))
+        return widget
+
+    # ── 热更新：Qt 自动派发 LanguageChange 时刷新本子页面 ──────────
 
     def changeEvent(self, event) -> None:
-        """切语言时整张子页面拆掉重建——比逐个 setText 简单且不漏。
-
-        要求子类的 ``_init_ui`` 可多次调用（不会产生重复副作用）；
-        ``_settings_ref`` 在 ``load_settings`` 时被记忆，重建后用它重新
-        ``load_settings`` 同步状态。
-        """
         if event.type() == QEvent.Type.LanguageChange:
             self._rebuild_for_language_change()
         super().changeEvent(event)
 
     def _rebuild_for_language_change(self) -> None:
-        """原子替换 scrollWidget——之前 takeAt + deleteLater 会让新旧 UI
-        瞬间双份并存（用户截图反映过）；现在让 ScrollArea.setWidget 接管：
-        Qt 文档明确 ``setWidget`` "destroys any existing widget"，**不能**
-        再手动 setParent(None) + deleteLater 旧 widget，否则 use-after-free
-        直接 0xC0000409。
+        """默认精准 retranslate：遍历两张注册表 setText/setSuffix。
+
+        之前用 ``setWidget(new_scrollWidget)`` 整张拆掉重建：在 about 页会
+        丢失「关于」组和重置按钮（疑似 ExpandLayout 中途 addWidget 与析构
+        顺序冲突）。改成精准刷新——子类负责在 ``_init_ui`` 内把要刷新的
+        控件 ``_tr_register`` 登记一遍即可。
         """
-        if not hasattr(self, "scrollWidget"):
-            return
-
-        # 造新 scrollWidget + expandLayout，与 __init__ 里完全一致。
-        self.scrollWidget = QWidget()
-        self.expandLayout = ExpandLayout(self.scrollWidget)
-        self.expandLayout.setSpacing(28)
-        self.expandLayout.setContentsMargins(20, 20, 20, 20)
-        self.scrollWidget.setAutoFillBackground(False)
-        # ScrollArea.setWidget 接管新 widget 并自动销毁旧 widget——无需手动
-        # 维护旧对象生命周期。
-        self.setWidget(self.scrollWidget)
-
-        # 重新 _init_ui 填充新 scrollWidget
-        if hasattr(self, "_init_ui"):
-            self._init_ui()
-
-        # 同步状态：优先用本子页面自己存的 _settings_ref；否则向上找
-        # SettingsInterface 拿全局 AppSettings。
-        s = getattr(self, "_settings_ref", None)
-        if s is None:
-            parent = self.parent()
-            while parent is not None:
-                if hasattr(parent, "get_settings"):
-                    try:
-                        s = parent.get_settings()
-                        break
-                    except Exception:
-                        pass
-                parent = parent.parent() if hasattr(parent, "parent") else None
-        if s is not None:
+        for widget, title_src, content_src, suffix_src in self._tr_registry:
             try:
-                self.load_settings(s)
+                if title_src is not None and hasattr(widget, "titleLabel"):
+                    widget.titleLabel.setText(self.tr(title_src))
+                if content_src is not None and hasattr(widget, "contentLabel"):
+                    widget.contentLabel.setText(self.tr(content_src))
+                if suffix_src is not None and hasattr(widget, "spin"):
+                    widget.spin.setSuffix(self.tr(suffix_src))
             except Exception:
                 pass
-        try:
-            self.connect_signals()
-        except Exception:
-            pass
+        for widget, attr, source in self._tr_text_registry:
+            try:
+                getattr(widget, attr)(self.tr(source))
+            except Exception:
+                pass

@@ -1499,16 +1499,16 @@ class ApplySingerDialog(QDialog):
         form = QFormLayout()
         lbl_char = QLabel(char_text)
         lbl_char.setStyleSheet("font-size: 16px; font-weight: bold;")
-        form.addRow("选中字符:", lbl_char)
+        form.addRow(self.tr("选中字符:"), lbl_char)
 
         # 第二行：当前演唱者信息
         if current_singers:
             singer_names = ", ".join(s.name for s in current_singers)
         else:
-            singer_names = "无"
+            singer_names = self.tr("无")
         lbl_current_singer = QLabel(singer_names)
         lbl_current_singer.setStyleSheet("font-size: 14px;")
-        form.addRow("当前演唱者:", lbl_current_singer)
+        form.addRow(self.tr("当前演唱者:"), lbl_current_singer)
         layout.addLayout(form)
 
         # 第三行：过滤器
@@ -1522,7 +1522,7 @@ class ApplySingerDialog(QDialog):
 
         # 第四行：演唱者列表
         self.list_singers = QTableWidget(len(all_singers), 2, self)
-        self.list_singers.setHorizontalHeaderLabels(["演唱者", "颜色预览"])
+        self.list_singers.setHorizontalHeaderLabels([self.tr("演唱者"), self.tr("颜色预览")])
         self.list_singers.horizontalHeader().setStretchLastSection(True)
         self.list_singers.setColumnWidth(1, 64)
         self.list_singers.verticalHeader().setVisible(False)
@@ -1633,21 +1633,22 @@ class CompleteTimestampDialog(QDialog):
         layout = QVBoxLayout(self)
 
         # 第一行：功能说明
-        desc_label = QLabel(
+        desc_label = QLabel(self.tr(
             "本功能用于所有打轴过程完成后，自动查找需要补轴点的字符（仅无普通时间戳字符），"
             "查找前后时间戳取平均值均分给待补偿时间戳。\n\n"
             "边界处理：行首无前方时间戳时，向后找到第一个时间戳并减去「行首扣除」值；"
             "行尾无后方时间戳时，向前找到第一个时间戳并加上「行尾增加」值。"
-        )
+        ))
         desc_label.setWordWrap(True)
         desc_label.setStyleSheet("font-size: 12px; color: #555; padding: 8px;")
         layout.addWidget(desc_label)
 
         # 第二行：适用范围（多选）
-        scope_group = QGroupBox("适用范围")
+        scope_group = QGroupBox(self.tr("适用范围"))
         scope_layout = QVBoxLayout(scope_group)
 
         self._scope_checkboxes: dict[str, QCheckBox] = {}
+        # 显示侧用 tr() 翻译；key 作为持久化标识保持不变
         scope_items = [
             ("kanji", "汉字"),
             ("hiragana", "平假名"),
@@ -1662,7 +1663,7 @@ class CompleteTimestampDialog(QDialog):
         ]
 
         for key, label in scope_items:
-            chk = QCheckBox(label)
+            chk = QCheckBox(self.tr(label))
             chk.setChecked(key in self._saved_scope_types)
             self._scope_checkboxes[key] = chk
             scope_layout.addWidget(chk)
@@ -1670,7 +1671,7 @@ class CompleteTimestampDialog(QDialog):
         layout.addWidget(scope_group)
 
         # 第三行：排除规则（多选）
-        exclude_group = QGroupBox("排除规则")
+        exclude_group = QGroupBox(self.tr("排除规则"))
         exclude_layout = QVBoxLayout(exclude_group)
 
         self._exclude_checkboxes: dict[str, QCheckBox] = {}
@@ -1679,7 +1680,7 @@ class CompleteTimestampDialog(QDialog):
         ]
 
         for key, label in exclude_items:
-            chk = QCheckBox(label)
+            chk = QCheckBox(self.tr(label))
             chk.setChecked(key in self._saved_exclude_rules)
             self._exclude_checkboxes[key] = chk
             exclude_layout.addWidget(chk)
@@ -1687,22 +1688,22 @@ class CompleteTimestampDialog(QDialog):
         layout.addWidget(exclude_group)
 
         # 第四行：边界时间戳偏移设置
-        offset_group = QGroupBox("边界时间戳偏移")
+        offset_group = QGroupBox(self.tr("边界时间戳偏移"))
         offset_layout = QFormLayout(offset_group)
 
         self._edit_head_offset = QLineEdit(str(self._saved_head_offset_ms))
         self._edit_head_offset.setPlaceholderText("150")
-        self._edit_head_offset.setToolTip(
+        self._edit_head_offset.setToolTip(self.tr(
             "行首字符无前方时间戳时，向后找到第一个时间戳后减去此值"
-        )
-        offset_layout.addRow("行首扣除时间戳 (ms):", self._edit_head_offset)
+        ))
+        offset_layout.addRow(self.tr("行首扣除时间戳 (ms):"), self._edit_head_offset)
 
         self._edit_tail_offset = QLineEdit(str(self._saved_tail_offset_ms))
         self._edit_tail_offset.setPlaceholderText("150")
-        self._edit_tail_offset.setToolTip(
+        self._edit_tail_offset.setToolTip(self.tr(
             "行尾字符无后方时间戳时，向前找到第一个时间戳后加上此值"
-        )
-        offset_layout.addRow("行尾增加时间戳 (ms):", self._edit_tail_offset)
+        ))
+        offset_layout.addRow(self.tr("行尾增加时间戳 (ms):"), self._edit_tail_offset)
 
         layout.addWidget(offset_group)
 
@@ -1805,7 +1806,7 @@ class AdjustRawTimestampDialog(QDialog):
 
         desc = QLabel(
             f"{tip}\n"
-            "每次点击「应用」立即执行偏移，可叠加多次操作。"
+            + self.tr("每次点击「应用」立即执行偏移，可叠加多次操作。")
         )
         desc.setWordWrap(True)
         layout.addWidget(desc)
@@ -1815,7 +1816,7 @@ class AdjustRawTimestampDialog(QDialog):
         self.spin_delta.setRange(-9999, 9999)
         self.spin_delta.setValue(0)
         self.spin_delta.setSuffix(" ms")
-        form.addRow("偏移量:", self.spin_delta)
+        form.addRow(self.tr("偏移量:"), self.spin_delta)
         layout.addLayout(form)
 
         self.lbl_status = QLabel("")

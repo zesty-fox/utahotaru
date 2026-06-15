@@ -28,23 +28,36 @@ class ExportSubInterface(SubSettingInterface):
     def _init_ui(self):
         tr = self.tr
         g = SettingCardGroup(tr("导出设定"), self.scrollWidget)
+        self._tr_register(g, title_source="导出设定")
         # 注意：格式 items 直接用做 _FMT_TO_IDX 的 key，因此**不能**用 tr() 包，
         # 否则切语言会让历史 config.json 里存的格式名失效。EN/JA 落地时改为
         # 用 dropdown 内部 (raw_key, label) 两层映射。
-        self.card_default_format = ComboSettingCard(FIF.SHARE, tr("默认导出格式"),
-            tr("导出歌词时的默认文件格式"),
-            items=["LRC (增强型)", "LRC (逐行)", "LRC (逐字)", "KRA", "TXT",
-                   "SRT", "txt2ass", "ASS", "Nicokara", "Nicokara (带注音)", "RL 编辑模式"],
-            parent=g)
-        self.card_export_dir = BrowseSettingCard(FIF.FOLDER, tr("默认导出目录"),
-            tr("设置后，导出时将始终优先使用此目录。\n留空则不启用，导出时自动使用最近加载的文件所在目录。"),
-            clearable=True, parent=g)
-        self.card_software_compensation = SpinSettingCard(FIF.HISTORY, tr("软件导出补偿"),
-            tr("导出时给时间戳加上此补偿值（除.sug外的所有格式），负值=提前，正值=延后"),
-            min_val=-5000, max_val=5000, step=10, suffix=" ms", parent=g)
-        self.card_nicokara_pause_char = TextSettingCard(FIF.EDIT, tr("Nicokara停顿符"),
-            tr("导出Nicokara（带注音）格式时，删除rubyTag中的此字符"),
-            placeholder=tr("输入停顿符"), max_length=5, parent=g)
+        self.card_default_format = self._tr_register(
+            ComboSettingCard(FIF.SHARE, tr("默认导出格式"),
+                tr("导出歌词时的默认文件格式"),
+                items=["LRC (增强型)", "LRC (逐行)", "LRC (逐字)", "KRA", "TXT",
+                       "SRT", "txt2ass", "ASS", "Nicokara", "Nicokara (带注音)", "RL 编辑模式"],
+                parent=g),
+            title_source="默认导出格式",
+            content_source="导出歌词时的默认文件格式")
+        self.card_export_dir = self._tr_register(
+            BrowseSettingCard(FIF.FOLDER, tr("默认导出目录"),
+                tr("设置后，导出时将始终优先使用此目录。\n留空则不启用，导出时自动使用最近加载的文件所在目录。"),
+                clearable=True, parent=g),
+            title_source="默认导出目录",
+            content_source="设置后，导出时将始终优先使用此目录。\n留空则不启用，导出时自动使用最近加载的文件所在目录。")
+        self.card_software_compensation = self._tr_register(
+            SpinSettingCard(FIF.HISTORY, tr("软件导出补偿"),
+                tr("导出时给时间戳加上此补偿值（除.sug外的所有格式），负值=提前，正值=延后"),
+                min_val=-5000, max_val=5000, step=10, suffix=" ms", parent=g),
+            title_source="软件导出补偿",
+            content_source="导出时给时间戳加上此补偿值（除.sug外的所有格式），负值=提前，正值=延后")
+        self.card_nicokara_pause_char = self._tr_register(
+            TextSettingCard(FIF.EDIT, tr("Nicokara停顿符"),
+                tr("导出Nicokara（带注音）格式时，删除rubyTag中的此字符"),
+                placeholder=tr("输入停顿符"), max_length=5, parent=g),
+            title_source="Nicokara停顿符",
+            content_source="导出Nicokara（带注音）格式时，删除rubyTag中的此字符")
         for c in [self.card_default_format, self.card_export_dir,
                   self.card_software_compensation, self.card_nicokara_pause_char]:
             g.addSettingCard(c)
