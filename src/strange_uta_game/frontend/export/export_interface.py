@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QDialog,
     QTextEdit,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, Qt, pyqtSignal
 from qfluentwidgets import (
     PushButton,
     PrimaryPushButton,
@@ -128,6 +128,39 @@ class ExportInterface(QWidget):
         self._project: Optional[Project] = None
         self._export_service = ExportService()
         self._init_ui()
+
+    def changeEvent(self, event):
+        """切语言时整张导出页拆掉重建。保留输出路径/文件名/格式选中等用户状态。"""
+        if event.type() == QEvent.Type.LanguageChange:
+            from strange_uta_game.frontend.localization import detach_layout_for_rebuild
+            saved = {
+                "output": self.line_output.text() if hasattr(self, "line_output") else "",
+                "fname": self.line_filename.text() if hasattr(self, "line_filename") else "",
+                "fmt_row": self.format_list.currentRow() if hasattr(self, "format_list") else -1,
+            }
+            detach_layout_for_rebuild(self)
+            self._init_ui()
+            # 还原用户输入
+            if hasattr(self, "line_output"):
+                self.line_output.setText(saved["output"])
+            if hasattr(self, "line_filename"):
+                self.line_filename.setText(saved["fname"])
+            if hasattr(self, "format_list") and saved["fmt_row"] >= 0:
+                try:
+                    self.format_list.setCurrentRow(saved["fmt_row"])
+                except Exception:
+                    pass
+            # 重新填充演唱者列表 + 格式 dropdown
+            try:
+                self._populate_formats()
+            except Exception:
+                pass
+            if hasattr(self, "_store") and self._store is not None:
+                try:
+                    self._refresh_singer_checkboxes()
+                except Exception:
+                    pass
+        super().changeEvent(event)
 
     def _init_ui(self):
         layout = QVBoxLayout(self)

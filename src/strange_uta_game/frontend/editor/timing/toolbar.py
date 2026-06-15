@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, Qt, pyqtSignal
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit
 from qfluentwidgets import (
     Action,
@@ -156,6 +156,17 @@ class EditorToolBar(QFrame):
         layout.addWidget(self.edit_offset)
 
         layout.addStretch()
+
+    def changeEvent(self, event):
+        """切语言时整条工具栏拆掉重建。"""
+        if event.type() == QEvent.Type.LanguageChange:
+            from strange_uta_game.frontend.localization import detach_layout_for_rebuild
+            saved_offset = self.edit_offset.text() if hasattr(self, "edit_offset") else ""
+            detach_layout_for_rebuild(self)
+            self._init_ui()
+            if saved_offset and hasattr(self, "edit_offset"):
+                self.edit_offset.setText(saved_offset)
+        super().changeEvent(event)
 
     def _on_offset_editing_finished(self):
         """偏移输入框编辑完成 — 解析并发射信号"""

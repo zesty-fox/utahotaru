@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QFileDialog,
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import QEvent, Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent
 from qfluentwidgets import (
     PushButton,
@@ -84,6 +84,24 @@ class HomeInterface(QWidget):
 
         self.setAcceptDrops(True)
         self._init_ui()
+
+    def changeEvent(self, event):
+        """切语言时整张首页拆掉重建——按钮/标签都是无状态的。"""
+        if event.type() == QEvent.Type.LanguageChange:
+            from strange_uta_game.frontend.localization import detach_layout_for_rebuild
+            # 保留用户已输入的歌词文本与已选音频路径
+            saved_lyrics = self.text_lyrics.toPlainText() if hasattr(self, "text_lyrics") else ""
+            saved_audio = self.line_audio_path.text() if hasattr(self, "line_audio_path") else ""
+            detach_layout_for_rebuild(self)
+            self._init_ui()
+            if saved_lyrics and hasattr(self, "text_lyrics"):
+                self.text_lyrics.setPlainText(saved_lyrics)
+            if saved_audio and hasattr(self, "line_audio_path"):
+                self.line_audio_path.setText(saved_audio)
+            # 重新同步保存按钮状态
+            if hasattr(self, "_store") and self._store is not None:
+                self.set_project(self._store.project)
+        super().changeEvent(event)
 
     def set_project(self, project: Optional[Project]):
         """设置当前项目（启用/禁用保存按钮）"""

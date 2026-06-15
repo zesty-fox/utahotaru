@@ -99,22 +99,29 @@ class SubSettingInterface(ScrollArea):
         super().changeEvent(event)
 
     def _rebuild_for_language_change(self) -> None:
-        """清空 expandLayout 内所有 widget 再 _init_ui + load_settings + connect_signals。
-
-        子类如需特殊处理可 override（如 about 子页面里语言下拉的额外同步）。
+        """原子替换 scrollWidget——之前 takeAt + deleteLater 会让新旧 UI
+        瞬间双份并存（用户截图反映过）；现在让 ScrollArea.setWidget 接管：
+        Qt 文档明确 ``setWidget`` "destroys any existing widget"，**不能**
+        再手动 setParent(None) + deleteLater 旧 widget，否则 use-after-free
+        直接 0xC0000409。
         """
-        if not hasattr(self, "expandLayout"):
+        if not hasattr(self, "scrollWidget"):
             return
-        # 拆旧 widget——deleteLater 让 Qt 事件循环清理
-        while self.expandLayout.count():
-            item = self.expandLayout.takeAt(0)
-            w = item.widget()
-            if w is not None:
-                w.setParent(None)
-                w.deleteLater()
-        # 重建
+
+        # 造新 scrollWidget + expandLayout，与 __init__ 里完全一致。
+        self.scrollWidget = QWidget()
+        self.expandLayout = ExpandLayout(self.scrollWidget)
+        self.expandLayout.setSpacing(28)
+        self.expandLayout.setContentsMargins(20, 20, 20, 20)
+        self.scrollWidget.setAutoFillBackground(False)
+        # ScrollArea.setWidget 接管新 widget 并自动销毁旧 widget——无需手动
+        # 维护旧对象生命周期。
+        self.setWidget(self.scrollWidget)
+
+        # 重新 _init_ui 填充新 scrollWidget
         if hasattr(self, "_init_ui"):
             self._init_ui()
+
         # 同步状态：优先用本子页面自己存的 _settings_ref；否则向上找
         # SettingsInterface 拿全局 AppSettings。
         s = getattr(self, "_settings_ref", None)

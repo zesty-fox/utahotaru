@@ -28,7 +28,7 @@ from PyQt6.QtWidgets import (
     QButtonGroup,
     QSizePolicy,
 )
-from PyQt6.QtCore import Qt, QRect, QSize, pyqtSignal
+from PyQt6.QtCore import QEvent, Qt, QRect, QSize, pyqtSignal
 from PyQt6.QtGui import QColor, QPixmap, QPainter
 from qfluentwidgets import (
     PushButton,
@@ -981,6 +981,24 @@ class SingerManagerInterface(QWidget):
         self._selected_ids: Set[str] = set()
 
         self._init_ui()
+
+    def changeEvent(self, event):
+        """切语言时整张演唱者管理页拆掉重建。
+        _selected_ids / _filter_text / _group_filter / _project 都是 self
+        实例状态——重建后 _refresh_list() 会按这些原状态恢复。"""
+        if event.type() == QEvent.Type.LanguageChange:
+            from strange_uta_game.frontend.localization import detach_layout_for_rebuild
+            saved_search = self.line_search.text() if hasattr(self, "line_search") else ""
+            detach_layout_for_rebuild(self)
+            self._init_ui()
+            if saved_search and hasattr(self, "line_search"):
+                self.line_search.setText(saved_search)
+            # 重新填充列表（持久 _selected_ids 已保留）
+            try:
+                self._refresh_list()
+            except Exception:
+                pass
+        super().changeEvent(event)
 
     def _init_ui(self):
         """初始化界面"""

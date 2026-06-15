@@ -26,6 +26,7 @@ from .manager import (
     install_translators,
     localization,
 )
+from .retranslate import detach_layout_for_rebuild
 
 __all__ = [
     "AVAILABLE_LANGUAGES",
@@ -33,6 +34,7 @@ __all__ = [
     "LocalizationManager",
     "Language",
     "PSEUDO_LANGUAGE_CODE",
+    "detach_layout_for_rebuild",
     "install_translators",
     "localization",
 ]
