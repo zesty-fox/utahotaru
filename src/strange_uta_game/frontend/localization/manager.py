@@ -154,7 +154,7 @@ class LocalizationManager:
     生命周期：
         - app 启动时由 :func:`install_translators` 调用 :meth:`apply_language`
           完成首次安装。
-        - 用户在「设置 → 关于」切换语言：UI 调用 :meth:`apply_language`，
+        - 用户在「设置 → 关于&语言」切换语言：UI 调用 :meth:`apply_language`，
           然后弹出"重启生效"提示（Qt 的运行时翻译切换需要每个 widget 主动
           响应 ``LanguageChange`` 事件，本期不做，按"重启"对待）。
 

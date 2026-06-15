@@ -4,9 +4,9 @@
 
 * 启动时检查更新（开关）
 * 源排序（三个 ComboBox 表示位置 1/2/3 各使用哪个源）
-* "立即检查更新" 按钮（位于关于卡组上方）
+* "立即检查更新" 按钮（位于关于&语言卡组上方）
 
-还提供 :func:`refresh_about_version`：把硬编码的关于卡片版本号替换为
+还提供 :func:`refresh_about_version`：把硬编码的关于&语言卡片版本号替换为
 ``__version__``，并附带一个 "检查更新" 按钮。
 """
 
@@ -147,7 +147,7 @@ class _CheckNowCard(SettingCard):
 
 
 def attach_update_group(settings_interface: "SettingsInterface") -> None:
-    """把"应用更新"分组追加到设置界面（位于"关于"之前）。"""
+    """把"应用更新"分组追加到设置界面（位于"关于&语言"之前）。"""
     parent = settings_interface
     group = SettingCardGroup(_tr("应用更新"), parent.scrollWidget)
 
@@ -210,7 +210,7 @@ def attach_update_group(settings_interface: "SettingsInterface") -> None:
 
 
 def refresh_about_version(settings_interface: "SettingsInterface") -> None:
-    """把"关于"卡组里的硬编码版本号替换为当前 ``__version__``。
+    """把"关于&语言"卡组里的硬编码版本号替换为当前 ``__version__``。
 
     可在 ``_init_about_group`` 后调用一次；安全幂等。
     """

@@ -111,7 +111,7 @@ class SettingsInterface(ScrollArea):
         ("export",     "导出"),
         ("shortcut",   "快捷键"),
         ("network",    "网络"),
-        ("about",      "关于"),
+        ("about",      "关于&语言"),
     ]
 
     # ── 类属性兼容：测试代码通过 SettingsInterface._SHORTCUT_* 访问 ──
@@ -339,7 +339,7 @@ class SettingsInterface(ScrollArea):
         子页面对"只在导出/导入时才被消费"的设置项调用本方法，避免每次
         微调都跑一遍 timing_interface._apply_settings 全量重应用
         （后者会遍历项目所有字符、可能触发 BASS 重载，是已知的 cascade
-        噪声源；参见 commit fccb832 关于 cascade 内异常变原生闪退的记录）。
+        噪声源；参见 commit fccb832 关于&语言 cascade 内异常变原生闪退的记录）。
         """
         if self._loading_settings:
             return

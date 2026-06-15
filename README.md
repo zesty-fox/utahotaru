@@ -115,7 +115,7 @@
 </td>
 <td align="center" width="50%">
   <a href="assets/shot-settings.png"><img src="assets/shot-settings.png" width="100%" alt="设置 · Settings" /></a><br/>
-  <sub><b>设置 · 10 个分类页</b><br/>演奏控制 / 打轴 / 自动保存 / AutoCheck / 词典 / 界面 / 导出 / 快捷键 / 网络 / 关于</sub>
+  <sub><b>设置 · 10 个分类页</b><br/>演奏控制 / 打轴 / 自动保存 / AutoCheck / 词典 / 界面 / 导出 / 快捷键 / 网络 / 关于&语言</sub>
 </td>
 </tr>
 <tr>

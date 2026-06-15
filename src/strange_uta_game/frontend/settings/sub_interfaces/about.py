@@ -1,4 +1,4 @@
-"""关于子页面。"""
+"""关于&语言子页面。"""
 
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ class AboutSubInterface(SubSettingInterface):
         self.language_group.addSettingCard(self._language_card)
         self.expandLayout.addWidget(self.language_group)
 
-        self.about_group = SettingCardGroup(self.tr("关于"), self.scrollWidget)
+        self.about_group = SettingCardGroup(self.tr("关于&语言"), self.scrollWidget)
 
         self._about_card = SettingCard(FIF.INFO, self.tr("StrangeUtaGame - 歌词打轴软件"),
             self.tr("版本 v{ver}  |  由 RhythmicaLyrics 启发").format(ver=_app_version),
@@ -151,7 +151,7 @@ class AboutSubInterface(SubSettingInterface):
         self._update_ffmpeg_label(ffmpeg_path)
 
     def collect_settings(self, s):
-        pass  # 关于页的 FFmpeg 路径与语言均在切换时即时保存，无需在此收集
+        pass  # 关于&语言页的 FFmpeg 路径与语言均在切换时即时保存，无需在此收集
 
     def _on_language_changed(self, idx: int):
         if self._settings_ref is None:
@@ -192,7 +192,7 @@ class AboutSubInterface(SubSettingInterface):
     def _rebuild_for_language_change(self) -> None:
         """改成精准 retranslate，不再 setWidget(new) 重建 scrollWidget。
 
-        rebuild 路径在本页面会丢失"关于"组与底部按钮（疑似 ExpandLayout 在
+        rebuild 路径在本页面会丢失"关于&语言"组与底部按钮（疑似 ExpandLayout 在
         滚动区域中途 addWidget 时序与 setWidget 销毁旧 widget 的析构顺序冲突，
         体现为切语言后整个 about_group + 重置按钮消失）。
         改成对每个被 tr 包过的可见字符串单独 setText/setContent，绕过整段

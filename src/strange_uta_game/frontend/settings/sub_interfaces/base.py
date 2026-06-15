@@ -134,7 +134,7 @@ class SubSettingInterface(ScrollArea):
         """默认精准 retranslate：遍历两张注册表 setText/setSuffix。
 
         之前用 ``setWidget(new_scrollWidget)`` 整张拆掉重建：在 about 页会
-        丢失「关于」组和重置按钮（疑似 ExpandLayout 中途 addWidget 与析构
+        丢失「关于&语言」组和重置按钮（疑似 ExpandLayout 中途 addWidget 与析构
         顺序冲突）。改成精准刷新——子类负责在 ``_init_ui`` 内把要刷新的
         控件 ``_tr_register`` 登记一遍即可。
         """
