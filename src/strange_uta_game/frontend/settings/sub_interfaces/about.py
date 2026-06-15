@@ -189,33 +189,8 @@ class AboutSubInterface(SubSettingInterface):
             parent=self,
         )
 
-    def changeEvent(self, event):
-        """Qt 自动派发的 LanguageChange 事件——重建本子页面 UI。
-
-        installTranslator 后 Qt 给所有 widget 投递 LanguageChange；本类的
-        响应方式是把 expandLayout 里的 group 全部清掉再 _init_ui 一遍，
-        load_settings 同步状态。比逐个 setText 简单且不容易漏。
-        """
-        if event.type() == QEvent.Type.LanguageChange:
-            self._rebuild_ui()
-        super().changeEvent(event)
-
-    def _rebuild_ui(self) -> None:
-        """清空旧 UI 并按当前语言重新构建。"""
-        # 1) 拆掉旧 widget——deleteLater 让 Qt 在事件循环中清理
-        while self.expandLayout.count():
-            item = self.expandLayout.takeAt(0)
-            w = item.widget()
-            if w is not None:
-                w.setParent(None)
-                w.deleteLater()
-        # 2) 重新构造（包括语言卡）
-        self._init_ui()
-        # 3) 同步状态：语言下拉位置、FFmpeg 路径、配置路径等
-        if self._settings_ref is not None:
-            self.load_settings(self._settings_ref)
-        # 4) 重新连接信号（语言下拉 → handler）
-        self.connect_signals()
+    # changeEvent / _rebuild_for_language_change 由 SubSettingInterface 基类
+    # 统一处理（清 expandLayout → _init_ui → load_settings → connect_signals）。
 
     def _open_config_dir(self):
         if self._settings_ref is None or self._settings_ref._config_path is None:

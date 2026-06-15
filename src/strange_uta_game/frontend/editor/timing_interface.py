@@ -324,27 +324,27 @@ class EditorInterface(QWidget):
         )
         bottom.addWidget(self.lbl_mode)
 
-        self.btn_tag = PrimaryPushButton("打轴 (Space)", self)
+        self.btn_tag = PrimaryPushButton(self.tr("打轴 (Space)"), self)
         self.btn_tag.setIcon(FIF.PIN)
         self.btn_tag.setMinimumHeight(36)
         self.btn_tag.setMinimumWidth(160)
         self.btn_tag.clicked.connect(self._on_tag_now)
         bottom.addWidget(self.btn_tag)
 
-        self.btn_clear_tags = PushButton("清除当前行时间戳", self)
+        self.btn_clear_tags = PushButton(self.tr("清除当前行时间戳"), self)
         self.btn_clear_tags.setIcon(FIF.DELETE)
         self.btn_clear_tags.clicked.connect(self._on_clear_current_line_tags)
         bottom.addWidget(self.btn_clear_tags)
 
-        self.btn_scroll_mode = PushButton("自动滚动", self)
+        self.btn_scroll_mode = PushButton(self.tr("自动滚动"), self)
         self.btn_scroll_mode.setObjectName("btnScrollMode")
         self.btn_scroll_mode.setIcon(FIF.SYNC)
-        self.btn_scroll_mode.setToolTip(
+        self.btn_scroll_mode.setToolTip(self.tr(
             "切换歌词预览滚动模式：\n"
             "自动滚动 — 操作后挂起 6 秒自动恢复\n"
             "始终滚动 — 始终跟随播放位置\n"
             "不滚动 — 完全停用自动滚动"
-        )
+        ))
         self.btn_scroll_mode.clicked.connect(self._on_cycle_scroll_mode)
         theme.changed.connect(self._update_scroll_mode_btn_style)
         bottom.addWidget(self.btn_scroll_mode)

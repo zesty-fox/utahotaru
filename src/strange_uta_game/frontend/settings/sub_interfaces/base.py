@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Optional
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtWidgets import QWidget
 from qfluentwidgets import ExpandLayout, ScrollArea
 
@@ -84,3 +84,56 @@ class SubSettingInterface(ScrollArea):
 
     def collect_settings(self, settings) -> None:
         """从 UI 控件读取值写入 AppSettings。子类实现。"""
+
+    # ── 热更新：Qt 自动派发 LanguageChange 时重建本子页面 ────────────
+
+    def changeEvent(self, event) -> None:
+        """切语言时整张子页面拆掉重建——比逐个 setText 简单且不漏。
+
+        要求子类的 ``_init_ui`` 可多次调用（不会产生重复副作用）；
+        ``_settings_ref`` 在 ``load_settings`` 时被记忆，重建后用它重新
+        ``load_settings`` 同步状态。
+        """
+        if event.type() == QEvent.Type.LanguageChange:
+            self._rebuild_for_language_change()
+        super().changeEvent(event)
+
+    def _rebuild_for_language_change(self) -> None:
+        """清空 expandLayout 内所有 widget 再 _init_ui + load_settings + connect_signals。
+
+        子类如需特殊处理可 override（如 about 子页面里语言下拉的额外同步）。
+        """
+        if not hasattr(self, "expandLayout"):
+            return
+        # 拆旧 widget——deleteLater 让 Qt 事件循环清理
+        while self.expandLayout.count():
+            item = self.expandLayout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.setParent(None)
+                w.deleteLater()
+        # 重建
+        if hasattr(self, "_init_ui"):
+            self._init_ui()
+        # 同步状态：优先用本子页面自己存的 _settings_ref；否则向上找
+        # SettingsInterface 拿全局 AppSettings。
+        s = getattr(self, "_settings_ref", None)
+        if s is None:
+            parent = self.parent()
+            while parent is not None:
+                if hasattr(parent, "get_settings"):
+                    try:
+                        s = parent.get_settings()
+                        break
+                    except Exception:
+                        pass
+                parent = parent.parent() if hasattr(parent, "parent") else None
+        if s is not None:
+            try:
+                self.load_settings(s)
+            except Exception:
+                pass
+        try:
+            self.connect_signals()
+        except Exception:
+            pass
