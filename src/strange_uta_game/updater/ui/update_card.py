@@ -228,10 +228,15 @@ def refresh_about_version(settings_interface: "SettingsInterface") -> None:
             title = child.titleLabel.text()  # type: ignore[attr-defined]
         except AttributeError:
             continue
-        if title == "StrangeUtaGame - 歌词打轴软件":
+        # 按"原文 + 翻译"匹配，避免切语言后比较失败（AboutSubInterface
+        # 的标题会跟着 LanguageChange 翻译）
+        from PyQt6.QtCore import QCoreApplication as _QApp
+        _src = "StrangeUtaGame - 歌词打轴软件"
+        _expected = {_src, _QApp.translate("AboutSubInterface", _src)}
+        if title in _expected:
             try:
                 child.setContent(  # type: ignore[attr-defined]
-                    f"版本 v{__version__}  |  由 RhythmicaLyrics 启发"
+                    _tr("版本 v{ver}  |  由 RhythmicaLyrics 启发").format(ver=__version__)
                 )
             except AttributeError:
                 pass

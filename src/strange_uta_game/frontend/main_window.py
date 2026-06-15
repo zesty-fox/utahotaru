@@ -582,9 +582,11 @@ class MainWindow(MSFluentWindow):
         if save_path and not self._store.is_temp_save_path(save_path):
             name = Path(save_path).name  # 如 "mysong.sug"
         else:
-            name = "未命名"
-        dirty_mark = "[未保存]" if (self._store and self._store.dirty) else ""
-        self.setWindowTitle(f"StrangeUtaGame - {name}{dirty_mark} //Bilibili@不会说话的呆轩cc")
+            name = self.tr("未命名")
+        dirty_mark = self.tr("[未保存]") if (self._store and self._store.dirty) else ""
+        self.setWindowTitle(self.tr(
+            "StrangeUtaGame - {name}{dirty_mark} //Bilibili@不会说话的呆轩cc"
+        ).format(name=name, dirty_mark=dirty_mark))
 
     def _on_data_changed(self, change_type: str):
         """响应 store 的数据变更 — 同步非 UI 组件。"""

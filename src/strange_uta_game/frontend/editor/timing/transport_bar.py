@@ -309,7 +309,7 @@ class TransportBar(QFrame):
             self.lbl_render.setText("")
         else:
             pct = max(0, min(99, int(progress * 100)))
-            self.lbl_render.setText(f"{speed:.2f}x 渲染 {pct}%")
+            self.lbl_render.setText(self.tr("{speed:.2f}x 渲染 {pct}%").format(speed=speed, pct=pct))
 
     def set_default_speed(self, pct: int) -> None:
         """Set the default speed value for double-click reset."""

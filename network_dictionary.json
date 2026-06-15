@@ -1,0 +1,6651 @@
+{
+  "rl_official": {
+    "entries": [
+      {
+        "enabled": true,
+        "word": "章",
+        "reading": "{章||し|る|し}"
+      },
+      {
+        "enabled": true,
+        "word": "紅茶",
+        "reading": "{紅||こ|う}{茶||ちゃ}"
+      },
+      {
+        "enabled": true,
+        "word": "爪弾",
+        "reading": "{爪||つ|ま}{弾||び}"
+      },
+      {
+        "enabled": true,
+        "word": "月灯り",
+        "reading": "{月||つ|き}{灯||あ|か}り"
+      },
+      {
+        "enabled": true,
+        "word": "空",
+        "reading": "{空||そ|ら}"
+      },
+      {
+        "enabled": true,
+        "word": "乞う",
+        "reading": "{乞||こ}う"
+      },
+      {
+        "enabled": true,
+        "word": "お供",
+        "reading": "お{供||と|も}"
+      },
+      {
+        "enabled": true,
+        "word": "夏暁",
+        "reading": "{夏暁||な|つ,あ|け}"
+      },
+      {
+        "enabled": true,
+        "word": "度",
+        "reading": "{度||た|び}"
+      },
+      {
+        "enabled": true,
+        "word": "天国",
+        "reading": "{天||て|ん}{国||ご|く}"
+      },
+      {
+        "enabled": true,
+        "word": "技術",
+        "reading": "{技||ぎ}{術||じゅ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "落ち",
+        "reading": "{落||お}ち"
+      },
+      {
+        "enabled": true,
+        "word": "夜明け",
+        "reading": "{夜||よ}{明||あ}け"
+      },
+      {
+        "enabled": true,
+        "word": "破天荒",
+        "reading": "{破||は}{天||て|ん}{荒||こ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "満タン",
+        "reading": "{満||ま|ん}タン"
+      },
+      {
+        "enabled": true,
+        "word": "栄光",
+        "reading": "{栄||え|い}{光||こ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "義体",
+        "reading": "{義||ぎ}{体||た|い}"
+      },
+      {
+        "enabled": true,
+        "word": "戦姫",
+        "reading": "{戦||せ|ん}{姫||き}"
+      },
+      {
+        "enabled": true,
+        "word": "夜明",
+        "reading": "{夜||よ}{明||あ}"
+      },
+      {
+        "enabled": true,
+        "word": "鬼哭に",
+        "reading": "{鬼||き}{哭||こ|く}に"
+      },
+      {
+        "enabled": true,
+        "word": "最低限",
+        "reading": "{最||さ|い}{低||て|い}{限||げ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "他人",
+        "reading": "{他||た}{人||に|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "味方",
+        "reading": "{味||み}{方||か|た}"
+      },
+      {
+        "enabled": true,
+        "word": "偽装",
+        "reading": "{偽||ぎ}{装||そ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "雲散霧消",
+        "reading": "{雲||う|ん}{散||さ|ん}{霧||む}{消||しょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "極彩",
+        "reading": "{極||ご|く}{彩||さ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "皮肉",
+        "reading": "{皮||ひ}{肉||に|く}"
+      },
+      {
+        "enabled": true,
+        "word": "世代",
+        "reading": "{世||せ}{代||だ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "否定",
+        "reading": "{否||ひ}{定||て|い}"
+      },
+      {
+        "enabled": true,
+        "word": "正義",
+        "reading": "{正||せ|い}{義||ぎ}"
+      },
+      {
+        "enabled": true,
+        "word": "切符",
+        "reading": "{切||きっ}{符||ぷ}"
+      },
+      {
+        "enabled": true,
+        "word": "列車",
+        "reading": "{列||れっ}{車||しゃ}"
+      },
+      {
+        "enabled": true,
+        "word": "箒星",
+        "reading": "{箒||ほ|う|き}{星||ぼ|し}"
+      },
+      {
+        "enabled": true,
+        "word": "1日",
+        "reading": "{1||い|ち}{日||に|ち}"
+      },
+      {
+        "enabled": true,
+        "word": "馳走",
+        "reading": "{馳||ち}{走||そ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "麻酔",
+        "reading": "{麻||ま}{酔||す|い}"
+      },
+      {
+        "enabled": true,
+        "word": "花瓶",
+        "reading": "{花||か}{瓶||び|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "紅一点",
+        "reading": "{紅||こ|う}{一||いっ}{点||て|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "不安定",
+        "reading": "{不||ふ}{安||あ|ん}{定||て|い}"
+      },
+      {
+        "enabled": true,
+        "word": "他愛の",
+        "reading": "{他||た}{愛||あ|い}の"
+      },
+      {
+        "enabled": true,
+        "word": "沈丁花",
+        "reading": "{沈||じ|ん}{丁||ちょ|う}{花||げ}"
+      },
+      {
+        "enabled": true,
+        "word": "仏様",
+        "reading": "{仏||ほ|と|け}{様||さ|ま}"
+      },
+      {
+        "enabled": true,
+        "word": "地道",
+        "reading": "{地||じ}{道||み|ち}"
+      },
+      {
+        "enabled": true,
+        "word": "結果",
+        "reading": "{結||けっ}{果||か}"
+      },
+      {
+        "enabled": true,
+        "word": "俯瞰",
+        "reading": "{俯||ふ}{瞰||か|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "模様",
+        "reading": "{模||も}{様||よ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "眩暈",
+        "reading": "{眩||め}{暈||ま|い}"
+      },
+      {
+        "enabled": true,
+        "word": "自然",
+        "reading": "{自||し}{然||ぜ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "絶対",
+        "reading": "{絶||ぜっ}{対||た|い}"
+      },
+      {
+        "enabled": true,
+        "word": "一回",
+        "reading": "{一||いっ}{回||か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "次第",
+        "reading": "{次||し}{第||だ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "野菜",
+        "reading": "{野||や}{菜||さ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "間違",
+        "reading": "{間||ま}{違||ち|が}"
+      },
+      {
+        "enabled": true,
+        "word": "法度",
+        "reading": "{法||はっ}{度||と}"
+      },
+      {
+        "enabled": true,
+        "word": "呆気",
+        "reading": "{呆||あっ}{気||け}"
+      },
+      {
+        "enabled": true,
+        "word": "都合",
+        "reading": "{都||つ}{合||ご|う}"
+      },
+      {
+        "enabled": true,
+        "word": "紅蓮",
+        "reading": "{紅||ぐ}{蓮||れ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "話題",
+        "reading": "{話||わ}{題||だ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "一点",
+        "reading": "{一||いっ}{点||て|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "机上",
+        "reading": "{机||き}{上||じょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "花壇",
+        "reading": "{花||か}{壇||だ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "大変身",
+        "reading": "{大||だ|い}{変||へ|ん}{身||し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "地獄",
+        "reading": "{地||じ}{獄||ご|く}"
+      },
+      {
+        "enabled": true,
+        "word": "創造的",
+        "reading": "{創||そ|う}{造||ぞ|う}{的||て|き}"
+      },
+      {
+        "enabled": true,
+        "word": "名詮自性",
+        "reading": "{名||みょ|う}{詮||せ|ん}{自||じ}{性||しょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "伽藍",
+        "reading": "{伽||が}{藍||ら|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "五体",
+        "reading": "{五||ご}{体||た|い}"
+      },
+      {
+        "enabled": true,
+        "word": "土台",
+        "reading": "{土||ど}{台||だ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "無礼行為",
+        "reading": "{無||ぶ}{礼||れ|い}{行||こ|う}{為||い}"
+      },
+      {
+        "enabled": true,
+        "word": "慇懃尾籠",
+        "reading": "{慇||い|ん}{懃||ぎ|ん}{尾||び}{籠||ろ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "禁止事項",
+        "reading": "{禁||き|ん}{止||し}{事||じ}{項||こ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "処刑",
+        "reading": "{処||しょ}{刑||け|い}"
+      },
+      {
+        "enabled": true,
+        "word": "頭上",
+        "reading": "{頭||ず}{上||じょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "地団駄",
+        "reading": "{地||じ}{団||た|ん}{駄||だ}"
+      },
+      {
+        "enabled": true,
+        "word": "矛盾",
+        "reading": "{矛||む}{盾||じゅ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "喜怒哀楽",
+        "reading": "{喜||き}{怒||ど}{哀||あ|い}{楽||ら|く}"
+      },
+      {
+        "enabled": true,
+        "word": "偽善",
+        "reading": "{偽||ぎ}{善||ぜ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "素振り",
+        "reading": "{素||そ}{振||ぶ}り"
+      },
+      {
+        "enabled": true,
+        "word": "一等星",
+        "reading": "{一||いっ}{等||と|う}{星||せ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "小町",
+        "reading": "{小||こ}{町||ま|ち}"
+      },
+      {
+        "enabled": true,
+        "word": "四六時中",
+        "reading": "{四||し}{六||ろ|く}{時||じ}{中||ちゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "あの娘",
+        "reading": "あの{娘||こ}"
+      },
+      {
+        "enabled": true,
+        "word": "一方通行",
+        "reading": "{一||いっ}{方||ぽ|う}{通||つ|う}{行||こ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "奴隷",
+        "reading": "{奴||ど}{隷||れ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "兎角",
+        "reading": "{兎||と}{角||か|く}"
+      },
+      {
+        "enabled": true,
+        "word": "咀嚼",
+        "reading": "{咀||そ}{嚼||しゃ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "作法",
+        "reading": "{作||さ}{法||ほ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "三ツ星",
+        "reading": "{三||み}ツ{星||ぼ|し}"
+      },
+      {
+        "enabled": true,
+        "word": "毎日",
+        "reading": "{毎||ま|い}{日||に|ち}"
+      },
+      {
+        "enabled": true,
+        "word": "由来",
+        "reading": "{由||ゆ}{来||ら|い}"
+      },
+      {
+        "enabled": true,
+        "word": "時限",
+        "reading": "{時||じ}{限||げ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "表裏",
+        "reading": "{表||ひょ|う}{裏||り}"
+      },
+      {
+        "enabled": true,
+        "word": "恐る恐る",
+        "reading": "{恐||お|そ}る{恐||お|そ}る"
+      },
+      {
+        "enabled": true,
+        "word": "木洩",
+        "reading": "{木||こ}{洩||も}"
+      },
+      {
+        "enabled": true,
+        "word": "砂丘",
+        "reading": "{砂||さ}{丘||きゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "呪縛",
+        "reading": "{呪||じゅ}{縛||ば|く}"
+      },
+      {
+        "enabled": true,
+        "word": "不正解",
+        "reading": "{不||ふ}{正||せ|い}{解||か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "亀裂",
+        "reading": "{亀||き}{裂||れ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "満天",
+        "reading": "{満||ま|ん}{天||て|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "闇夜",
+        "reading": "{闇||や|み}{夜||よ}"
+      },
+      {
+        "enabled": true,
+        "word": "一発二発",
+        "reading": "{一||いっ}{発||ぱ|つ}{二||に}{発||は|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "処分",
+        "reading": "{処||しょ}{分||ぶ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "想像力",
+        "reading": "{想||そ|う}{像||ぞ|う}{力||りょ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "弥生",
+        "reading": "{弥生||や|よ|い,}"
+      },
+      {
+        "enabled": true,
+        "word": "有象無象",
+        "reading": "{有||う}{象||ぞ|う}{無||む}{象||ぞ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "規範",
+        "reading": "{規||き}{範||は|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "果実",
+        "reading": "{果||か}{実||じ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "都会",
+        "reading": "{都||と}{会||か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "飛び交う",
+        "reading": "{飛||と}び{交||か}う"
+      },
+      {
+        "enabled": true,
+        "word": "小鳥",
+        "reading": "{小||こ}{鳥||と|り}"
+      },
+      {
+        "enabled": true,
+        "word": "何百回",
+        "reading": "{何||な|ん}{百||びゃっ}{回||か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "何千回",
+        "reading": "{何||な|ん}{千||ぜ|ん}{回||か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "火星",
+        "reading": "{火||か}{星||せ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "今年",
+        "reading": "{今年||こ|と|し,}"
+      },
+      {
+        "enabled": true,
+        "word": "三回目",
+        "reading": "{三||さ|ん}{回||か|い}{目||め}"
+      },
+      {
+        "enabled": true,
+        "word": "二回目",
+        "reading": "{二||に}{回||か|い}{目||め}"
+      },
+      {
+        "enabled": true,
+        "word": "欠片",
+        "reading": "{欠片||か|け|ら,}"
+      },
+      {
+        "enabled": true,
+        "word": "彼奴",
+        "reading": "{彼奴||あ|い,つ}"
+      },
+      {
+        "enabled": true,
+        "word": "未成年者",
+        "reading": "{未||み}{成||せ|い}{年||ね|ん}{者||しゃ}"
+      },
+      {
+        "enabled": true,
+        "word": "離れ離",
+        "reading": "{離||は|な}れ{離||ば|な}"
+      },
+      {
+        "enabled": true,
+        "word": "離れ離れ",
+        "reading": "{離||は|な}れ{離||ば|な}れ"
+      },
+      {
+        "enabled": true,
+        "word": "全国各地",
+        "reading": "{全||ぜ|ん}{国||こ|く}{各||か|く}{地||ち}"
+      },
+      {
+        "enabled": true,
+        "word": "危機感",
+        "reading": "{危||き}{機||き}{感||か|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "唯唯諾諾",
+        "reading": "{唯||い}{唯||い}{諾||だ|く}{諾||だ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "既視感",
+        "reading": "{既||き}{視||し}{感||か|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "五分",
+        "reading": "{五||ご}{分||ふ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "透き間",
+        "reading": "{透||す}き{間||ま}"
+      },
+      {
+        "enabled": true,
+        "word": "助言",
+        "reading": "{助||じょ}{言||げ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "色即是空",
+        "reading": "{色||し|き}{即||そ|く}{是||ぜ}{空||く|う}"
+      },
+      {
+        "enabled": true,
+        "word": "鼓動",
+        "reading": "{鼓||こ}{動||ど|う}"
+      },
+      {
+        "enabled": true,
+        "word": "森羅万象",
+        "reading": "{森||し|ん}{羅||ら}{万||ば|ん}{象||しょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "四面楚歌",
+        "reading": "{四||し}{面||め|ん}{楚||そ}{歌||か}"
+      },
+      {
+        "enabled": true,
+        "word": "公開処刑",
+        "reading": "{公||こ|う}{開||か|い}{処||しょ}{刑||け|い}"
+      },
+      {
+        "enabled": true,
+        "word": "2人",
+        "reading": "{2人||ふ|た,り}"
+      },
+      {
+        "enabled": true,
+        "word": "宣戰布告",
+        "reading": "{宣||せ|ん}{戰||せ|ん}{布||ふ}{告||こ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "四季彩",
+        "reading": "{四||し}{季||き}{彩||さ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "行き交う",
+        "reading": "{行||ゆ}き{交||か}う"
+      },
+      {
+        "enabled": true,
+        "word": "0時",
+        "reading": "{0||れ|い}{時||じ}"
+      },
+      {
+        "enabled": true,
+        "word": "焼き付",
+        "reading": "{焼||や}き{付||つ}"
+      },
+      {
+        "enabled": true,
+        "word": "月日",
+        "reading": "{月日||つ|き,ひ}"
+      },
+      {
+        "enabled": true,
+        "word": "舞い降",
+        "reading": "{舞||ま}い{降||お}"
+      },
+      {
+        "enabled": true,
+        "word": "時を止",
+        "reading": "{時||と|き}を{止||と}"
+      },
+      {
+        "enabled": true,
+        "word": "語り続",
+        "reading": "{語||か|た}り{続||つ|づ}"
+      },
+      {
+        "enabled": true,
+        "word": "名残",
+        "reading": "{名残||な,ご|り}"
+      },
+      {
+        "enabled": true,
+        "word": "凝れた",
+        "reading": "{凝||こ|ご}れた"
+      },
+      {
+        "enabled": true,
+        "word": "眩し",
+        "reading": "{眩||ま|ぶ}し"
+      },
+      {
+        "enabled": true,
+        "word": "空振",
+        "reading": "{空振||か|ら,ぶ}"
+      },
+      {
+        "enabled": true,
+        "word": "空虚",
+        "reading": "{空||く|う}{虚||きょ}"
+      },
+      {
+        "enabled": true,
+        "word": "道の上",
+        "reading": "{道||み|ち}の{上||う|え}"
+      },
+      {
+        "enabled": true,
+        "word": "見え方",
+        "reading": "{見||み}え{方||か|た}"
+      },
+      {
+        "enabled": true,
+        "word": "あり得",
+        "reading": "あり{得||え}"
+      },
+      {
+        "enabled": true,
+        "word": "砂時計",
+        "reading": "{砂||す|な}{時||ど}{計||け|い}"
+      },
+      {
+        "enabled": true,
+        "word": "一刀両断",
+        "reading": "{一刀両断||いっ,と|う,りょ|う,だ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "一見",
+        "reading": "{一見||いっ,け|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "日進月歩",
+        "reading": "{日進月歩||にっ,し|ん,げっ,ぽ}"
+      },
+      {
+        "enabled": true,
+        "word": "栄枯盛衰",
+        "reading": "{栄枯盛衰||え|い,こ,せ|い,す|い}"
+      },
+      {
+        "enabled": true,
+        "word": "何曜日",
+        "reading": "{何曜日||な|ん,よ|う,び}"
+      },
+      {
+        "enabled": true,
+        "word": "1000％",
+        "reading": "{1000％||せ|ん,,,,パー|セ|ン|ト}"
+      },
+      {
+        "enabled": true,
+        "word": "男気",
+        "reading": "{男気||お|と|こ,ぎ}"
+      },
+      {
+        "enabled": true,
+        "word": "情報化",
+        "reading": "{情報化||じょ|う,ほ|う,か}"
+      },
+      {
+        "enabled": true,
+        "word": "具合",
+        "reading": "{具合||ぐ,あ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "腸内",
+        "reading": "{腸内||ちょ|う,な|い}"
+      },
+      {
+        "enabled": true,
+        "word": "乳酸菌",
+        "reading": "{乳酸菌||にゅ|う,さ|ん,き|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "躍起",
+        "reading": "{躍起||やっ,き}"
+      },
+      {
+        "enabled": true,
+        "word": "老若男女",
+        "reading": "{老若男女||ろ|う,にゃ|く,な|ん,にょ}"
+      },
+      {
+        "enabled": true,
+        "word": "七転",
+        "reading": "{七転||し|ち,て|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "学歴",
+        "reading": "{学歴||が|く,れ|き}"
+      },
+      {
+        "enabled": true,
+        "word": "非日常",
+        "reading": "{非日常||ひ,に|ち,じょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "華吹雪",
+        "reading": "{華吹雪||は|な,ふ|ぶ|き,}"
+      },
+      {
+        "enabled": true,
+        "word": "定礎",
+        "reading": "{定礎||て|い,そ}"
+      },
+      {
+        "enabled": true,
+        "word": "御飯",
+        "reading": "{御飯||ご,は|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "定食",
+        "reading": "{定食||て|い,しょ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "焼肉",
+        "reading": "{焼肉||や|き,に|く}"
+      },
+      {
+        "enabled": true,
+        "word": "下剋上",
+        "reading": "{下剋上||げ,こ|く,じょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "男伊達",
+        "reading": "{男伊達||お|と|こ,だ,て}"
+      },
+      {
+        "enabled": true,
+        "word": "会社",
+        "reading": "{会社||か|い,しゃ}"
+      },
+      {
+        "enabled": true,
+        "word": "月極",
+        "reading": "{月極||つ|き,ぎ|め}"
+      },
+      {
+        "enabled": true,
+        "word": "告知",
+        "reading": "{告知||こ|く,ち}"
+      },
+      {
+        "enabled": true,
+        "word": "激突",
+        "reading": "{激突||げ|き,と|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "特命",
+        "reading": "{特命||と|く,め|い}"
+      },
+      {
+        "enabled": true,
+        "word": "不正",
+        "reading": "{不正||ふ,せ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "凄絶",
+        "reading": "{凄絶||せ|い,ぜ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "大気",
+        "reading": "{大気||た|い,き}"
+      },
+      {
+        "enabled": true,
+        "word": "何億光年",
+        "reading": "{何億光年||な|ん,お|く,こ|う,ね|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "流線型",
+        "reading": "{流線型||りゅ|う,せ|ん,け|い}"
+      },
+      {
+        "enabled": true,
+        "word": "編入",
+        "reading": "{編入||へ|ん,にゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "腹黒",
+        "reading": "{腹黒||は|ら,ぐ|ろ}"
+      },
+      {
+        "enabled": true,
+        "word": "百合",
+        "reading": "{百合||ゆ,り}"
+      },
+      {
+        "enabled": true,
+        "word": "美少女",
+        "reading": "{美少女||び,しょ|う,じょ}"
+      },
+      {
+        "enabled": true,
+        "word": "鼻歌",
+        "reading": "{鼻||は|な}{歌||う|た}"
+      },
+      {
+        "enabled": true,
+        "word": "女子寮",
+        "reading": "{女子寮||じょ,し,りょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "好物",
+        "reading": "{好物||こ|う,ぶ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "変態",
+        "reading": "{変態||へ|ん,た|い}"
+      },
+      {
+        "enabled": true,
+        "word": "鉄分",
+        "reading": "{鉄分||て|つ,ぶ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "補給",
+        "reading": "{補給||ほ,きゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "蕁麻疹",
+        "reading": "{蕁麻疹||じ|ん,ま,し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "女学院",
+        "reading": "{女学院||じょ,が|く,い|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "宮前",
+        "reading": "{宮前||み|や,ま|え}"
+      },
+      {
+        "enabled": true,
+        "word": "2年",
+        "reading": "{2年||に,ね|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "保健室",
+        "reading": "{保健室||ほ,け|ん,し|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "保健",
+        "reading": "{保健||ほ,け|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "水中",
+        "reading": "{水中||す|い,ちゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "騎馬戦",
+        "reading": "{騎馬戦||き,ば,せ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "騎馬",
+        "reading": "{騎馬||き,ば}"
+      },
+      {
+        "enabled": true,
+        "word": "鼻血",
+        "reading": "{鼻血||は|な,ぢ}"
+      },
+      {
+        "enabled": true,
+        "word": "万古",
+        "reading": "{万古||ば|ん,こ}"
+      },
+      {
+        "enabled": true,
+        "word": "赤子",
+        "reading": "{赤||あ|か}{子||ご}"
+      },
+      {
+        "enabled": true,
+        "word": "構成",
+        "reading": "{構成||こ|う,せ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "真鍮",
+        "reading": "{真鍮||し|ん,ちゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "激安",
+        "reading": "{激安||げ|き,や|す}"
+      },
+      {
+        "enabled": true,
+        "word": "奇想天外",
+        "reading": "{奇想天外||き,そ|う,て|ん,が|い}"
+      },
+      {
+        "enabled": true,
+        "word": "千客万来",
+        "reading": "{千客万来||せ|ん,きゃ|く,ば|ん,ら|い}"
+      },
+      {
+        "enabled": true,
+        "word": "平安",
+        "reading": "{平安||へ|い,あ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "一攫千金",
+        "reading": "{一攫千金||いっ,か|く,せ|ん,き|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "群雄割拠",
+        "reading": "{群雄割拠||ぐ|ん,ゆ|う,かっ,きょ}"
+      },
+      {
+        "enabled": true,
+        "word": "丁丁発止",
+        "reading": "{丁丁発止||ちょ|う,ちょ|う,はっ,し}"
+      },
+      {
+        "enabled": true,
+        "word": "雪月花",
+        "reading": "{雪月花||せ|つ,げ|つ,か}"
+      },
+      {
+        "enabled": true,
+        "word": "満身創痍",
+        "reading": "{満身創痍||ま|ん,し|ん,そ|う,い}"
+      },
+      {
+        "enabled": true,
+        "word": "千変万化",
+        "reading": "{千変万化||せ|ん,べ|ん,ば|ん,か}"
+      },
+      {
+        "enabled": true,
+        "word": "一日千秋",
+        "reading": "{一日千秋||い|ち,じ|つ,せ|ん,しゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "神出鬼没",
+        "reading": "{神出鬼没||し|ん,しゅ|つ,き,ぼ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "蒟蒻",
+        "reading": "{蒟蒻||こ|ん,にゃ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "個体",
+        "reading": "{個体||こ,た|い}"
+      },
+      {
+        "enabled": true,
+        "word": "降りた",
+        "reading": "{降||お}りた"
+      },
+      {
+        "enabled": true,
+        "word": "芳醇",
+        "reading": "{芳醇||ほ|う,じゅ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "交渉",
+        "reading": "{交渉||こ|う,しょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "成立",
+        "reading": "{成立||せ|い,り|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "原型師",
+        "reading": "{原型師||げ|ん,け|い,し}"
+      },
+      {
+        "enabled": true,
+        "word": "造形美",
+        "reading": "{造形美||ぞ|う,け|い,び}"
+      },
+      {
+        "enabled": true,
+        "word": "造形",
+        "reading": "{造形||ぞ|う,け|い}"
+      },
+      {
+        "enabled": true,
+        "word": "爆走",
+        "reading": "{爆走||ば|く,そ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "原型",
+        "reading": "{原||げ|ん}{型||け|い}"
+      },
+      {
+        "enabled": true,
+        "word": "素体",
+        "reading": "{素体||そ,た|い}"
+      },
+      {
+        "enabled": true,
+        "word": "実物大",
+        "reading": "{実物大||じ|つ,ぶ|つ,だ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "急接近",
+        "reading": "{急接近||きゅ|う,せっ,き|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "補充",
+        "reading": "{補充||ほ,じゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "難波船",
+        "reading": "{難波船||な|ん,ば,せ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "難波",
+        "reading": "{難波||な|ん,ば}"
+      },
+      {
+        "enabled": true,
+        "word": "敏腕",
+        "reading": "{敏腕||び|ん,わ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "精度",
+        "reading": "{精度||せ|い,ど}"
+      },
+      {
+        "enabled": true,
+        "word": "光源",
+        "reading": "{光源||こ|う,げ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "藻屑",
+        "reading": "{藻屑||も,く|ず}"
+      },
+      {
+        "enabled": true,
+        "word": "鬼火",
+        "reading": "{鬼火||お|に,び}"
+      },
+      {
+        "enabled": true,
+        "word": "酔狂",
+        "reading": "{酔狂||す|い,きょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "散華",
+        "reading": "{散華||さ|ん,げ}"
+      },
+      {
+        "enabled": true,
+        "word": "神楽",
+        "reading": "{神楽||か|ぐ,ら}"
+      },
+      {
+        "enabled": true,
+        "word": "無想",
+        "reading": "{無想||む,そ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "夢追人",
+        "reading": "{夢追人||ゆ|め,お|い,び|と}"
+      },
+      {
+        "enabled": true,
+        "word": "悠遠",
+        "reading": "{悠遠||ゆ|う,え|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "聖夜",
+        "reading": "{聖夜||せ|い,や}"
+      },
+      {
+        "enabled": true,
+        "word": "未満",
+        "reading": "{未満||み,ま|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "推定",
+        "reading": "{推定||す|い,て|い}"
+      },
+      {
+        "enabled": true,
+        "word": "隙き間",
+        "reading": "{隙||す}き{間||ま}"
+      },
+      {
+        "enabled": true,
+        "word": "道順",
+        "reading": "{道順||み|ち,じゅ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "立ち止ま",
+        "reading": "{立||た}ち{止||ど}ま"
+      },
+      {
+        "enabled": true,
+        "word": "時折",
+        "reading": "{時||と|き}{折||お|り}"
+      },
+      {
+        "enabled": true,
+        "word": "拒否",
+        "reading": "{拒否||きょ,ひ}"
+      },
+      {
+        "enabled": true,
+        "word": "手土産",
+        "reading": "{手土産||て,み|や|げ,}"
+      },
+      {
+        "enabled": true,
+        "word": "貴様",
+        "reading": "{貴様||き,さ|ま}"
+      },
+      {
+        "enabled": true,
+        "word": "安心",
+        "reading": "{安心||あ|ん,し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "七転八倒",
+        "reading": "{七転八倒||し|ち,て|ん,ばっ,と|う}"
+      },
+      {
+        "enabled": true,
+        "word": "悶絶",
+        "reading": "{悶絶||も|ん,ぜ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "存在感",
+        "reading": "{存在感||そ|ん,ざ|い,か|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "規格外",
+        "reading": "{規格外||き,か|く,が|い}"
+      },
+      {
+        "enabled": true,
+        "word": "規格",
+        "reading": "{規格||き,か|く}"
+      },
+      {
+        "enabled": true,
+        "word": "変更",
+        "reading": "{変更||へ|ん,こ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "御奉仕",
+        "reading": "{御奉仕||ご,ほ|う,し}"
+      },
+      {
+        "enabled": true,
+        "word": "奉仕",
+        "reading": "{奉仕||ほ|う,し}"
+      },
+      {
+        "enabled": true,
+        "word": "獣道",
+        "reading": "{獣道||け|も|の,み|ち}"
+      },
+      {
+        "enabled": true,
+        "word": "全人類",
+        "reading": "{全人類||ぜ|ん,じ|ん,る|い}"
+      },
+      {
+        "enabled": true,
+        "word": "非道",
+        "reading": "{非道||ひ,ど|う}"
+      },
+      {
+        "enabled": true,
+        "word": "無駄口",
+        "reading": "{無駄口||む,だ,ぐ|ち}"
+      },
+      {
+        "enabled": true,
+        "word": "知力",
+        "reading": "{知力||ち,りょ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "日付",
+        "reading": "{日付||ひ,づ|け}"
+      },
+      {
+        "enabled": true,
+        "word": "一髪",
+        "reading": "{一髪||いっ,ぱ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "道端",
+        "reading": "{道端||み|ち,ば|た}"
+      },
+      {
+        "enabled": true,
+        "word": "潮風",
+        "reading": "{潮風||し|お,か|ぜ}"
+      },
+      {
+        "enabled": true,
+        "word": "天秤",
+        "reading": "{天秤||て|ん,び|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "無期限",
+        "reading": "{無期限||む,き,げ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "期限",
+        "reading": "{期||き}{限||げ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "無償",
+        "reading": "{無償||む,しょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "理念",
+        "reading": "{理念||り,ね|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "英知",
+        "reading": "{英知||え|い,ち}"
+      },
+      {
+        "enabled": true,
+        "word": "一文字",
+        "reading": "{一文字||ひ|と,も,じ}"
+      },
+      {
+        "enabled": true,
+        "word": "衝天",
+        "reading": "{衝天||しょ|う,て|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "百回",
+        "reading": "{百回||ひゃっ,か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "公園",
+        "reading": "{公園||こ|う,え|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "映画館",
+        "reading": "{映画館||え|い,が,か|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "予行",
+        "reading": "{予行||よ,こ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "毛布",
+        "reading": "{毛布||も|う,ふ}"
+      },
+      {
+        "enabled": true,
+        "word": "想い出",
+        "reading": "{想||お|も}い{出||で}"
+      },
+      {
+        "enabled": true,
+        "word": "代表的",
+        "reading": "{代表的||だ|い,ひょ|う,て|き}"
+      },
+      {
+        "enabled": true,
+        "word": "太平洋",
+        "reading": "{太平洋||た|い,へ|い,よ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "退職",
+        "reading": "{退職||た|い,しょ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "増加",
+        "reading": "{増加||ぞ|う,か}"
+      },
+      {
+        "enabled": true,
+        "word": "前半",
+        "reading": "{前半||ぜ|ん,は|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "宣伝",
+        "reading": "{宣伝||せ|ん,で|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "選挙",
+        "reading": "{選挙||せ|ん,きょ}"
+      },
+      {
+        "enabled": true,
+        "word": "成分",
+        "reading": "{成分||せ|い,ぶ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "生年月日",
+        "reading": "{生年月日||せ|い,ね|ん,がっ,ぴ}"
+      },
+      {
+        "enabled": true,
+        "word": "成人式",
+        "reading": "{成人式||せ|い,じ|ん,し|き}"
+      },
+      {
+        "enabled": true,
+        "word": "成人",
+        "reading": "{成人||せ|い,じ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "生産",
+        "reading": "{生産||せ|い,さ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "進学",
+        "reading": "{進学||し|ん,が|く}"
+      },
+      {
+        "enabled": true,
+        "word": "女優",
+        "reading": "{女優||じょ,ゆ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "上流",
+        "reading": "{上流||じょ|う,りゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "昇進",
+        "reading": "{昇進||しょ|う,し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "上司",
+        "reading": "{上司||じょ|う,し}"
+      },
+      {
+        "enabled": true,
+        "word": "消極的",
+        "reading": "{消極的||しょ|う,きょ|く,て|き}"
+      },
+      {
+        "enabled": true,
+        "word": "上位",
+        "reading": "{上位||じょ|う,い}"
+      },
+      {
+        "enabled": true,
+        "word": "出世",
+        "reading": "{出世||しゅっ,せ}"
+      },
+      {
+        "enabled": true,
+        "word": "週刊誌",
+        "reading": "{週刊誌||しゅ|う,か|ん,し}"
+      },
+      {
+        "enabled": true,
+        "word": "週刊",
+        "reading": "{週刊||しゅ|う,か|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "出産",
+        "reading": "{出産||しゅっ,さ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "実現",
+        "reading": "{実現||じ|つ,げ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "左右",
+        "reading": "{左右||さ,ゆ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "作曲",
+        "reading": "{作曲||さっ,きょ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "作曲家",
+        "reading": "{作曲家||さっ,きょ|く,か}"
+      },
+      {
+        "enabled": true,
+        "word": "作詞家",
+        "reading": "{作詞家||さ|く,し,か}"
+      },
+      {
+        "enabled": true,
+        "word": "作詞",
+        "reading": "{作詞||さ|く,し}"
+      },
+      {
+        "enabled": true,
+        "word": "国民",
+        "reading": "{国民||こ|く,み|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "航海",
+        "reading": "{航海||こ|う,か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "後者",
+        "reading": "{後者||こ|う,しゃ}"
+      },
+      {
+        "enabled": true,
+        "word": "校長",
+        "reading": "{校長||こ|う,ちょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "後輩",
+        "reading": "{後||こ|う}{輩||は|い}"
+      },
+      {
+        "enabled": true,
+        "word": "後半",
+        "reading": "{後半||こ|う,は|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "減少",
+        "reading": "{減少||げ|ん,しょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "工夫",
+        "reading": "{工||く}{夫||ふ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "教授",
+        "reading": "{教授||きょ|う,じゅ}"
+      },
+      {
+        "enabled": true,
+        "word": "帰宅",
+        "reading": "{帰宅||き,た|く}"
+      },
+      {
+        "enabled": true,
+        "word": "技師",
+        "reading": "{技師||ぎ,し}"
+      },
+      {
+        "enabled": true,
+        "word": "企業",
+        "reading": "{企業||き,ぎょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "感想文",
+        "reading": "{感想文||か|ん,そ|う,ぶ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "感想",
+        "reading": "{感想||か|ん,そ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "看護婦",
+        "reading": "{看護婦||か|ん,ご,ふ}"
+      },
+      {
+        "enabled": true,
+        "word": "看護",
+        "reading": "{看護||か|ん,ご}"
+      },
+      {
+        "enabled": true,
+        "word": "観光地",
+        "reading": "{観光地||か|ん,こ|う,ち}"
+      },
+      {
+        "enabled": true,
+        "word": "観光",
+        "reading": "{観光||か|ん,こ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "下流",
+        "reading": "{下流||か,りゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "活発",
+        "reading": "{活発||かっ,ぱ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "格闘技",
+        "reading": "{格闘技||か|く,と|う,ぎ}"
+      },
+      {
+        "enabled": true,
+        "word": "格闘",
+        "reading": "{格闘||か|く,と|う}"
+      },
+      {
+        "enabled": true,
+        "word": "格言",
+        "reading": "{格言||か|く,げ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "調味料",
+        "reading": "{調味料||ちょ|う,み,りょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "海水",
+        "reading": "{海水||か|い,す|い}"
+      },
+      {
+        "enabled": true,
+        "word": "演技",
+        "reading": "{演技||え|ん,ぎ}"
+      },
+      {
+        "enabled": true,
+        "word": "一方",
+        "reading": "{一方||いっ,ぽ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "一般的",
+        "reading": "{一般的||いっ,ぱ|ん,て|き}"
+      },
+      {
+        "enabled": true,
+        "word": "一般",
+        "reading": "{一般||いっ,ぱ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "一層",
+        "reading": "{一層||いっ,そ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "居酒屋",
+        "reading": "{居酒屋||い,ざ|か,や}"
+      },
+      {
+        "enabled": true,
+        "word": "物理",
+        "reading": "{物理||ぶ|つ,り}"
+      },
+      {
+        "enabled": true,
+        "word": "文集",
+        "reading": "{文集||ぶ|ん,しゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "漫才",
+        "reading": "{漫才||ま|ん,ざ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "名言",
+        "reading": "{名言||め|い,げ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "免疫力",
+        "reading": "{免疫力||め|ん,え|き,りょ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "免疫",
+        "reading": "{免疫||め|ん,え|き}"
+      },
+      {
+        "enabled": true,
+        "word": "野党",
+        "reading": "{野党||や,と|う}"
+      },
+      {
+        "enabled": true,
+        "word": "役者",
+        "reading": "{役者||や|く,しゃ}"
+      },
+      {
+        "enabled": true,
+        "word": "雪国",
+        "reading": "{雪国||ゆ|き,ぐ|に}"
+      },
+      {
+        "enabled": true,
+        "word": "落語",
+        "reading": "{落語||ら|く,ご}"
+      },
+      {
+        "enabled": true,
+        "word": "楽観的",
+        "reading": "{楽観的||らっ,か|ん,て|き}"
+      },
+      {
+        "enabled": true,
+        "word": "老後",
+        "reading": "{老後||ろ|う,ご}"
+      },
+      {
+        "enabled": true,
+        "word": "割合",
+        "reading": "{割合||わ|り,あ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "高校生",
+        "reading": "{高校生||こ|う,こ|う,せ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "高校",
+        "reading": "{高校||こ|う,こ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "多忙",
+        "reading": "{多忙||た,ぼ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "矢印",
+        "reading": "{矢印||や,じ|る|し}"
+      },
+      {
+        "enabled": true,
+        "word": "友好",
+        "reading": "{友好||ゆ|う,こ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "条約",
+        "reading": "{条約||じょ|う,や|く}"
+      },
+      {
+        "enabled": true,
+        "word": "破棄",
+        "reading": "{破棄||は,き}"
+      },
+      {
+        "enabled": true,
+        "word": "志望",
+        "reading": "{志望||し,ぼ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "最愛",
+        "reading": "{最||さ|い}{愛||あ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "放棄",
+        "reading": "{放棄||ほ|う,き}"
+      },
+      {
+        "enabled": true,
+        "word": "静観",
+        "reading": "{静観||せ|い,か|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "試合",
+        "reading": "{試合||し,あ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "牽制",
+        "reading": "{牽制||け|ん,せ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "大勢",
+        "reading": "{大勢||お|お,ぜ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "平行線",
+        "reading": "{平行線||へ|い,こ|う,せ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "平行",
+        "reading": "{平行||へ|い,こ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "上辺",
+        "reading": "{上辺||う|わ,べ}"
+      },
+      {
+        "enabled": true,
+        "word": "盤上",
+        "reading": "{盤上||ば|ん,じょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "平均",
+        "reading": "{平均||へ|い,き|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "依然",
+        "reading": "{依然||い,ぜ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "録画",
+        "reading": "{録画||ろ|く,が}"
+      },
+      {
+        "enabled": true,
+        "word": "科目",
+        "reading": "{科目||か,も|く}"
+      },
+      {
+        "enabled": true,
+        "word": "次回",
+        "reading": "{次回||じ,か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "心得",
+        "reading": "{心得||こ|こ|ろ,え}"
+      },
+      {
+        "enabled": true,
+        "word": "多摩川",
+        "reading": "{多摩川||た,ま,が|わ}"
+      },
+      {
+        "enabled": true,
+        "word": "多摩",
+        "reading": "{多摩||た,ま}"
+      },
+      {
+        "enabled": true,
+        "word": "河川",
+        "reading": "{河川||か,せ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "六畳間",
+        "reading": "{六畳間||ろ|く,じょ|う,ま}"
+      },
+      {
+        "enabled": true,
+        "word": "二子橋",
+        "reading": "{二子橋||ふ|た,ご,ば|し}"
+      },
+      {
+        "enabled": true,
+        "word": "連中",
+        "reading": "{連中||れ|ん,ちゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "連絡",
+        "reading": "{連絡||れ|ん,ら|く}"
+      },
+      {
+        "enabled": true,
+        "word": "遅刻",
+        "reading": "{遅刻||ち,こ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "伏目",
+        "reading": "{伏目||ふ|し,め}"
+      },
+      {
+        "enabled": true,
+        "word": "意図的",
+        "reading": "{意図的||い,と,て|き}"
+      },
+      {
+        "enabled": true,
+        "word": "漠然",
+        "reading": "{漠然||ば|く,ぜ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "一刀",
+        "reading": "{一刀||いっ,と|う}"
+      },
+      {
+        "enabled": true,
+        "word": "爪牙",
+        "reading": "{爪牙||そ|う,が}"
+      },
+      {
+        "enabled": true,
+        "word": "脈絡",
+        "reading": "{脈絡||みゃ|く,ら|く}"
+      },
+      {
+        "enabled": true,
+        "word": "怨嗟",
+        "reading": "{怨嗟||え|ん,さ}"
+      },
+      {
+        "enabled": true,
+        "word": "奮闘",
+        "reading": "{奮闘||ふ|ん,と|う}"
+      },
+      {
+        "enabled": true,
+        "word": "孤軍",
+        "reading": "{孤軍||こ,ぐ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "堂堂",
+        "reading": "{堂堂||ど|う,ど|う}"
+      },
+      {
+        "enabled": true,
+        "word": "啓示",
+        "reading": "{啓示||け|い,じ}"
+      },
+      {
+        "enabled": true,
+        "word": "薄墨色",
+        "reading": "{薄墨色||う|す,ず|み,い|ろ}"
+      },
+      {
+        "enabled": true,
+        "word": "対峙",
+        "reading": "{対峙||た|い,じ}"
+      },
+      {
+        "enabled": true,
+        "word": "血肉",
+        "reading": "{血肉||ち,に|く}"
+      },
+      {
+        "enabled": true,
+        "word": "極点",
+        "reading": "{極点||きょ|く,て|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "金狼",
+        "reading": "{金狼||き|ん,ろ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "慈悲",
+        "reading": "{慈悲||じ,ひ}"
+      },
+      {
+        "enabled": true,
+        "word": "却下",
+        "reading": "{却下||きゃっ,か}"
+      },
+      {
+        "enabled": true,
+        "word": "許可局",
+        "reading": "{許可局||きょ,か,きょ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "特許",
+        "reading": "{特許||とっ,きょ}"
+      },
+      {
+        "enabled": true,
+        "word": "東京",
+        "reading": "{東京||と|う,きょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "許可",
+        "reading": "{許可||きょ,か}"
+      },
+      {
+        "enabled": true,
+        "word": "笑う門には福来たる",
+        "reading": "{笑||わ|ら}う{門||か|ど}には{福||ふ|く}{来||き}たる"
+      },
+      {
+        "enabled": true,
+        "word": "紅葉",
+        "reading": "{紅葉||も|み|じ,}"
+      },
+      {
+        "enabled": true,
+        "word": "拍子",
+        "reading": "{拍子||ひょ|う,し}"
+      },
+      {
+        "enabled": true,
+        "word": "種子",
+        "reading": "{種子||しゅ,し}"
+      },
+      {
+        "enabled": true,
+        "word": "要素",
+        "reading": "{要素||よ|う,そ}"
+      },
+      {
+        "enabled": true,
+        "word": "予選",
+        "reading": "{予選||よ,せ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "予知",
+        "reading": "{予知||よ,ち}"
+      },
+      {
+        "enabled": true,
+        "word": "予備",
+        "reading": "{予備||よ,び}"
+      },
+      {
+        "enabled": true,
+        "word": "予防",
+        "reading": "{予防||よ,ぼ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "落石",
+        "reading": "{落石||ら|く,せ|き}"
+      },
+      {
+        "enabled": true,
+        "word": "連想",
+        "reading": "{連想||れ|ん,そ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "老婆",
+        "reading": "{老婆||ろ|う,ば}"
+      },
+      {
+        "enabled": true,
+        "word": "美容師",
+        "reading": "{美容師||び,よ|う,し}"
+      },
+      {
+        "enabled": true,
+        "word": "悲観的",
+        "reading": "{悲観的||ひ,か|ん,て|き}"
+      },
+      {
+        "enabled": true,
+        "word": "日本海",
+        "reading": "{日本海||に,ほ|ん,か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "都市",
+        "reading": "{都市||と,し}"
+      },
+      {
+        "enabled": true,
+        "word": "読書",
+        "reading": "{読書||ど|く,しょ}"
+      },
+      {
+        "enabled": true,
+        "word": "同僚",
+        "reading": "{同僚||ど|う,りょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "哲学者",
+        "reading": "{哲学者||て|つ,が|く,しゃ}"
+      },
+      {
+        "enabled": true,
+        "word": "転職",
+        "reading": "{転職||て|ん,しょ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "適性",
+        "reading": "{適性||て|き,せ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "調査",
+        "reading": "{調査||ちょ|う,さ}"
+      },
+      {
+        "enabled": true,
+        "word": "抽象的",
+        "reading": "{抽象的||ちゅ|う,しょ|う,て|き}"
+      },
+      {
+        "enabled": true,
+        "word": "男優",
+        "reading": "{男優||だ|ん,ゆ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "団体",
+        "reading": "{団体||だ|ん,た|い}"
+      },
+      {
+        "enabled": true,
+        "word": "題名",
+        "reading": "{題名||だ|い,め|い}"
+      },
+      {
+        "enabled": true,
+        "word": "凌駕",
+        "reading": "{凌駕||りょ|う,が}"
+      },
+      {
+        "enabled": true,
+        "word": "白昼",
+        "reading": "{白昼||は|く,ちゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "跳躍",
+        "reading": "{跳躍||ちょ|う,や|く}"
+      },
+      {
+        "enabled": true,
+        "word": "吹っ飛ぶ",
+        "reading": "{吹||ふ}っ{飛||と}ぶ"
+      },
+      {
+        "enabled": true,
+        "word": "快調",
+        "reading": "{快調||か|い,ちょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "一掃",
+        "reading": "{一掃||いっ,そ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "闊歩",
+        "reading": "{闊歩||かっ,ぽ}"
+      },
+      {
+        "enabled": true,
+        "word": "抵抗",
+        "reading": "{抵抗||て|い,こ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "捜索",
+        "reading": "{捜索||そ|う,さ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "怪我",
+        "reading": "{怪我||け,が}"
+      },
+      {
+        "enabled": true,
+        "word": "犯罪",
+        "reading": "{犯罪||は|ん,ざ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "数奇",
+        "reading": "{数奇||す|う,き}"
+      },
+      {
+        "enabled": true,
+        "word": "伏線",
+        "reading": "{伏線||ふ|く,せ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "錯誤",
+        "reading": "{錯誤||さ|く,ご}"
+      },
+      {
+        "enabled": true,
+        "word": "潮騒",
+        "reading": "{潮騒||し|お,さ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "状況",
+        "reading": "{状||じょ|う}{況||きょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "年中",
+        "reading": "{年中||ね|ん,じゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "金庫",
+        "reading": "{金庫||き|ん,こ}"
+      },
+      {
+        "enabled": true,
+        "word": "竹尾",
+        "reading": "{竹尾||た|け,お}"
+      },
+      {
+        "enabled": true,
+        "word": "社長",
+        "reading": "{社長||しゃ,ちょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "小学生",
+        "reading": "{小学生||しょ|う,が|く,せ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "社員",
+        "reading": "{社員||しゃ,い|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "我社",
+        "reading": "{我社||わ|が,しゃ}"
+      },
+      {
+        "enabled": true,
+        "word": "残業",
+        "reading": "{残業||ざ|ん,ぎょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "勇士",
+        "reading": "{勇士||ゆ|う,し}"
+      },
+      {
+        "enabled": true,
+        "word": "真上",
+        "reading": "{真上||ま,う|え}"
+      },
+      {
+        "enabled": true,
+        "word": "芸術",
+        "reading": "{芸術||げ|い,じゅ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "老人",
+        "reading": "{老人||ろ|う,じ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "手足",
+        "reading": "{手足||て,あ|し}"
+      },
+      {
+        "enabled": true,
+        "word": "生贄",
+        "reading": "{生贄||い|け,に|え}"
+      },
+      {
+        "enabled": true,
+        "word": "蝋人形",
+        "reading": "{蝋人形||ろ|う,に|ん,ぎょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "事後",
+        "reading": "{事後||じ,ご}"
+      },
+      {
+        "enabled": true,
+        "word": "細波",
+        "reading": "{細波||さ|ざ,な|み}"
+      },
+      {
+        "enabled": true,
+        "word": "既視",
+        "reading": "{既視||き,し}"
+      },
+      {
+        "enabled": true,
+        "word": "暫定",
+        "reading": "{暫定||ざ|ん,て|い}"
+      },
+      {
+        "enabled": true,
+        "word": "不定形",
+        "reading": "{不定形||ふ,て|い,け|い}"
+      },
+      {
+        "enabled": true,
+        "word": "定形",
+        "reading": "{定形||て|い,け|い}"
+      },
+      {
+        "enabled": true,
+        "word": "通過",
+        "reading": "{通過||つ|う,か}"
+      },
+      {
+        "enabled": true,
+        "word": "純真",
+        "reading": "{純真||じゅ|ん,し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "一粒",
+        "reading": "{一粒||ひ|と,つ|ぶ}"
+      },
+      {
+        "enabled": true,
+        "word": "相場",
+        "reading": "{相場||そ|う,ば}"
+      },
+      {
+        "enabled": true,
+        "word": "暴言",
+        "reading": "{暴言||ぼ|う,げ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "三遊間",
+        "reading": "{三遊間||さ|ん,ゆ|う,か|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "蒸気",
+        "reading": "{蒸気||じょ|う,き}"
+      },
+      {
+        "enabled": true,
+        "word": "金属",
+        "reading": "{金属||き|ん,ぞ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "注射",
+        "reading": "{注射||ちゅ|う,しゃ}"
+      },
+      {
+        "enabled": true,
+        "word": "絵画",
+        "reading": "{絵画||か|い,が}"
+      },
+      {
+        "enabled": true,
+        "word": "廃材",
+        "reading": "{廃材||は|い,ざ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "集束",
+        "reading": "{集束||しゅ|う,そ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "進化前",
+        "reading": "{進化前||し|ん,か,ま|え}"
+      },
+      {
+        "enabled": true,
+        "word": "照射",
+        "reading": "{照射||しょ|う,しゃ}"
+      },
+      {
+        "enabled": true,
+        "word": "儀式",
+        "reading": "{儀式||ぎ,し|き}"
+      },
+      {
+        "enabled": true,
+        "word": "反面",
+        "reading": "{反面||は|ん,め|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "共犯",
+        "reading": "{共犯||きょ|う,は|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "気温",
+        "reading": "{気温||き,お|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "平熱",
+        "reading": "{平熱||へ|い,ね|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "蒸発",
+        "reading": "{蒸発||じょ|う,は|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "盛り上",
+        "reading": "{盛||も}り{上||あ}"
+      },
+      {
+        "enabled": true,
+        "word": "先頭",
+        "reading": "{先頭||せ|ん,と|う}"
+      },
+      {
+        "enabled": true,
+        "word": "最上級",
+        "reading": "{最上級||さ|い,じょ|う,きゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "回転数",
+        "reading": "{回転数||か|い,て|ん,す|う}"
+      },
+      {
+        "enabled": true,
+        "word": "玲瓏",
+        "reading": "{玲瓏||れ|い,ろ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "邪心",
+        "reading": "{邪心||じゃ,し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "聖獣",
+        "reading": "{聖獣||せ|い,じゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "大怪獣",
+        "reading": "{大怪獣||だ|い,か|い,じゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "樹海",
+        "reading": "{樹海||じゅ,か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "無鉄砲",
+        "reading": "{無鉄砲||む,てっ,ぽ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "鉄砲",
+        "reading": "{鉄砲||てっ,ぽ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "順調",
+        "reading": "{順調||じゅ|ん,ちょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "総統",
+        "reading": "{総統||そ|う,と|う}"
+      },
+      {
+        "enabled": true,
+        "word": "劇中",
+        "reading": "{劇中||げ|き,ちゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "弁士",
+        "reading": "{弁士||べ|ん,し}"
+      },
+      {
+        "enabled": true,
+        "word": "案内人",
+        "reading": "{案内人||あ|ん,な|い,に|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "卒業式",
+        "reading": "{卒業式||そ|つ,ぎょ|う,し|き}"
+      },
+      {
+        "enabled": true,
+        "word": "軽快",
+        "reading": "{軽快||け|い,か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "実社会",
+        "reading": "{実社会||じ|つ,しゃ,か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "心拍数",
+        "reading": "{心拍数||し|ん,ぱ|く,す|う}"
+      },
+      {
+        "enabled": true,
+        "word": "根源",
+        "reading": "{根源||こ|ん,げ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "激烈",
+        "reading": "{激烈||げ|き,れ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "新生",
+        "reading": "{新生||し|ん,せ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "茘枝",
+        "reading": "{茘枝||ラ|イ|チ,}"
+      },
+      {
+        "enabled": true,
+        "word": "果汁",
+        "reading": "{果汁||か,じゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "悪事",
+        "reading": "{悪事||あ|く,じ}"
+      },
+      {
+        "enabled": true,
+        "word": "愛車",
+        "reading": "{愛車||あ|い,しゃ}"
+      },
+      {
+        "enabled": true,
+        "word": "摩擦",
+        "reading": "{摩擦||ま,さ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "回帰",
+        "reading": "{回帰||か|い,き}"
+      },
+      {
+        "enabled": true,
+        "word": "総称",
+        "reading": "{総称||そ|う,しょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "国旗",
+        "reading": "{国旗||こっ,き}"
+      },
+      {
+        "enabled": true,
+        "word": "土壇場",
+        "reading": "{土壇場||ど,た|ん,ば}"
+      },
+      {
+        "enabled": true,
+        "word": "遭難",
+        "reading": "{遭難||そ|う,な|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "丸裸",
+        "reading": "{丸裸||ま|る,は|だ|か}"
+      },
+      {
+        "enabled": true,
+        "word": "地面",
+        "reading": "{地||じ}{面||め|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "御自慢",
+        "reading": "{御自慢||ご,じ,ま|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "夕飯",
+        "reading": "{夕飯||ゆ|う,は|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "名人",
+        "reading": "{名人||め|い,じ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "紙芝居",
+        "reading": "{紙芝居||か|み,し|ば,い}"
+      },
+      {
+        "enabled": true,
+        "word": "裏庭",
+        "reading": "{裏庭||う|ら,に|わ}"
+      },
+      {
+        "enabled": true,
+        "word": "御満悦",
+        "reading": "{御満悦||ご,ま|ん,え|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "芝居",
+        "reading": "{芝居||し|ば,い}"
+      },
+      {
+        "enabled": true,
+        "word": "真白",
+        "reading": "{真白||まっ,し|ろ}"
+      },
+      {
+        "enabled": true,
+        "word": "爆笑",
+        "reading": "{爆笑||ば|く,しょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "非公認",
+        "reading": "{非公認||ひ,こ|う,に|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "搭乗",
+        "reading": "{搭乗||と|う,じょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "有意義",
+        "reading": "{有意義||ゆ|う,い,ぎ}"
+      },
+      {
+        "enabled": true,
+        "word": "合神",
+        "reading": "{合神||がっ,し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "毛虫",
+        "reading": "{毛虫||け,む|し}"
+      },
+      {
+        "enabled": true,
+        "word": "毒虫",
+        "reading": "{毒虫||ど|く,む|し}"
+      },
+      {
+        "enabled": true,
+        "word": "新種",
+        "reading": "{新種||し|ん,しゅ}"
+      },
+      {
+        "enabled": true,
+        "word": "有馬",
+        "reading": "{有馬||あ,り|ま}"
+      },
+      {
+        "enabled": true,
+        "word": "牡馬",
+        "reading": "{牡馬||ぼ,ば}"
+      },
+      {
+        "enabled": true,
+        "word": "牝馬",
+        "reading": "{牝馬||ひ|ん,ば}"
+      },
+      {
+        "enabled": true,
+        "word": "右往左往",
+        "reading": "{右往||う,お|う}{左往||さ,お|う}"
+      },
+      {
+        "enabled": true,
+        "word": "消化",
+        "reading": "{消化||しょ|う,か}"
+      },
+      {
+        "enabled": true,
+        "word": "豆腐",
+        "reading": "{豆腐||と|う,ふ}"
+      },
+      {
+        "enabled": true,
+        "word": "節約",
+        "reading": "{節約||せ|つ,や|く}"
+      },
+      {
+        "enabled": true,
+        "word": "貧乏",
+        "reading": "{貧乏||び|ん,ぼ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "浜辺",
+        "reading": "{浜辺||は|ま,べ}"
+      },
+      {
+        "enabled": true,
+        "word": "前髪",
+        "reading": "{前髪||ま|え,が|み}"
+      },
+      {
+        "enabled": true,
+        "word": "交通",
+        "reading": "{交通||こ|う,つ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "自動車",
+        "reading": "{自動車||じ,ど|う,しゃ}"
+      },
+      {
+        "enabled": true,
+        "word": "武闘",
+        "reading": "{武闘||ぶ,と|う}"
+      },
+      {
+        "enabled": true,
+        "word": "拳法",
+        "reading": "{拳法||け|ん,ぽ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "新体操",
+        "reading": "{新体操||し|ん,た|い,そ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "大陸",
+        "reading": "{大陸||た|い,り|く}"
+      },
+      {
+        "enabled": true,
+        "word": "隊員",
+        "reading": "{隊員||た|い,い|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "凶悪",
+        "reading": "{凶悪||きょ|う,あ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "野原",
+        "reading": "{野原||の,は|ら}"
+      },
+      {
+        "enabled": true,
+        "word": "目玉",
+        "reading": "{目玉||め,だ|ま}"
+      },
+      {
+        "enabled": true,
+        "word": "褒美",
+        "reading": "{褒美||ほ|う,び}"
+      },
+      {
+        "enabled": true,
+        "word": "水着",
+        "reading": "{水着||み|ず,ぎ}"
+      },
+      {
+        "enabled": true,
+        "word": "構造",
+        "reading": "{構||こ|う}{造||ぞ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "青葉",
+        "reading": "{青葉||あ|お,ば}"
+      },
+      {
+        "enabled": true,
+        "word": "遺言",
+        "reading": "{遺言||ゆ|い,ご|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "冷酷",
+        "reading": "{冷酷||れ|い,こ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "新大陸",
+        "reading": "{新大陸||し|ん,た|い,り|く}"
+      },
+      {
+        "enabled": true,
+        "word": "微笑も",
+        "reading": "{微||ほ|ほ}{笑||え}も"
+      },
+      {
+        "enabled": true,
+        "word": "光る",
+        "reading": "{光||ひ|か}る"
+      },
+      {
+        "enabled": true,
+        "word": "足掻け",
+        "reading": "{足||あ}{掻||が}け"
+      },
+      {
+        "enabled": true,
+        "word": "足掻き",
+        "reading": "{足||あ}{掻||が}き"
+      },
+      {
+        "enabled": true,
+        "word": "足掻く",
+        "reading": "{足||あ}{掻||が}く"
+      },
+      {
+        "enabled": true,
+        "word": "伽藍洞",
+        "reading": "{伽||が}{藍||ら|ん}{洞||ど|う}"
+      },
+      {
+        "enabled": true,
+        "word": "残り香",
+        "reading": "{残||の|こ}り{香||が}"
+      },
+      {
+        "enabled": true,
+        "word": "貴方",
+        "reading": "{貴方||あ|な|た,}"
+      },
+      {
+        "enabled": true,
+        "word": "一気",
+        "reading": "{一||いっ}{気||き}"
+      },
+      {
+        "enabled": true,
+        "word": "昇華",
+        "reading": "{昇||しょ|う}{華||か}"
+      },
+      {
+        "enabled": true,
+        "word": "綺麗",
+        "reading": "{綺||き}{麗||れ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "天使",
+        "reading": "{天||て|ん}{使||し}"
+      },
+      {
+        "enabled": true,
+        "word": "良い",
+        "reading": "{良||い}い"
+      },
+      {
+        "enabled": true,
+        "word": "風化",
+        "reading": "{風||ふ|う}{化||か}"
+      },
+      {
+        "enabled": true,
+        "word": "平和",
+        "reading": "{平||へ|い}{和||わ}"
+      },
+      {
+        "enabled": true,
+        "word": "後ろ髪",
+        "reading": "{後||う|し}ろ{髪||が|み}"
+      },
+      {
+        "enabled": true,
+        "word": "数字",
+        "reading": "{数字||す|う,じ}"
+      },
+      {
+        "enabled": true,
+        "word": "並べ",
+        "reading": "{並||な|ら}べ"
+      },
+      {
+        "enabled": true,
+        "word": "身体",
+        "reading": "{身体||か|ら|だ,}"
+      },
+      {
+        "enabled": true,
+        "word": "彷徨っ",
+        "reading": "{彷徨||さ,ま|よ}っ"
+      },
+      {
+        "enabled": true,
+        "word": "幼子",
+        "reading": "{幼子||お|さ|な,ご}"
+      },
+      {
+        "enabled": true,
+        "word": "檸檬",
+        "reading": "{檸檬||れ,も|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "真ん中",
+        "reading": "{真||ま}ん{中||な|か}"
+      },
+      {
+        "enabled": true,
+        "word": "嬉し",
+        "reading": "{嬉||う|れ}し"
+      },
+      {
+        "enabled": true,
+        "word": "向かい",
+        "reading": "{向||む}かい"
+      },
+      {
+        "enabled": true,
+        "word": "終わ",
+        "reading": "{終||お}わ"
+      },
+      {
+        "enabled": true,
+        "word": "笑顔",
+        "reading": "{笑顔||え,が|お}"
+      },
+      {
+        "enabled": true,
+        "word": "彼方",
+        "reading": "{彼方||か|な,た}"
+      },
+      {
+        "enabled": true,
+        "word": "生意気",
+        "reading": "{生意気||な|ま,い,き}"
+      },
+      {
+        "enabled": true,
+        "word": "大好き",
+        "reading": "{大||だ|い}{好||す}き"
+      },
+      {
+        "enabled": true,
+        "word": "道標",
+        "reading": "{道標||み|ち,し|る|べ}"
+      },
+      {
+        "enabled": true,
+        "word": "深呼吸",
+        "reading": "{深||し|ん}{呼||こ}{吸||きゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "燈す",
+        "reading": "{燈||と|も}す"
+      },
+      {
+        "enabled": true,
+        "word": "燈し",
+        "reading": "{燈||と|も}し"
+      },
+      {
+        "enabled": true,
+        "word": "受け止め",
+        "reading": "{受||う}け{止||と}め"
+      },
+      {
+        "enabled": true,
+        "word": "間に合",
+        "reading": "{間||ま}に{合||あ}"
+      },
+      {
+        "enabled": true,
+        "word": "泣い",
+        "reading": "{泣||な}い"
+      },
+      {
+        "enabled": true,
+        "word": "怯え",
+        "reading": "{怯||お|び}え"
+      },
+      {
+        "enabled": true,
+        "word": "貴女",
+        "reading": "{貴女||あ|な|た,}"
+      },
+      {
+        "enabled": true,
+        "word": "宝物",
+        "reading": "{宝物||た|か|ら,も|の}"
+      },
+      {
+        "enabled": true,
+        "word": "滲",
+        "reading": "{滲||に|じ}"
+      },
+      {
+        "enabled": true,
+        "word": "天",
+        "reading": "{天||て|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "硝子",
+        "reading": "{硝子||ガ|ラ,ス}"
+      },
+      {
+        "enabled": true,
+        "word": "虚空",
+        "reading": "{虚空||こ,く|う}"
+      },
+      {
+        "enabled": true,
+        "word": "夜の帳",
+        "reading": "{夜||よ|る}の{帳||と|ば|り}"
+      },
+      {
+        "enabled": true,
+        "word": "過ぎ行",
+        "reading": "{過||す}ぎ{行||ゆ}"
+      },
+      {
+        "enabled": true,
+        "word": "消え行",
+        "reading": "{消||き}え{行||ゆ}"
+      },
+      {
+        "enabled": true,
+        "word": "緋く",
+        "reading": "{緋||あ|か}く"
+      },
+      {
+        "enabled": true,
+        "word": "潤す",
+        "reading": "{潤||う|る|お}す"
+      },
+      {
+        "enabled": true,
+        "word": "清ら",
+        "reading": "{清||き|よ}ら"
+      },
+      {
+        "enabled": true,
+        "word": "逆撫で",
+        "reading": "{逆撫||さ|か,な}で"
+      },
+      {
+        "enabled": true,
+        "word": "覗く",
+        "reading": "{覗||の|ぞ}く"
+      },
+      {
+        "enabled": true,
+        "word": "星空",
+        "reading": "{星空||ほ|し,ぞ|ら}"
+      },
+      {
+        "enabled": true,
+        "word": "垣間見",
+        "reading": "{垣間見||か|い,ま,み}"
+      },
+      {
+        "enabled": true,
+        "word": "最奥",
+        "reading": "{最||さ|い}{奥||お|う}"
+      },
+      {
+        "enabled": true,
+        "word": "咎人",
+        "reading": "{咎||と|が}{人||び|と}"
+      },
+      {
+        "enabled": true,
+        "word": "木漏れ日",
+        "reading": "{木||こ}{漏||も}れ{日||び}"
+      },
+      {
+        "enabled": true,
+        "word": "合言葉",
+        "reading": "{合言葉||あ|い,こ|と,ば}"
+      },
+      {
+        "enabled": true,
+        "word": "空白",
+        "reading": "{空||く|う}{白||は|く}"
+      },
+      {
+        "enabled": true,
+        "word": "光",
+        "reading": "{光||ひ|か|り}"
+      },
+      {
+        "enabled": true,
+        "word": "大丈夫",
+        "reading": "{大||だ|い}{丈||じょ|う}{夫||ぶ}"
+      },
+      {
+        "enabled": true,
+        "word": "憎しみ",
+        "reading": "{憎||に|く}しみ"
+      },
+      {
+        "enabled": true,
+        "word": "呟い",
+        "reading": "{呟||つ|ぶ|や}い"
+      },
+      {
+        "enabled": true,
+        "word": "呟き",
+        "reading": "{呟||つ|ぶ|や}き"
+      },
+      {
+        "enabled": true,
+        "word": "昏い",
+        "reading": "{昏||く|ら}い"
+      },
+      {
+        "enabled": true,
+        "word": "思う",
+        "reading": "{思||お|も}う"
+      },
+      {
+        "enabled": true,
+        "word": "思っ",
+        "reading": "{思||お|も}っ"
+      },
+      {
+        "enabled": true,
+        "word": "囁く",
+        "reading": "{囁||さ|さ|や}く"
+      },
+      {
+        "enabled": true,
+        "word": "囁いた",
+        "reading": "{囁||さ|さ|や}いた"
+      },
+      {
+        "enabled": true,
+        "word": "囁いて",
+        "reading": "{囁||さ|さ|や}いて"
+      },
+      {
+        "enabled": true,
+        "word": "囁き",
+        "reading": "{囁||さ|さ|や}き"
+      },
+      {
+        "enabled": true,
+        "word": "毒牙",
+        "reading": "{毒牙||ど|く,が}"
+      },
+      {
+        "enabled": true,
+        "word": "野良犬",
+        "reading": "{野良犬||の,ら,い|ぬ}"
+      },
+      {
+        "enabled": true,
+        "word": "野良",
+        "reading": "{野良||の,ら}"
+      },
+      {
+        "enabled": true,
+        "word": "魔物",
+        "reading": "{魔物||ま,も|の}"
+      },
+      {
+        "enabled": true,
+        "word": "妖怪",
+        "reading": "{妖怪||よ|う,か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "不条理",
+        "reading": "{不||ふ}{条||じょ|う}{理||り}"
+      },
+      {
+        "enabled": true,
+        "word": "不可視",
+        "reading": "{不可視||ふ,か,し}"
+      },
+      {
+        "enabled": true,
+        "word": "雑貨",
+        "reading": "{雑貨||ざっ,か}"
+      },
+      {
+        "enabled": true,
+        "word": "壁時計",
+        "reading": "{壁時計||か|べ,ど,け|い}"
+      },
+      {
+        "enabled": true,
+        "word": "用意",
+        "reading": "{用意||よ|う,い}"
+      },
+      {
+        "enabled": true,
+        "word": "休憩",
+        "reading": "{休憩||きゅ|う,け|い}"
+      },
+      {
+        "enabled": true,
+        "word": "窓際",
+        "reading": "{窓際||ま|ど,ぎ|わ}"
+      },
+      {
+        "enabled": true,
+        "word": "案内",
+        "reading": "{案内||あ|ん,な|い}"
+      },
+      {
+        "enabled": true,
+        "word": "途上",
+        "reading": "{途上||と,じょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "見事",
+        "reading": "{見事||み,ご|と}"
+      },
+      {
+        "enabled": true,
+        "word": "失恋",
+        "reading": "{失恋||し|つ,れ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "出発",
+        "reading": "{出発||しゅっ,ぱ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "流れ星",
+        "reading": "{流||な|が}れ{星||ぼ|し}"
+      },
+      {
+        "enabled": true,
+        "word": "一番星",
+        "reading": "{一番星||い|ち,ば|ん,ぼ|し}"
+      },
+      {
+        "enabled": true,
+        "word": "光速",
+        "reading": "{光速||こ|う,そ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "耳元",
+        "reading": "{耳元||み|み,も|と}"
+      },
+      {
+        "enabled": true,
+        "word": "月夜",
+        "reading": "{月夜||つ|き,よ}"
+      },
+      {
+        "enabled": true,
+        "word": "解除",
+        "reading": "{解除||か|い,じょ}"
+      },
+      {
+        "enabled": true,
+        "word": "実際",
+        "reading": "{実||じっ}{際||さ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "全速",
+        "reading": "{全速||ぜ|ん,そ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "上層",
+        "reading": "{上層||じょ|う,そ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "閃光",
+        "reading": "{閃光||せ|ん,こ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "朝日",
+        "reading": "{朝||あ|さ}{日||ひ}"
+      },
+      {
+        "enabled": true,
+        "word": "家族",
+        "reading": "{家族||か,ぞ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "両目",
+        "reading": "{両目||りょ|う,め}"
+      },
+      {
+        "enabled": true,
+        "word": "祝祭",
+        "reading": "{祝祭||しゅ|く,さ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "舞台",
+        "reading": "{舞台||ぶ,た|い}"
+      },
+      {
+        "enabled": true,
+        "word": "主役",
+        "reading": "{主||しゅ}{役||や|く}"
+      },
+      {
+        "enabled": true,
+        "word": "愛罪",
+        "reading": "{愛罪||あ|い,ざ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "仕草",
+        "reading": "{仕||し}{草||ぐ|さ}"
+      },
+      {
+        "enabled": true,
+        "word": "火花",
+        "reading": "{火花||ひ,ば|な}"
+      },
+      {
+        "enabled": true,
+        "word": "反抗",
+        "reading": "{反抗||は|ん,こ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "氾濫",
+        "reading": "{氾濫||は|ん,ら|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "警報",
+        "reading": "{警報||け|い,ほ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "滅多",
+        "reading": "{滅多||めっ,た}"
+      },
+      {
+        "enabled": true,
+        "word": "絶命",
+        "reading": "{絶命||ぜ|つ,め|い}"
+      },
+      {
+        "enabled": true,
+        "word": "絶体",
+        "reading": "{絶体||ぜっ,た|い}"
+      },
+      {
+        "enabled": true,
+        "word": "剪定",
+        "reading": "{剪定||せ|ん,て|い}"
+      },
+      {
+        "enabled": true,
+        "word": "退路",
+        "reading": "{退路||た|い,ろ}"
+      },
+      {
+        "enabled": true,
+        "word": "発症",
+        "reading": "{発症||はっ,しょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "何億年",
+        "reading": "{何億年||な|ん,お|く,ね|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "翻弄",
+        "reading": "{翻弄||ほ|ん,ろ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "創始",
+        "reading": "{創始||そ|う,し}"
+      },
+      {
+        "enabled": true,
+        "word": "理想郷",
+        "reading": "{理想郷||り,そ|う,きょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "羽撃",
+        "reading": "{羽撃||は,ば|た}"
+      },
+      {
+        "enabled": true,
+        "word": "愛情",
+        "reading": "{愛||あ|い}{情||じょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "云々",
+        "reading": "{云々||う|ん,ぬ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "五感",
+        "reading": "{五感||ご,か|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "最大級",
+        "reading": "{最||さ|い}{大||だ|い}{級||きゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "最大",
+        "reading": "{最大||さ|い,だ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "冷徹",
+        "reading": "{冷徹||れ|い,て|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "一撃",
+        "reading": "{一撃||い|ち,げ|き}"
+      },
+      {
+        "enabled": true,
+        "word": "支配",
+        "reading": "{支||し}{配||は|い}"
+      },
+      {
+        "enabled": true,
+        "word": "極限",
+        "reading": "{極限||きょ|く,げ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "最悪",
+        "reading": "{最悪||さ|い,あ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "戦火",
+        "reading": "{戦火||せ|ん,か}"
+      },
+      {
+        "enabled": true,
+        "word": "神風",
+        "reading": "{神風||か|み,か|ぜ}"
+      },
+      {
+        "enabled": true,
+        "word": "脇目",
+        "reading": "{脇目||わ|き,め}"
+      },
+      {
+        "enabled": true,
+        "word": "恋路",
+        "reading": "{恋路||こ|い,じ}"
+      },
+      {
+        "enabled": true,
+        "word": "何千里",
+        "reading": "{何千里||な|ん,ぜ|ん,り}"
+      },
+      {
+        "enabled": true,
+        "word": "鱗粉",
+        "reading": "{鱗粉||り|ん,ぷ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "無口",
+        "reading": "{無口||む,く|ち}"
+      },
+      {
+        "enabled": true,
+        "word": "人魚",
+        "reading": "{人魚||に|ん,ぎょ}"
+      },
+      {
+        "enabled": true,
+        "word": "満足",
+        "reading": "{満||ま|ん}{足||ぞ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "内緒",
+        "reading": "{内緒||な|い,しょ}"
+      },
+      {
+        "enabled": true,
+        "word": "斜塔",
+        "reading": "{斜塔||しゃ,と|う}"
+      },
+      {
+        "enabled": true,
+        "word": "虫歯",
+        "reading": "{虫歯||む|し,ば}"
+      },
+      {
+        "enabled": true,
+        "word": "変顔",
+        "reading": "{変顔||へ|ん,が|お}"
+      },
+      {
+        "enabled": true,
+        "word": "徹夜",
+        "reading": "{徹夜||て|つ,や}"
+      },
+      {
+        "enabled": true,
+        "word": "千円",
+        "reading": "{千円||せ|ん,え|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "菓子",
+        "reading": "{菓||か}{子||し}"
+      },
+      {
+        "enabled": true,
+        "word": "洋服",
+        "reading": "{洋服||よ|う,ふ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "放題",
+        "reading": "{放題||ほ|う,だ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "溜息",
+        "reading": "{溜息||た|め,い|き}"
+      },
+      {
+        "enabled": true,
+        "word": "一晩",
+        "reading": "{一晩||ひ|と,ば|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "不可思議",
+        "reading": "{不可思議||ふ,か,し,ぎ}"
+      },
+      {
+        "enabled": true,
+        "word": "現象",
+        "reading": "{現象||げ|ん,しょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "納得",
+        "reading": "{納得||なっ,と|く}"
+      },
+      {
+        "enabled": true,
+        "word": "安堵",
+        "reading": "{安||あ|ん}{堵||ど}"
+      },
+      {
+        "enabled": true,
+        "word": "閉鎖",
+        "reading": "{閉鎖||へ|い,さ}"
+      },
+      {
+        "enabled": true,
+        "word": "大変",
+        "reading": "{大変||た|い,へ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "自体",
+        "reading": "{自体||じ,た|い}"
+      },
+      {
+        "enabled": true,
+        "word": "随分",
+        "reading": "{随分||ず|い,ぶ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "灯火",
+        "reading": "{灯||と|う}{火||か}"
+      },
+      {
+        "enabled": true,
+        "word": "経験値",
+        "reading": "{経験値||け|い,け|ん,ち}"
+      },
+      {
+        "enabled": true,
+        "word": "調子",
+        "reading": "{調子||ちょ|う,し}"
+      },
+      {
+        "enabled": true,
+        "word": "最近",
+        "reading": "{最近||さ|い,き|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "新聞",
+        "reading": "{新聞||し|ん,ぶ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "結構",
+        "reading": "{結構||けっ,こ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "幻想曲",
+        "reading": "{幻想曲||げ|ん,そ|う,きょ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "船出",
+        "reading": "{船出||ふ|な,で}"
+      },
+      {
+        "enabled": true,
+        "word": "光景",
+        "reading": "{光景||こ|う,け|い}"
+      },
+      {
+        "enabled": true,
+        "word": "発生",
+        "reading": "{発生||はっ,せ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "伝達",
+        "reading": "{伝達||で|ん,た|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "齟齬",
+        "reading": "{齟齬||そ,ご}"
+      },
+      {
+        "enabled": true,
+        "word": "思念体",
+        "reading": "{思念体||し,ね|ん,た|い}"
+      },
+      {
+        "enabled": true,
+        "word": "思念",
+        "reading": "{思念||し,ね|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "統括",
+        "reading": "{統括||と|う,か|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "生命体",
+        "reading": "{生命体||せ|い,め|い,た|い}"
+      },
+      {
+        "enabled": true,
+        "word": "有機",
+        "reading": "{有機||ゆ|う,き}"
+      },
+      {
+        "enabled": true,
+        "word": "統合",
+        "reading": "{統合||と|う,ご|う}"
+      },
+      {
+        "enabled": true,
+        "word": "段階",
+        "reading": "{段階||だ|ん,か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "寝息",
+        "reading": "{寝息||ね,い|き}"
+      },
+      {
+        "enabled": true,
+        "word": "場面",
+        "reading": "{場面||ば,め|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "絹糸",
+        "reading": "{絹糸||き|ぬ,い|と}"
+      },
+      {
+        "enabled": true,
+        "word": "真夜中",
+        "reading": "{真夜中||ま,よ,な|か}"
+      },
+      {
+        "enabled": true,
+        "word": "宝石",
+        "reading": "{宝石||ほ|う,せ|き}"
+      },
+      {
+        "enabled": true,
+        "word": "散歩",
+        "reading": "{散歩||さ|ん,ぽ}"
+      },
+      {
+        "enabled": true,
+        "word": "星影",
+        "reading": "{星影||ほ|し,か|げ}"
+      },
+      {
+        "enabled": true,
+        "word": "白々",
+        "reading": "{白々||し|ら,じ|ら}"
+      },
+      {
+        "enabled": true,
+        "word": "時刻",
+        "reading": "{時刻||じ,こ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "魅惑",
+        "reading": "{魅惑||み,わ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "大海原",
+        "reading": "{大海原||お|お,う|な,ば|ら}"
+      },
+      {
+        "enabled": true,
+        "word": "寸前",
+        "reading": "{寸前||す|ん,ぜ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "万華鏡",
+        "reading": "{万華鏡||ま|ん,げ,きょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "幾千万",
+        "reading": "{幾千万||い|く,せ|ん,ま|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "帽子",
+        "reading": "{帽子||ぼ|う,し}"
+      },
+      {
+        "enabled": true,
+        "word": "何万回",
+        "reading": "{何||な|ん}{万||ま|ん}{回||か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "世界一",
+        "reading": "{世界一||せ,か|い,い|ち}"
+      },
+      {
+        "enabled": true,
+        "word": "目眩",
+        "reading": "{目眩||め,ま|い}"
+      },
+      {
+        "enabled": true,
+        "word": "不要",
+        "reading": "{不要||ふ,よ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "引力",
+        "reading": "{引||い|ん}{力||りょ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "命運",
+        "reading": "{命運||め|い,う|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "挑発",
+        "reading": "{挑発||ちょ|う,は|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "理論",
+        "reading": "{理論||り,ろ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "1人",
+        "reading": "{1人||ひ|と,り}"
+      },
+      {
+        "enabled": true,
+        "word": "宿題",
+        "reading": "{宿題||しゅ|く,だ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "保護者",
+        "reading": "{保護者||ほ,ご,しゃ}"
+      },
+      {
+        "enabled": true,
+        "word": "毎年",
+        "reading": "{毎年||ま|い,と|し}"
+      },
+      {
+        "enabled": true,
+        "word": "原作",
+        "reading": "{原作||げ|ん,さ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "役割",
+        "reading": "{役割||や|く,わ|り}"
+      },
+      {
+        "enabled": true,
+        "word": "分担",
+        "reading": "{分担||ぶ|ん,た|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "毎週",
+        "reading": "{毎週||ま|い,しゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "充電",
+        "reading": "{充電||じゅ|う,で|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "時々",
+        "reading": "{時々||と|き,ど|き}"
+      },
+      {
+        "enabled": true,
+        "word": "朝昼",
+        "reading": "{朝昼||あ|さ,ひ|る}"
+      },
+      {
+        "enabled": true,
+        "word": "毎回",
+        "reading": "{毎||ま|い}{回||か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "黙秘",
+        "reading": "{黙秘||も|く,ひ}"
+      },
+      {
+        "enabled": true,
+        "word": "新鮮",
+        "reading": "{新鮮||し|ん,せ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "成長",
+        "reading": "{成||せ|い}{長||ちょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "強化",
+        "reading": "{強化||きょ|う,か}"
+      },
+      {
+        "enabled": true,
+        "word": "未遂",
+        "reading": "{未遂||み,す|い}"
+      },
+      {
+        "enabled": true,
+        "word": "送信",
+        "reading": "{送信||そ|う,し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "三転",
+        "reading": "{三転||さ|ん,て|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "二転",
+        "reading": "{二転||に,て|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "復活",
+        "reading": "{復活||ふっ,か|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "連続",
+        "reading": "{連続||れ|ん,ぞ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "海辺",
+        "reading": "{海辺||う|み,べ}"
+      },
+      {
+        "enabled": true,
+        "word": "岸辺",
+        "reading": "{岸辺||き|し,べ}"
+      },
+      {
+        "enabled": true,
+        "word": "10年",
+        "reading": "{10年||じゅ|う,,ね|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "100年",
+        "reading": "{100年||ひゃ|く,,,ね|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "買い物",
+        "reading": "{買||か}い{物||も|の}"
+      },
+      {
+        "enabled": true,
+        "word": "手袋",
+        "reading": "{手袋||て,ぶ|く|ろ}"
+      },
+      {
+        "enabled": true,
+        "word": "謎色",
+        "reading": "{謎色||な|ぞ,い|ろ}"
+      },
+      {
+        "enabled": true,
+        "word": "一匙",
+        "reading": "{一匙||ひ|と,さ|じ}"
+      },
+      {
+        "enabled": true,
+        "word": "基準",
+        "reading": "{基準||き,じゅ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "童話",
+        "reading": "{童話||ど|う,わ}"
+      },
+      {
+        "enabled": true,
+        "word": "伝心",
+        "reading": "{伝心||で|ん,し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "最新",
+        "reading": "{最新||さ|い,し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "以心",
+        "reading": "{以心||い,し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "一所",
+        "reading": "{一所||いっ,しょ}"
+      },
+      {
+        "enabled": true,
+        "word": "電信",
+        "reading": "{電信||で|ん,し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "ジャケ買い",
+        "reading": "{ジャ||じ,ゃ}ケ{買||が}い"
+      },
+      {
+        "enabled": true,
+        "word": "珈琲",
+        "reading": "{珈||コー}{琲||ヒー}"
+      },
+      {
+        "enabled": true,
+        "word": "良し悪し",
+        "reading": "{良||よ}し{悪||あ}し"
+      },
+      {
+        "enabled": true,
+        "word": "壊れた",
+        "reading": "{壊||こ|わ}れた"
+      },
+      {
+        "enabled": true,
+        "word": "剥げ",
+        "reading": "{剥||は}げ"
+      },
+      {
+        "enabled": true,
+        "word": "剥ぎ",
+        "reading": "{剥||は}ぎ"
+      },
+      {
+        "enabled": true,
+        "word": "吐いた",
+        "reading": "{吐||は}いた"
+      },
+      {
+        "enabled": true,
+        "word": "吐いて",
+        "reading": "{吐||は}いて"
+      },
+      {
+        "enabled": true,
+        "word": "壊し",
+        "reading": "{壊||こ|わ}し"
+      },
+      {
+        "enabled": true,
+        "word": "壊した",
+        "reading": "{壊||こ|わ}した"
+      },
+      {
+        "enabled": true,
+        "word": "痛く",
+        "reading": "{痛||い|た}く"
+      },
+      {
+        "enabled": true,
+        "word": "繋ぎ",
+        "reading": "{繋||つ|な}ぎ"
+      },
+      {
+        "enabled": true,
+        "word": "怖く",
+        "reading": "{怖||こ|わ}く"
+      },
+      {
+        "enabled": true,
+        "word": "痛む",
+        "reading": "{痛||い|た}む"
+      },
+      {
+        "enabled": true,
+        "word": "痛み",
+        "reading": "{痛||い|た}み"
+      },
+      {
+        "enabled": true,
+        "word": "痛い",
+        "reading": "{痛||い|た}い"
+      },
+      {
+        "enabled": true,
+        "word": "繋がれ",
+        "reading": "{繋||つ|な}がれ"
+      },
+      {
+        "enabled": true,
+        "word": "恨む",
+        "reading": "{恨||う|ら}む"
+      },
+      {
+        "enabled": true,
+        "word": "痛まない",
+        "reading": "{痛||い|た}まない"
+      },
+      {
+        "enabled": true,
+        "word": "吐き",
+        "reading": "{吐||は}き"
+      },
+      {
+        "enabled": true,
+        "word": "吐け",
+        "reading": "{吐||は}け"
+      },
+      {
+        "enabled": true,
+        "word": "松前",
+        "reading": "{松前||ま|つ,ま|え}"
+      },
+      {
+        "enabled": true,
+        "word": "私達",
+        "reading": "{私||わ|た|し}{達||た|ち}"
+      },
+      {
+        "enabled": true,
+        "word": "我が",
+        "reading": "{我||わ}が"
+      },
+      {
+        "enabled": true,
+        "word": "旅路",
+        "reading": "{旅路||た|び,じ}"
+      },
+      {
+        "enabled": true,
+        "word": "試練",
+        "reading": "{試||し}{練||れ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "巨人",
+        "reading": "{巨人||きょ,じ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "青春",
+        "reading": "{青||せ|い}{春||しゅ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "必殺",
+        "reading": "{必殺||ひっ,さ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "武器",
+        "reading": "{武||ぶ}{器||き}"
+      },
+      {
+        "enabled": true,
+        "word": "闘士",
+        "reading": "{闘士||と|う,し}"
+      },
+      {
+        "enabled": true,
+        "word": "銀河",
+        "reading": "{銀河||ぎ|ん,が}"
+      },
+      {
+        "enabled": true,
+        "word": "指令",
+        "reading": "{指令||し,れ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "撃破",
+        "reading": "{撃||げ|き}{破||は}"
+      },
+      {
+        "enabled": true,
+        "word": "必中",
+        "reading": "{必中||ひっ,ちゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "闘志",
+        "reading": "{闘志||と|う,し}"
+      },
+      {
+        "enabled": true,
+        "word": "弐式",
+        "reading": "{弐式||に,し|き}"
+      },
+      {
+        "enabled": true,
+        "word": "鋼鉄",
+        "reading": "{鋼鉄||こ|う,て|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "危機",
+        "reading": "{危||き}{機||き}"
+      },
+      {
+        "enabled": true,
+        "word": "堕天使",
+        "reading": "{堕天使||だ,て|ん,し}"
+      },
+      {
+        "enabled": true,
+        "word": "番犬",
+        "reading": "{番犬||ば|ん,け|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "仮面",
+        "reading": "{仮||か}{面||め|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "毒蜂",
+        "reading": "{毒蜂||ど|く,ば|ち}"
+      },
+      {
+        "enabled": true,
+        "word": "花園",
+        "reading": "{花園||は|な,ぞ|の}"
+      },
+      {
+        "enabled": true,
+        "word": "野心",
+        "reading": "{野心||や,し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "瑪瑙",
+        "reading": "{瑪瑙||め,の|う}"
+      },
+      {
+        "enabled": true,
+        "word": "軌跡",
+        "reading": "{軌跡||き,せ|き}"
+      },
+      {
+        "enabled": true,
+        "word": "虚構",
+        "reading": "{虚構||きょ,こ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "抱かれて",
+        "reading": "{抱||い|だ}かれて"
+      },
+      {
+        "enabled": true,
+        "word": "部屋",
+        "reading": "{部屋||ヘ,や}"
+      },
+      {
+        "enabled": true,
+        "word": "小部屋",
+        "reading": "{小部屋||こ,べ,や}"
+      },
+      {
+        "enabled": true,
+        "word": "悲嘆",
+        "reading": "{悲嘆||ひ,た|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "美酒",
+        "reading": "{美酒||び,しゅ}"
+      },
+      {
+        "enabled": true,
+        "word": "猜疑心",
+        "reading": "{猜疑心||さ|い,ぎ,し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "深紅",
+        "reading": "{深紅||し|ん,く}"
+      },
+      {
+        "enabled": true,
+        "word": "此所",
+        "reading": "{此所||こ,こ}"
+      },
+      {
+        "enabled": true,
+        "word": "根拠",
+        "reading": "{根拠||こ|ん,きょ}"
+      },
+      {
+        "enabled": true,
+        "word": "戦略",
+        "reading": "{戦||せ|ん}{略||りゃ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "攻略",
+        "reading": "{攻略||こ|う,りゃ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "野生",
+        "reading": "{野生||や,せ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "次元",
+        "reading": "{次||じ}{元||げ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "何故",
+        "reading": "{何故||な,ぜ}"
+      },
+      {
+        "enabled": true,
+        "word": "準備",
+        "reading": "{準||じゅ|ん}{備||び}"
+      },
+      {
+        "enabled": true,
+        "word": "注目度",
+        "reading": "{注目度||ちゅ|う,も|く,ど}"
+      },
+      {
+        "enabled": true,
+        "word": "直前",
+        "reading": "{直前||ちょ|く,ぜ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "原動力",
+        "reading": "{原動力||げ|ん,ど|う,りょ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "刺激",
+        "reading": "{刺||し}{激||げ|き}"
+      },
+      {
+        "enabled": true,
+        "word": "針路",
+        "reading": "{針路||し|ん,ろ}"
+      },
+      {
+        "enabled": true,
+        "word": "順位",
+        "reading": "{順位||じゅ|ん,い}"
+      },
+      {
+        "enabled": true,
+        "word": "難易度",
+        "reading": "{難易度||な|ん,い,ど}"
+      },
+      {
+        "enabled": true,
+        "word": "足跡",
+        "reading": "{足||あ|し}{跡||あ|と}"
+      },
+      {
+        "enabled": true,
+        "word": "相手",
+        "reading": "{相手||あ|い,て}"
+      },
+      {
+        "enabled": true,
+        "word": "証拠",
+        "reading": "{証拠||しょ|う,こ}"
+      },
+      {
+        "enabled": true,
+        "word": "選択肢",
+        "reading": "{選択肢||せ|ん,た|く,し}"
+      },
+      {
+        "enabled": true,
+        "word": "勝負",
+        "reading": "{勝||しょ|う}{負||ぶ}"
+      },
+      {
+        "enabled": true,
+        "word": "波風",
+        "reading": "{波風||な|み,か|ぜ}"
+      },
+      {
+        "enabled": true,
+        "word": "羅針盤",
+        "reading": "{羅針盤||ら,し|ん,ば|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "在り処",
+        "reading": "{在||あ}り{処||か}"
+      },
+      {
+        "enabled": true,
+        "word": "前進",
+        "reading": "{前進||ぜ|ん,し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "未知",
+        "reading": "{未知||み,ち}"
+      },
+      {
+        "enabled": true,
+        "word": "原理",
+        "reading": "{原理||げ|ん,り}"
+      },
+      {
+        "enabled": true,
+        "word": "肝心",
+        "reading": "{肝心||か|ん,じ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "予定",
+        "reading": "{予定||よ,て|い}"
+      },
+      {
+        "enabled": true,
+        "word": "調和",
+        "reading": "{調和||ちょ|う,わ}"
+      },
+      {
+        "enabled": true,
+        "word": "指名",
+        "reading": "{指名||し,め|い}"
+      },
+      {
+        "enabled": true,
+        "word": "手配",
+        "reading": "{手配||て,は|い}"
+      },
+      {
+        "enabled": true,
+        "word": "絶望",
+        "reading": "{絶||ぜ|つ}{望||ぼ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "無数",
+        "reading": "{無||む}{数||す|う}"
+      },
+      {
+        "enabled": true,
+        "word": "両手",
+        "reading": "{両手||りょ|う,て}"
+      },
+      {
+        "enabled": true,
+        "word": "放物線",
+        "reading": "{放物線||ほ|う,ぶ|つ,せ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "予感",
+        "reading": "{予||よ}{感||か|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "能力",
+        "reading": "{能力||の|う,りょ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "地平",
+        "reading": "{地||ち}{平||へ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "紅",
+        "reading": "{紅||く|れ|な|い}"
+      },
+      {
+        "enabled": true,
+        "word": "常闇",
+        "reading": "{常闇||と|こ,や|み}"
+      },
+      {
+        "enabled": true,
+        "word": "獰猛",
+        "reading": "{獰猛||ど|う,も|う}"
+      },
+      {
+        "enabled": true,
+        "word": "歌声",
+        "reading": "{歌声||う|た,ご|え}"
+      },
+      {
+        "enabled": true,
+        "word": "車輪",
+        "reading": "{車輪||しゃ,り|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "混沌",
+        "reading": "{混沌||こ|ん,と|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "複雑",
+        "reading": "{複雑||ふ|く,ざ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "究極",
+        "reading": "{究極||きゅ|う,きょ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "状態",
+        "reading": "{状態||じょ|う,た|い}"
+      },
+      {
+        "enabled": true,
+        "word": "無情",
+        "reading": "{無情||む,じょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "宣戦",
+        "reading": "{宣戦||せ|ん,せ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "布告",
+        "reading": "{布告||ふ,こ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "四面",
+        "reading": "{四面||し,め|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "楚歌",
+        "reading": "{楚歌||そ,か}"
+      },
+      {
+        "enabled": true,
+        "word": "時代",
+        "reading": "{時||じ}{代||だ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "異常",
+        "reading": "{異常||い,じょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "事態",
+        "reading": "{事||じ}{態||た|い}"
+      },
+      {
+        "enabled": true,
+        "word": "強者",
+        "reading": "{強者||つ|わ,も|の}"
+      },
+      {
+        "enabled": true,
+        "word": "確固",
+        "reading": "{確固||かっ,こ}"
+      },
+      {
+        "enabled": true,
+        "word": "決意",
+        "reading": "{決||け|つ}{意||い}"
+      },
+      {
+        "enabled": true,
+        "word": "惑星",
+        "reading": "{惑星||わ|く,せ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "仲間",
+        "reading": "{仲間||な|か,ま}"
+      },
+      {
+        "enabled": true,
+        "word": "覚醒",
+        "reading": "{覚醒||か|く,せ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "全身",
+        "reading": "{全||ぜ|ん}{身||し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "意識",
+        "reading": "{意||い}{識||し|き}"
+      },
+      {
+        "enabled": true,
+        "word": "微熱",
+        "reading": "{微熱||び,ね|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "手当",
+        "reading": "{手当||て,あ|て}"
+      },
+      {
+        "enabled": true,
+        "word": "不解",
+        "reading": "{不解||ふ,か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "全開",
+        "reading": "{全||ぜ|ん}{開||か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "速度",
+        "reading": "{速||そ|く}{度||ど}"
+      },
+      {
+        "enabled": true,
+        "word": "不純",
+        "reading": "{不純||ふ,じゅ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "別々",
+        "reading": "{別々||べ|つ,べ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "頑張",
+        "reading": "{頑||が|ん}{張||ば}"
+      },
+      {
+        "enabled": true,
+        "word": "薄紅色",
+        "reading": "{薄紅色||う|す,べ|に,い|ろ}"
+      },
+      {
+        "enabled": true,
+        "word": "紅色",
+        "reading": "{紅色||べ|に,い|ろ}"
+      },
+      {
+        "enabled": true,
+        "word": "居場所",
+        "reading": "{居||い}{場||ば}{所||しょ}"
+      },
+      {
+        "enabled": true,
+        "word": "雨宿",
+        "reading": "{雨宿||あ|ま,や|ど}"
+      },
+      {
+        "enabled": true,
+        "word": "宵闇",
+        "reading": "{宵闇||よ|い,や|み}"
+      },
+      {
+        "enabled": true,
+        "word": "想像",
+        "reading": "{想||そ|う}{像||ぞ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "天上",
+        "reading": "{天上||て|ん,じょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "必然",
+        "reading": "{必然||ひ|つ,ぜ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "軌道",
+        "reading": "{軌道||き,ど|う}"
+      },
+      {
+        "enabled": true,
+        "word": "争鳴",
+        "reading": "{争鳴||そ|う,め|い}"
+      },
+      {
+        "enabled": true,
+        "word": "飴色",
+        "reading": "{飴色||あ|め,い|ろ}"
+      },
+      {
+        "enabled": true,
+        "word": "極上",
+        "reading": "{極上||ご|く,じょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "創造",
+        "reading": "{創||そ|う}{造||ぞ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "紀元",
+        "reading": "{紀元||き,げ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "胎動",
+        "reading": "{胎動||た|い,ど|う}"
+      },
+      {
+        "enabled": true,
+        "word": "天声",
+        "reading": "{天声||て|ん,せ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "神秘",
+        "reading": "{神秘||し,ん|ぴ}"
+      },
+      {
+        "enabled": true,
+        "word": "歴史",
+        "reading": "{歴||れ|き}{史||し}"
+      },
+      {
+        "enabled": true,
+        "word": "証明",
+        "reading": "{証||しょ|う}{明||め|い}"
+      },
+      {
+        "enabled": true,
+        "word": "凛々",
+        "reading": "{凛々||り,り}"
+      },
+      {
+        "enabled": true,
+        "word": "事実",
+        "reading": "{事||じ}{実||じ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "無惨",
+        "reading": "{無惨||む,ざ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "気配",
+        "reading": "{気配||け,は|い}"
+      },
+      {
+        "enabled": true,
+        "word": "世界中",
+        "reading": "{世||せ}{界||か|い}{中||じゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "歩道",
+        "reading": "{歩道||ほ,ど|う}"
+      },
+      {
+        "enabled": true,
+        "word": "宝箱",
+        "reading": "{宝箱||た|か|ら,ば|こ}"
+      },
+      {
+        "enabled": true,
+        "word": "過剩",
+        "reading": "{過剩||か,じょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "今度",
+        "reading": "{今||こ|ん}{度||ど}"
+      },
+      {
+        "enabled": true,
+        "word": "個人的",
+        "reading": "{個人的||こ,じ|ん,て|き}"
+      },
+      {
+        "enabled": true,
+        "word": "個人",
+        "reading": "{個人||こ,じ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "伝説",
+        "reading": "{伝説||で|ん,せ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "渋滞",
+        "reading": "{渋滞||じゅ|う,た|い}"
+      },
+      {
+        "enabled": true,
+        "word": "吉日",
+        "reading": "{吉日||き|ち,じ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "連発",
+        "reading": "{連発||れ|ん,ぱ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "感謝",
+        "reading": "{感||か|ん}{謝||しゃ}"
+      },
+      {
+        "enabled": true,
+        "word": "氷河",
+        "reading": "{氷河||ひょ|う,が}"
+      },
+      {
+        "enabled": true,
+        "word": "美食",
+        "reading": "{美食||び,しょ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "捕獲",
+        "reading": "{捕獲||ほ,か|く}"
+      },
+      {
+        "enabled": true,
+        "word": "失敗",
+        "reading": "{失||しっ}{敗||ぱ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "千年",
+        "reading": "{千年||せ|ん,ね|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "冒険",
+        "reading": "{冒険||ぼ|う,け|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "一個",
+        "reading": "{一個||いっ,こ}"
+      },
+      {
+        "enabled": true,
+        "word": "努力",
+        "reading": "{努||ど}{力||りょ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "一度",
+        "reading": "{一||い|ち}{度||ど}"
+      },
+      {
+        "enabled": true,
+        "word": "雄々",
+        "reading": "{雄々||お,お}"
+      },
+      {
+        "enabled": true,
+        "word": "夢幻",
+        "reading": "{夢||む}{幻||げ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "不思議",
+        "reading": "{不思議||ふ,し,ぎ}"
+      },
+      {
+        "enabled": true,
+        "word": "気力",
+        "reading": "{気力||き,りょ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "魔力",
+        "reading": "{魔力||ま,りょ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "超力",
+        "reading": "{超力||ちょ|う,りょ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "巨神",
+        "reading": "{巨神||きょ,し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "粉砕",
+        "reading": "{粉砕||ふ|ん,さ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "発進",
+        "reading": "{発進||はっ,し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "獅子",
+        "reading": "{獅子||し,し}"
+      },
+      {
+        "enabled": true,
+        "word": "頑強",
+        "reading": "{頑強||が|ん,きょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "軍団",
+        "reading": "{軍団||ぐ|ん,だ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "勇者王",
+        "reading": "{勇者王||ゆ|う,しゃ,お|う}"
+      },
+      {
+        "enabled": true,
+        "word": "守護神",
+        "reading": "{守護神||しゅ,ご,し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "誕生",
+        "reading": "{誕生||た|ん,じょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "湾曲",
+        "reading": "{湾曲||わ|ん,きょ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "空間",
+        "reading": "{空||く|う}{間||か|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "合体",
+        "reading": "{合体||がっ,た|い}"
+      },
+      {
+        "enabled": true,
+        "word": "承認",
+        "reading": "{承認||しょ|う,に|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "戦争",
+        "reading": "{戦||せ|ん}{争||そ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "怪獣",
+        "reading": "{怪||か|い}{獣||じゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "巨大",
+        "reading": "{巨大||きょ,だ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "退屈",
+        "reading": "{退||た|い}{屈||く|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "戦隊",
+        "reading": "{戦隊||せ|ん,た|い}"
+      },
+      {
+        "enabled": true,
+        "word": "爆竜",
+        "reading": "{爆竜||ば|く,りゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "使命",
+        "reading": "{使命||し,め|い}"
+      },
+      {
+        "enabled": true,
+        "word": "人形",
+        "reading": "{人形||に|ん,ぎょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "意思",
+        "reading": "{意||い}{思||し}"
+      },
+      {
+        "enabled": true,
+        "word": "法則",
+        "reading": "{法則||ほ|う,そ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "理由",
+        "reading": "{理||り}{由||ゆ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "面影",
+        "reading": "{面影||お|も,か|げ}"
+      },
+      {
+        "enabled": true,
+        "word": "覚悟",
+        "reading": "{覚||か|く}{悟||ご}"
+      },
+      {
+        "enabled": true,
+        "word": "片隅",
+        "reading": "{片隅||か|た,す|み}"
+      },
+      {
+        "enabled": true,
+        "word": "何気",
+        "reading": "{何気||な|に,げ}"
+      },
+      {
+        "enabled": true,
+        "word": "歯車",
+        "reading": "{歯||は}{車||ぐ|る|ま}"
+      },
+      {
+        "enabled": true,
+        "word": "虚無",
+        "reading": "{虚||きょ}{無||む}"
+      },
+      {
+        "enabled": true,
+        "word": "女神",
+        "reading": "{女神||め,が|み}"
+      },
+      {
+        "enabled": true,
+        "word": "蒼穹",
+        "reading": "{蒼穹||そ|う,きゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "最期",
+        "reading": "{最||さ|い}{期||ご}"
+      },
+      {
+        "enabled": true,
+        "word": "身体中",
+        "reading": "{身体中||か|ら,だ,じゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "喧騒",
+        "reading": "{喧騒||け|ん,そ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "確率",
+        "reading": "{確率||か|く,り|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "成功",
+        "reading": "{成功||せ|い,こ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "空論",
+        "reading": "{空論||く|う,ろ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "全力",
+        "reading": "{全||ぜ|ん}{力||りょ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "開拓",
+        "reading": "{開拓||か|い,た|く}"
+      },
+      {
+        "enabled": true,
+        "word": "声明",
+        "reading": "{声明||せ|い,め|い}"
+      },
+      {
+        "enabled": true,
+        "word": "普遍",
+        "reading": "{普遍||ふ,へ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "空欄",
+        "reading": "{空欄||く|う,ら|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "結末",
+        "reading": "{結末||け|つ,ま|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "迷路",
+        "reading": "{迷||め|い}{路||ろ}"
+      },
+      {
+        "enabled": true,
+        "word": "精一杯",
+        "reading": "{精一杯||せ|い,いっ,ぱ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "些細",
+        "reading": "{些細||さ,さ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "自由",
+        "reading": "{自||じ}{由||ゆ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "手順",
+        "reading": "{手順||て,じゅ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "一時的",
+        "reading": "{一||い|ち}{時||じ}{的||て|き}"
+      },
+      {
+        "enabled": true,
+        "word": "感傷",
+        "reading": "{感傷||か|ん,しょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "一時",
+        "reading": "{一時||い|ち,じ}"
+      },
+      {
+        "enabled": true,
+        "word": "可能性",
+        "reading": "{可||か}{能||の|う}{性||せ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "精査",
+        "reading": "{精査||せ|い,さ}"
+      },
+      {
+        "enabled": true,
+        "word": "迂闊",
+        "reading": "{迂闊||う,か|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "胃袋",
+        "reading": "{胃袋||い,ぶ|く|ろ}"
+      },
+      {
+        "enabled": true,
+        "word": "食材",
+        "reading": "{食材||しょ|く,ざ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "大人",
+        "reading": "{大人||お,と|な}"
+      },
+      {
+        "enabled": true,
+        "word": "呪文",
+        "reading": "{呪文||じゅ,も|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "星屑",
+        "reading": "{星||ほ|し}{屑||く|ず}"
+      },
+      {
+        "enabled": true,
+        "word": "以上",
+        "reading": "{以||い}{上||じょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "真紅",
+        "reading": "{真紅||し|ん,く}"
+      },
+      {
+        "enabled": true,
+        "word": "終焉",
+        "reading": "{終焉||しゅ|う,え|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "遺伝子",
+        "reading": "{遺伝子||い,で|ん,し}"
+      },
+      {
+        "enabled": true,
+        "word": "万象",
+        "reading": "{万象||ば|ん,しょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "森羅",
+        "reading": "{森羅||し|ん,ら}"
+      },
+      {
+        "enabled": true,
+        "word": "全霊",
+        "reading": "{全||ぜ|ん}{霊||れ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "初めて",
+        "reading": "{初||は|じ}めて"
+      },
+      {
+        "enabled": true,
+        "word": "無意識",
+        "reading": "{無意識||む,い,し|き}"
+      },
+      {
+        "enabled": true,
+        "word": "荒野",
+        "reading": "{荒野||こ|う,や}"
+      },
+      {
+        "enabled": true,
+        "word": "理性",
+        "reading": "{理||り}{性||せ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "狭間",
+        "reading": "{狭間||は|ざ,ま}"
+      },
+      {
+        "enabled": true,
+        "word": "熱戦",
+        "reading": "{熱戦||ねっ,せ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "彼の日",
+        "reading": "{彼||か}の{日||ひ}"
+      },
+      {
+        "enabled": true,
+        "word": "此処",
+        "reading": "{此処||こ,こ}"
+      },
+      {
+        "enabled": true,
+        "word": "体中",
+        "reading": "{体中||か|ら|だ,じゅ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "苦しい",
+        "reading": "{苦||く|る}しい"
+      },
+      {
+        "enabled": true,
+        "word": "絶唱",
+        "reading": "{絶唱||ぜっ,しょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "生命",
+        "reading": "{生命||せ|い,め|い}"
+      },
+      {
+        "enabled": true,
+        "word": "本能",
+        "reading": "{本||ほ|ん}{能||の|う}"
+      },
+      {
+        "enabled": true,
+        "word": "巡る",
+        "reading": "{巡||め|ぐ}る"
+      },
+      {
+        "enabled": true,
+        "word": "帝国華撃団",
+        "reading": "{帝国||て|い,こ|く}{華撃団||か,げ|き,だ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "錏",
+        "reading": "{錏||ゑ}"
+      },
+      {
+        "enabled": true,
+        "word": "蘢",
+        "reading": "{蘢||ゐ}"
+      },
+      {
+        "enabled": true,
+        "word": "腹上",
+        "reading": "{腹||ふ|く}{上||じょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "誘なう",
+        "reading": "{誘||い|ざ}なう"
+      },
+      {
+        "enabled": true,
+        "word": "繋ごう",
+        "reading": "{繋||つ|な}ごう"
+      },
+      {
+        "enabled": true,
+        "word": "繋げる",
+        "reading": "{繋||つ|な}げる"
+      },
+      {
+        "enabled": true,
+        "word": "繋がる",
+        "reading": "{繋||つ|な}がる"
+      },
+      {
+        "enabled": true,
+        "word": "眩しい",
+        "reading": "{眩||ま|ぶ}しい"
+      },
+      {
+        "enabled": true,
+        "word": "儚く",
+        "reading": "{儚||は|か|な}く"
+      },
+      {
+        "enabled": true,
+        "word": "噛み",
+        "reading": "{噛||か}み"
+      },
+      {
+        "enabled": true,
+        "word": "呼んで",
+        "reading": "{呼||よ}んで"
+      },
+      {
+        "enabled": true,
+        "word": "呼んだ",
+        "reading": "{呼||よ}んだ"
+      },
+      {
+        "enabled": true,
+        "word": "挟ま",
+        "reading": "{挟||は|さ}ま"
+      },
+      {
+        "enabled": true,
+        "word": "挟ん",
+        "reading": "{挟||は|さ}ん"
+      },
+      {
+        "enabled": true,
+        "word": "挟も",
+        "reading": "{挟||は|さ}も"
+      },
+      {
+        "enabled": true,
+        "word": "挟め",
+        "reading": "{挟||は|さ}め"
+      },
+      {
+        "enabled": true,
+        "word": "挟み",
+        "reading": "{挟||は|さ}み"
+      },
+      {
+        "enabled": true,
+        "word": "儚い",
+        "reading": "{儚||は|か|な}い"
+      },
+      {
+        "enabled": true,
+        "word": "眩む",
+        "reading": "{眩||く|ら}む"
+      },
+      {
+        "enabled": true,
+        "word": "込める",
+        "reading": "{込||こ}める"
+      },
+      {
+        "enabled": true,
+        "word": "込めた",
+        "reading": "{込||こ}めた"
+      },
+      {
+        "enabled": true,
+        "word": "込めて",
+        "reading": "{込||こ}めて"
+      },
+      {
+        "enabled": true,
+        "word": "繋いだ",
+        "reading": "{繋||つ|な}いだ"
+      },
+      {
+        "enabled": true,
+        "word": "眩んで",
+        "reading": "{眩||く|ら}んで"
+      },
+      {
+        "enabled": true,
+        "word": "眩んだ",
+        "reading": "{眩||く|ら}んだ"
+      },
+      {
+        "enabled": true,
+        "word": "酔い",
+        "reading": "{酔||よ}い"
+      },
+      {
+        "enabled": true,
+        "word": "込む",
+        "reading": "{込||こ}む"
+      },
+      {
+        "enabled": true,
+        "word": "込んだ",
+        "reading": "{込||こ}んだ"
+      },
+      {
+        "enabled": true,
+        "word": "込んで",
+        "reading": "{込||こ}んで"
+      },
+      {
+        "enabled": true,
+        "word": "潰さ",
+        "reading": "{潰||つ|ぶ}さ"
+      },
+      {
+        "enabled": true,
+        "word": "潰せ",
+        "reading": "{潰||つ|ぶ}せ"
+      },
+      {
+        "enabled": true,
+        "word": "潰した",
+        "reading": "{潰||つ|ぶ}した"
+      },
+      {
+        "enabled": true,
+        "word": "潰して",
+        "reading": "{潰||つ|ぶ}して"
+      },
+      {
+        "enabled": true,
+        "word": "綻び",
+        "reading": "{綻||ほ|こ|ろ}び"
+      },
+      {
+        "enabled": true,
+        "word": "掴め",
+        "reading": "{掴||つ|か}め"
+      },
+      {
+        "enabled": true,
+        "word": "掴んで",
+        "reading": "{掴||つ|か}んで"
+      },
+      {
+        "enabled": true,
+        "word": "掴んだ",
+        "reading": "{掴||つ|か}んだ"
+      },
+      {
+        "enabled": true,
+        "word": "掴む",
+        "reading": "{掴||つ|か}む"
+      },
+      {
+        "enabled": true,
+        "word": "叩いて",
+        "reading": "{叩||た|た}いて"
+      },
+      {
+        "enabled": true,
+        "word": "叩いた",
+        "reading": "{叩||た|た}いた"
+      },
+      {
+        "enabled": true,
+        "word": "呟いた",
+        "reading": "{呟||つ|ぶ|や}いた"
+      },
+      {
+        "enabled": true,
+        "word": "噛ん",
+        "reading": "{噛||か}ん"
+      },
+      {
+        "enabled": true,
+        "word": "悔しく",
+        "reading": "{悔||く|や}しく"
+      },
+      {
+        "enabled": true,
+        "word": "繋いで",
+        "reading": "{繋||つ|な}いで"
+      },
+      {
+        "enabled": true,
+        "word": "繋ぐ",
+        "reading": "{繋||つ|な}ぐ"
+      },
+      {
+        "enabled": true,
+        "word": "泣け",
+        "reading": "{泣||な}け"
+      },
+      {
+        "enabled": true,
+        "word": "泣き",
+        "reading": "{泣||な}き"
+      },
+      {
+        "enabled": true,
+        "word": "時計",
+        "reading": "{時計||と,け|い}"
+      },
+      {
+        "enabled": true,
+        "word": "見失",
+        "reading": "{見||み}{失||う|し|な}"
+      },
+      {
+        "enabled": true,
+        "word": "翡翠",
+        "reading": "{翡翠||ひ,す|い}"
+      },
+      {
+        "enabled": true,
+        "word": "景色",
+        "reading": "{景色||け,し|き}"
+      },
+      {
+        "enabled": true,
+        "word": "秘か",
+        "reading": "{秘||ひ|そ}か"
+      },
+      {
+        "enabled": true,
+        "word": "一緒",
+        "reading": "{一緒||いっ,しょ}"
+      },
+      {
+        "enabled": true,
+        "word": "二度",
+        "reading": "{二||に}{度||ど}"
+      },
+      {
+        "enabled": true,
+        "word": "相乗効果",
+        "reading": "{相||そ|う}{乗||じょ|う}{効||こ|う}{果||か}"
+      },
+      {
+        "enabled": true,
+        "word": "言の葉",
+        "reading": "{言||こ|と}の{葉||は}"
+      },
+      {
+        "enabled": true,
+        "word": "祭囃子",
+        "reading": "{祭囃子||ま|つ|り,ば|や,し}"
+      },
+      {
+        "enabled": true,
+        "word": "丁半",
+        "reading": "{丁||ちょ|う}{半||は|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "小遣い",
+        "reading": "{小||こ}{遣||づ|か}い"
+      },
+      {
+        "enabled": true,
+        "word": "逃げ道",
+        "reading": "{逃||に}げ{道||み|ち}"
+      },
+      {
+        "enabled": true,
+        "word": "因数",
+        "reading": "{因||い|ん}{数||す|う}"
+      },
+      {
+        "enabled": true,
+        "word": "蜃気楼",
+        "reading": "{蜃||し|ん}{気||き}{楼||ろ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "朧月夜",
+        "reading": "{朧||お|ぼ|ろ}{月||づ|き}{夜||よ}"
+      },
+      {
+        "enabled": true,
+        "word": "捲土",
+        "reading": "{捲||け|ん}{土||ど}"
+      },
+      {
+        "enabled": true,
+        "word": "言い訳",
+        "reading": "{言||い}い{訳||わ|け}"
+      },
+      {
+        "enabled": true,
+        "word": "司る",
+        "reading": "{司||つ|か|さ|ど}る"
+      },
+      {
+        "enabled": true,
+        "word": "厭穢欣浄",
+        "reading": "{厭||え|ん}{穢||え}{欣||ご|ん}{浄||じょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "三位一体",
+        "reading": "{三||さ|ん}{位||み}{一||いっ}{体||た|い}"
+      },
+      {
+        "enabled": true,
+        "word": "真に受け",
+        "reading": "{真||ま}に{受||う}け"
+      },
+      {
+        "enabled": true,
+        "word": "空想癖",
+        "reading": "{空||く|う}{想||そ|う}{癖||へ|き}"
+      },
+      {
+        "enabled": true,
+        "word": "今宵",
+        "reading": "{今||こ}{宵||よ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "華",
+        "reading": "{華||は|な}"
+      },
+      {
+        "enabled": true,
+        "word": "嫉妬",
+        "reading": "{嫉||しっ}{妬||と}"
+      },
+      {
+        "enabled": true,
+        "word": "勝手",
+        "reading": "{勝||かっ}{手||て}"
+      },
+      {
+        "enabled": true,
+        "word": "居心地",
+        "reading": "{居||い}{心||ご|こ}{地||ち}"
+      },
+      {
+        "enabled": true,
+        "word": "絶え間",
+        "reading": "{絶||た}え{間||ま}"
+      },
+      {
+        "enabled": true,
+        "word": "引っ",
+        "reading": "{引||ひ}っ"
+      },
+      {
+        "enabled": true,
+        "word": "流る",
+        "reading": "{流||な|が}る"
+      },
+      {
+        "enabled": true,
+        "word": "苦し",
+        "reading": "{苦||く|る}し"
+      },
+      {
+        "enabled": true,
+        "word": "描き",
+        "reading": "{描||え|が}き"
+      },
+      {
+        "enabled": true,
+        "word": "描い",
+        "reading": "{描||え|が}い"
+      },
+      {
+        "enabled": true,
+        "word": "勇気",
+        "reading": "{勇||ゆ|う}{気||き}"
+      },
+      {
+        "enabled": true,
+        "word": "巻き込",
+        "reading": "{巻||ま}き{込||こ}"
+      },
+      {
+        "enabled": true,
+        "word": "思想",
+        "reading": "{思||し}{想||そ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "尖らせ",
+        "reading": "{尖||と|が}らせ"
+      },
+      {
+        "enabled": true,
+        "word": "痛ましい",
+        "reading": "{痛||い|た}ましい"
+      },
+      {
+        "enabled": true,
+        "word": "鳴らせ",
+        "reading": "{鳴||な}らせ"
+      },
+      {
+        "enabled": true,
+        "word": "微笑み",
+        "reading": "{微||ほ|ほ}{笑||え}み"
+      },
+      {
+        "enabled": true,
+        "word": "栄華",
+        "reading": "{栄||え|い}{華||が}"
+      },
+      {
+        "enabled": true,
+        "word": "最高峰",
+        "reading": "{最||さ|い}{高||こ|う}{峰||ほ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "見逃",
+        "reading": "{見||み}{逃||の|が}"
+      },
+      {
+        "enabled": true,
+        "word": "案の定",
+        "reading": "{案||あ|ん}の{定||じょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "孤独",
+        "reading": "{孤||こ}{独||ど|く}"
+      },
+      {
+        "enabled": true,
+        "word": "太陽",
+        "reading": "{太||た|い}{陽||よ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "送電塔",
+        "reading": "{送電塔||そ|う,で|ん,と|う}"
+      },
+      {
+        "enabled": true,
+        "word": "羽虫",
+        "reading": "{羽||は}{虫||む|し}"
+      },
+      {
+        "enabled": true,
+        "word": "展開",
+        "reading": "{展||て|ん}{開||か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "一切",
+        "reading": "{一||いっ}{切||さ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "回転",
+        "reading": "{回||か|い}{転||て|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "舗装",
+        "reading": "{舗||ほ}{装||そ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "贖罪",
+        "reading": "{贖||しょ|く}{罪||ざ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "傷跡",
+        "reading": "{傷||き|ず}{跡||あ|と}"
+      },
+      {
+        "enabled": true,
+        "word": "暗闇",
+        "reading": "{暗||く|ら}{闇||や|み}"
+      },
+      {
+        "enabled": true,
+        "word": "秘密",
+        "reading": "{秘||ひ}{密||み|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "辞書",
+        "reading": "{辞||じ}{書||しょ}"
+      },
+      {
+        "enabled": true,
+        "word": "可愛い",
+        "reading": "{可愛||か|わ|い,}い"
+      },
+      {
+        "enabled": true,
+        "word": "陰口",
+        "reading": "{陰||か|げ}{口||ぐ|ち}"
+      },
+      {
+        "enabled": true,
+        "word": "最高",
+        "reading": "{最||さ|い}{高||こ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "方程式",
+        "reading": "{方||ほ|う}{程||て|い}{式||し|き}"
+      },
+      {
+        "enabled": true,
+        "word": "友達",
+        "reading": "{友||と|も}{達||だ|ち}"
+      },
+      {
+        "enabled": true,
+        "word": "隙間",
+        "reading": "{隙||す|き}{間||ま}"
+      },
+      {
+        "enabled": true,
+        "word": "小石",
+        "reading": "{小||こ}{石||い|し}"
+      },
+      {
+        "enabled": true,
+        "word": "当然",
+        "reading": "{当||と|う}{然||ぜ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "感情",
+        "reading": "{感||か|ん}{情||じょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "徒然",
+        "reading": "{徒然||つ|れ,づ|れ}"
+      },
+      {
+        "enabled": true,
+        "word": "自身",
+        "reading": "{自||じ}{身||し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "今日",
+        "reading": "{今日||きょ,う}"
+      },
+      {
+        "enabled": true,
+        "word": "平等",
+        "reading": "{平||びょ|う}{等||ど|う}"
+      },
+      {
+        "enabled": true,
+        "word": "騒然",
+        "reading": "{騒||そ|う}{然||ぜ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "創世",
+        "reading": "{創世||そ|う,せ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "何度",
+        "reading": "{何||な|ん}{度||ど}"
+      },
+      {
+        "enabled": true,
+        "word": "羽根",
+        "reading": "{羽||は}{根||ね}"
+      },
+      {
+        "enabled": true,
+        "word": "泡沫",
+        "reading": "{泡||う|た}{沫||か|た}"
+      },
+      {
+        "enabled": true,
+        "word": "昨日",
+        "reading": "{昨日||き|の|う,}"
+      },
+      {
+        "enabled": true,
+        "word": "水平線",
+        "reading": "{水||す|い}{平||へ|い}{線||せ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "一杯",
+        "reading": "{一||いっ}{杯||ぱ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "未練",
+        "reading": "{未||み}{練||れ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "摩天楼",
+        "reading": "{摩||ま}{天||て|ん}{楼||ろ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "重力",
+        "reading": "{重||じゅ|う}{力||りょ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "航路",
+        "reading": "{航||こ|う}{路||ろ}"
+      },
+      {
+        "enabled": true,
+        "word": "記憶",
+        "reading": "{記憶||き,お|く}"
+      },
+      {
+        "enabled": true,
+        "word": "脊髄",
+        "reading": "{脊||せ|き}{髄||ず|い}"
+      },
+      {
+        "enabled": true,
+        "word": "心臓",
+        "reading": "{心||し|ん}{臓||ぞ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "未踏",
+        "reading": "{未踏||み,と|う}"
+      },
+      {
+        "enabled": true,
+        "word": "空想",
+        "reading": "{空||く|う}{想||そ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "静寂",
+        "reading": "{静||せ|い}{寂||じゃ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "幽霊船",
+        "reading": "{幽||ゆ|う}{霊||れ|い}{船||せ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "明日",
+        "reading": "{明日||あ|し|た,}"
+      },
+      {
+        "enabled": true,
+        "word": "束の間",
+        "reading": "{束||つ|か}の{間||ま}"
+      },
+      {
+        "enabled": true,
+        "word": "世界",
+        "reading": "{世||せ}{界||か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "七色",
+        "reading": "{七色||な|な,い|ろ}"
+      },
+      {
+        "enabled": true,
+        "word": "流星",
+        "reading": "{流||りゅ|う}{星||せ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "境界線",
+        "reading": "{境||きょ|う}{界||か|い}{線||せ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "不安",
+        "reading": "{不||ふ}{安||あ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "夜空",
+        "reading": "{夜||よ}{空||ぞ|ら}"
+      },
+      {
+        "enabled": true,
+        "word": "地平線",
+        "reading": "{地||ち}{平||へ|い}{線||せ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "奇跡",
+        "reading": "{奇||き}{跡||せ|き}"
+      },
+      {
+        "enabled": true,
+        "word": "季節",
+        "reading": "{季||き}{節||せ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "名前",
+        "reading": "{名||な}{前||ま|え}"
+      },
+      {
+        "enabled": true,
+        "word": "飛行船",
+        "reading": "{飛||ひ}{行||こ|う}{船||せ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "運命",
+        "reading": "{運||う|ん}{命||め|い}"
+      },
+      {
+        "enabled": true,
+        "word": "透明",
+        "reading": "{透||と|う}{明||め|い}"
+      },
+      {
+        "enabled": true,
+        "word": "指先",
+        "reading": "{指||ゆ|び}{先||さ|き}"
+      },
+      {
+        "enabled": true,
+        "word": "提案",
+        "reading": "{提||て|い}{案||あ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "性格",
+        "reading": "{性||せ|い}{格||か|く}"
+      },
+      {
+        "enabled": true,
+        "word": "無計画",
+        "reading": "{無||む}{計||け|い}{画||か|く}"
+      },
+      {
+        "enabled": true,
+        "word": "迷惑",
+        "reading": "{迷||め|い}{惑||わ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "大事",
+        "reading": "{大||だ|い}{事||じ}"
+      },
+      {
+        "enabled": true,
+        "word": "退勤",
+        "reading": "{退||た|い}{勤||き|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "興味",
+        "reading": "{興||きょ|う}{味||み}"
+      },
+      {
+        "enabled": true,
+        "word": "贅沢",
+        "reading": "{贅||ぜ|い}{沢||た|く}"
+      },
+      {
+        "enabled": true,
+        "word": "半歩",
+        "reading": "{半||は|ん}{歩||ぽ}"
+      },
+      {
+        "enabled": true,
+        "word": "廃棄",
+        "reading": "{廃||は|い}{棄||き}"
+      },
+      {
+        "enabled": true,
+        "word": "毎晩",
+        "reading": "{毎||ま|い}{晩||ば|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "沢山",
+        "reading": "{沢||た|く}{山||さ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "一歩",
+        "reading": "{一||いっ}{歩||ぽ}"
+      },
+      {
+        "enabled": true,
+        "word": "全部",
+        "reading": "{全||ぜ|ん}{部||ぶ}"
+      },
+      {
+        "enabled": true,
+        "word": "後悔",
+        "reading": "{後||こ|う}{悔||か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "爽快",
+        "reading": "{爽||そ|う}{快||か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "放送",
+        "reading": "{放||ほ|う}{送||そ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "音響",
+        "reading": "{音||お|ん}{響||きょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "上々",
+        "reading": "{上||じょ|う}{々||じょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "頂戴",
+        "reading": "{頂||ちょ|う}{戴||だ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "本性",
+        "reading": "{本||ほ|ん}{性||しょ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "問答",
+        "reading": "{問||も|ん}{答||ど|う}"
+      },
+      {
+        "enabled": true,
+        "word": "堂々",
+        "reading": "{堂||ど|う}{々||ど|う}"
+      },
+      {
+        "enabled": true,
+        "word": "問題",
+        "reading": "{問||も|ん}{題||だ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "崩壊",
+        "reading": "{崩壊||ほ|う,か|い}"
+      },
+      {
+        "enabled": true,
+        "word": "商売",
+        "reading": "{商||しょ|う}{売||ば|い}"
+      },
+      {
+        "enabled": true,
+        "word": "総立ち",
+        "reading": "{総||そ|う}{立||だ}ち"
+      },
+      {
+        "enabled": true,
+        "word": "呆然",
+        "reading": "{呆||ぼ|う}{然||ぜ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "大物",
+        "reading": "{大||お|お}{物||も|の}"
+      },
+      {
+        "enabled": true,
+        "word": "暴走",
+        "reading": "{暴||ぼ|う}{走||そ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "轟音",
+        "reading": "{轟||ご|う}{音||お|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "会話",
+        "reading": "{会||か|い}{話||わ}"
+      },
+      {
+        "enabled": true,
+        "word": "建物",
+        "reading": "{建||た|て}{物||も|の}"
+      },
+      {
+        "enabled": true,
+        "word": "口数",
+        "reading": "{口||く|ち}{数||か|ず}"
+      },
+      {
+        "enabled": true,
+        "word": "週末",
+        "reading": "{週||しゅ|う}{末||ま|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "心地",
+        "reading": "{心||こ|こ}{地||ち}"
+      },
+      {
+        "enabled": true,
+        "word": "時間",
+        "reading": "{時||じ}{間||か|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "未熟",
+        "reading": "{未熟||み,じゅ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "現実",
+        "reading": "{現||げ|ん}{実||じ|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "接近",
+        "reading": "{接||せっ}{近||き|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "合図",
+        "reading": "{合||あ|い}{図||ず}"
+      },
+      {
+        "enabled": true,
+        "word": "細胞",
+        "reading": "{細||さ|い}{胞||ぼ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "動脈",
+        "reading": "{動||ど|う}{脈||みゃ|く}"
+      },
+      {
+        "enabled": true,
+        "word": "距離",
+        "reading": "{距||きょ}{離||り}"
+      },
+      {
+        "enabled": true,
+        "word": "躊躇う",
+        "reading": "{躊躇||た|め,ら}う"
+      },
+      {
+        "enabled": true,
+        "word": "自信",
+        "reading": "{自||じ}{信||し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "雑踏",
+        "reading": "{雑||ざっ}{踏||と|う}"
+      },
+      {
+        "enabled": true,
+        "word": "いつの間",
+        "reading": "いつの{間||ま}"
+      },
+      {
+        "enabled": true,
+        "word": "夕陽",
+        "reading": "{夕陽||ゆ|う,ひ}"
+      },
+      {
+        "enabled": true,
+        "word": "電車",
+        "reading": "{電||で|ん}{車||しゃ}"
+      },
+      {
+        "enabled": true,
+        "word": "陳腐",
+        "reading": "{陳||ち|ん}{腐||ぷ}"
+      },
+      {
+        "enabled": true,
+        "word": "言葉",
+        "reading": "{言||こ|と}{葉||ば}"
+      },
+      {
+        "enabled": true,
+        "word": "悪戯",
+        "reading": "{悪戯||い|た,ず|ら}"
+      },
+      {
+        "enabled": true,
+        "word": "本当",
+        "reading": "{本||ほ|ん}{当||と|う}"
+      },
+      {
+        "enabled": true,
+        "word": "残像",
+        "reading": "{残||ざ|ん}{像||ぞ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "一瞬",
+        "reading": "{一瞬||いっ,しゅ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "場所",
+        "reading": "{場||ば}{所||しょ}"
+      },
+      {
+        "enabled": true,
+        "word": "進化",
+        "reading": "{進||し|ん}{化||か}"
+      },
+      {
+        "enabled": true,
+        "word": "未来",
+        "reading": "{未||み}{来||ら|い}"
+      },
+      {
+        "enabled": true,
+        "word": "自分",
+        "reading": "{自||じ}{分||ぶ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "本物",
+        "reading": "{本||ほ|ん}{物||も|の}"
+      },
+      {
+        "enabled": true,
+        "word": "人生",
+        "reading": "{人||じ|ん}{生||せ|い}"
+      },
+      {
+        "enabled": true,
+        "word": "完全",
+        "reading": "{完||か|ん}{全||ぜ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "洒落",
+        "reading": "{洒落||しゃ,れ}"
+      },
+      {
+        "enabled": true,
+        "word": "思考",
+        "reading": "{思考||し,こ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "中坊",
+        "reading": "{中||ちゅ|う}{坊||ぼ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "相応し",
+        "reading": "{相応||ふ|さ|わ,}し"
+      },
+      {
+        "enabled": true,
+        "word": "剣の舞",
+        "reading": "{剣||つ|る|ぎ}の{舞||ま|い}"
+      },
+      {
+        "enabled": true,
+        "word": "夜な夜な",
+        "reading": "{夜||よ}な{夜||よ}な"
+      },
+      {
+        "enabled": true,
+        "word": "我が物顔",
+        "reading": "{我||わ}が{物||も|の}{顔||が|お}"
+      },
+      {
+        "enabled": true,
+        "word": "二人",
+        "reading": "{二人||ふ|た|り,}"
+      },
+      {
+        "enabled": true,
+        "word": "思い出せ",
+        "reading": "{思||お|も}い{出||だ}せ"
+      },
+      {
+        "enabled": true,
+        "word": "思い出し",
+        "reading": "{思||お|も}い{出||だ}し"
+      },
+      {
+        "enabled": true,
+        "word": "思い出す",
+        "reading": "{思||お|も}い{出||だ}す"
+      },
+      {
+        "enabled": true,
+        "word": "掛け替え",
+        "reading": "{掛||か}け{替||が}え"
+      },
+      {
+        "enabled": true,
+        "word": "伸び代",
+        "reading": "{伸||の}び{代||し|ろ}"
+      },
+      {
+        "enabled": true,
+        "word": "神話",
+        "reading": "{神||し|ん}{話||わ}"
+      },
+      {
+        "enabled": true,
+        "word": "真理",
+        "reading": "{真||し|ん}{理||り}"
+      },
+      {
+        "enabled": true,
+        "word": "裸足",
+        "reading": "{裸足||は|だ|し,}"
+      },
+      {
+        "enabled": true,
+        "word": "一人",
+        "reading": "{一人||ひ|と|り,}"
+      },
+      {
+        "enabled": true,
+        "word": "×",
+        "reading": "{×||ば|つ}"
+      },
+      {
+        "enabled": true,
+        "word": "○",
+        "reading": "{○||ま|る}"
+      },
+      {
+        "enabled": true,
+        "word": "行方",
+        "reading": "{行方||ゆ|く|え,}"
+      },
+      {
+        "enabled": true,
+        "word": "彷徨",
+        "reading": "{彷徨||さ|ま|よ,}"
+      },
+      {
+        "enabled": true,
+        "word": "希望",
+        "reading": "{希||き}{望||ぼ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "差し出",
+        "reading": "{差||さ}し{出||だ}"
+      },
+      {
+        "enabled": true,
+        "word": "空気",
+        "reading": "{空||く|う}{気||き}"
+      },
+      {
+        "enabled": true,
+        "word": "思い出",
+        "reading": "{思||お|も}い{出||で}"
+      },
+      {
+        "enabled": true,
+        "word": "下手",
+        "reading": "{下手||へ|た,}"
+      },
+      {
+        "enabled": true,
+        "word": "何時何分",
+        "reading": "{何||な|ん}{時||じ}{何||な|ん}{分||ぷ|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "天下",
+        "reading": "{天||て|ん}{下||か}"
+      },
+      {
+        "enabled": true,
+        "word": "知勇",
+        "reading": "{知||ち}{勇||ゆ|う}"
+      },
+      {
+        "enabled": true,
+        "word": "ブッ放",
+        "reading": "ブッ{放||ぱ|な}"
+      },
+      {
+        "enabled": true,
+        "word": "運心",
+        "reading": "{運||う|ん}{心||し|ん}"
+      },
+      {
+        "enabled": true,
+        "word": "直下",
+        "reading": "{直||ちょっ}{下||か}"
+      },
+      {
+        "enabled": true,
+        "word": "月下",
+        "reading": "{月||げっ}{下||か}"
+      },
+      {
+        "enabled": true,
+        "word": "ぶっ放す",
+        "reading": "ぶっ{放||ぱ|な}す"
+      },
+      {
+        "enabled": true,
+        "word": "解き放",
+        "reading": "{解||と}き{放||は|な}"
+      },
+      {
+        "enabled": true,
+        "word": "生き様",
+        "reading": "{生||い}き{様||ざ|ま}"
+      },
+      {
+        "enabled": true,
+        "word": "空却",
+        "reading": "{空||く|う}{却||こ|う}"
+      }
+    ],
+    "last_fetched": 1779521411
+  },
+  "fmpeach": {
+    "entries": [],
+    "last_fetched": null
+  }
+}

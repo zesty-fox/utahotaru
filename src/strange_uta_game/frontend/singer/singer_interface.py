@@ -454,7 +454,7 @@ class SingerEditDialog(QDialog):
         layout.setContentsMargins(8, 0, 0, 0)
         layout.setSpacing(4)
 
-        title = CaptionLabel("项目已用颜色")
+        title = CaptionLabel(self.tr("项目已用颜色"))
         layout.addWidget(title)
 
         scroll = QScrollArea()

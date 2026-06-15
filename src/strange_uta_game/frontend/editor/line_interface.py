@@ -314,14 +314,14 @@ class LineDetailDialog(QDialog):
         title_text = self.sentence.text[:30] + (
             "..." if len(self.sentence.text) > 30 else ""
         )
-        self.setWindowTitle(f"行详情 - {title_text}")
+        self.setWindowTitle(self.tr("行详情 - {title}").format(title=title_text))
         self.resize(900, 500)
         self.setFont(QFont("Microsoft YaHei", 10))
 
         self.vbox = QVBoxLayout(self)
 
         # 提示
-        hint = QLabel(
+        hint = QLabel(self.tr(
             "连词合并为一行；除「字符」外各列均用逗号「,」分隔\n"
             "双击可编辑「字符」「注音」「Checkpoint数」「句尾」「时间标签」「演唱者」列\n"
             "Checkpoint数：每字符一项（如 2,2,1），累加为本行节奏点总数 K\n"
@@ -329,7 +329,7 @@ class LineDetailDialog(QDialog):
             "时间标签：每个节奏点一段、按序对齐到 K 个节奏点，允许空段(,,)留空；"
             "句尾释放点写在最后；总数不得超过 K(+句尾1)\n"
             "句尾列填写「是」标记为句尾（独立记录释放时间），留空取消；演唱者每字符一项"
-        )
+        ))
         self.vbox.addWidget(hint)
 
         # Table

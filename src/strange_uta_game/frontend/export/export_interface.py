@@ -746,11 +746,11 @@ class ExportInterface(QWidget):
         # 检查文件是否已存在
         if Path(filepath).exists():
             msg = QMessageBox(self)
-            msg.setWindowTitle("文件已存在")
-            msg.setText(f"文件已存在：\n{filename}")
-            msg.setInformativeText("是否覆盖该文件？")
-            btn_overwrite = msg.addButton("覆盖", QMessageBox.ButtonRole.AcceptRole)
-            msg.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+            msg.setWindowTitle(self.tr("文件已存在"))
+            msg.setText(self.tr("文件已存在：\n{filename}").format(filename=filename))
+            msg.setInformativeText(self.tr("是否覆盖该文件？"))
+            btn_overwrite = msg.addButton(self.tr("覆盖"), QMessageBox.ButtonRole.AcceptRole)
+            msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
             msg.exec()
             if msg.clickedButton() != btn_overwrite:
                 return

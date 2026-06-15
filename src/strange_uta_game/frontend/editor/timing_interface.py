@@ -1793,8 +1793,8 @@ class EditorInterface(QWidget):
                     more = f"\n...（还有 {len(failures) - 20} 项未显示）"
                 QMessageBox.information(
                     self,
-                    "部分连词设置未应用",
-                    "以下位置为末字/句尾/行尾，不能设置连词，已自动跳过：\n\n"
+                    self.tr("部分连词设置未应用"),
+                    self.tr("以下位置为末字/句尾/行尾，不能设置连词，已自动跳过：\n\n")
                     + "\n".join(lines)
                     + more,
                 )
@@ -5594,10 +5594,17 @@ class EditorInterface(QWidget):
 
     _SCROLL_MODE_LABELS = {"auto": "自动滚动", "always": "始终滚动", "never": "从不滚动"}
 
+    def _scroll_mode_label(self, mode: str) -> str:
+        # 显式 tr 调用，让 .ts 提取器抓到这三个源串
+        if mode == "always":
+            return self.tr("始终滚动")
+        if mode == "never":
+            return self.tr("从不滚动")
+        return self.tr("自动滚动")
+
     def _sync_scroll_mode(self):
         """将当前 _scroll_mode 同步到按钮文字、颜色和 preview。"""
-        # 源串保留中文供 tr 扫描；显示时 tr() 翻译
-        self.btn_scroll_mode.setText(self.tr(self._SCROLL_MODE_LABELS.get(self._scroll_mode, "自动滚动")))
+        self.btn_scroll_mode.setText(self._scroll_mode_label(self._scroll_mode))
         self._update_scroll_mode_btn_style()
         self.preview.set_scroll_mode(self._scroll_mode)
         # 切换到 always / auto 时：重置挂起状态并立刻滚动到当前播放行
@@ -5932,7 +5939,7 @@ class EditorInterface(QWidget):
         project_copy = deepcopy(self._project)
 
         green = theme.status_complete.name()
-        state_tooltip = StateToolTip("正在分析注音", "准备中...", self)
+        state_tooltip = StateToolTip(self.tr("正在分析注音"), self.tr("准备中..."), self)
         state_tooltip.setStyleSheet(f"""
             StateToolTip {{
                 background-color: {green};
@@ -6178,7 +6185,7 @@ class EditorInterface(QWidget):
         subset_tooltip = None
         if llm_active:
             green = theme.status_complete.name()
-            subset_tooltip = StateToolTip("正在分析注音", "正在等待 LLM 返回…", self)
+            subset_tooltip = StateToolTip(self.tr("正在分析注音"), self.tr("正在等待 LLM 返回…"), self)
             subset_tooltip.setStyleSheet(f"""
                 StateToolTip {{
                     background-color: {green};
@@ -6248,8 +6255,8 @@ class EditorInterface(QWidget):
                 move_cp=False,
             )
             InfoBar.success(
-                title=f"{label}完成",
-                content="已分析所选范围的注音",
+                title=self.tr("{label}完成").format(label=label),
+                content=self.tr("已分析所选范围的注音"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -6261,7 +6268,7 @@ class EditorInterface(QWidget):
             _cleanup()
             _close_tooltip()
             InfoBar.warning(
-                title=f"{label}失败",
+                title=self.tr("{label}失败").format(label=label),
                 content=err,
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,

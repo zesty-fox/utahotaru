@@ -210,7 +210,7 @@ class FontSettingCard(SettingCard):
         super().__init__(icon, title, content, parent)
         self._title_text = title
         self._family = ""
-        self.btn = PushButton("选择字体", self)
+        self.btn = PushButton(self.tr("选择字体"), self)
         self.btn.setMinimumWidth(200)
         self.btn.clicked.connect(self._on_click)
         self.hBoxLayout.addWidget(self.btn, 0, Qt.AlignmentFlag.AlignRight)
@@ -250,7 +250,7 @@ class FontSettingCard(SettingCard):
 
     def setValue(self, family: str):
         self._family = family or ""
-        self.btn.setText(self._label_for(self._family) if self._family else "选择字体")
+        self.btn.setText(self._label_for(self._family) if self._family else self.tr("选择字体"))
 
     def value(self) -> str:
         return self._family
@@ -654,8 +654,8 @@ class ShortcutSettingCard(SettingCard):
         self.btn_key1.setEnabled(not readonly)
         self.btn_key2.setEnabled(not readonly)
         if readonly:
-            self.btn_key1.setToolTip("此快捷键不可修改")
-            self.btn_key2.setToolTip("此快捷键不可修改")
+            self.btn_key1.setToolTip(self.tr("此快捷键不可修改"))
+            self.btn_key2.setToolTip(self.tr("此快捷键不可修改"))
         else:
             self.btn_key1.setToolTip("")
             self.btn_key2.setToolTip("")

@@ -750,7 +750,7 @@ class InsertGuideSymbolDialog(QDialog):
             start_ts = self._find_prev_timestamp()
             if start_ts >= ref_ts:
                 InfoBar.warning(
-                    title="无法补足间隔时间",
+                    title=self.tr("无法补足间隔时间"),
                     content=self.tr("起点 {start}ms 不早于终点 {end}ms，间隔无效。").format(start=start_ts, end=ref_ts),
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
@@ -1264,7 +1264,7 @@ class SetSingerByLineDialog(QDialog):
         layout.addLayout(select_layout)
 
         # 演唱者选择区（名称过滤 + 分组过滤 + 列表预览）
-        singer_group = QGroupBox("设置演唱者为", self)
+        singer_group = QGroupBox(self.tr("设置演唱者为"), self)
         sg_layout = QVBoxLayout(singer_group)
         sg_layout.setSpacing(4)
 
@@ -1281,7 +1281,7 @@ class SetSingerByLineDialog(QDialog):
         self.singer_group_filter.addItem(self.tr("全部"), "")
         _groups = sorted({s.group for s in singers if s.group})
         if any(not s.group for s in singers):
-            self.singer_group_filter.addItem("（无分组）", "\x00nogroup")
+            self.singer_group_filter.addItem(self.tr("（无分组）"), "\x00nogroup")
         for _g in _groups:
             self.singer_group_filter.addItem(_g, _g)
         self.singer_group_filter.currentIndexChanged.connect(self._apply_singer_filter)
@@ -1914,18 +1914,18 @@ class SeparateSymbolTimestampDialog(QDialog):
         layout.setSpacing(8)
 
         # 说明文本
-        desc = QLabel(
+        desc = QLabel(self.tr(
             "针对选中的符号分组，自动处理时间戳：\n"
             "• 后补偿：符号无普通时间戳（cc=0）但有句尾停顿标记时，将停顿时间提升为普通时间戳，"
             "并将句尾时间戳后移「后补偿」值。\n"
             "• 前补偿：符号已有时间戳（cc=1）且紧跟的第一个非符号字符无时间戳（cc=0）时，"
             "将符号时间戳传递给该字符，并将符号时间戳前移「前补偿」值。"
-        )
+        ))
         desc.setWordWrap(True)
         layout.addWidget(desc)
 
         # 符号分组选择（两列布局）
-        group_box = QGroupBox("适用符号分组")
+        group_box = QGroupBox(self.tr("适用符号分组"))
         group_hlayout = QHBoxLayout(group_box)
         mid = (len(_SEPARATE_SYM_GROUPS) + 1) // 2
         left_col = QVBoxLayout()
@@ -1958,27 +1958,27 @@ class SeparateSymbolTimestampDialog(QDialog):
         layout.addLayout(sel_row)
 
         # 补偿设置
-        comp_box = QGroupBox("补偿时间戳")
+        comp_box = QGroupBox(self.tr("补偿时间戳"))
         comp_form = QFormLayout(comp_box)
 
         self.spin_pre_comp = SpinBox(self)
         self.spin_pre_comp.setRange(0, 9999)
         self.spin_pre_comp.setValue(self._saved_pre_comp)
         self.spin_pre_comp.setSuffix(" ms")
-        self.spin_pre_comp.setToolTip(
+        self.spin_pre_comp.setToolTip(self.tr(
             "符号已有时间戳（cc=1）时，将其时间戳前移的量；\n"
             "同时将原始符号时间戳赋给紧跟的无时间戳非符号字符"
-        )
-        comp_form.addRow("前补偿（前移符号时间戳）:", self.spin_pre_comp)
+        ))
+        comp_form.addRow(self.tr("前补偿（前移符号时间戳）:"), self.spin_pre_comp)
 
         self.spin_post_comp = SpinBox(self)
         self.spin_post_comp.setRange(0, 9999)
         self.spin_post_comp.setValue(self._saved_post_comp)
         self.spin_post_comp.setSuffix(" ms")
-        self.spin_post_comp.setToolTip(
+        self.spin_post_comp.setToolTip(self.tr(
             "符号无普通时间戳（cc=0）但有句尾停顿时，将句尾时间戳后移的量"
-        )
-        comp_form.addRow("后补偿（后移句尾时间戳）:", self.spin_post_comp)
+        ))
+        comp_form.addRow(self.tr("后补偿（后移句尾时间戳）:"), self.spin_post_comp)
 
         layout.addWidget(comp_box)
 

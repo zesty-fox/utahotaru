@@ -812,7 +812,8 @@ class FileLoader:
 
             if not sentences:
                 InfoBar.warning(
-                    title="解析结果为空", content="歌词文件未解析出有效内容",
+                    title=self._editor.tr("解析结果为空"),
+                    content=self._editor.tr("歌词文件未解析出有效内容"),
                     orient=Qt.Orientation.Horizontal, isClosable=True,
                     position=InfoBarPosition.TOP, duration=3000,
                     parent=self._editor,

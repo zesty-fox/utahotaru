@@ -170,7 +170,7 @@ def load_existing(ts_path: Path) -> dict[tuple[str, str], str]:
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("--src", type=Path, default=Path("src/strange_uta_game/frontend"))
+    p.add_argument("--src", type=Path, default=Path("src/strange_uta_game"))
     p.add_argument(
         "--ts",
         type=Path,
