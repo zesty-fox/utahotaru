@@ -402,9 +402,22 @@ class DeleteRubyByTypeDialog(QDialog):
         else:
             default_set = {CharType.HIRAGANA}
 
+        # 显式枚举每个 label 走 self.tr，让 .ts 抽取器把源串归入本类上下文
+        # （class 级常量里的字符串无法在抽取期定位到 self）。
+        _tr = self.tr
+        _tr("ひらがな（平假名）")
+        _tr("カタカナ（片假名・注音为平假名）")
+        _tr("カタカナ（片假名・注音含有英文）")
+        _tr("漢字（汉字）")
+        _tr("アルファベット（英文字母）")
+        _tr("数字")
+        _tr("記号（符号）")
+        _tr("長音符号（ー、～等）")
+        _tr("その他（♪等特殊符号）")
+        _tr("空格")
+
         self._checkboxes: list[tuple] = []
         for char_type, label in self._TYPE_LABELS:
-            # _TYPE_LABELS 是类属性，label 含中文源串；显示时 tr 翻译
             cb = QCheckBox(self.tr(label), self)
             cb.setChecked(char_type in default_set)
             layout.addWidget(cb)

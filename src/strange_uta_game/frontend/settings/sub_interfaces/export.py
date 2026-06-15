@@ -29,14 +29,16 @@ class ExportSubInterface(SubSettingInterface):
         tr = self.tr
         g = SettingCardGroup(tr("导出设定"), self.scrollWidget)
         self._tr_register(g, title_source="导出设定")
-        # 注意：格式 items 直接用做 _FMT_TO_IDX 的 key，因此**不能**用 tr() 包，
-        # 否则切语言会让历史 config.json 里存的格式名失效。EN/JA 落地时改为
-        # 用 dropdown 内部 (raw_key, label) 两层映射。
+        # config.json 存的是中文 key（如 "LRC (增强型)"），由 _FMT_TO_IDX /
+        # _IDX_TO_FMT 走"索引"做映射。这里 items 只决定显示文本，可安全 tr 翻译。
         self.card_default_format = self._tr_register(
             ComboSettingCard(FIF.SHARE, tr("默认导出格式"),
                 tr("导出歌词时的默认文件格式"),
-                items=["LRC (增强型)", "LRC (逐行)", "LRC (逐字)", "KRA", "TXT",
-                       "SRT", "txt2ass", "ASS", "Nicokara", "Nicokara (带注音)", "RL 编辑模式"],
+                items=[
+                    tr("LRC (增强型)"), tr("LRC (逐行)"), tr("LRC (逐字)"),
+                    "KRA", "TXT", "SRT", "txt2ass", "ASS",
+                    "Nicokara", tr("Nicokara (带注音)"), tr("RL 编辑模式"),
+                ],
                 parent=g),
             title_source="默认导出格式",
             content_source="导出歌词时的默认文件格式")

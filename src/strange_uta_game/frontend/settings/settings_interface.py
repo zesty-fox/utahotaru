@@ -202,11 +202,11 @@ class SettingsInterface(ScrollArea):
         self.pivot.setFixedHeight(40)
         self.vBoxLayout.addWidget(self.pivot)
 
-        for key, text in self._tab_config:
+        for key, _raw_text in self._tab_config:
             # 类级 TAB_CONFIG 保留中文源串供测试引用，显示时统一 tr()
             self.pivot.addItem(
                 routeKey=key,
-                text=self.tr(text),
+                text=self._tab_display_text(key),
                 onClick=lambda checked, k=key: self._on_tab_changed(k),
             )
 
@@ -289,16 +289,32 @@ class SettingsInterface(ScrollArea):
 
     # ── 热更新：Qt 自动派发的 LanguageChange ─────────────────────────
 
+    def _tab_display_text(self, key: str) -> str:
+        """各 tab 显示文本——逐项 self.tr 以便 .ts 抽取器把源串归入
+        SettingsInterface 上下文（变量参数的 ``self.tr(var)`` 抓不到）。
+        """
+        if key == "playback":   return self.tr("演奏控制")
+        if key == "timing":     return self.tr("打轴")
+        if key == "auto_save":  return self.tr("自动保存")
+        if key == "auto_check": return self.tr("AutoCheck")
+        if key == "dictionary": return self.tr("读音词典")
+        if key == "ui":         return self.tr("界面")
+        if key == "export":     return self.tr("导出")
+        if key == "shortcut":   return self.tr("快捷键")
+        if key == "network":    return self.tr("网络")
+        if key == "about":      return self.tr("关于/语言")
+        return key
+
     def changeEvent(self, event):
         if event.type() == QEvent.Type.LanguageChange:
             # 重新设置标题
             self.settingLabel.setText(self.tr("设置"))
             # 重新设置 Pivot 各 tab 的显示文本
-            for routeKey, raw_text in self._tab_config:
+            for routeKey, _raw_text in self._tab_config:
                 try:
                     item = self.pivot.widget(routeKey)
                     if item is not None and hasattr(item, "setText"):
-                        item.setText(self.tr(raw_text))
+                        item.setText(self._tab_display_text(routeKey))
                 except Exception:
                     pass
         super().changeEvent(event)

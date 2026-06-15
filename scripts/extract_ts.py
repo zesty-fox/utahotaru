@@ -62,6 +62,12 @@ class _Visitor(ast.NodeVisitor):
                 s = _extract_string(node.args[0])
                 if s:
                     self.entries.append((self._current_context(), s, node.lineno))
+        # ── 裸名 tr("...") / _tr("...")（常见做法：``tr = self.tr`` 别名）─
+        elif isinstance(node.func, ast.Name) and node.func.id in ("tr", "_tr"):
+            if node.args:
+                s = _extract_string(node.args[0])
+                if s:
+                    self.entries.append((self._current_context(), s, node.lineno))
         # ── QCoreApplication.translate("Ctx", "...") ──────────
         elif (
             isinstance(node.func, ast.Attribute)

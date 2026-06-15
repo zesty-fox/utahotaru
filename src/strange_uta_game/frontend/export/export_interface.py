@@ -354,6 +354,17 @@ class ExportInterface(QWidget):
         """
         return re.sub(r"\s*\(\.[^)]+\)$", "", name).strip()
 
+    def _tr_format_name(self, name: str) -> str:
+        """显式枚举各 format key → 让 .ts 抽取器把源串纳入 ExportInterface
+        上下文（变量参数的 self.tr(var) 抓不到）。"""
+        if name == "LRC (增强型)":      return self.tr("LRC (增强型)")
+        if name == "LRC (逐行)":        return self.tr("LRC (逐行)")
+        if name == "LRC (逐字)":        return self.tr("LRC (逐字)")
+        if name == "Nicokara (带注音)": return self.tr("Nicokara (带注音)")
+        if name == "RL 编辑模式":        return self.tr("RL 编辑模式")
+        # KRA / TXT / SRT / txt2ass / ASS / Nicokara 都是英文，无需翻译
+        return name
+
     def _populate_formats(self):
         """填充格式列表"""
         # 必须先 clear——changeEvent 重建后会再次调，不清会双份
@@ -362,7 +373,7 @@ class ExportInterface(QWidget):
         for fmt in formats:
             # name 是 config.json 里的 key（如 "LRC (增强型)"），不能改写；
             # 列表里只翻译显示文本，UserRole 仍存原 name 供保存/查询用。
-            display = f"{self.tr(fmt['name'])} ({fmt['extension']})"
+            display = f"{self._tr_format_name(fmt['name'])} ({fmt['extension']})"
             item = QListWidgetItem(display)
             item.setData(Qt.ItemDataRole.UserRole, fmt["name"])
             self.format_list.addItem(item)

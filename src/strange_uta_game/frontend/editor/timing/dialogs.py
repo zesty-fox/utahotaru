@@ -105,13 +105,22 @@ def _create_ruby_split_group(parent: QWidget) -> tuple[QRadioButton, QRadioButto
         (radio_direct, radio_by_char, radio_by_mora, group_box)
     """
     from PyQt6.QtCore import QCoreApplication
-    _tr = lambda s: QCoreApplication.translate("RubySplit", s)
-    group_box = QGroupBox(_tr("注音分段方式"))
+    # 显式 QCoreApplication.translate 让 .ts 抽取器以 "RubySplit" 为上下文
+    # 收录源串（lambda 包装时抽取器无法跟踪到内嵌上下文名）。
+    group_box = QGroupBox(
+        QCoreApplication.translate("RubySplit", "注音分段方式")
+    )
     group_layout = QVBoxLayout(group_box)
 
-    radio_direct = QRadioButton(_tr("直接应用（用逗号手动分段，无逗号则不分段）"))
-    radio_by_char = QRadioButton(_tr("按字符均分"))
-    radio_by_mora = QRadioButton(_tr("按 mora 均分（推荐）"))
+    radio_direct = QRadioButton(QCoreApplication.translate(
+        "RubySplit", "直接应用（用逗号手动分段，无逗号则不分段）"
+    ))
+    radio_by_char = QRadioButton(QCoreApplication.translate(
+        "RubySplit", "按字符均分"
+    ))
+    radio_by_mora = QRadioButton(QCoreApplication.translate(
+        "RubySplit", "按 mora 均分（推荐）"
+    ))
 
     # 读取配置值
     mode = _get_ruby_split_mode()
@@ -1648,22 +1657,23 @@ class CompleteTimestampDialog(QDialog):
         scope_layout = QVBoxLayout(scope_group)
 
         self._scope_checkboxes: dict[str, QCheckBox] = {}
-        # 显示侧用 tr() 翻译；key 作为持久化标识保持不变
-        scope_items = [
-            ("kanji", "汉字"),
-            ("hiragana", "平假名"),
-            ("katakana", "片假名"),
-            ("sokuon", "促音（っ/ッ）"),
-            ("long_vowel", "长音符号"),
-            ("chon", "拨音（ん/ン）"),
-            ("chisai_kana", "捨仮名"),
-            ("alphabet", "英文字母"),
-            ("number", "数字"),
-            ("symbol", "特殊符号"),
+        # 显示侧逐项显式 self.tr 以便 .ts 抽取器把源串归入本类上下文
+        # （self.tr(变量) 无法静态求值）。key 作为持久化标识不变。
+        scope_items: list[tuple[str, str]] = [
+            ("kanji",       self.tr("汉字")),
+            ("hiragana",    self.tr("平假名")),
+            ("katakana",    self.tr("片假名")),
+            ("sokuon",      self.tr("促音（っ/ッ）")),
+            ("long_vowel",  self.tr("长音符号")),
+            ("chon",        self.tr("拨音（ん/ン）")),
+            ("chisai_kana", self.tr("捨仮名")),
+            ("alphabet",    self.tr("英文字母")),
+            ("number",      self.tr("数字")),
+            ("symbol",      self.tr("特殊符号")),
         ]
 
         for key, label in scope_items:
-            chk = QCheckBox(self.tr(label))
+            chk = QCheckBox(label)
             chk.setChecked(key in self._saved_scope_types)
             self._scope_checkboxes[key] = chk
             scope_layout.addWidget(chk)
@@ -1675,12 +1685,12 @@ class CompleteTimestampDialog(QDialog):
         exclude_layout = QVBoxLayout(exclude_group)
 
         self._exclude_checkboxes: dict[str, QCheckBox] = {}
-        exclude_items = [
-            ("linked", "排除被连词字符"),
+        exclude_items: list[tuple[str, str]] = [
+            ("linked", self.tr("排除被连词字符")),
         ]
 
         for key, label in exclude_items:
-            chk = QCheckBox(self.tr(label))
+            chk = QCheckBox(label)
             chk.setChecked(key in self._saved_exclude_rules)
             self._exclude_checkboxes[key] = chk
             exclude_layout.addWidget(chk)
