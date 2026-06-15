@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 from .manager import (
+    AUTO_LANGUAGE_CODE,
     AVAILABLE_LANGUAGES,
     DEFAULT_LANGUAGE,
     LocalizationManager,
@@ -25,10 +26,12 @@ from .manager import (
     PSEUDO_LANGUAGE_CODE,
     install_translators,
     localization,
+    resolve_auto_language,
 )
 from .retranslate import detach_layout_for_rebuild
 
 __all__ = [
+    "AUTO_LANGUAGE_CODE",
     "AVAILABLE_LANGUAGES",
     "DEFAULT_LANGUAGE",
     "LocalizationManager",
@@ -37,4 +40,5 @@ __all__ = [
     "detach_layout_for_rebuild",
     "install_translators",
     "localization",
+    "resolve_auto_language",
 ]

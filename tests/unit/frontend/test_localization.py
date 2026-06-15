@@ -22,13 +22,18 @@ from strange_uta_game.frontend.localization import (
 
 
 class TestLanguageRegistry:
-    def test_default_is_zh_cn(self):
-        assert DEFAULT_LANGUAGE.code == "zh_CN"
-        assert DEFAULT_LANGUAGE.native_name == "简体中文"
+    def test_default_is_auto(self):
+        # 默认从 zh_CN 改成 auto（按系统 locale 解析到 zh_CN/ja_JP/en_US）
+        assert DEFAULT_LANGUAGE.code == "auto"
+        assert DEFAULT_LANGUAGE.native_name == "自动 / Auto"
 
     def test_pseudo_registered(self):
         codes = {l.code for l in AVAILABLE_LANGUAGES}
         assert PSEUDO_LANGUAGE_CODE in codes
+
+    def test_auto_resolves_to_real_language(self, qapp):
+        from strange_uta_game.frontend.localization import resolve_auto_language
+        assert resolve_auto_language() in ("zh_CN", "ja_JP", "en_US")
 
     def test_native_names_unique(self):
         names = [l.native_name for l in AVAILABLE_LANGUAGES]

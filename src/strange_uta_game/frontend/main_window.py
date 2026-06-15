@@ -65,7 +65,7 @@ class MainWindow(MSFluentWindow):
             from strange_uta_game.frontend.settings.app_settings import AppSettings
             from strange_uta_game.frontend.localization import install_translators
             try:
-                _lang = AppSettings().get("ui.language", "zh_CN")
+                _lang = AppSettings().get("ui.language", "auto")
             except Exception:
                 _lang = "zh_CN"
             install_translators(_lang)

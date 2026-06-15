@@ -68,10 +68,15 @@ class Language:
 
 #: 受支持的语言列表。EN/JA 翻译就绪后再追加。
 #:
+#: "auto" 是指令式选项，不是真实 .qm 语言：``apply_language("auto")`` 时
+#: 用 ``QLocale.system()`` 把系统语言映射到 zh_CN / ja_JP / en_US 三选
+#: 之一（简繁中文统一为 zh_CN，日文为 ja_JP，其余为 en_US）。
+#:
 #: "pseudo" 是开发用伪语言：所有被 ``tr()`` 包过的字符串显示成 ``⟦原文⟧``，
 #: 没 wrap 的纯中文保留原样。切到 pseudo 可一眼看出哪些字符串还没纳入 i18n。
 #: 它不依赖 .qm 文件——见 :class:`_PseudoTranslator`。
 AVAILABLE_LANGUAGES: Tuple[Language, ...] = (
+    Language(code="auto",   native_name="自动 / Auto", qlocale_name="auto"),
     Language(code="zh_CN",  native_name="简体中文", qlocale_name="zh_CN"),
     Language(code="ja_JP",  native_name="日本語",   qlocale_name="ja_JP"),
     Language(code="en_US",  native_name="English",  qlocale_name="en_US"),
@@ -84,6 +89,28 @@ DEFAULT_LANGUAGE: Language = AVAILABLE_LANGUAGES[0]
 
 
 PSEUDO_LANGUAGE_CODE: str = "pseudo"
+AUTO_LANGUAGE_CODE: str = "auto"
+
+
+def resolve_auto_language() -> str:
+    """读 ``QLocale.system().name()`` 推断要装载的真实语言代号。
+
+    规则（与用户约定）：
+    - ``zh_*`` （含 zh_CN、zh_TW、zh_HK、zh_SG…）→ 全部走 zh_CN
+    - ``ja_*`` → ja_JP
+    - 其他 → en_US
+    """
+    from PyQt6.QtCore import QLocale
+    name = ""
+    try:
+        name = QLocale.system().name() or ""
+    except Exception:
+        pass
+    if name.startswith("zh"):
+        return "zh_CN"
+    if name.startswith("ja"):
+        return "ja_JP"
+    return "en_US"
 
 
 def language_by_code(code: str) -> Language:
@@ -225,6 +252,7 @@ class LocalizationManager:
         self._fluent_translator: Optional[QTranslator] = None
         self._fallback_translator: Optional[QTranslator] = None
         self._current: Language = DEFAULT_LANGUAGE
+        self._effective_code: str = DEFAULT_LANGUAGE.code
 
     @property
     def current(self) -> Language:
@@ -234,6 +262,11 @@ class LocalizationManager:
     def current_code(self) -> str:
         return self._current.code
 
+    @property
+    def effective_code(self) -> str:
+        """实际生效的真实语言代号（auto 解析后；其他情况等于 current_code）。"""
+        return self._effective_code
+
     def available(self) -> List[Language]:
         return list(AVAILABLE_LANGUAGES)
 
@@ -242,11 +275,17 @@ class LocalizationManager:
 
         Args:
             code: ``Language.code``。未知值回退到默认语言。
+                ``"auto"`` 指令在此被解析成 zh_CN / ja_JP / en_US 之一，
+                **但 ``self._current`` 仍记 auto** —— 这样设置面板下拉
+                可以一直显示"自动"，关于刷盘/同步只用 ``"auto"`` 这个值。
 
         Returns:
             实际生效的 :class:`Language`。
         """
         lang = language_by_code(code)
+        # auto 解析成真实语言用于安装 translator，但内部状态保留 auto
+        is_auto = lang.code == AUTO_LANGUAGE_CODE
+        effective = language_by_code(resolve_auto_language()) if is_auto else lang
 
         app = QCoreApplication.instance()
         if app is None:
@@ -268,20 +307,20 @@ class LocalizationManager:
         # ── 安装 fallback translator（先装，Qt 按 LIFO 倒序查找，
         # fallback 作为兜底**最后**才被检查）─────────────────────────
         # pseudo 模式无需 fallback——_PseudoTranslator 永远返回 ⟦原文⟧
-        if lang.code != PSEUDO_LANGUAGE_CODE:
+        if effective.code != PSEUDO_LANGUAGE_CODE:
             fb = _FallbackTranslator()
-            if fb.load_from_ts(lang):
+            if fb.load_from_ts(effective):
                 app.installTranslator(fb)
                 self._fallback_translator = fb
 
         # ── 安装 app translator ─────────────────────────────────────
         # pseudo 走自己的可视化分支，其余按 .qm 文件加载（zh_CN 没 .qm 时
         # 回落到源字符串——本就是简体中文，行为等价）。
-        if lang.code == PSEUDO_LANGUAGE_CODE:
+        if effective.code == PSEUDO_LANGUAGE_CODE:
             app_tr: QTranslator = _PseudoTranslator()
         else:
             real = _AppTranslator()
-            real.load_language(lang)
+            real.load_language(effective)
             app_tr = real
         app.installTranslator(app_tr)
         self._app_translator = app_tr
@@ -293,7 +332,7 @@ class LocalizationManager:
         # PyQt6 的 ``installTranslator`` 拒绝并抛 TypeError。我们把这视为
         # "本环境无 qfluentwidgets 翻译"，静默回退——qfluentwidgets 内部 UI
         # 仍然工作，只是右键 Cut/Copy/Paste 等会显示英文源字符串。
-        fluent_tr = _build_fluent_translator(lang)
+        fluent_tr = _build_fluent_translator(effective)
         if fluent_tr is not None:
             try:
                 app.installTranslator(fluent_tr)
@@ -302,7 +341,10 @@ class LocalizationManager:
             else:
                 self._fluent_translator = fluent_tr
 
+        # 内部状态保留用户选择（含 "auto"），下拉显示一致；下游若想拿
+        # 实际生效的真实语言，用 self.effective_code 读取。
         self._current = lang
+        self._effective_code = effective.code
         self.language_changed.emit(lang.code)
         return lang
 
