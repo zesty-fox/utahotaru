@@ -141,6 +141,9 @@ python scripts/find_unwrapped.py
 | en_US 翻译后某条仍是中文 | translations_en_US.json 缺这条 | apply_translations 输出会列出，补 JSON 即可 |
 | 按钮文字被裁断 | 翻译变长 | `setMinimumWidth` 或缩短英文标签 |
 | pseudo 模式 ⟦字符⟧ 没出现 | 字面量没走 tr | grep 源码定位、补 tr |
+| 状态/动态文本切语言后停在旧语种 | 文本由事件回调设置（如 lbl_status / lbl_audio_name），自然没在 changeEvent 中复跑 | 用**状态码**（如 `_status_state = "playing"`）+ `_tr_xxx(state)` 渲染；changeEvent 时按当前状态重渲染 |
+| 自定义 SettingCard 子类（带内部按钮 / LineEdit / 多选）切语言不刷 | 内部子控件没在父类的 _tr_register 注册表里 | 在该 SettingCard 子类自己写 changeEvent，主动 setText/setPlaceholderText |
+| InfoBar 显示 ctx 与抽取 ctx 错位（如 FileLoader 用 self._editor.tr） | Qt 按 self._editor.class 查上下文，抽取器按 enclosing class 归类 | 已由 `_FallbackTranslator` 处理（source-only 兜底）；无需额外动作 |
 
 ---
 

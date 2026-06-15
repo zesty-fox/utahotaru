@@ -200,13 +200,17 @@ class ComboSettingCard(SettingCard):
     def changeEvent(self, event):
         from PyQt6.QtCore import QEvent as _QEvent
         if event.type() == _QEvent.Type.LanguageChange and self._item_sources:
-            idx = self.combo.currentIndex()
+            idx = max(0, self.combo.currentIndex())
             self.combo.blockSignals(True)
             self.combo.clear()
             self.combo.addItems([self.tr(s) for s in self._item_sources])
-            if 0 <= idx < self.combo.count():
-                self.combo.setCurrentIndex(idx)
+            # 必须先恢复 index，再显式 setCurrentText —— qfluentwidgets 的
+            # ComboBox 在 clear+addItems 后**不会**自动刷新折叠态显示文本
+            self.combo.setCurrentIndex(min(idx, self.combo.count() - 1))
+            if self.combo.count() > 0:
+                self.combo.setCurrentText(self.combo.itemText(self.combo.currentIndex()))
             self.combo.blockSignals(False)
+            self.combo.update()
         super().changeEvent(event)
 
     def setCurrentIndex(self, idx: int):
@@ -303,7 +307,7 @@ class BrowseSettingCard(SettingCard):
         self.hBoxLayout.addSpacing(16)
 
     def _on_browse(self):
-        dir_path = QFileDialog.getExistingDirectory(self, "选择目录", "")
+        dir_path = QFileDialog.getExistingDirectory(self, self.tr("选择目录"), "")
         if dir_path:
             self.line.setText(dir_path)
             self.path_changed.emit(dir_path)
@@ -312,6 +316,15 @@ class BrowseSettingCard(SettingCard):
         self.line.clear()
         self.cleared.emit()
         self.path_changed.emit("")
+
+    def changeEvent(self, event):
+        from PyQt6.QtCore import QEvent as _QEvent
+        if event.type() == _QEvent.Type.LanguageChange:
+            self.line.setPlaceholderText(self.tr("未设置"))
+            if self._clearable and hasattr(self, "btn_clear"):
+                self.btn_clear.setText(self.tr("清除"))
+            self.btn.setText(self.tr("浏览"))
+        super().changeEvent(event)
 
     def setText(self, text: str):
         self.line.setText(text)
@@ -750,6 +763,12 @@ class MultiCheckSettingCard(SettingCard):
         """更新按钮显示文本。"""
         self.btn.setText(self.tr("编辑"))
 
+    def changeEvent(self, event):
+        from PyQt6.QtCore import QEvent as _QEvent
+        if event.type() == _QEvent.Type.LanguageChange:
+            self.btn.setText(self.tr("编辑"))
+        super().changeEvent(event)
+
     def setSelectedValues(self, values: list[str]):
         """设置选中的值列表。"""
         self._selected = list(values)
@@ -826,6 +845,12 @@ class MultiBoolSettingCard(SettingCard):
             new_values = {key: cb.isChecked() for key, cb in checkboxes}
             self._values = new_values
             self.selection_changed.emit(self._values)
+
+    def changeEvent(self, event):
+        from PyQt6.QtCore import QEvent as _QEvent
+        if event.type() == _QEvent.Type.LanguageChange:
+            self.btn.setText(self.tr("编辑"))
+        super().changeEvent(event)
 
     def setValues(self, values: dict[str, bool]):
         """设置各配置项的值。"""

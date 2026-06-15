@@ -216,6 +216,12 @@ class EditorInterface(QWidget):
             self._update_status()
         except Exception:
             pass
+        # lbl_status（"就绪"/"播放中"/...）按当前状态码重新翻译
+        if hasattr(self, "lbl_status"):
+            try:
+                self.lbl_status.setText(self._tr_status(self._status_state))
+            except Exception:
+                pass
         # 快捷键提示：用最近一次缓存的快捷键映射重新渲染
         if hasattr(self, "_shortcut_actions_timing"):
             try:
@@ -234,6 +240,14 @@ class EditorInterface(QWidget):
                 self.btn_tag.setText(self.tr("打轴 ({key})").format(key=tag_first))
             except Exception:
                 pass
+
+    def _tr_status(self, state: str) -> str:
+        """按状态码翻译——显式列举源串让 extractor 抓到。"""
+        if state == "playing":  return self.tr("播放中")
+        if state == "paused":   return self.tr("已暂停")
+        if state == "stopped":  return self.tr("已停止")
+        if state == "finished": return self.tr("播放完毕")
+        return self.tr("就绪")
 
     def _init_keysound(self) -> None:
         """创建播放器并预加载默认风格样本（失败时静默跳过，不影响主功能）。"""
@@ -423,6 +437,10 @@ class EditorInterface(QWidget):
         # 布局：[播放状态] <stretch> [当前行/字符/时间戳] <stretch> [总体进度]
         status = QHBoxLayout()
         status.setContentsMargins(5, 2, 5, 2)
+        # 状态码：'ready' / 'playing' / 'paused' / 'stopped' / 'finished'。
+        # 显示文本通过 _render_status_label() 渲染，便于语言切换时按当前
+        # 状态重译。
+        self._status_state: str = "ready"
         self.lbl_status = QLabel(self.tr("就绪"))
         self.lbl_status.setStyleSheet(f"font-size: 12px; color: {theme.text_primary.name()};")
         status.addWidget(self.lbl_status)
@@ -3338,6 +3356,7 @@ class EditorInterface(QWidget):
                 self.transport.set_playing(True)
                 self.preview.set_playing(True)
                 self.timeline.set_playing(True)
+                self._status_state = "playing"
                 self.lbl_status.setText(self.tr("播放中"))
                 self._update_mode_indicator()
                 self.preview._last_auto_scroll_line_idx = -1
@@ -3357,6 +3376,7 @@ class EditorInterface(QWidget):
             self.transport.set_playing(False)
             self.preview.set_playing(False)
             self.timeline.set_playing(False)
+            self._status_state = "paused"
             self.lbl_status.setText(self.tr("已暂停"))
             self._update_mode_indicator()
             # 重置自动滚动状态
@@ -3376,6 +3396,7 @@ class EditorInterface(QWidget):
             self.timeline.set_playing(False)
             self.transport.set_position(0)
             self.timeline.set_position(0)
+            self._status_state = "stopped"
             self.lbl_status.setText(self.tr("已停止"))
             self._update_mode_indicator()
             # 重置自动滚动状态
@@ -5568,6 +5589,7 @@ class EditorInterface(QWidget):
             self.transport.set_playing(False)
             self.preview.set_playing(False)
             self.timeline.set_playing(False)
+            self._status_state = "finished"
             self.lbl_status.setText(self.tr("播放完毕"))
             self._update_mode_indicator()
             # 重置自动滚动状态

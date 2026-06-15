@@ -1148,5 +1148,6 @@
   "还剩 {n} 个标记点未添加导唱符。": "{n} markers still missing a guide symbol.",
   "还原": "Revert",
   "连词合并为一行；除「字符」外各列均用逗号「,」分隔\n双击可编辑「字符」「注音」「Checkpoint数」「句尾」「时间标签」「演唱者」列\nCheckpoint数：每字符一项（如 2,2,1），累加为本行节奏点总数 K\n注音：每个 mora 一段、全行展平，段数须等于 K；留空表示整行无注音，不再自动重切\n时间标签：每个节奏点一段、按序对齐到 K 个节奏点，允许空段(,,)留空；句尾释放点写在最后；总数不得超过 K(+句尾1)\n句尾列填写「是」标记为句尾（独立记录释放时间），留空取消；演唱者每字符一项": "Linked words merge into one row; columns other than 'Char' are comma-separated.\nDouble-click to edit Char/Ruby/Checkpoints/SentenceEnd/Timetags/Singer.\nCheckpoints: one entry per char (e.g. 2,2,1); their sum is the row checkpoint total K.\nRuby: one segment per mora, flattened across the row; segment count must equal K. Empty = no ruby for the whole row, no auto re-split.\nTimetags: one entry per checkpoint, aligned to K; empty segments (,,) allowed. The sentence-end release point goes last; total must not exceed K(+1 for sentence end).\nSentenceEnd column: 'Yes' marks sentence end (separate release time), empty cancels. Singer is one entry per char.",
-  "；": ";"
+  "；": ";",
+  "选择目录": "Choose directory"
 }
