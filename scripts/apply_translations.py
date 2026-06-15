@@ -12,8 +12,12 @@ import xml.etree.ElementTree as ET
 
 def main() -> None:
     root = Path(__file__).resolve().parent.parent
-    ts_path = root / "src/strange_uta_game/frontend/localization/translations/app.ja_JP.ts"
-    json_path = root / "scripts/translations_ja_JP.json"
+    lang = "ja_JP"
+    for i, a in enumerate(sys.argv):
+        if a == "--lang" and i + 1 < len(sys.argv):
+            lang = sys.argv[i + 1]
+    ts_path = root / f"src/strange_uta_game/frontend/localization/translations/app.{lang}.ts"
+    json_path = root / f"scripts/translations_{lang}.json"
 
     with json_path.open(encoding="utf-8") as f:
         translations: dict[str, str] = json.load(f)

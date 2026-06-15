@@ -55,7 +55,14 @@ _MODE_LABELS = ["关闭代理", "使用系统代理", "自动检测代理", "手
 
 
 def _mode_labels_translated() -> list[str]:
-    return [_tr(s) for s in _MODE_LABELS]
+    # 显式逐项 _tr 让 extractor 在 UpdaterUI 上下文里登记源串
+    # （列表推导 _tr(变量) 形式静态抽取拿不到字面参数）
+    return [
+        _tr("关闭代理"),
+        _tr("使用系统代理"),
+        _tr("自动检测代理"),
+        _tr("手动指定地址"),
+    ]
 
 
 class _ProxyModeCard(SettingCard):

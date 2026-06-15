@@ -74,8 +74,8 @@ class Language:
 AVAILABLE_LANGUAGES: Tuple[Language, ...] = (
     Language(code="zh_CN",  native_name="简体中文", qlocale_name="zh_CN"),
     Language(code="ja_JP",  native_name="日本語",   qlocale_name="ja_JP"),
+    Language(code="en_US",  native_name="English",  qlocale_name="en_US"),
     Language(code="pseudo", native_name="⟦pseudo⟧", qlocale_name="C"),
-    # Language(code="en_US", native_name="English",  qlocale_name="en_US"),
 )
 
 
