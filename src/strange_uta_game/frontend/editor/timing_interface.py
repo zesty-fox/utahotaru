@@ -143,6 +143,38 @@ class EditorInterface(QWidget):
         self._mini_singer_manager: Optional[MiniSingerManager] = None
         self._init_ui()
 
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setAcceptDrops(True)
+        self._bind_callback_signals()
+
+        # 位置主动拉取定时器（UI 线程 60fps，替代旧的回调线程+信号推送）
+        self._position_poll_timer = QTimer(self)
+        self._position_poll_timer.setInterval(16)  # ~60fps
+        self._position_poll_timer.timeout.connect(self._poll_audio_position)
+
+        # 滚动模式：auto / always / never（由按钮循环切换，持久化到 config）
+        self._scroll_mode: str = "auto"
+        self._update_scroll_mode_btn_style()
+
+        # 自动滚动状态机：用户交互挂起 → 播放到达新行 + 3s 无交互后恢复
+        self._auto_scroll_suspended: bool = False
+        self._auto_scroll_new_line_reached: bool = False
+        self._auto_scroll_cooldown_timer = QTimer(self)
+        self._auto_scroll_cooldown_timer.setSingleShot(True)
+        self._auto_scroll_cooldown_timer.setInterval(6000)
+        self._auto_scroll_cooldown_timer.timeout.connect(
+            self._on_auto_scroll_cooldown_timeout
+        )
+        # eventFilter 中鼠标拖拽检测
+        self._auto_scroll_mouse_press_pos = None
+
+        # 按键音播放器（低延迟，基于 BASS Sample API）
+        self._keysound_player = None
+        self._keysound_enabled: bool = True
+        # None 表示"尚未加载过任何风格"，确保 _apply_settings 首次调用时强制加载
+        self._keysound_style = None
+        self._init_keysound()
+
     def changeEvent(self, event):
         """切语言时刷新可见 labels/buttons——本 widget 持有音频引擎等重状态，
         不能整体 rebuild。改成精确 retranslate：每个文本独立 setText 一遍。"""
@@ -202,37 +234,6 @@ class EditorInterface(QWidget):
                 self.btn_tag.setText(self.tr("打轴 ({key})").format(key=tag_first))
             except Exception:
                 pass
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.setAcceptDrops(True)
-        self._bind_callback_signals()
-
-        # 位置主动拉取定时器（UI 线程 60fps，替代旧的回调线程+信号推送）
-        self._position_poll_timer = QTimer(self)
-        self._position_poll_timer.setInterval(16)  # ~60fps
-        self._position_poll_timer.timeout.connect(self._poll_audio_position)
-
-        # 滚动模式：auto / always / never（由按钮循环切换，持久化到 config）
-        self._scroll_mode: str = "auto"
-        self._update_scroll_mode_btn_style()
-
-        # 自动滚动状态机：用户交互挂起 → 播放到达新行 + 3s 无交互后恢复
-        self._auto_scroll_suspended: bool = False
-        self._auto_scroll_new_line_reached: bool = False
-        self._auto_scroll_cooldown_timer = QTimer(self)
-        self._auto_scroll_cooldown_timer.setSingleShot(True)
-        self._auto_scroll_cooldown_timer.setInterval(6000)
-        self._auto_scroll_cooldown_timer.timeout.connect(
-            self._on_auto_scroll_cooldown_timeout
-        )
-        # eventFilter 中鼠标拖拽检测
-        self._auto_scroll_mouse_press_pos = None
-
-        # 按键音播放器（低延迟，基于 BASS Sample API）
-        self._keysound_player = None
-        self._keysound_enabled: bool = True
-        # None 表示"尚未加载过任何风格"，确保 _apply_settings 首次调用时强制加载
-        self._keysound_style = None
-        self._init_keysound()
 
     def _init_keysound(self) -> None:
         """创建播放器并预加载默认风格样本（失败时静默跳过，不影响主功能）。"""
