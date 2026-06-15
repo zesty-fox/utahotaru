@@ -333,7 +333,7 @@ class _KeyCaptureButton(PushButton):
         self._original_key = self._captured_key
         self._original_trigger = self._trigger_type
         self._pending_key = None
-        self.setText("按下按键...")
+        self.setText(self.tr("按下按键..."))
         self.setStyleSheet("border: 2px solid #0078D4; border-radius: 4px;")
         self.setFocus()
 
@@ -433,13 +433,24 @@ class _KeyCaptureButton(PushButton):
 
     def _update_display(self):
         if self._captured_key:
-            suffix = " (长)" if self._trigger_type == "long" else ""
+            suffix = self.tr(" (长)") if self._trigger_type == "long" else ""
             # COMMA 是逗号键的内部占位名，显示时还原成字面 ","（组合键如
             # "CTRL+COMMA" 也会正确显示为 "CTRL+,"）。
             display_key = self._captured_key.replace("COMMA", ",")
             self.setText(f"{display_key}{suffix}")
         else:
-            self.setText("未设置")
+            self.setText(self.tr("未设置"))
+
+    def changeEvent(self, event):
+        # 切语言时刷新当前显示文本：捕获状态下 (_listening) 维持"按下按键..."；
+        # 否则按当前 captured_key/trigger 重渲染一遍。
+        from PyQt6.QtCore import QEvent as _QEvent
+        if event.type() == _QEvent.Type.LanguageChange:
+            if self._listening:
+                self.setText(self.tr("按下按键..."))
+            else:
+                self._update_display()
+        super().changeEvent(event)
 
     def set_key(self, key_with_trigger: str):
         """设置按键值，支持 "F5:short" / "F5:long" / "F5" 格式。"""
