@@ -40,10 +40,54 @@ def _extract_string(node: ast.AST) -> str | None:
     return None
 
 
+def _detect_tr_alias_context(tree: ast.AST) -> dict[str, str]:
+    """扫描模块/函数体里 ``def _tr(s): return QCoreApplication.translate("Ctx", s)``
+    或 ``_tr = lambda s: QCoreApplication.translate("Ctx", s)`` 的定义，
+    返回 {别名: 上下文}。``_tr(...)`` 调用按这张表落到正确上下文。"""
+    out: dict[str, str] = {}
+
+    def _ctx_from_call(call: ast.Call) -> str | None:
+        if (
+            isinstance(call.func, ast.Attribute)
+            and call.func.attr == "translate"
+            and isinstance(call.func.value, ast.Name)
+            and call.func.value.id == "QCoreApplication"
+            and call.args
+            and isinstance(call.args[0], ast.Constant)
+            and isinstance(call.args[0].value, str)
+        ):
+            return call.args[0].value
+        return None
+
+    for node in ast.walk(tree):
+        # def _tr(s): return QCoreApplication.translate("Ctx", s)
+        if isinstance(node, ast.FunctionDef) and node.name in ("_tr", "tr"):
+            for stmt in node.body:
+                if isinstance(stmt, ast.Return) and isinstance(stmt.value, ast.Call):
+                    ctx = _ctx_from_call(stmt.value)
+                    if ctx:
+                        out[node.name] = ctx
+                        break
+        # _tr = lambda s: QCoreApplication.translate("Ctx", s)
+        if isinstance(node, ast.Assign):
+            if (
+                len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)
+                and node.targets[0].id in ("_tr", "tr")
+                and isinstance(node.value, ast.Lambda)
+                and isinstance(node.value.body, ast.Call)
+            ):
+                ctx = _ctx_from_call(node.value.body)
+                if ctx:
+                    out[node.targets[0].id] = ctx
+    return out
+
+
 class _Visitor(ast.NodeVisitor):
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, alias_ctx: dict[str, str] | None = None) -> None:
         self.path = path
         self.class_stack: list[str] = []
+        self.alias_ctx: dict[str, str] = alias_ctx or {}
         # (context, source, line)
         self.entries: list[tuple[str, str, int]] = []
 
@@ -67,7 +111,10 @@ class _Visitor(ast.NodeVisitor):
             if node.args:
                 s = _extract_string(node.args[0])
                 if s:
-                    self.entries.append((self._current_context(), s, node.lineno))
+                    # 若文件里有 ``_tr = lambda s: QCoreApplication.translate("Ctx", s)``
+                    # 或 ``def _tr(s)`` 走 translate，则按该 Ctx 归类
+                    ctx = self.alias_ctx.get(node.func.id, self._current_context())
+                    self.entries.append((ctx, s, node.lineno))
         # ── QCoreApplication.translate("Ctx", "...") ──────────
         elif (
             isinstance(node.func, ast.Attribute)
@@ -97,7 +144,8 @@ def scan_dir(root: Path) -> dict[str, dict[str, list[tuple[Path, int]]]]:
         except SyntaxError as e:
             print(f"skip syntax-error: {path}: {e}", file=sys.stderr)
             continue
-        v = _Visitor(path)
+        alias_ctx = _detect_tr_alias_context(tree)
+        v = _Visitor(path, alias_ctx=alias_ctx)
         v.visit(tree)
         for ctx, s, line in v.entries:
             out.setdefault(ctx, {}).setdefault(s, []).append((path, line))

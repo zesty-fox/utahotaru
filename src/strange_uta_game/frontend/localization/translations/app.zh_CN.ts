@@ -3294,336 +3294,6 @@
     </message>
 </context>
 <context>
-    <name>Global</name>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="321" />
-        <source>GitHub API 可达</source>
-        <translation>GitHub API 可达</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="253" />
-        <source>Windows 系统代理未启用，但 {hint}。建议切换为「自动检测代理」或「手动指定地址」。</source>
-        <translation>Windows 系统代理未启用，但 {hint}。建议切换为「自动检测代理」或「手动指定地址」。</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="258" />
-        <source>Windows 系统代理未启用，本机也未发现常用代理端口监听。若你的代理软件正在运行，请改用「手动指定地址」。</source>
-        <translation>Windows 系统代理未启用，本机也未发现常用代理端口监听。若你的代理软件正在运行，请改用「手动指定地址」。</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="241" />
-        <source>{url}　已生效（{mode} · 来源：{source}）</source>
-        <translation>{url}　已生效（{mode} · 来源：{source}）</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="425" />
-        <source>即将退出当前应用，由 Updater 完成替换并自动重启…</source>
-        <translation>即将退出当前应用，由 Updater 完成替换并自动重启…</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="299" />
-        <source>在本机端口 {ports} 上检测到代理监听</source>
-        <translation>在本机端口 {ports} 上检测到代理监听</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="57" />
-        <source>复制命令</source>
-        <translation>复制命令</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="148" />
-        <source>安装完成</source>
-        <translation>安装完成</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="275" />
-        <source>尚未填写手动代理地址，例如 http://127.0.0.1:7897</source>
-        <translation>尚未填写手动代理地址，例如 http://127.0.0.1:7897</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="186" />
-        <source>已使用代理 {url}（来源：{source}）</source>
-        <translation>已使用代理 {url}（来源：{source}）</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="233" />
-        <source>已关闭代理 —— 应用将直接访问网络。</source>
-        <translation>已关闭代理 —— 应用将直接访问网络。</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="274" />
-        <source>已是最新版本</source>
-        <translation>已是最新版本</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="333" />
-        <source>已跳过此版本</source>
-        <translation>已跳过此版本</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="152" />
-        <source>应用更新</source>
-        <translation>应用更新</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="275" />
-        <source>当前版本 v{version} 已是最新</source>
-        <translation>当前版本 v{version} 已是最新</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="58" />
-        <source>我知道了</source>
-        <translation>我知道了</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="280" />
-        <source>手动地址 {url!r} 无效，请检查协议与端口。</source>
-        <translation>手动地址 {url!r} 无效，请检查协议与端口。</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="124" />
-        <source>手动安装</source>
-        <translation>手动安装</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="55" />
-        <source>手动安装日语注音组件</source>
-        <translation>手动安装日语注音组件</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="238" />
-        <source>手动指定</source>
-        <translation>手动指定</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="138" />
-        <source>授权安装</source>
-        <translation>授权安装</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="139" />
-        <source>接下来会弹出 Windows 的「用户账户控制 (UAC)」窗口，
-请点击「是」以授权安装日语组件。
-
-是否继续？</source>
-        <translation>接下来会弹出 Windows 的「用户账户控制 (UAC)」窗口，
-请点击「是」以授权安装日语组件。
-
-是否继续？</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="413" />
-        <source>无法启动 Updater</source>
-        <translation>无法启动 Updater</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="149" />
-        <source>日语注音组件已安装，可以开始注音了。</source>
-        <translation>日语注音组件已安装，可以开始注音了。</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="118" />
-        <source>日语注音需要 Windows 的日语功能（含日语 IME），当前系统未安装。
-约几十 MB，从 Windows Update 联网下载，不会更改系统显示语言。
-
-是否现在安装？</source>
-        <translation>日语注音需要 Windows 的日语功能（含日语 IME），当前系统未安装。
-约几十 MB，从 Windows Update 联网下载，不会更改系统显示语言。
-
-是否现在安装？</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="125" />
-        <source>暂不</source>
-        <translation>暂不</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="351" />
-        <source>更新器未就绪</source>
-        <translation>更新器未就绪</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="424" />
-        <source>更新已启动</source>
-        <translation>更新已启动</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="199" />
-        <source>未发现系统代理，也未在常用端口（{ports} 等）发现监听</source>
-        <translation>未发现系统代理，也未在常用端口（{ports} 等）发现监听</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="285" />
-        <source>未启用代理</source>
-        <translation>未启用代理</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="109" />
-        <source>未找到 winrt 运行库（winrt-Windows.Globalization）。
-这通常是安装包不完整导致，请重新安装本应用或联系开发者。</source>
-        <translation>未找到 winrt 运行库（winrt-Windows.Globalization）。
-这通常是安装包不完整导致，请重新安装本应用或联系开发者。</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="334" />
-        <source>未来不再为 v{version} 提示。重新检测可重新启用。</source>
-        <translation>未来不再为 v{version} 提示。重新检测可重新启用。</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="198" />
-        <source>未检测到代理</source>
-        <translation>未检测到代理</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="239" />
-        <source>未知</source>
-        <translation>未知</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="265" />
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="414" />
-        <source>未知错误</source>
-        <translation>未知错误</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="252" />
-        <source>检查中...</source>
-        <translation>检查中...</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="261" />
-        <source>检查更新</source>
-        <translation>检查更新</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="185" />
-        <source>检测成功</source>
-        <translation>检测成功</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="72" />
-        <source>正在从 Windows Update 下载并安装日语注音组件，请稍候…
-（请在弹出的 UAC 窗口点击「是」以授权安装）</source>
-        <translation>正在从 Windows Update 下载并安装日语注音组件，请稍候…
-（请在弹出的 UAC 窗口点击「是」以授权安装）</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="383" />
-        <source>正在准备更新</source>
-        <translation>正在准备更新</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="71" />
-        <source>正在安装</source>
-        <translation>正在安装</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/lyric_loader.py" line="218" />
-        <source>正在对齐注音 {idx}/{total} 行</source>
-        <translation>正在对齐注音 {idx}/{total} 行</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="384" />
-        <source>正在获取最新更新器，请稍候…</source>
-        <translation>正在获取最新更新器，请稍候…</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/lyric_loader.py" line="537" />
-        <source>正在解析 ASS 格式...</source>
-        <translation>正在解析 ASS 格式...</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/lyric_loader.py" line="595" />
-        <source>正在解析 LRC 格式...</source>
-        <translation>正在解析 LRC 格式...</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/lyric_loader.py" line="471" />
-        <source>正在解析 Nicokara 格式...</source>
-        <translation>正在解析 Nicokara 格式...</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/lyric_loader.py" line="582" />
-        <source>正在解析 SRT 格式...</source>
-        <translation>正在解析 SRT 格式...</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/lyric_loader.py" line="449" />
-        <source>正在解析 UtaTen 格式...</source>
-        <translation>正在解析 UtaTen 格式...</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="307" />
-        <source>测试中...</source>
-        <translation>测试中...</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="316" />
-        <source>测试连通性</source>
-        <translation>测试连通性</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="239" />
-        <source>版本 v{ver}  |  由 RhythmicaLyrics 启发</source>
-        <translation>版本 v{ver}  |  由 RhythmicaLyrics 启发</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="123" />
-        <source>现在安装</source>
-        <translation>现在安装</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="238" />
-        <source>系统代理</source>
-        <translation>系统代理</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="352" />
-        <source>缺少 Updater.exe。请到 GitHub Release 手动下载最新版本。</source>
-        <translation>缺少 Updater.exe。请到 GitHub Release 手动下载最新版本。</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="108" />
-        <source>缺少注音组件</source>
-        <translation>缺少注音组件</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="137" />
-        <source>网络与代理（更新源）</source>
-        <translation>网络与代理（更新源）</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="155" />
-        <source>自动安装未完成（可能未授权 UAC 或下载失败）。可按下面的方式手动安装：</source>
-        <translation>自动安装未完成（可能未授权 UAC 或下载失败）。可按下面的方式手动安装：</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="238" />
-        <source>自动检测</source>
-        <translation>自动检测</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="267" />
-        <source>自动检测未发现可用代理。如确有代理在运行，请改用「手动指定地址」。</source>
-        <translation>自动检测未发现可用代理。如确有代理在运行，请改用「手动指定地址」。</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="330" />
-        <source>连通失败</source>
-        <translation>连通失败</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="320" />
-        <source>连通成功</source>
-        <translation>连通成功</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="117" />
-        <source>需要安装日语注音组件</source>
-        <translation>需要安装日语注音组件</translation>
-    </message>
-</context>
-<context>
     <name>HomeInterface</name>
     <message>
         <location filename="src/strange_uta_game/frontend/home/home_interface.py" line="542" />
@@ -4157,6 +3827,39 @@ Checkpoint数：每字符一项（如 2,2,1），累加为本行节奏点总数 
 注音：每个 mora 一段、全行展平，段数须等于 K；留空表示整行无注音，不再自动重切
 时间标签：每个节奏点一段、按序对齐到 K 个节奏点，允许空段(,,)留空；句尾释放点写在最后；总数不得超过 K(+句尾1)
 句尾列填写「是」标记为句尾（独立记录释放时间），留空取消；演唱者每字符一项</translation>
+    </message>
+</context>
+<context>
+    <name>LyricLoader</name>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/lyric_loader.py" line="218" />
+        <source>正在对齐注音 {idx}/{total} 行</source>
+        <translation>正在对齐注音 {idx}/{total} 行</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/lyric_loader.py" line="537" />
+        <source>正在解析 ASS 格式...</source>
+        <translation>正在解析 ASS 格式...</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/lyric_loader.py" line="595" />
+        <source>正在解析 LRC 格式...</source>
+        <translation>正在解析 LRC 格式...</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/lyric_loader.py" line="471" />
+        <source>正在解析 Nicokara 格式...</source>
+        <translation>正在解析 Nicokara 格式...</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/lyric_loader.py" line="582" />
+        <source>正在解析 SRT 格式...</source>
+        <translation>正在解析 SRT 格式...</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/lyric_loader.py" line="449" />
+        <source>正在解析 UtaTen 格式...</source>
+        <translation>正在解析 UtaTen 格式...</translation>
     </message>
 </context>
 <context>
@@ -5583,7 +5286,7 @@ Checkpoint数：每字符一项（如 2,2,1），累加为本行节奏点总数 
 <context>
     <name>ShortcutSubInterface</name>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="294" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="371" />
         <source>[{mode}]「{action}」已占用{trigger}按键 {key}</source>
         <translation>[{mode}]「{action}」已占用{trigger}按键 {key}</translation>
     </message>
@@ -5605,24 +5308,569 @@ Checkpoint数：每字符一项（如 2,2,1），累加为本行节奏点总数 
         <translation>[通用]</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="161" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="167" />
+        <source>上一字符</source>
+        <translation>上一字符</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="166" />
+        <source>上一行</source>
+        <translation>上一行</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="167" />
+        <source>下一字符</source>
+        <translation>下一字符</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="166" />
+        <source>下一行</source>
+        <translation>下一行</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="218" />
+        <source>为选中字符设置演唱者</source>
+        <translation>为选中字符设置演唱者</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="215" />
+        <source>仅分析当前行的注音</source>
+        <translation>仅分析当前行的注音</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="216" />
+        <source>仅分析当前行选中字符的注音</source>
+        <translation>仅分析当前行选中字符的注音</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="221" />
+        <source>使用默认导出格式快速导出到文件</source>
+        <translation>使用默认导出格式快速导出到文件</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="182" />
+        <source>保存</source>
+        <translation>保存</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="223" />
+        <source>保存项目</source>
+        <translation>保存项目</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="175" />
+        <source>修改所选字符</source>
+        <translation>修改所选字符</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="176" />
+        <source>修改选中行</source>
+        <translation>修改选中行</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="165" />
+        <source>停止</source>
+        <translation>停止</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="185" />
+        <source>停止播放</source>
+        <translation>停止播放</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="178" />
+        <source>全文本编辑</source>
+        <translation>全文本编辑</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="187" />
+        <source>减小播放音量</source>
+        <translation>减小播放音量</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="206" />
+        <source>减少当前字符的节奏点数量</source>
+        <translation>减少当前字符的节奏点数量</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="208" />
+        <source>减少当前字符的节奏点数量（默认 Backspace）</source>
+        <translation>减少当前字符的节奏点数量（默认 Backspace）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="207" />
+        <source>减少当前字符的节奏点数量（默认 ]</source>
+        <translation>减少当前字符的节奏点数量（默认 ]</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="192" />
+        <source>减少选中节奏点时间戳</source>
+        <translation>减少选中节奏点时间戳</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="165" />
+        <source>减速</source>
+        <translation>减速</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="174" />
+        <source>切换句尾</source>
+        <translation>切换句尾</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="169" />
+        <source>切换字内节奏点</source>
+        <translation>切换字内节奏点</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="168" />
+        <source>切换字内节奏点（反向）</source>
+        <translation>切换字内节奏点（反向）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="176" />
+        <source>切换导唱待办</source>
+        <translation>切换导唱待办</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="209" />
+        <source>切换当前字符的句尾标记</source>
+        <translation>切换当前字符的句尾标记</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="210" />
+        <source>切换当前字符的句尾标记（默认 句号）</source>
+        <translation>切换当前字符的句尾标记（默认 句号）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="213" />
+        <source>切换当前字符的导唱待办标记（在字符左上角显示半透明 ✚，提示稍后需要插入导唱符）</source>
+        <translation>切换当前字符的导唱待办标记（在字符左上角显示半透明 ✚，提示稍后需要插入导唱符）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="185" />
+        <source>切换播放和暂停</source>
+        <translation>切换播放和暂停</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="183" />
+        <source>删除字符</source>
+        <translation>删除字符</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="220" />
+        <source>删除当前字符全部节奏点并取消句尾标记（cc=0，is_sentence_end=False）</source>
+        <translation>删除当前字符全部节奏点并取消句尾标记（cc=0，is_sentence_end=False）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="173" />
+        <source>删除当前时间戳并回滚</source>
+        <translation>删除当前时间戳并回滚</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="174" />
+        <source>删除节奏点</source>
+        <translation>删除节奏点</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="202" />
+        <source>删除跳转【仅打轴模式】</source>
+        <translation>删除跳转【仅打轴模式】</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="227" />
+        <source>删除选中内容或当前字符</source>
+        <translation>删除选中内容或当前字符</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="173" />
+        <source>前进</source>
+        <translation>前进</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="201" />
+        <source>前进跳转【仅打轴模式】</source>
+        <translation>前进跳转【仅打轴模式】</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="165" />
+        <source>加速</source>
+        <translation>加速</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="219" />
+        <source>取消所有节奏点、清除时间戳并标记为句尾</source>
+        <translation>取消所有节奏点、清除时间戳并标记为句尾</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="183" />
+        <source>合并上一行</source>
+        <translation>合并上一行</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="173" />
+        <source>后退</source>
+        <translation>后退</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="201" />
+        <source>后退跳转【仅打轴模式】</source>
+        <translation>后退跳转【仅打轴模式】</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="226" />
+        <source>在光标处插入换行</source>
+        <translation>在光标处插入换行</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="222" />
+        <source>在当前字符后插入空格</source>
+        <translation>在当前字符后插入空格</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="191" />
+        <source>在当前字符的多个节奏点之间反向循环切换（Alt+←）</source>
+        <translation>在当前字符的多个节奏点之间反向循环切换（Alt+←）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="193" />
+        <source>在当前字符的多个节奏点之间循环切换（Alt+→）</source>
+        <translation>在当前字符的多个节奏点之间循环切换（Alt+→）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="189" />
+        <source>在当前行内移动到上一个字符；若已在首字符则跳到上一行末字符</source>
+        <translation>在当前行内移动到上一个字符；若已在首字符则跳到上一行末字符</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="190" />
+        <source>在当前行内移动到下一个字符；若已在末字符则跳到下一行首字符</source>
+        <translation>在当前行内移动到下一个字符；若已在末字符则跳到下一行首字符</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="203" />
+        <source>增加当前字符的节奏点数量</source>
+        <translation>增加当前字符的节奏点数量</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="205" />
+        <source>增加当前字符的节奏点数量（默认 Space）</source>
+        <translation>增加当前字符的节奏点数量（默认 Space）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="204" />
+        <source>增加当前字符的节奏点数量（默认 [）</source>
+        <translation>增加当前字符的节奏点数量（默认 [）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="174" />
+        <source>增加节奏点</source>
+        <translation>增加节奏点</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="192" />
+        <source>增加选中节奏点时间戳</source>
+        <translation>增加选中节奏点时间戳</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="187" />
+        <source>增大播放音量</source>
+        <translation>增大播放音量</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="182" />
+        <source>复制字符</source>
+        <translation>复制字符</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="224" />
+        <source>复制选中字符的完整信息</source>
+        <translation>复制选中字符的完整信息</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="226" />
+        <source>将当前行合并到上一行末尾</source>
+        <translation>将当前行合并到上一行末尾</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="179" />
+        <source>应用演唱者</source>
+        <translation>应用演唱者</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="181" />
+        <source>快捷导出</source>
+        <translation>快捷导出</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="238" />
         <source>快捷键</source>
         <translation>快捷键</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="293" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="370" />
         <source>快捷键冲突</source>
         <translation>快捷键冲突</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="291" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="211" />
+        <source>打开修改所选字符对话框</source>
+        <translation>打开修改所选字符对话框</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="214" />
+        <source>打开修改选中行对话框</source>
+        <translation>打开修改选中行对话框</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="217" />
+        <source>打开全文本编辑界面</source>
+        <translation>打开全文本编辑界面</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="211" />
+        <source>打开批量变更对话框</source>
+        <translation>打开批量变更对话框</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="212" />
+        <source>打开插入导唱符对话框</source>
+        <translation>打开插入导唱符对话框</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="171" />
+        <source>打轴并删除下一节奏点</source>
+        <translation>打轴并删除下一节奏点</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="197" />
+        <source>打轴操作的备用按键【仅打轴模式】</source>
+        <translation>打轴操作的备用按键【仅打轴模式】</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="196" />
+        <source>打轴操作的按键【仅打轴模式】</source>
+        <translation>打轴操作的按键【仅打轴模式】</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="229" />
+        <source>打轴模式（音乐播放时）</source>
+        <translation>打轴模式（音乐播放时）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="171" />
+        <source>打轴键</source>
+        <translation>打轴键</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="171" />
+        <source>打轴键 Extra</source>
+        <translation>打轴键 Extra</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="172" />
+        <source>打轴键 Extra（编辑模式）</source>
+        <translation>打轴键 Extra（编辑模式）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="172" />
+        <source>打轴键（编辑模式）</source>
+        <translation>打轴键（编辑模式）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="175" />
+        <source>批量变更</source>
+        <translation>批量变更</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="178" />
+        <source>按类型删除注音</source>
+        <translation>按类型删除注音</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="217" />
+        <source>按类型删除注音对话框</source>
+        <translation>按类型删除注音对话框</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="218" />
+        <source>按行批量设置演唱者</source>
+        <translation>按行批量设置演唱者</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="177" />
+        <source>按行注音分析</source>
+        <translation>按行注音分析</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="179" />
+        <source>按行设置演唱者</source>
+        <translation>按行设置演唱者</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="186" />
+        <source>提高播放速度</source>
+        <translation>提高播放速度</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="175" />
+        <source>插入导唱符</source>
+        <translation>插入导唱符</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="183" />
+        <source>插入换行</source>
+        <translation>插入换行</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="181" />
+        <source>插入空格</source>
+        <translation>插入空格</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="182" />
+        <source>撤销</source>
+        <translation>撤销</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="223" />
+        <source>撤销操作</source>
+        <translation>撤销操作</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="165" />
+        <source>播放/暂停</source>
+        <translation>播放/暂停</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="225" />
+        <source>无歌词时粘贴整批歌词文本；已有歌词时在光标处插入（复制的字符或纯文本）</source>
+        <translation>无歌词时粘贴整批歌词文本；已有歌词时在光标处插入（复制的字符或纯文本）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="168" />
+        <source>时间戳+步长</source>
+        <translation>时间戳+步长</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="168" />
+        <source>时间戳-步长</source>
+        <translation>时间戳-步长</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="180" />
+        <source>时间戳转句尾</source>
+        <translation>时间戳转句尾</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="177" />
+        <source>注音分析</source>
+        <translation>注音分析</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="177" />
+        <source>注音分析所选字符</source>
+        <translation>注音分析所选字符</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="170" />
+        <source>注音编辑</source>
+        <translation>注音编辑</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="180" />
+        <source>清除所有节奏点</source>
+        <translation>清除所有节奏点</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="368" />
         <source>短按</source>
         <translation>短按</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="291" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="188" />
+        <source>移动到上一歌词行</source>
+        <translation>移动到上一歌词行</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="188" />
+        <source>移动到下一歌词行</source>
+        <translation>移动到下一歌词行</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="183" />
+        <source>粘贴</source>
+        <translation>粘贴</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="194" />
+        <source>编辑当前字符注音</source>
+        <translation>编辑当前字符注音</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="200" />
+        <source>编辑模式下打轴（备用键）：记录当前进度条时间戳至当前节奏点【仅编辑模式】</source>
+        <translation>编辑模式下打轴（备用键）：记录当前进度条时间戳至当前节奏点【仅编辑模式】</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="199" />
+        <source>编辑模式下打轴：记录当前进度条时间戳至当前节奏点【仅编辑模式】</source>
+        <translation>编辑模式下打轴：记录当前进度条时间戳至当前节奏点【仅编辑模式】</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="229" />
+        <source>编辑模式（音乐暂停时）</source>
+        <translation>编辑模式（音乐暂停时）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="215" />
+        <source>自动分析全部注音</source>
+        <translation>自动分析全部注音</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="198" />
+        <source>记录当前节奏点时间戳，同时删除下一个节奏点本身（减少 check_count），光标跳至原第三个节奏点【仅打轴模式】</source>
+        <translation>记录当前节奏点时间戳，同时删除下一个节奏点本身（减少 check_count），光标跳至原第三个节奏点【仅打轴模式】</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="170" />
+        <source>连词</source>
+        <translation>连词</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="195" />
+        <source>连词/取消连词；划选多个字符时：全未连词则整段连为一个词，否则整段取消连词</source>
+        <translation>连词/取消连词；划选多个字符时：全未连词则整段连为一个词，否则整段取消连词</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="182" />
+        <source>重做</source>
+        <translation>重做</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="223" />
+        <source>重做操作</source>
+        <translation>重做操作</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="368" />
         <source>长按</source>
         <translation>长按</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="186" />
+        <source>降低播放速度</source>
+        <translation>降低播放速度</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="166" />
+        <source>音量减小</source>
+        <translation>音量减小</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/shortcut.py" line="166" />
+        <source>音量增大</source>
+        <translation>音量增大</translation>
     </message>
 </context>
 <context>
@@ -6234,46 +6482,6 @@ Checkpoint数：每字符一项（如 2,2,1），累加为本行节奏点总数 
     </message>
 </context>
 <context>
-    <name>SourceOrderDialog</name>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/source_order_dialog.py" line="105" />
-        <source>↑ 上移</source>
-        <translation>↑ 上移</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/source_order_dialog.py" line="109" />
-        <source>↓ 下移</source>
-        <translation>↓ 下移</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/source_order_dialog.py" line="124" />
-        <source>取消</source>
-        <translation>取消</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/source_order_dialog.py" line="113" />
-        <source>恢复默认</source>
-        <translation>恢复默认</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/source_order_dialog.py" line="72" />
-        <source>按顺序尝试，前一项失败时自动降级到下一项。
-你可以拖动条目，或选中条目后用右侧 ↑/↓ 按钮调整。</source>
-        <translation>按顺序尝试，前一项失败时自动降级到下一项。
-你可以拖动条目，或选中条目后用右侧 ↑/↓ 按钮调整。</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/source_order_dialog.py" line="123" />
-        <source>确定</source>
-        <translation>确定</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/source_order_dialog.py" line="68" />
-        <source>调整更新源优先级</source>
-        <translation>调整更新源优先级</translation>
-    </message>
-</context>
-<context>
     <name>SwitchSettingCard</name>
     <message>
         <location filename="src/strange_uta_game/frontend/settings/cards.py" line="150" />
@@ -6689,11 +6897,61 @@ Checkpoint数：每字符一项（如 2,2,1），累加为本行节奏点总数 
     </message>
 </context>
 <context>
-    <name>UpdateAvailableDialog</name>
+    <name>UpdaterUI</name>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="87" />
+        <source> 小时</source>
+        <translation> 小时</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="321" />
+        <source>GitHub API 可达</source>
+        <translation>GitHub API 可达</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="253" />
+        <source>Windows 系统代理未启用，但 {hint}。建议切换为「自动检测代理」或「手动指定地址」。</source>
+        <translation>Windows 系统代理未启用，但 {hint}。建议切换为「自动检测代理」或「手动指定地址」。</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="258" />
+        <source>Windows 系统代理未启用，本机也未发现常用代理端口监听。若你的代理软件正在运行，请改用「手动指定地址」。</source>
+        <translation>Windows 系统代理未启用，本机也未发现常用代理端口监听。若你的代理软件正在运行，请改用「手动指定地址」。</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="241" />
+        <source>{url}　已生效（{mode} · 来源：{source}）</source>
+        <translation>{url}　已生效（{mode} · 来源：{source}）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/source_order_dialog.py" line="105" />
+        <source>↑ 上移</source>
+        <translation>↑ 上移</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/source_order_dialog.py" line="109" />
+        <source>↓ 下移</source>
+        <translation>↓ 下移</translation>
+    </message>
     <message>
         <location filename="src/strange_uta_game/updater/ui/update_dialog.py" line="87" />
         <source>下载源：{label}</source>
         <translation>下载源：{label}</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="67" />
+        <source>代理模式</source>
+        <translation>代理模式</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="86" />
+        <source>例如 http://127.0.0.1:7890 ；仅在选择「手动指定地址」时生效</source>
+        <translation>例如 http://127.0.0.1:7890 ；仅在选择「手动指定地址」时生效</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="425" />
+        <source>即将退出当前应用，由 Updater 完成替换并自动重启…</source>
+        <translation>即将退出当前应用，由 Updater 完成替换并自动重启…</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/updater/ui/update_dialog.py" line="69" />
@@ -6701,9 +6959,64 @@ Checkpoint数：每字符一项（如 2,2,1），累加为本行节奏点总数 
         <translation>发现新版本</translation>
     </message>
     <message>
+        <location filename="src/strange_uta_game/updater/ui/source_order_dialog.py" line="124" />
+        <source>取消</source>
+        <translation>取消</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="65" />
+        <source>启动时检查更新</source>
+        <translation>启动时检查更新</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="80" />
+        <source>启动检查间隔</source>
+        <translation>启动检查间隔</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="299" />
+        <source>在本机端口 {ports} 上检测到代理监听</source>
+        <translation>在本机端口 {ports} 上检测到代理监听</translation>
+    </message>
+    <message>
         <location filename="src/strange_uta_game/updater/ui/update_dialog.py" line="127" />
         <source>在浏览器中查看完整发布说明</source>
         <translation>在浏览器中查看完整发布说明</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="275" />
+        <source>尚未填写手动代理地址，例如 http://127.0.0.1:7897</source>
+        <translation>尚未填写手动代理地址，例如 http://127.0.0.1:7897</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="186" />
+        <source>已使用代理 {url}（来源：{source}）</source>
+        <translation>已使用代理 {url}（来源：{source}）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="233" />
+        <source>已关闭代理 —— 应用将直接访问网络。</source>
+        <translation>已关闭代理 —— 应用将直接访问网络。</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="274" />
+        <source>已是最新版本</source>
+        <translation>已是最新版本</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="333" />
+        <source>已跳过此版本</source>
+        <translation>已跳过此版本</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="66" />
+        <source>应用启动后在后台轻量检查 GitHub Release，发现新版本时弹窗提示</source>
+        <translation>应用启动后在后台轻量检查 GitHub Release，发现新版本时弹窗提示</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="152" />
+        <source>应用更新</source>
+        <translation>应用更新</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/updater/ui/update_dialog.py" line="77" />
@@ -6711,9 +7024,96 @@ Checkpoint数：每字符一项（如 2,2,1），累加为本行节奏点总数 
         <translation>当前版本 v{local}　|　发布于 {date}</translation>
     </message>
     <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="275" />
+        <source>当前版本 v{version} 已是最新</source>
+        <translation>当前版本 v{version} 已是最新</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="109" />
+        <source>当前生效代理</source>
+        <translation>当前生效代理</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/source_order_dialog.py" line="113" />
+        <source>恢复默认</source>
+        <translation>恢复默认</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_dialog.py" line="196" />
+        <source>我知道了</source>
+        <translation>我知道了</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="85" />
+        <source>手动代理地址</source>
+        <translation>手动代理地址</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="280" />
+        <source>手动地址 {url!r} 无效，请检查协议与端口。</source>
+        <translation>手动地址 {url!r} 无效，请检查协议与端口。</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="238" />
+        <source>手动指定</source>
+        <translation>手动指定</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/source_order_dialog.py" line="72" />
+        <source>按顺序尝试，前一项失败时自动降级到下一项。
+你可以拖动条目，或选中条目后用右侧 ↑/↓ 按钮调整。</source>
+        <translation>按顺序尝试，前一项失败时自动降级到下一项。
+你可以拖动条目，或选中条目后用右侧 ↑/↓ 按钮调整。</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="413" />
+        <source>无法启动 Updater</source>
+        <translation>无法启动 Updater</translation>
+    </message>
+    <message>
         <location filename="src/strange_uta_game/updater/ui/update_dialog.py" line="96" />
         <source>更新内容：</source>
         <translation>更新内容：</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="351" />
+        <source>更新器未就绪</source>
+        <translation>更新器未就绪</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="424" />
+        <source>更新已启动</source>
+        <translation>更新已启动</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="100" />
+        <source>更新源优先级</source>
+        <translation>更新源优先级</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="199" />
+        <source>未发现系统代理，也未在常用端口（{ports} 等）发现监听</source>
+        <translation>未发现系统代理，也未在常用端口（{ports} 等）发现监听</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="285" />
+        <source>未启用代理</source>
+        <translation>未启用代理</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="334" />
+        <source>未来不再为 v{version} 提示。重新检测可重新启用。</source>
+        <translation>未来不再为 v{version} 提示。重新检测可重新启用。</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="198" />
+        <source>未检测到代理</source>
+        <translation>未检测到代理</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="239" />
+        <source>未知</source>
+        <translation>未知</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/updater/ui/update_dialog.py" line="75" />
@@ -6721,32 +7121,21 @@ Checkpoint数：每字符一项（如 2,2,1），累加为本行节奏点总数 
         <translation>未知日期</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/updater/ui/update_dialog.py" line="133" />
-        <source>稍后再说</source>
-        <translation>稍后再说</translation>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="265" />
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="414" />
+        <source>未知错误</source>
+        <translation>未知错误</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/updater/ui/update_dialog.py" line="132" />
-        <source>立即更新</source>
-        <translation>立即更新</translation>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="252" />
+        <source>检查中...</source>
+        <translation>检查中...</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/updater/ui/update_dialog.py" line="135" />
-        <source>跳过此版本</source>
-        <translation>跳过此版本</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_dialog.py" line="122" />
-        <source>（发布说明为空）</source>
-        <translation>（发布说明为空）</translation>
-    </message>
-</context>
-<context>
-    <name>UpdateCheckErrorDialog</name>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_dialog.py" line="196" />
-        <source>我知道了</source>
-        <translation>我知道了</translation>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="139" />
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="261" />
+        <source>检查更新</source>
+        <translation>检查更新</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/updater/ui/update_dialog.py" line="173" />
@@ -6754,9 +7143,141 @@ Checkpoint数：每字符一项（如 2,2,1），累加为本行节奏点总数 
         <translation>检查更新失败</translation>
     </message>
     <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="185" />
+        <source>检测成功</source>
+        <translation>检测成功</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="383" />
+        <source>正在准备更新</source>
+        <translation>正在准备更新</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="384" />
+        <source>正在获取最新更新器，请稍候…</source>
+        <translation>正在获取最新更新器，请稍候…</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="307" />
+        <source>测试中...</source>
+        <translation>测试中...</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="115" />
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="316" />
+        <source>测试连通性</source>
+        <translation>测试连通性</translation>
+    </message>
+    <message>
         <location filename="src/strange_uta_game/updater/ui/update_dialog.py" line="181" />
         <source>源尝试记录：</source>
         <translation>源尝试记录：</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="239" />
+        <source>版本 v{ver}  |  由 RhythmicaLyrics 启发</source>
+        <translation>版本 v{ver}  |  由 RhythmicaLyrics 启发</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/source_order_dialog.py" line="123" />
+        <source>确定</source>
+        <translation>确定</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_dialog.py" line="133" />
+        <source>稍后再说</source>
+        <translation>稍后再说</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="136" />
+        <source>立即从所选源拉取最新发布信息（不受启动检查间隔限制）</source>
+        <translation>立即从所选源拉取最新发布信息（不受启动检查间隔限制）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_dialog.py" line="132" />
+        <source>立即更新</source>
+        <translation>立即更新</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="135" />
+        <source>立即检查更新</source>
+        <translation>立即检查更新</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="238" />
+        <source>系统代理</source>
+        <translation>系统代理</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="104" />
+        <source>编辑顺序</source>
+        <translation>编辑顺序</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="352" />
+        <source>缺少 Updater.exe。请到 GitHub Release 手动下载最新版本。</source>
+        <translation>缺少 Updater.exe。请到 GitHub Release 手动下载最新版本。</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="137" />
+        <source>网络与代理（更新源）</source>
+        <translation>网络与代理（更新源）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="113" />
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="238" />
+        <source>自动检测</source>
+        <translation>自动检测</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="267" />
+        <source>自动检测未发现可用代理。如确有代理在运行，请改用「手动指定地址」。</source>
+        <translation>自动检测未发现可用代理。如确有代理在运行，请改用「手动指定地址」。</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="68" />
+        <source>访问 GitHub 时是否经过代理；自动检测会探测常用本地代理端口</source>
+        <translation>访问 GitHub 时是否经过代理；自动检测会探测常用本地代理端口</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/source_order_dialog.py" line="68" />
+        <source>调整更新源优先级</source>
+        <translation>调整更新源优先级</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="81" />
+        <source>距上次检查不足该时长时，启动期不再发起请求（手动检查不受限）</source>
+        <translation>距上次检查不足该时长时，启动期不再发起请求（手动检查不受限）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_dialog.py" line="135" />
+        <source>跳过此版本</source>
+        <translation>跳过此版本</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="330" />
+        <source>连通失败</source>
+        <translation>连通失败</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="320" />
+        <source>连通成功</source>
+        <translation>连通成功</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_dialog.py" line="122" />
+        <source>（发布说明为空）</source>
+        <translation>（发布说明为空）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="110" />
+        <source>（尚未检测）</source>
+        <translation>（尚未检测）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="101" />
+        <source>（尚未读取）</source>
+        <translation>（尚未读取）</translation>
     </message>
 </context>
 <context>
@@ -6784,39 +7305,107 @@ Checkpoint数：每字符一项（如 2,2,1），累加为本行节奏点总数 
     </message>
 </context>
 <context>
-    <name>_CheckIntervalCard</name>
+    <name>WinRTJapaneseGuide</name>
     <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="87" />
-        <source> 小时</source>
-        <translation> 小时</translation>
+        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="57" />
+        <source>复制命令</source>
+        <translation>复制命令</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="80" />
-        <source>启动检查间隔</source>
-        <translation>启动检查间隔</translation>
+        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="148" />
+        <source>安装完成</source>
+        <translation>安装完成</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="81" />
-        <source>距上次检查不足该时长时，启动期不再发起请求（手动检查不受限）</source>
-        <translation>距上次检查不足该时长时，启动期不再发起请求（手动检查不受限）</translation>
-    </message>
-</context>
-<context>
-    <name>_CheckNowCard</name>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="139" />
-        <source>检查更新</source>
-        <translation>检查更新</translation>
+        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="58" />
+        <source>我知道了</source>
+        <translation>我知道了</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="136" />
-        <source>立即从所选源拉取最新发布信息（不受启动检查间隔限制）</source>
-        <translation>立即从所选源拉取最新发布信息（不受启动检查间隔限制）</translation>
+        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="124" />
+        <source>手动安装</source>
+        <translation>手动安装</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="135" />
-        <source>立即检查更新</source>
-        <translation>立即检查更新</translation>
+        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="55" />
+        <source>手动安装日语注音组件</source>
+        <translation>手动安装日语注音组件</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="138" />
+        <source>授权安装</source>
+        <translation>授权安装</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="139" />
+        <source>接下来会弹出 Windows 的「用户账户控制 (UAC)」窗口，
+请点击「是」以授权安装日语组件。
+
+是否继续？</source>
+        <translation>接下来会弹出 Windows 的「用户账户控制 (UAC)」窗口，
+请点击「是」以授权安装日语组件。
+
+是否继续？</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="149" />
+        <source>日语注音组件已安装，可以开始注音了。</source>
+        <translation>日语注音组件已安装，可以开始注音了。</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="118" />
+        <source>日语注音需要 Windows 的日语功能（含日语 IME），当前系统未安装。
+约几十 MB，从 Windows Update 联网下载，不会更改系统显示语言。
+
+是否现在安装？</source>
+        <translation>日语注音需要 Windows 的日语功能（含日语 IME），当前系统未安装。
+约几十 MB，从 Windows Update 联网下载，不会更改系统显示语言。
+
+是否现在安装？</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="125" />
+        <source>暂不</source>
+        <translation>暂不</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="109" />
+        <source>未找到 winrt 运行库（winrt-Windows.Globalization）。
+这通常是安装包不完整导致，请重新安装本应用或联系开发者。</source>
+        <translation>未找到 winrt 运行库（winrt-Windows.Globalization）。
+这通常是安装包不完整导致，请重新安装本应用或联系开发者。</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="72" />
+        <source>正在从 Windows Update 下载并安装日语注音组件，请稍候…
+（请在弹出的 UAC 窗口点击「是」以授权安装）</source>
+        <translation>正在从 Windows Update 下载并安装日语注音组件，请稍候…
+（请在弹出的 UAC 窗口点击「是」以授权安装）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="71" />
+        <source>正在安装</source>
+        <translation>正在安装</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="123" />
+        <source>现在安装</source>
+        <translation>现在安装</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="108" />
+        <source>缺少注音组件</source>
+        <translation>缺少注音组件</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="155" />
+        <source>自动安装未完成（可能未授权 UAC 或下载失败）。可按下面的方式手动安装：</source>
+        <translation>自动安装未完成（可能未授权 UAC 或下载失败）。可按下面的方式手动安装：</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/winrt_japanese_guide.py" line="117" />
+        <source>需要安装日语注音组件</source>
+        <translation>需要安装日语注音组件</translation>
     </message>
 </context>
 <context>
@@ -6846,86 +7435,6 @@ Checkpoint数：每字符一项（如 2,2,1），累加为本行节奏点总数 
         <location filename="src/strange_uta_game/frontend/settings/cards.py" line="442" />
         <source>未设置</source>
         <translation>未设置</translation>
-    </message>
-</context>
-<context>
-    <name>_ProxyManualCard</name>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="86" />
-        <source>例如 http://127.0.0.1:7890 ；仅在选择「手动指定地址」时生效</source>
-        <translation>例如 http://127.0.0.1:7890 ；仅在选择「手动指定地址」时生效</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="85" />
-        <source>手动代理地址</source>
-        <translation>手动代理地址</translation>
-    </message>
-</context>
-<context>
-    <name>_ProxyModeCard</name>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="67" />
-        <source>代理模式</source>
-        <translation>代理模式</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="68" />
-        <source>访问 GitHub 时是否经过代理；自动检测会探测常用本地代理端口</source>
-        <translation>访问 GitHub 时是否经过代理；自动检测会探测常用本地代理端口</translation>
-    </message>
-</context>
-<context>
-    <name>_ProxyStatusCard</name>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="109" />
-        <source>当前生效代理</source>
-        <translation>当前生效代理</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="115" />
-        <source>测试连通性</source>
-        <translation>测试连通性</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="113" />
-        <source>自动检测</source>
-        <translation>自动检测</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/proxy_card.py" line="110" />
-        <source>（尚未检测）</source>
-        <translation>（尚未检测）</translation>
-    </message>
-</context>
-<context>
-    <name>_SourceOrderCard</name>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="100" />
-        <source>更新源优先级</source>
-        <translation>更新源优先级</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="104" />
-        <source>编辑顺序</source>
-        <translation>编辑顺序</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="101" />
-        <source>（尚未读取）</source>
-        <translation>（尚未读取）</translation>
-    </message>
-</context>
-<context>
-    <name>_StartupCheckCard</name>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="65" />
-        <source>启动时检查更新</source>
-        <translation>启动时检查更新</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/updater/ui/update_card.py" line="66" />
-        <source>应用启动后在后台轻量检查 GitHub Release，发现新版本时弹窗提示</source>
-        <translation>应用启动后在后台轻量检查 GitHub Release，发现新版本时弹窗提示</translation>
     </message>
 </context>
 </TS>
