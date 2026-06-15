@@ -22,7 +22,7 @@ class MiniSingerManager(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("演唱者管理")
+        self.setWindowTitle(self.tr("演唱者管理"))
         self.setWindowFlags(
             Qt.WindowType.Window
             | Qt.WindowType.WindowStaysOnTopHint

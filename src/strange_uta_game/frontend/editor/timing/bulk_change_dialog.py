@@ -77,7 +77,7 @@ class BulkChangeDialog(QDialog):
             FONT_FIELD_LABEL,
         )
 
-        self.setWindowTitle("批量变更")
+        self.setWindowTitle(self.tr("批量变更"))
         self.resize(*CHAR_DIALOG_SIZE)
         self.setFont(char_dialog_font(FONT_DIALOG_BASE))
 
@@ -87,10 +87,10 @@ class BulkChangeDialog(QDialog):
         search_row = QHBoxLayout()
         self.edit_word = LineEdit(self)
         self.edit_word.setText(initial_word)
-        self.edit_word.setPlaceholderText("输入要搜索的词")
+        self.edit_word.setPlaceholderText(self.tr("输入要搜索的词"))
         self.edit_word.setFont(char_dialog_font(FONT_MAIN_INPUT))
         self.lbl_match = CaptionLabel("")
-        lbl_search = BodyLabel("搜索词:")
+        lbl_search = BodyLabel(self.tr("搜索词:"))
         lbl_search.setFont(char_dialog_font(FONT_FIELD_LABEL))
         search_row.addWidget(lbl_search)
         search_row.addWidget(self.edit_word, stretch=1)
@@ -101,17 +101,17 @@ class BulkChangeDialog(QDialog):
         top_form = QFormLayout()
         self.edit_new_chars = LineEdit(self)
         self.edit_new_chars.setText(initial_word)
-        self.edit_new_chars.setPlaceholderText("输入替换后的字符（默认=搜索词）")
+        self.edit_new_chars.setPlaceholderText(self.tr("输入替换后的字符（默认=搜索词）"))
         self.edit_new_chars.setFont(char_dialog_font(FONT_MAIN_INPUT))
-        lbl_replace = BodyLabel("替换为:")
+        lbl_replace = BodyLabel(self.tr("替换为:"))
         lbl_replace.setFont(char_dialog_font(FONT_FIELD_LABEL))
         top_form.addRow(lbl_replace, self.edit_new_chars)
         layout.addLayout(top_form)
 
-        hint = CaptionLabel(
+        hint = CaptionLabel(self.tr(
             "按字符编辑（注音用半角逗号分隔 RubyPart；节奏点为非负整数）。\n"
             "字符数与搜索词相同 → 保留时间戳；不同 → 丢失所有匹配处时间戳。"
-        )
+        ))
         hint.setWordWrap(True)
         layout.addWidget(hint)
 
@@ -128,13 +128,13 @@ class BulkChangeDialog(QDialog):
 
         # 注册到词典 + 快速连词
         register_row = QHBoxLayout()
-        self.chk_register = CheckBox("将此词注册到读音词典")
+        self.chk_register = CheckBox(self.tr("将此词注册到读音词典"))
         register_row.addWidget(self.chk_register)
         register_row.addStretch()
-        self.btn_toggle_linked = PushButton("快速连词/取消连词", self)
-        self.btn_toggle_linked.setToolTip(
+        self.btn_toggle_linked = PushButton(self.tr("快速连词/取消连词"), self)
+        self.btn_toggle_linked.setToolTip(self.tr(
             "若全部未连词，则将除最后一个字符外的向后连词全部勾选；否则全部取消连词"
-        )
+        ))
         self.btn_toggle_linked.clicked.connect(self._on_toggle_all_linked)
         from strange_uta_game.frontend.editor.timing.dialogs import style_quick_link_button
         style_quick_link_button(self.btn_toggle_linked)
@@ -147,7 +147,7 @@ class BulkChangeDialog(QDialog):
         layout.addWidget(ruby_split_group)
 
         # 预览区域
-        self.preview_label = CaptionLabel("预览: ")
+        self.preview_label = CaptionLabel(self.tr("预览: "))
         self.preview_label.setWordWrap(True)
         layout.addWidget(self.preview_label)
 
@@ -159,13 +159,13 @@ class BulkChangeDialog(QDialog):
         # 按钮
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        self.btn_exec = PrimaryPushButton("执行", self)
+        self.btn_exec = PrimaryPushButton(self.tr("执行"), self)
         self.btn_exec.clicked.connect(self._on_execute)
         btn_row.addWidget(self.btn_exec)
-        self.btn_query = PushButton("查询候补字典", self)
+        self.btn_query = PushButton(self.tr("查询候补字典"), self)
         self.btn_query.clicked.connect(self._on_query_dict_candidates)
         btn_row.addWidget(self.btn_query)
-        btn_close = PushButton("关闭", self)
+        btn_close = PushButton(self.tr("关闭"), self)
         btn_close.clicked.connect(self.reject)
         btn_row.addWidget(btn_close)
         layout.addLayout(btn_row)
@@ -220,18 +220,18 @@ class BulkChangeDialog(QDialog):
         lbl.setFont(char_dialog_font(FONT_CHAR_GLYPH, bold=True))
         edit_ruby = LineEdit(row_widget)
         edit_ruby.setText(ruby_str)
-        edit_ruby.setPlaceholderText("注音（逗号分隔多 RubyPart）")
+        edit_ruby.setPlaceholderText(self.tr("注音（逗号分隔多 RubyPart）"))
         edit_ruby.setFont(char_dialog_font(FONT_ROW_INPUT))
         edit_check = LineEdit(row_widget)
         edit_check.setText(check_str)
-        edit_check.setPlaceholderText("节奏点")
+        edit_check.setPlaceholderText(self.tr("节奏点"))
         edit_check.setFixedWidth(64)
         edit_check.setFont(char_dialog_font(FONT_ROW_INPUT))
-        chk_linked = CheckBox("向后连词")
+        chk_linked = CheckBox(self.tr("向后连词"))
         chk_linked.setChecked(bool(linked))
-        chk_linked.setToolTip(
+        chk_linked.setToolTip(self.tr(
             "连接到下一字符（末字/行尾不可连词，提交时将跳过并提示；句尾=停顿点，允许连词）"
-        )
+        ))
         # 监控用户手动编辑
         edit_ruby.textEdited.connect(self._on_row_user_edited)
         edit_check.textEdited.connect(self._on_row_user_edited)
@@ -314,7 +314,7 @@ class BulkChangeDialog(QDialog):
             parts = split_ruby_segments(edit_ruby.text(), check_count, mode)
             preview_items.append(f"[{','.join(parts)}]")
 
-        self.preview_label.setText(f"预览: {' '.join(preview_items)}")
+        self.preview_label.setText(self.tr("预览: {items}").format(items=' '.join(preview_items)))
 
     # ---------- 信号处理 ----------
 
@@ -365,7 +365,7 @@ class BulkChangeDialog(QDialog):
             self.lbl_match.setText("")
             return
         count = sum(1 for _ in self._iter_matches(word))
-        self.lbl_match.setText(f"找到 {count} 处")
+        self.lbl_match.setText(self.tr("找到 {n} 处").format(n=count))
 
     def _refill_from_first_match(self, fallback_reading: str):
         """用首个匹配的字符/注音/节奏点填充新字符框和 rows。
@@ -470,18 +470,20 @@ class BulkChangeDialog(QDialog):
             matches_by_sentence.setdefault(id(sentence), (sentence, []))[1].append(pos)
         total_matches = sum(len(v[1]) for v in matches_by_sentence.values())
         if total_matches == 0:
-            self.lbl_match.setText("找到 0 处（无改动）")
+            self.lbl_match.setText(self.tr("找到 0 处（无改动）"))
             return
 
         same_len = len(new_text) == len(word)
         if not same_len:
             # 丢时间戳确认
             msg = QMessageBox(self)
-            msg.setWindowTitle("确认批量替换")
-            msg.setText(f"替换后字符数 ({len(new_text)}) 与搜索词 ({len(word)}) 不同，\n"
-                f"将丢失全部 {total_matches} 处匹配的时间戳。是否继续？")
-            btn_yes = msg.addButton("是", QMessageBox.ButtonRole.AcceptRole)
-            msg.addButton("否", QMessageBox.ButtonRole.RejectRole)
+            msg.setWindowTitle(self.tr("确认批量替换"))
+            msg.setText(self.tr(
+                "替换后字符数 ({new}) 与搜索词 ({word}) 不同，\n"
+                "将丢失全部 {n} 处匹配的时间戳。是否继续？"
+            ).format(new=len(new_text), word=len(word), n=total_matches))
+            btn_yes = msg.addButton(self.tr("是"), QMessageBox.ButtonRole.AcceptRole)
+            msg.addButton(self.tr("否"), QMessageBox.ButtonRole.RejectRole)
             msg.setDefaultButton(btn_yes)
             msg.exec()
             clicked = msg.clickedButton()
@@ -522,9 +524,9 @@ class BulkChangeDialog(QDialog):
                             or tgt.is_line_end
                         ):
                             reason = (
-                                "最后一个字符"
+                                self.tr("最后一个字符")
                                 if is_last_in_sentence
-                                else "行尾"
+                                else self.tr("行尾")
                             )
                             self._linked_failures.append(
                                 (s_idx, ci, ch_str, reason)
@@ -578,9 +580,9 @@ class BulkChangeDialog(QDialog):
                             or new_ch.is_line_end
                         ):
                             reason = (
-                                "最后一个字符"
+                                self.tr("最后一个字符")
                                 if is_last_in_sentence
-                                else "行尾"
+                                else self.tr("行尾")
                             )
                             self._linked_failures.append(
                                 (s_idx, abs_idx, new_ch.char, reason)
@@ -633,7 +635,7 @@ class BulkChangeDialog(QDialog):
         if self._linked_failures:
             self._show_linked_failures_popup()
 
-        self.lbl_match.setText(f"已修改 {changed} 处")
+        self.lbl_match.setText(self.tr("已修改 {n} 处").format(n=changed))
         # 一次执行后，后续搜索词变化不应再覆盖 rows（用户已 commit 过）
         self._rows_user_edited = True
 
@@ -657,7 +659,7 @@ class BulkChangeDialog(QDialog):
             return
         after_sentences = deepcopy(self._project.sentences)
         word = self.edit_word.text().strip()
-        description = f"批量变更「{word}」（{changed} 处）"
+        description = self.tr("批量变更「{word}」（{n} 处）").format(word=word, n=changed)
         command = SentenceSnapshotCommand(
             self._project, before_sentences, after_sentences, description
         )
@@ -669,14 +671,16 @@ class BulkChangeDialog(QDialog):
             return
         lines = []
         for s_idx, c_idx, ch, reason in self._linked_failures[:20]:
-            lines.append(f"  第 {s_idx + 1} 句 第 {c_idx + 1} 字「{ch}」：{reason}")
+            lines.append(self.tr("  第 {s} 句 第 {c} 字「{ch}」：{reason}").format(
+                s=s_idx + 1, c=c_idx + 1, ch=ch, reason=reason))
         more = ""
         if len(self._linked_failures) > 20:
-            more = f"\n...（还有 {len(self._linked_failures) - 20} 项未显示）"
+            more = self.tr("\n...（还有 {n} 项未显示）").format(
+                n=len(self._linked_failures) - 20)
         QMessageBox.information(
             self,
-            "部分连词设置未应用",
-            "以下位置为末字/行尾，不能设置连词，已自动跳过：\n\n"
+            self.tr("部分连词设置未应用"),
+            self.tr("以下位置为末字/行尾，不能设置连词，已自动跳过：\n\n")
             + "\n".join(lines)
             + more,
         )

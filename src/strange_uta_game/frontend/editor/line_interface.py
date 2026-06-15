@@ -334,16 +334,16 @@ class LineDetailDialog(QDialog):
 
         # Table
         char_toolbar = QHBoxLayout()
-        self.btn_add_char = PushButton("添加字符", self)
+        self.btn_add_char = PushButton(self.tr("添加字符"), self)
         self.btn_add_char.clicked.connect(self._add_character)
         char_toolbar.addWidget(self.btn_add_char)
-        self.btn_delete_char = PushButton("删除字符", self)
+        self.btn_delete_char = PushButton(self.tr("删除字符"), self)
         self.btn_delete_char.clicked.connect(self._delete_characters)
         char_toolbar.addWidget(self.btn_delete_char)
-        self.btn_copy_char = PushButton("复制字符", self)
+        self.btn_copy_char = PushButton(self.tr("复制字符"), self)
         self.btn_copy_char.clicked.connect(self._copy_characters)
         char_toolbar.addWidget(self.btn_copy_char)
-        self.btn_insert_char = PushButton("插入字符", self)
+        self.btn_insert_char = PushButton(self.tr("插入字符"), self)
         self.btn_insert_char.clicked.connect(self._insert_characters)
         char_toolbar.addWidget(self.btn_insert_char)
         char_toolbar.addStretch()
@@ -351,9 +351,10 @@ class LineDetailDialog(QDialog):
 
         self.table = TableWidget(self)
         self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(
-            ["字符", "注音", "Checkpoint数", "句尾", "时间标签", "演唱者"]
-        )
+        self.table.setHorizontalHeaderLabels([
+            self.tr("字符"), self.tr("注音"), self.tr("Checkpoint数"),
+            self.tr("句尾"), self.tr("时间标签"), self.tr("演唱者"),
+        ])
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         header = self.table.horizontalHeader()
@@ -367,10 +368,10 @@ class LineDetailDialog(QDialog):
         # 保存/关闭按钮
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        self.btn_save = PrimaryPushButton("保存修改", self)
+        self.btn_save = PrimaryPushButton(self.tr("保存修改"), self)
         self.btn_save.clicked.connect(self._on_save)
         btn_layout.addWidget(self.btn_save)
-        self.btn_close = PushButton("关闭", self)
+        self.btn_close = PushButton(self.tr("关闭"), self)
         self.btn_close.clicked.connect(self.reject)
         btn_layout.addWidget(self.btn_close)
         self.vbox.addLayout(btn_layout)
@@ -437,7 +438,7 @@ class LineDetailDialog(QDialog):
 
     def _notify_no_detail_selection(self, content: str):
         InfoBar.warning(
-            title="未选择字符",
+            title=self.tr("未选择字符"),
             content=content,
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
@@ -468,12 +469,12 @@ class LineDetailDialog(QDialog):
     def _delete_characters(self):
         selected_indices = self._selected_character_indices()
         if not selected_indices:
-            self._notify_no_detail_selection("请先选择要删除的字符")
+            self._notify_no_detail_selection(self.tr("请先选择要删除的字符"))
             return
         if len(selected_indices) >= len(self.sentence.characters):
             InfoBar.warning(
-                title="无法删除",
-                content="每行至少需要保留 1 个字符",
+                title=self.tr("无法删除"),
+                content=self.tr("每行至少需要保留 1 个字符"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -493,15 +494,15 @@ class LineDetailDialog(QDialog):
     def _copy_characters(self):
         cloned_characters = self._clone_selected_characters()
         if not cloned_characters:
-            self._notify_no_detail_selection("请先选择要复制的字符")
+            self._notify_no_detail_selection(self.tr("请先选择要复制的字符"))
             return
         self._char_clipboard = cloned_characters
 
     def _insert_characters(self):
         if not self._char_clipboard:
             InfoBar.warning(
-                title="剪贴板为空",
-                content="请先复制字符",
+                title=self.tr("剪贴板为空"),
+                content=self.tr("请先复制字符"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -576,7 +577,7 @@ class LineDetailDialog(QDialog):
 
         if errors:
             InfoBar.warning(
-                title="数据校验失败，未保存",
+                title=self.tr("数据校验失败，未保存"),
                 content="\n".join(errors[:8]),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
@@ -604,8 +605,8 @@ class LineDetailDialog(QDialog):
         self._populate_table()
 
         InfoBar.success(
-            title="已保存",
-            content="数据已更新",
+            title=self.tr("已保存"),
+            content=self.tr("数据已更新"),
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -730,34 +731,34 @@ class EditInterface(QWidget):
         self.vbox.setSpacing(10)
 
         # Top Area
-        self.title_label = QLabel("行编辑视图", self)
+        self.title_label = QLabel(self.tr("行编辑视图"), self)
         self.title_label.setFont(QFont("Microsoft YaHei", 24, QFont.Weight.Bold))
         self.vbox.addWidget(self.title_label)
 
-        self.desc_label = CaptionLabel("查看和编辑所有歌词行的打轴数据", self)
+        self.desc_label = CaptionLabel(self.tr("查看和编辑所有歌词行的打轴数据"), self)
         self.vbox.addWidget(self.desc_label)
 
         # Stats
-        self.stats_label = QLabel("共 0 行 | 已完成 0 行 | 进度 0%", self)
+        self.stats_label = QLabel(self.tr("共 0 行 | 已完成 0 行 | 进度 0%"), self)
         self.stats_label.setFont(QFont("Microsoft YaHei", 10))
         self.vbox.addWidget(self.stats_label)
 
         # Toolbar
         toolbar = QHBoxLayout()
-        self.btn_refresh = PushButton("刷新", self)
+        self.btn_refresh = PushButton(self.tr("刷新"), self)
         self.btn_refresh.setIcon(FIF.SYNC)
         self.btn_refresh.clicked.connect(self._update_table)
         toolbar.addWidget(self.btn_refresh)
-        self.btn_add_row = PushButton("添加行", self)
+        self.btn_add_row = PushButton(self.tr("添加行"), self)
         self.btn_add_row.clicked.connect(self._add_row)
         toolbar.addWidget(self.btn_add_row)
-        self.btn_delete_row = PushButton("删除行", self)
+        self.btn_delete_row = PushButton(self.tr("删除行"), self)
         self.btn_delete_row.clicked.connect(self._delete_rows)
         toolbar.addWidget(self.btn_delete_row)
-        self.btn_copy_row = PushButton("复制行", self)
+        self.btn_copy_row = PushButton(self.tr("复制行"), self)
         self.btn_copy_row.clicked.connect(self._copy_rows)
         toolbar.addWidget(self.btn_copy_row)
-        self.btn_insert_row = PushButton("插入行", self)
+        self.btn_insert_row = PushButton(self.tr("插入行"), self)
         self.btn_insert_row.clicked.connect(self._insert_rows)
         toolbar.addWidget(self.btn_insert_row)
         toolbar.addStretch()
@@ -766,18 +767,16 @@ class EditInterface(QWidget):
         # Table Layout
         self.table = TableWidget(self)
         self.table.setColumnCount(8)
-        self.table.setHorizontalHeaderLabels(
-            [
-                "行号",
-                "歌词文本",
-                "演唱者",
-                "字符数",
-                "已打轴",
-                "总Checkpoint",
-                "时间范围",
-                "操作",
-            ]
-        )
+        self.table.setHorizontalHeaderLabels([
+            self.tr("行号"),
+            self.tr("歌词文本"),
+            self.tr("演唱者"),
+            self.tr("字符数"),
+            self.tr("已打轴"),
+            self.tr("总Checkpoint"),
+            self.tr("时间范围"),
+            self.tr("操作"),
+        ])
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         # 隐藏Qt默认行号表头，避免与自定义行号列重复
@@ -826,7 +825,7 @@ class EditInterface(QWidget):
     def _update_table(self):
         if not self.project:
             self.table.setRowCount(0)
-            self.stats_label.setText("共 0 行 | 已完成 0 行 | 进度 0%")
+            self.stats_label.setText(self.tr("共 0 行 | 已完成 0 行 | 进度 0%"))
             return
 
         sentences = self.project.sentences
@@ -838,9 +837,9 @@ class EditInterface(QWidget):
         completed_lines = sum(1 for s in meaningful_lines if s.is_fully_timed())
         progress = (completed_lines / total_lines * 100) if total_lines > 0 else 0
 
-        self.stats_label.setText(
-            f"共 {total_lines} 行 | 已完成 {completed_lines} 行 | 进度 {progress:.1f}%"
-        )
+        self.stats_label.setText(self.tr(
+            "共 {total} 行 | 已完成 {done} 行 | 进度 {pct:.1f}%"
+        ).format(total=total_lines, done=completed_lines, pct=progress))
 
         self.table.setRowCount(total_lines)
         for i, sentence in enumerate(meaningful_lines):
@@ -926,7 +925,7 @@ class EditInterface(QWidget):
             self.table.setItem(i, 6, item_range)
 
             # 8. 操作 (Button)
-            btn = PushButton("编辑", self.table)
+            btn = PushButton(self.tr("编辑"), self.table)
             btn.clicked.connect(
                 lambda checked, current_sentence=sentence: self._show_detail(
                     current_sentence
@@ -989,15 +988,15 @@ class EditInterface(QWidget):
 
         selected_sentences = self._selected_sentences()
         if not selected_sentences:
-            self._notify_row_warning("未选择行", "请先选择要删除的行")
+            self._notify_row_warning(self.tr("未选择行"), self.tr("请先选择要删除的行"))
             return
 
         if len(selected_sentences) > 1:
             msg = QMessageBox(self)
-            msg.setWindowTitle("确认删除")
-            msg.setText(f"确定要删除选中的 {len(selected_sentences)} 行吗？")
-            btn_yes = msg.addButton("是", QMessageBox.ButtonRole.AcceptRole)
-            msg.addButton("否", QMessageBox.ButtonRole.RejectRole)
+            msg.setWindowTitle(self.tr("确认删除"))
+            msg.setText(self.tr("确定要删除选中的 {n} 行吗？").format(n=len(selected_sentences)))
+            btn_yes = msg.addButton(self.tr("是"), QMessageBox.ButtonRole.AcceptRole)
+            msg.addButton(self.tr("否"), QMessageBox.ButtonRole.RejectRole)
             msg.setDefaultButton(btn_yes)
             msg.exec()
             clicked = msg.clickedButton()
@@ -1011,7 +1010,7 @@ class EditInterface(QWidget):
     def _copy_rows(self):
         selected_sentences = self._selected_sentences()
         if not selected_sentences:
-            self._notify_row_warning("未选择行", "请先选择要复制的行")
+            self._notify_row_warning(self.tr("未选择行"), self.tr("请先选择要复制的行"))
             return
 
         self._row_clipboard = [
@@ -1023,7 +1022,7 @@ class EditInterface(QWidget):
         if not self.project:
             return
         if not self._row_clipboard:
-            self._notify_row_warning("剪贴板为空", "请先复制行")
+            self._notify_row_warning(self.tr("剪贴板为空"), self.tr("请先复制行"))
             return
 
         selected_rows = self._selected_row_indices()
