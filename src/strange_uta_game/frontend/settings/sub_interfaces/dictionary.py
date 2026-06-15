@@ -269,8 +269,22 @@ class DictionarySubInterface(SubSettingInterface):
     _LLM_PROVIDER_DESC = ("选择服务商的接口形态：Chat Completions 覆盖大多数（含本地 Ollama/LM Studio）；"
                           "Anthropic 用 /v1/messages；Responses 用 /v1/responses（OpenAI 新接口）")
 
+    def _register_literal_class_constants_for_extractor(self):
+        """class 级常量 .ts 抽取器拿不到字面参数；这里显式 self.tr 一遍
+        每个长描述，把它们登记进 DictionarySubInterface 上下文。运行时
+        ``tr(self._LLM_DESC)`` 才能查到 → 翻译生效。
+        """
+        tr = self.tr
+        tr("开启后注音改用 LLM（整首一次发送、保留上下文），跳过 WinRT/Sudachi/pykakasi；"
+           "请求失败时自动回退本地引擎。")
+        tr("选择服务商的接口形态：Chat Completions 覆盖大多数（含本地 Ollama/LM Studio）；"
+           "Anthropic 用 /v1/messages；Responses 用 /v1/responses（OpenAI 新接口）")
+        tr("如 https://api.openai.com/v1（自动补 /chat/completions）；填完整端点也可，"
+           "末尾加 # 表示按字面 URL 使用不再追加路径")
+
     def _init_llm_ui(self):
         """LLM 注音设置组。"""
+        self._register_literal_class_constants_for_extractor()
         tr = self.tr
         g = SettingCardGroup(tr("LLM 注音"), self.scrollWidget)
         self._tr_register(g, title_source="LLM 注音")
@@ -404,6 +418,61 @@ class DictionarySubInterface(SubSettingInterface):
                 order.insert(0, _LOCAL_ID)
             new_doc["source_order"] = order
             self._settings_ref.save_network_dictionary(new_doc)
+
+    def _rebuild_for_language_change(self) -> None:
+        # 默认基类按 _tr_register 表刷新 SettingCard 文本；这里追加两个
+        # 裸 ComboBox 的 items 刷新，它们持有 (中文显示 / 内部 key) 两层映射。
+        super()._rebuild_for_language_change()
+        # 单位下拉「周/天/小时」
+        if hasattr(self, "_interval_combo") and hasattr(self, "_UNIT_LABELS"):
+            idx = max(0, self._interval_combo.currentIndex())
+            # _UNIT_LABELS 里的 label 已经是 tr 过的旧语言；这里用 key
+            # 映射回中文源串再 tr 一遍当前语言
+            UNIT_SRC = {"week": "周", "day": "天", "hour": "小时"}
+            self._interval_combo.blockSignals(True)
+            self._interval_combo.clear()
+            new_labels = [self.tr(UNIT_SRC[key]) for _label, key in self._UNIT_LABELS]
+            self._interval_combo.addItems(new_labels)
+            self._interval_combo.setCurrentIndex(min(idx, self._interval_combo.count() - 1))
+            if self._interval_combo.count() > 0:
+                self._interval_combo.setCurrentText(
+                    self._interval_combo.itemText(self._interval_combo.currentIndex())
+                )
+            self._interval_combo.blockSignals(False)
+            self._interval_combo.update()
+            # 同步更新 _UNIT_LABELS 缓存（保留 key，刷新 label）
+            self._UNIT_LABELS = [
+                (new_labels[i], self._UNIT_LABELS[i][1]) for i in range(len(self._UNIT_LABELS))
+            ]
+        # LLM 接口格式下拉
+        if hasattr(self, "_llm_provider_combo") and hasattr(self, "_LLM_PROVIDERS"):
+            idx = max(0, self._llm_provider_combo.currentIndex())
+            # 第一项是中文（"OpenAI Chat Completions（兼容）"），需要重译；
+            # 后两项是英文产品名，保持不变
+            providers_src = [
+                ("OpenAI Chat Completions（兼容）", "openai"),
+                ("Anthropic Messages", "anthropic"),
+                ("OpenAI Responses", "responses"),
+            ]
+            self._llm_provider_combo.blockSignals(True)
+            self._llm_provider_combo.clear()
+            new_labels = [
+                self.tr(label) if i == 0 else label
+                for i, (label, _key) in enumerate(providers_src)
+            ]
+            self._llm_provider_combo.addItems(new_labels)
+            self._llm_provider_combo.setCurrentIndex(
+                min(idx, self._llm_provider_combo.count() - 1)
+            )
+            if self._llm_provider_combo.count() > 0:
+                self._llm_provider_combo.setCurrentText(
+                    self._llm_provider_combo.itemText(self._llm_provider_combo.currentIndex())
+                )
+            self._llm_provider_combo.blockSignals(False)
+            self._llm_provider_combo.update()
+            self._LLM_PROVIDERS = [
+                (new_labels[i], providers_src[i][1]) for i in range(len(providers_src))
+            ]
 
     def _on_open_priority_order(self):
         """打开优先级编辑对话框 —— 每次都重新 load_network_dictionary 取最新源列表。"""

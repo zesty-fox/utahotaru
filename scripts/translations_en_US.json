@@ -1054,7 +1054,7 @@
   "周": "Week",
   "天": "Day",
   "小时": "Hour",
-  "如 https://api.openai.com/v1（自动补 /chat/completions）；填完整端点也可，末尾加 # 表示按字面 URL 使用不再追加路径": "E.g. https://api.openai.com/v1 (auto-appends /chat/completions). Full endpoints are accepted; append # at the end to use the URL literally without further suffixes.",
+  "如 https://api.openai.com/v1（自动补 /chat/completions）；填完整端点也可，末尾加 # 表示按字面 URL 使用不再追加路径": "E.g. https://api.openai.com/v1 (auto-appends /chat/completions). Full endpoints are accepted; append # at end to use URL literally without further suffixes.",
   "如 gpt-4o-mini、deepseek-chat、claude-3-5-haiku-latest": "E.g. gpt-4o-mini, deepseek-chat, claude-3-5-haiku-latest",
   "固定特定词汇的注音读法（最长匹配优先）": "Fix the reading of specific words (longest match wins)",
   "余白": "Margin",
@@ -1149,5 +1149,8 @@
   "还原": "Revert",
   "连词合并为一行；除「字符」外各列均用逗号「,」分隔\n双击可编辑「字符」「注音」「Checkpoint数」「句尾」「时间标签」「演唱者」列\nCheckpoint数：每字符一项（如 2,2,1），累加为本行节奏点总数 K\n注音：每个 mora 一段、全行展平，段数须等于 K；留空表示整行无注音，不再自动重切\n时间标签：每个节奏点一段、按序对齐到 K 个节奏点，允许空段(,,)留空；句尾释放点写在最后；总数不得超过 K(+句尾1)\n句尾列填写「是」标记为句尾（独立记录释放时间），留空取消；演唱者每字符一项": "Linked words merge into one row; columns other than 'Char' are comma-separated.\nDouble-click to edit Char/Ruby/Checkpoints/SentenceEnd/Timetags/Singer.\nCheckpoints: one entry per char (e.g. 2,2,1); their sum is the row checkpoint total K.\nRuby: one segment per mora, flattened across the row; segment count must equal K. Empty = no ruby for the whole row, no auto re-split.\nTimetags: one entry per checkpoint, aligned to K; empty segments (,,) allowed. The sentence-end release point goes last; total must not exceed K(+1 for sentence end).\nSentenceEnd column: 'Yes' marks sentence end (separate release time), empty cancels. Singer is one entry per char.",
   "；": ";",
-  "选择目录": "Choose directory"
+  "选择目录": "Choose directory",
+  "开启后无爆音，但倍速切换可能有延迟，且需占用 .cache 进行离线预渲染；关闭后占用较小、切换即时，但可能会有爆音。默认开启。": "When ON, no audio clipping, but speed switching may have latency and requires .cache for offline pre-rendering. When OFF, smaller .cache usage and instant switching, but possible clipping. Default ON.",
+  "开启后注音改用 LLM（整首一次发送、保留上下文），跳过 WinRT/Sudachi/pykakasi；请求失败时自动回退本地引擎。": "When ON, ruby generation uses LLM (full lyrics sent at once with context). Skips WinRT/Sudachi/pykakasi. On failure, falls back to local engine.",
+  "选择服务商的接口形态：Chat Completions 覆盖大多数（含本地 Ollama/LM Studio）；Anthropic 用 /v1/messages；Responses 用 /v1/responses（OpenAI 新接口）": "Choose provider API format: Chat Completions covers most cases (incl. local Ollama/LM Studio). Anthropic uses /v1/messages. Responses uses /v1/responses (OpenAI new API)."
 }

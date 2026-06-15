@@ -1118,5 +1118,9 @@
   "使用系统代理": "システムプロキシを使用",
   "自动检测代理": "プロキシを自動検出",
   "手动指定地址": "アドレスを手動指定",
-  "选择目录": "ディレクトリを選択"
+  "选择目录": "ディレクトリを選択",
+  "开启后无爆音，但倍速切换可能有延迟，且需占用 .cache 进行离线预渲染；关闭后占用较小、切换即时，但可能会有爆音。默认开启。": "ON にすると音割れがなくなりますが、変速切替に遅延が発生し、.cache でオフライン事前レンダリングが必要です。\nOFF にすると .cache 占有が小さく、切替も即時ですが、音割れが発生する可能性があります。既定 ON。",
+  "开启后注音改用 LLM（整首一次发送、保留上下文），跳过 WinRT/Sudachi/pykakasi；请求失败时自动回退本地引擎。": "ON にするとルビ生成を LLM へ切替（歌詞全文を一括送信、コンテキスト保持）。WinRT/Sudachi/pykakasi をスキップ。失敗時はローカルエンジンへ自動フォールバック。",
+  "选择服务商的接口形态：Chat Completions 覆盖大多数（含本地 Ollama/LM Studio）；Anthropic 用 /v1/messages；Responses 用 /v1/responses（OpenAI 新接口）": "プロバイダの API 形式を選択：Chat Completions は大多数に対応（ローカル Ollama/LM Studio 含む）。Anthropic は /v1/messages、Responses は /v1/responses（OpenAI の新 API）。",
+  "如 https://api.openai.com/v1（自动补 /chat/completions）；填完整端点也可，末尾加 # 表示按字面 URL 使用不再追加路径": "例 https://api.openai.com/v1（自動で /chat/completions を補完）。完全なエンドポイントも可、末尾に # を付けると URL をそのまま使用し追加パスなし。"
 }

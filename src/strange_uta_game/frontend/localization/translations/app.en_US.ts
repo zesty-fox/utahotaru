@@ -1341,32 +1341,32 @@ Example: {微笑||ほほ,え}ん  /  {大冒険||だ|い,ぼ|う,け|ん}</trans
 <context>
     <name>DictionarySubInterface</name>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="304" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="318" />
         <source>API 地址 (Base URL)</source>
         <translation>API Address (Base URL)</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="275" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="289" />
         <source>LLM 注音</source>
         <translation>LLM ruby</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="358" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="372" />
         <source>LLM 注音时应用用户词典</source>
         <translation>Apply user dictionary during LLM ruby</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="290" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="304" />
         <source>OpenAI Chat Completions（兼容）</source>
         <translation>OpenAI Chat Completions (compatible)</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="317" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="331" />
         <source>仅保存在本地 config.json（明文）；默认留空</source>
         <translation>Stored only locally in config.json (plain text). Empty by default.</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="280" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="294" />
         <source>启用 LLM 注音</source>
         <translation>Enable LLM ruby</translation>
     </message>
@@ -1396,9 +1396,14 @@ Example: {微笑||ほほ,え}ん  /  {大冒険||だ|い,ぼ|う,け|ん}</trans
         <translation>Day</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="331" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="345" />
         <source>如 gpt-4o-mini、deepseek-chat、claude-3-5-haiku-latest</source>
         <translation>E.g. gpt-4o-mini, deepseek-chat, claude-3-5-haiku-latest</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="282" />
+        <source>如 https://api.openai.com/v1（自动补 /chat/completions）；填完整端点也可，末尾加 # 表示按字面 URL 使用不再追加路径</source>
+        <translation>E.g. https://api.openai.com/v1 (auto-appends /chat/completions). Full endpoints are accepted; append # at end to use URL literally without further suffixes.</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="235" />
@@ -1416,9 +1421,14 @@ Example: {微笑||ほほ,え}ん  /  {大冒険||だ|い,ぼ|う,け|ん}</trans
         <translation>On startup, check whether enabled network sources are due; auto-fetch in background if so</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="359" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="373" />
         <source>开启后即便使用 LLM 注音，用户词典条目仍以最高优先级覆盖；关闭则完全以 LLM 结果为准</source>
         <translation>When on, user-dictionary entries still override at highest priority even with LLM ruby; when off, use LLM result only</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="278" />
+        <source>开启后注音改用 LLM（整首一次发送、保留上下文），跳过 WinRT/Sudachi/pykakasi；请求失败时自动回退本地引擎。</source>
+        <translation>When ON, ruby generation uses LLM (full lyrics sent at once with context). Skips WinRT/Sudachi/pykakasi. On failure, falls back to local engine.</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="184" />
@@ -1431,7 +1441,7 @@ Example: {微笑||ほほ,え}ん  /  {大冒険||だ|い,ぼ|う,け|ん}</trans
         <translation>When on, pure-katakana entries or English-reading entries in user dict are applied; when off, such entries are blocked</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="284" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="298" />
         <source>接口格式</source>
         <translation>API format</translation>
     </message>
@@ -1446,28 +1456,28 @@ Example: {微笑||ほほ,え}ん  /  {大冒険||だ|い,ぼ|う,け|ん}</trans
         <translation>Annotate katakana with English using the user dictionary</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="330" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="344" />
         <source>模型 (Model)</source>
         <translation>Model</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="347" />
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="500" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="361" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="569" />
         <source>测试</source>
         <translation>Test</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="489" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="558" />
         <source>测试中…</source>
         <translation>Testing…</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="343" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="357" />
         <source>测试连通性</source>
         <translation>Test connection</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="344" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="358" />
         <source>用当前配置对一行示例发起注音请求，验证地址/Key/模型是否可用</source>
         <translation>Send a sample ruby request with current config to verify address/key/model</translation>
     </message>
@@ -1507,7 +1517,7 @@ Example: {微笑||ほほ,え}ん  /  {大冒険||だ|い,ぼ|う,け|ん}</trans
         <translation>Custom reading</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="483" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="552" />
         <source>请先填写 Base URL、API Key 与模型</source>
         <translation>Please fill Base URL, API Key and Model first</translation>
     </message>
@@ -1527,19 +1537,24 @@ Example: {微笑||ほほ,え}ん  /  {大冒険||だ|い,ぼ|う,け|ん}</trans
         <translation>Once this interval has passed since last auto-sync, the next startup triggers a background fetch</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="482" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="551" />
         <source>连接信息不完整</source>
         <translation>Connection info incomplete</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="508" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="577" />
         <source>连接失败</source>
         <translation>Connection failed</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="503" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="572" />
         <source>连接成功</source>
         <translation>Connected</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/dictionary.py" line="280" />
+        <source>选择服务商的接口形态：Chat Completions 覆盖大多数（含本地 Ollama/LM Studio）；Anthropic 用 /v1/messages；Responses 用 /v1/responses（OpenAI 新接口）</source>
+        <translation>Choose provider API format: Chat Completions covers most cases (incl. local Ollama/LM Studio). Anthropic uses /v1/messages. Responses uses /v1/responses (OpenAI new API).</translation>
     </message>
 </context>
 <context>
@@ -4570,117 +4585,122 @@ Ruby format: {source||seg1,seg2,...} (| splits mora, , splits chars within a blo
 <context>
     <name>PlaybackSubInterface</name>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="66" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="70" />
         <source>从不滚动</source>
         <translation>Never scroll</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="55" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="59" />
         <source>删除节奏点时跳转到该时间戳前的毫秒数</source>
         <translation>Milliseconds before the timestamp to jump to when deleting a checkpoint</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="54" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="58" />
         <source>删除节奏点跳转提前量</source>
         <translation>Jump-back amount when deleting checkpoint</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="48" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="52" />
         <source>加载音频文件后自动开始播放</source>
         <translation>Start playback automatically after loading audio</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="66" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="70" />
         <source>始终滚动</source>
         <translation>Always scroll</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="40" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="22" />
+        <source>开启后无爆音，但倍速切换可能有延迟，且需占用 .cache 进行离线预渲染；关闭后占用较小、切换即时，但可能会有爆音。默认开启。</source>
+        <translation>When ON, no audio clipping, but speed switching may have latency and requires .cache for offline pre-rendering. When OFF, smaller .cache usage and instant switching, but possible clipping. Default ON.</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="44" />
         <source>快进量</source>
         <translation>Fast-forward amount</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="44" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="48" />
         <source>快退量</source>
         <translation>Rewind amount</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="65" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="69" />
         <source>打轴时歌词预览是否跟随播放位置自动滚动</source>
         <translation>Whether the lyrics preview auto-scrolls with playback during tagging</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="40" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="44" />
         <source>按下快进键跳过的时间</source>
         <translation>Time skipped per fast-forward press</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="44" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="48" />
         <source>按下快退键后退的时间</source>
         <translation>Time rewound per rewind press</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="36" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="40" />
         <source>播放栏速度滑块的上限</source>
         <translation>Upper limit of playback speed slider</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="32" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="36" />
         <source>播放栏速度滑块的下限</source>
         <translation>Lower limit of playback speed slider</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="64" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="68" />
         <source>歌词预览滚动模式</source>
         <translation>Lyrics preview scroll mode</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="21" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="25" />
         <source>演奏控制</source>
         <translation>Playback control</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="48" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="52" />
         <source>自动播放</source>
         <translation>Auto-play</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="66" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="70" />
         <source>自动滚动（操作后挂起 6 秒）</source>
         <translation>Auto scroll (pause 6s after action)</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="36" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="40" />
         <source>速度滑块最大值</source>
         <translation>Speed slider max</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="32" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="36" />
         <source>速度滑块最小值</source>
         <translation>Speed slider min</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="28" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="32" />
         <source>音频加载后的初始播放速度</source>
         <translation>Initial playback speed after audio loads</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="24" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="28" />
         <source>音频加载后的初始音量</source>
         <translation>Initial volume after audio loads</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="51" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="55" />
         <source>高质量倍速</source>
         <translation>HQ speed-change</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="28" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="32" />
         <source>默认速度</source>
         <translation>Default speed</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="24" />
+        <location filename="src/strange_uta_game/frontend/settings/sub_interfaces/playback.py" line="28" />
         <source>默认音量</source>
         <translation>Default volume</translation>
     </message>

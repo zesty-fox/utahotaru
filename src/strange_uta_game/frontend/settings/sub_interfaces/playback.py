@@ -17,6 +17,10 @@ class PlaybackSubInterface(SubSettingInterface):
                       "关闭后占用较小、切换即时，但可能会有爆音。默认开启。")
 
     def _init_ui(self):
+        # 类常量 .ts 抽取器拿不到字面参数；显式 self.tr 让源串落入本类
+        # 上下文，运行时 tr(self._HQ_SPEED_DESC) 才能命中翻译。
+        self.tr("开启后无爆音，但倍速切换可能有延迟，且需占用 .cache 进行离线预渲染；"
+                "关闭后占用较小、切换即时，但可能会有爆音。默认开启。")
         tr = self.tr
         g = SettingCardGroup(tr("演奏控制"), self.scrollWidget)
         self._tr_register(g, title_source="演奏控制")
