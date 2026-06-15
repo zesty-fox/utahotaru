@@ -455,13 +455,11 @@ class TimelineWidget(QWidget):
                 # pseudo 模式下需要我们的 tr 接管才能显示 ⟦⟧。
                 self.switch_waveform.setOnText(self.tr("开"))
                 self.switch_waveform.setOffText(self.tr("关"))
-            # 音频名标签：仅当显示的是默认占位"未加载音频"时刷新；
-            # 否则用户已加载了具体文件，文件名不翻译。
-            if hasattr(self, "lbl_audio_name"):
-                cur = self.lbl_audio_name.text()
-                if not cur or cur in ("未加载音频",) or cur.startswith("⟦"):
-                    # ⟦未加载音频⟧ 形态（pseudo）也属于占位，重新 tr 拿到新语言版本
-                    self.lbl_audio_name.setText(self.tr("未加载音频"))
+            # 音频名标签：用布尔 flag 标记是否是占位，不靠字符串比较——
+            # 切到 ja_JP 后 "未加载音频" 变成 "音声未読み込み"，再切到
+            # en_US 时字符串比较失败导致不刷新。
+            if hasattr(self, "lbl_audio_name") and getattr(self, "_audio_name_is_placeholder", True):
+                self.lbl_audio_name.setText(self.tr("未加载音频"))
             # WaveformDisplay 的绘制 placeholder 自带 self.tr，自动跟随
             if hasattr(self, "waveform_display"):
                 self.waveform_display.update()
@@ -505,8 +503,10 @@ class TimelineWidget(QWidget):
         self.scroll_bar.valueChanged.connect(self._on_scroll_bar_changed)
         bottom_layout.addWidget(self.scroll_bar, stretch=1)
 
-        # 音频名称标签
+        # 音频名称标签（_audio_name_is_placeholder 标志位让 changeEvent
+        # 不靠字符串比较即可判断是否需要重译）
         self.lbl_audio_name = CaptionLabel(self.tr("未加载音频"), self)
+        self._audio_name_is_placeholder = True
         # 音频名很长时（长文件名 + 翻译后的"未加载音频"前缀）让标签可压缩；
         # 用 maxWidth 限制上限避免吃掉太多 toolbar 空间。
         self.lbl_audio_name.setMaximumWidth(400)
@@ -545,10 +545,12 @@ class TimelineWidget(QWidget):
 
     def clear_audio_data(self):
         self.waveform_display.clear_audio_data()
+        self._audio_name_is_placeholder = True
         self.lbl_audio_name.setText(self.tr("未加载音频"))
 
     def set_audio_name(self, name: str):
         """设置音频文件名称显示"""
+        self._audio_name_is_placeholder = False
         self.lbl_audio_name.setText(name)
 
     def set_playing(self, playing: bool) -> None:

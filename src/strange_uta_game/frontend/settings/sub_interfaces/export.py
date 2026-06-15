@@ -42,6 +42,11 @@ class ExportSubInterface(SubSettingInterface):
                 parent=g),
             title_source="默认导出格式",
             content_source="导出歌词时的默认文件格式")
+        self.card_default_format.set_item_sources([
+            "LRC (增强型)", "LRC (逐行)", "LRC (逐字)",
+            "KRA", "TXT", "SRT", "txt2ass", "ASS",
+            "Nicokara", "Nicokara (带注音)", "RL 编辑模式",
+        ])
         self.card_export_dir = self._tr_register(
             BrowseSettingCard(FIF.FOLDER, tr("默认导出目录"),
                 tr("设置后，导出时将始终优先使用此目录。\n留空则不启用，导出时自动使用最近加载的文件所在目录。"),

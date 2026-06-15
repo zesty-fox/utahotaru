@@ -82,6 +82,20 @@ class _ProxyModeCard(SettingCard):
         self.hBoxLayout.addWidget(self.combo, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addSpacing(16)
 
+    def changeEvent(self, event):
+        from PyQt6.QtCore import QEvent as _QEvent
+        if event.type() == _QEvent.Type.LanguageChange:
+            self.titleLabel.setText(_tr("代理模式"))
+            self.contentLabel.setText(_tr("访问 GitHub 时是否经过代理；自动检测会探测常用本地代理端口"))
+            idx = self.combo.currentIndex()
+            self.combo.blockSignals(True)
+            self.combo.clear()
+            self.combo.addItems(_mode_labels_translated())
+            if 0 <= idx < self.combo.count():
+                self.combo.setCurrentIndex(idx)
+            self.combo.blockSignals(False)
+        super().changeEvent(event)
+
 
 class _ProxyManualCard(SettingCard):
     """手动代理地址输入卡片。"""
@@ -98,6 +112,13 @@ class _ProxyManualCard(SettingCard):
         self.edit.setMinimumWidth(260)
         self.hBoxLayout.addWidget(self.edit, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addSpacing(16)
+
+    def changeEvent(self, event):
+        from PyQt6.QtCore import QEvent as _QEvent
+        if event.type() == _QEvent.Type.LanguageChange:
+            self.titleLabel.setText(_tr("手动代理地址"))
+            self.contentLabel.setText(_tr("例如 http://127.0.0.1:7890 ；仅在选择「手动指定地址」时生效"))
+        super().changeEvent(event)
 
 
 class _ProxyStatusCard(SettingCard):
@@ -133,6 +154,16 @@ class _ProxyStatusCard(SettingCard):
             self.iconLabel.setIcon(FIF.ACCEPT if is_active else FIF.INFO)  # type: ignore[attr-defined]
         except Exception:
             pass
+
+    def changeEvent(self, event):
+        from PyQt6.QtCore import QEvent as _QEvent
+        if event.type() == _QEvent.Type.LanguageChange:
+            self.titleLabel.setText(_tr("当前生效代理"))
+            self.btn_detect.setText(_tr("自动检测"))
+            self.btn_test.setText(_tr("测试连通性"))
+            # 父对象 SettingsInterface 会在下一次 _update_status 重新计算
+            # content；这里只刷新按钮即可。
+        super().changeEvent(event)
 
 
 def attach_proxy_group(settings_interface: "SettingsInterface") -> None:

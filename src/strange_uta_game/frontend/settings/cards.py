@@ -181,6 +181,10 @@ class ComboSettingCard(SettingCard):
     ):
         super().__init__(icon, title, content, parent)
         self.combo = ComboBox(self)
+        # 保留构造时传入的 items（已经过 tr 的成品）。后续热更新需要让
+        # SubSettingInterface 通过 set_item_sources(src_list) 提供 *源串*，
+        # changeEvent 时按当前语言重译。
+        self._item_sources: list[str] = []
         self.combo.addItems(items)
         # 用 minimumWidth：英文/日文翻译后的"自动滚动（操作后挂起 6 秒）"等长选项
         # 在 140px 下会被裁断；让 ComboBox 按内容自然撑开。
@@ -188,6 +192,22 @@ class ComboSettingCard(SettingCard):
         self.combo.currentIndexChanged.connect(self.index_changed.emit)
         self.hBoxLayout.addWidget(self.combo, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addSpacing(16)
+
+    def set_item_sources(self, sources: list[str]) -> None:
+        """登记每项的 *源中文串*，让 changeEvent 切语言时按当前 tr 重译。"""
+        self._item_sources = list(sources)
+
+    def changeEvent(self, event):
+        from PyQt6.QtCore import QEvent as _QEvent
+        if event.type() == _QEvent.Type.LanguageChange and self._item_sources:
+            idx = self.combo.currentIndex()
+            self.combo.blockSignals(True)
+            self.combo.clear()
+            self.combo.addItems([self.tr(s) for s in self._item_sources])
+            if 0 <= idx < self.combo.count():
+                self.combo.setCurrentIndex(idx)
+            self.combo.blockSignals(False)
+        super().changeEvent(event)
 
     def setCurrentIndex(self, idx: int):
         self.combo.setCurrentIndex(idx)

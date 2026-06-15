@@ -821,10 +821,11 @@ class EditorInterface(QWidget):
             if key:
                 first_key = key.split(",")[0].split(":")[0].strip()
                 if first_key:
-                    parts.append(f"{first_key}{label}")
+                    # 用 [key] action 包裹键名，避免 "DPlay" 这类挤在一起难辨
+                    parts.append(f"[{first_key}] {label}")
         parts.append(self.tr("Alt+→ 切换字内节奏点"))
         if hasattr(self, "lbl_shortcut_hint"):
-            self.lbl_shortcut_hint.setText(" ".join(parts))
+            self.lbl_shortcut_hint.setText("  ".join(parts))
         # 缓存以便模式切换时再次调用（无需重读设置）
         self._shortcut_actions_timing = timing_actions
         self._shortcut_actions_edit = edit_actions or timing_actions

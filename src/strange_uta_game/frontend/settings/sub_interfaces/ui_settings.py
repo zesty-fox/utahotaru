@@ -30,6 +30,7 @@ class UISubInterface(SubSettingInterface):
                 tr("选择界面主题，或设为自动跟随系统切换"),
                 items=[tr("自动"), tr("浅色"), tr("深色")], parent=g),
             title_source="主题", content_source="选择界面主题，或设为自动跟随系统切换")
+        self.card_theme.set_item_sources(["自动", "浅色", "深色"])
         self.card_main_font = self._tr_register(
             FontSettingCard(FIF.FONT, tr("主文字字体"),
                 tr("卡拉OK预览主文字（当前行/上下文行）字体，取自系统已安装字体；同时用于全文本编辑的字宽统计"), parent=g),
@@ -89,6 +90,7 @@ class UISubInterface(SubSettingInterface):
                 items=[tr("左对齐"), tr("居中对齐"), tr("右对齐")], parent=g),
             title_source="歌词对齐方式",
             content_source="卡拉OK预览中歌词文本的水平对齐方式（左对齐时注意行号区域不被覆盖）")
+        self.card_lyrics_alignment.set_item_sources(["左对齐", "居中对齐", "右对齐"])
         self.card_checkpoint_markers = self._tr_register(
             SettingCard(FIF.FONT_SIZE, tr("Checkpoint 字符设定"),
                 tr("自定义节奏点标记的显示字符（首节奏点 / 后续 / 句尾，已打轴 / 未打轴）"), g),

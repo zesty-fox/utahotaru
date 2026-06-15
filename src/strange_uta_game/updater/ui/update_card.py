@@ -56,6 +56,19 @@ if TYPE_CHECKING:
 # ───────────────────────── 自定义卡片 ─────────────────────────
 
 
+def _retranslate(event, *pairs):
+    """共用：LanguageChange 时按 [(widget_attr_method, source), ...] 重设。"""
+    from PyQt6.QtCore import QEvent as _QEvent
+    if event.type() != _QEvent.Type.LanguageChange:
+        return False
+    for setter, src in pairs:
+        try:
+            setter(_tr(src))
+        except Exception:
+            pass
+    return True
+
+
 class _StartupCheckCard(SettingCard):
     """启动时自动检查更新（开关）。"""
 
@@ -69,6 +82,13 @@ class _StartupCheckCard(SettingCard):
         self.switch = SwitchButton(self)
         self.hBoxLayout.addWidget(self.switch, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addSpacing(16)
+
+    def changeEvent(self, event):
+        _retranslate(event,
+            (self.titleLabel.setText, "启动时检查更新"),
+            (self.contentLabel.setText, "应用启动后在后台轻量检查 GitHub Release，发现新版本时弹窗提示"),
+        )
+        super().changeEvent(event)
 
 
 class _CheckIntervalCard(SettingCard):
@@ -90,6 +110,14 @@ class _CheckIntervalCard(SettingCard):
         self.hBoxLayout.addWidget(self.spin, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addSpacing(16)
 
+    def changeEvent(self, event):
+        _retranslate(event,
+            (self.titleLabel.setText, "启动检查间隔"),
+            (self.contentLabel.setText, "距上次检查不足该时长时，启动期不再发起请求（手动检查不受限）"),
+            (self.spin.setSuffix, " 小时"),
+        )
+        super().changeEvent(event)
+
 
 class _SourceOrderCard(SettingCard):
     """显示当前源优先级 + "编辑顺序"按钮（点击弹出 :class:`SourceOrderDialog`）。"""
@@ -106,6 +134,14 @@ class _SourceOrderCard(SettingCard):
         self.btn_edit.setMinimumWidth(110)
         self.hBoxLayout.addWidget(self.btn_edit, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addSpacing(16)
+
+    def changeEvent(self, event):
+        # contentLabel 由 set_order 维护当前顺序串，不重译；只刷标题/按钮
+        _retranslate(event,
+            (self.titleLabel.setText, "更新源优先级"),
+            (self.btn_edit.setText, "编辑顺序"),
+        )
+        super().changeEvent(event)
 
     def set_order(self, order: List[SourceId]) -> None:
         """更新副标题文本展示当前顺序。"""
@@ -141,6 +177,14 @@ class _CheckNowCard(SettingCard):
         self.btn.setMinimumWidth(120)
         self.hBoxLayout.addWidget(self.btn, 0, Qt.AlignmentFlag.AlignRight)
         self.hBoxLayout.addSpacing(16)
+
+    def changeEvent(self, event):
+        _retranslate(event,
+            (self.titleLabel.setText, "立即检查更新"),
+            (self.contentLabel.setText, "立即从所选源拉取最新发布信息（不受启动检查间隔限制）"),
+            (self.btn.setText, "检查更新"),
+        )
+        super().changeEvent(event)
 
 
 # ───────────────────────── 主入口 ─────────────────────────

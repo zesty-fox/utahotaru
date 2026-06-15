@@ -68,6 +68,9 @@ class PlaybackSubInterface(SubSettingInterface):
             ),
             title_source="歌词预览滚动模式",
             content_source="打轴时歌词预览是否跟随播放位置自动滚动")
+        self.card_scroll_mode.set_item_sources(
+            ["自动滚动（操作后挂起 6 秒）", "始终滚动", "从不滚动"]
+        )
         for c in [self.card_volume, self.card_speed, self.card_speed_min,
                   self.card_speed_max, self.card_fast_forward,
                   self.card_rewind, self.card_auto_play, self.card_hq_speed,

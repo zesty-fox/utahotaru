@@ -41,6 +41,21 @@ class NetworkSubInterface(SubSettingInterface):
             import logging
             logging.getLogger(__name__).warning("加载 updater UI 失败，已忽略", exc_info=True)
 
+    def _rebuild_for_language_change(self) -> None:
+        # 默认基类实现按 _tr_registry 走 self.tr，但 updater UI 的源
+        # 字符串归在 UpdaterUI 上下文，self.tr 拿不到。手动用 _tr。
+        super()._rebuild_for_language_change()
+        from strange_uta_game.updater.ui.proxy_card import _tr as _updater_tr
+        for attr, src in (("proxy_group", "网络与代理（更新源）"),
+                          ("update_group", "应用更新")):
+            group = getattr(self, attr, None)
+            if group is None:
+                continue
+            try:
+                group.titleLabel.setText(_updater_tr(src))
+            except Exception:
+                pass
+
     # load/collect/connect 由 updater 自己负责，这里是空实现
     def connect_signals(self):
         pass

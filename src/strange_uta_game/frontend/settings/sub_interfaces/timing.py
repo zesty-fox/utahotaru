@@ -69,6 +69,7 @@ class TimingSubInterface(SubSettingInterface):
                 tr("选择按键音音效风格"),
                 items=[tr("默认"), "osu", tr("街机风"), tr("金属感")], parent=g),
             title_source="按键音风格", content_source="选择按键音音效风格")
+        self.card_keysound_style.set_item_sources(["默认", "osu", "街机风", "金属感"])
         for c in [self.card_offset, self.card_speed_correction, self.card_export_offset,
                   self.card_timing_step, self.card_disable_click_jump, self.card_preview_guide,
                   self.card_keysound, self.card_keysound_volume, self.card_keysound_style]:
