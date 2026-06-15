@@ -104,12 +104,14 @@ def _create_ruby_split_group(parent: QWidget) -> tuple[QRadioButton, QRadioButto
     Returns:
         (radio_direct, radio_by_char, radio_by_mora, group_box)
     """
-    group_box = QGroupBox("注音分段方式")
+    from PyQt6.QtCore import QCoreApplication
+    _tr = lambda s: QCoreApplication.translate("RubySplit", s)
+    group_box = QGroupBox(_tr("注音分段方式"))
     group_layout = QVBoxLayout(group_box)
 
-    radio_direct = QRadioButton("直接应用（用逗号手动分段，无逗号则不分段）")
-    radio_by_char = QRadioButton("按字符均分")
-    radio_by_mora = QRadioButton("按 mora 均分（推荐）")
+    radio_direct = QRadioButton(_tr("直接应用（用逗号手动分段，无逗号则不分段）"))
+    radio_by_char = QRadioButton(_tr("按字符均分"))
+    radio_by_mora = QRadioButton(_tr("按 mora 均分（推荐）"))
 
     # 读取配置值
     mode = _get_ruby_split_mode()
@@ -250,7 +252,7 @@ class ModifyCharacterDialog(QDialog):
         # (pos, char, reason) 列表，执行后由调用方读取弹窗汇总
         self._char_rows: list[tuple[QLabel, QLineEdit, QLineEdit, QCheckBox]] = []
 
-        self.setWindowTitle("修改所选字符")
+        self.setWindowTitle(self.tr("修改所选字符"))
         self.resize(*CHAR_DIALOG_SIZE)
         self.setFont(char_dialog_font(FONT_DIALOG_BASE))
 
@@ -263,20 +265,20 @@ class ModifyCharacterDialog(QDialog):
         top_form = QFormLayout()
         lbl_current = StrongBodyLabel(current_text)
         lbl_current.setFont(char_dialog_font(FONT_VALUE_DISPLAY, bold=True))
-        lbl_cur_label = BodyLabel("当前选中字符:")
+        lbl_cur_label = BodyLabel(self.tr("当前选中字符:"))
         lbl_cur_label.setFont(char_dialog_font(FONT_FIELD_LABEL))
         top_form.addRow(lbl_cur_label, lbl_current)
         self.edit_new_chars = LineEdit(self)
         self.edit_new_chars.setText(current_text)
-        self.edit_new_chars.setPlaceholderText("输入新字符")
+        self.edit_new_chars.setPlaceholderText(self.tr("输入新字符"))
         self.edit_new_chars.setFont(char_dialog_font(FONT_MAIN_INPUT))
-        lbl_new_label = BodyLabel("新字符:")
+        lbl_new_label = BodyLabel(self.tr("新字符:"))
         lbl_new_label.setFont(char_dialog_font(FONT_FIELD_LABEL))
         top_form.addRow(lbl_new_label, self.edit_new_chars)
         layout.addLayout(top_form)
 
         # 字符级编辑区标题
-        hint = CaptionLabel("按字符编辑（注音用半角逗号分隔 RubyPart；节奏点为非负整数）:")
+        hint = CaptionLabel(self.tr("按字符编辑（注音用半角逗号分隔 RubyPart；节奏点为非负整数）:"))
         layout.addWidget(hint)
 
         # Scroll area with per-char rows
@@ -302,13 +304,13 @@ class ModifyCharacterDialog(QDialog):
 
         # 注册词典 + 快速连词
         register_row = QHBoxLayout()
-        self.chk_register = CheckBox("将此词注册到读音词典")
+        self.chk_register = CheckBox(self.tr("将此词注册到读音词典"))
         register_row.addWidget(self.chk_register)
         register_row.addStretch()
-        self.btn_toggle_linked = PushButton("快速连词/取消连词", self)
-        self.btn_toggle_linked.setToolTip(
+        self.btn_toggle_linked = PushButton(self.tr("快速连词/取消连词"), self)
+        self.btn_toggle_linked.setToolTip(self.tr(
             "若全部未连词，则将除最后一个字符外的向后连词全部勾选；否则全部取消连词"
-        )
+        ))
         self.btn_toggle_linked.clicked.connect(self._on_toggle_all_linked)
         style_quick_link_button(self.btn_toggle_linked)
         register_row.addWidget(self.btn_toggle_linked)
@@ -319,7 +321,7 @@ class ModifyCharacterDialog(QDialog):
         layout.addWidget(ruby_split_group)
 
         # 预览区域
-        self.preview_label = CaptionLabel("预览: ")
+        self.preview_label = CaptionLabel(self.tr("预览: "))
         self.preview_label.setWordWrap(True)
         layout.addWidget(self.preview_label)
 
@@ -336,13 +338,13 @@ class ModifyCharacterDialog(QDialog):
         # Buttons
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        btn_exec = PrimaryPushButton("执行", self)
+        btn_exec = PrimaryPushButton(self.tr("执行"), self)
         btn_exec.clicked.connect(self._on_execute)
         btn_layout.addWidget(btn_exec)
-        btn_query = PushButton("查询候补字典", self)
+        btn_query = PushButton(self.tr("查询候补字典"), self)
         btn_query.clicked.connect(self._on_query_dict_candidates)
         btn_layout.addWidget(btn_query)
-        btn_close = PushButton("关闭", self)
+        btn_close = PushButton(self.tr("关闭"), self)
         btn_close.clicked.connect(self.reject)
         btn_layout.addWidget(btn_close)
         layout.addLayout(btn_layout)
@@ -377,18 +379,18 @@ class ModifyCharacterDialog(QDialog):
         lbl.setFont(char_dialog_font(FONT_CHAR_GLYPH, bold=True))
         edit_ruby = LineEdit(row_widget)
         edit_ruby.setText(ruby_str)
-        edit_ruby.setPlaceholderText("注音（逗号分隔多 RubyPart）")
+        edit_ruby.setPlaceholderText(self.tr("注音（逗号分隔多 RubyPart）"))
         edit_ruby.setFont(char_dialog_font(FONT_ROW_INPUT))
         edit_check = LineEdit(row_widget)
         edit_check.setText(check_str)
-        edit_check.setPlaceholderText("节奏点")
+        edit_check.setPlaceholderText(self.tr("节奏点"))
         edit_check.setFixedWidth(64)
         edit_check.setFont(char_dialog_font(FONT_ROW_INPUT))
-        chk_linked = CheckBox("向后连词")
+        chk_linked = CheckBox(self.tr("向后连词"))
         chk_linked.setChecked(bool(linked))
-        chk_linked.setToolTip(
+        chk_linked.setToolTip(self.tr(
             "连接到下一字符（末字/行尾不可连词，提交时将跳过并提示；句尾=停顿点，允许连词）"
-        )
+        ))
         # 监控用户手动编辑
         edit_ruby.textEdited.connect(self._on_row_user_edited)
         edit_check.textEdited.connect(self._on_row_user_edited)
@@ -456,7 +458,7 @@ class ModifyCharacterDialog(QDialog):
             parts = split_ruby_segments(edit_ruby.text(), check_count, mode)
             preview_items.append(f"[{','.join(parts)}]")
 
-        self.preview_label.setText(f"预览: {' '.join(preview_items)}")
+        self.preview_label.setText(self.tr("预览: {items}").format(items=' '.join(preview_items)))
 
     def _parse_ruby(self, raw: str, check_count: int = 1):
         """解析 ruby 文本，根据 check_count 自动分段（用 radio 实时模式）"""
@@ -617,7 +619,7 @@ class InsertGuideSymbolDialog(QDialog):
         saved_reverse = settings.get("timing.guide_reverse", False)
         saved_fill_gap = settings.get("timing.guide_fill_gap", False)
 
-        self.setWindowTitle("插入导唱符")
+        self.setWindowTitle(self.tr("插入导唱符"))
         self.resize(400, 320)
         self.setFont(QFont("Microsoft YaHei", 10))
 
@@ -629,33 +631,33 @@ class InsertGuideSymbolDialog(QDialog):
         ch = sentence.characters[char_idx]
         lbl_current = QLabel(ch.char)
         lbl_current.setStyleSheet("font-size: 16px; font-weight: bold;")
-        form.addRow("当前选中字符:", lbl_current)
+        form.addRow(self.tr("当前选中字符:"), lbl_current)
 
         # Field 2: Guide symbol text
         self.edit_symbol = QLineEdit(saved_symbol)
-        self.edit_symbol.setPlaceholderText("请填写要插入的导唱符")
-        form.addRow("导唱符:", self.edit_symbol)
+        self.edit_symbol.setPlaceholderText(self.tr("请填写要插入的导唱符"))
+        form.addRow(self.tr("导唱符:"), self.edit_symbol)
 
         # Field 3: Count
         self.edit_count = QLineEdit(str(saved_count))
-        self.edit_count.setPlaceholderText("个数")
-        form.addRow("个数:", self.edit_count)
+        self.edit_count.setPlaceholderText(self.tr("个数"))
+        form.addRow(self.tr("个数:"), self.edit_count)
 
         # Field 4: Duration per symbol
         self.edit_duration = QLineEdit(str(saved_duration))
-        self.edit_duration.setPlaceholderText("每个导唱符持续时间（毫秒）")
-        form.addRow("持续时间 (ms):", self.edit_duration)
+        self.edit_duration.setPlaceholderText(self.tr("每个导唱符持续时间（毫秒）"))
+        form.addRow(self.tr("持续时间 (ms):"), self.edit_duration)
 
         # Field 5: Fill gap — 补足间隔时间
         # 勾选后忽略手动持续时间，自动在「前一个时间戳」与「本字符首个时间戳」
         # 之间平均分配，前一个时间戳搜索不到时以 0ms（歌曲开始）为起点。
-        self.chk_fill_gap = QCheckBox("补足间隔时间")
+        self.chk_fill_gap = QCheckBox(self.tr("补足间隔时间"))
         self.chk_fill_gap.setChecked(bool(saved_fill_gap))
         self.chk_fill_gap.toggled.connect(self._on_fill_gap_toggled)
         form.addRow("", self.chk_fill_gap)
 
         # Field 6: Reverse timestamp order
-        self.chk_reverse = QCheckBox("时间戳反向")
+        self.chk_reverse = QCheckBox(self.tr("时间戳反向"))
         self.chk_reverse.setChecked(bool(saved_reverse))
         form.addRow("", self.chk_reverse)
 
@@ -668,15 +670,15 @@ class InsertGuideSymbolDialog(QDialog):
         # Buttons
         btn_layout = QHBoxLayout()
         # 清除导唱标记：仅在当前字符已有 needs_guide 标记时启用
-        self.btn_clear_marker = PushButton("清除导唱标记", self)
+        self.btn_clear_marker = PushButton(self.tr("清除导唱标记"), self)
         self.btn_clear_marker.setEnabled(bool(getattr(ch, "needs_guide", False)))
         self.btn_clear_marker.clicked.connect(self._on_clear_marker)
         btn_layout.addWidget(self.btn_clear_marker)
         btn_layout.addStretch()
-        btn_exec = PrimaryPushButton("执行", self)
+        btn_exec = PrimaryPushButton(self.tr("执行"), self)
         btn_exec.clicked.connect(self._on_execute)
         btn_layout.addWidget(btn_exec)
-        btn_close = PushButton("关闭", self)
+        btn_close = PushButton(self.tr("关闭"), self)
         btn_close.clicked.connect(self.reject)
         btn_layout.addWidget(btn_close)
         layout.addLayout(btn_layout)
@@ -736,8 +738,8 @@ class InsertGuideSymbolDialog(QDialog):
             # 终点 = 本字符首个时间戳，按个数平均分配。
             if ref_ts is None:
                 InfoBar.warning(
-                    title="无法补足间隔时间",
-                    content="当前字符没有时间戳，无法确定间隔终点。",
+                    title=self.tr("无法补足间隔时间"),
+                    content=self.tr("当前字符没有时间戳，无法确定间隔终点。"),
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
                     position=InfoBarPosition.TOP,
@@ -749,7 +751,7 @@ class InsertGuideSymbolDialog(QDialog):
             if start_ts >= ref_ts:
                 InfoBar.warning(
                     title="无法补足间隔时间",
-                    content=f"起点 {start_ts}ms 不早于终点 {ref_ts}ms，间隔无效。",
+                    content=self.tr("起点 {start}ms 不早于终点 {end}ms，间隔无效。").format(start=start_ts, end=ref_ts),
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
                     position=InfoBarPosition.TOP,
@@ -804,8 +806,8 @@ class InsertGuideSymbolDialog(QDialog):
                         ts = ref_ts - duration_ms * (count - i)
                     if ts < 0:
                         InfoBar.warning(
-                            title="时间戳越界",
-                            content=f"导唱符时间戳 {ts}ms 小于0，已自动设为0ms",
+                            title=self.tr("时间戳越界"),
+                            content=self.tr("导唱符时间戳 {ts}ms 小于0，已自动设为0ms").format(ts=ts),
                             orient=Qt.Orientation.Horizontal,
                             isClosable=True,
                             position=InfoBarPosition.TOP,
@@ -851,7 +853,7 @@ class CharEditDialog(QDialog):
         self._modified = False
         self._char_rows: list[tuple[QLabel, QLineEdit, QLineEdit, QCheckBox]] = []
 
-        self.setWindowTitle("编辑字符")
+        self.setWindowTitle(self.tr("编辑字符"))
         self.resize(*CHAR_DIALOG_SIZE)
         self.setFont(char_dialog_font(FONT_DIALOG_BASE))
 
@@ -873,7 +875,7 @@ class CharEditDialog(QDialog):
         top_form = QFormLayout()
         lbl_current = StrongBodyLabel(display)
         lbl_current.setFont(char_dialog_font(FONT_VALUE_DISPLAY, bold=True))
-        lbl_cur_label = BodyLabel("当前字符:")
+        lbl_cur_label = BodyLabel(self.tr("当前字符:"))
         lbl_cur_label.setFont(char_dialog_font(FONT_FIELD_LABEL))
         top_form.addRow(lbl_cur_label, lbl_current)
         # 新字符输入框只包含字符本身，不包含 " + "
@@ -881,15 +883,15 @@ class CharEditDialog(QDialog):
         self.edit_new_chars.setText("".join(
             sentence.characters[i].char for i in range(word_start, word_end)
         ))
-        self.edit_new_chars.setPlaceholderText("输入新字符")
+        self.edit_new_chars.setPlaceholderText(self.tr("输入新字符"))
         self.edit_new_chars.setFont(char_dialog_font(FONT_MAIN_INPUT))
-        lbl_new_label = BodyLabel("新字符:")
+        lbl_new_label = BodyLabel(self.tr("新字符:"))
         lbl_new_label.setFont(char_dialog_font(FONT_FIELD_LABEL))
         top_form.addRow(lbl_new_label, self.edit_new_chars)
         layout.addLayout(top_form)
 
         # 字符级编辑区标题
-        hint = CaptionLabel("按字符编辑（注音用半角逗号分隔 RubyPart；节奏点为非负整数）:")
+        hint = CaptionLabel(self.tr("按字符编辑（注音用半角逗号分隔 RubyPart；节奏点为非负整数）:"))
         layout.addWidget(hint)
 
         # Scroll area with per-char rows
@@ -916,13 +918,13 @@ class CharEditDialog(QDialog):
 
         # 注册词典 + 快速连词
         register_row = QHBoxLayout()
-        self.chk_register = CheckBox("将此词注册到读音词典")
+        self.chk_register = CheckBox(self.tr("将此词注册到读音词典"))
         register_row.addWidget(self.chk_register)
         register_row.addStretch()
-        self.btn_toggle_linked = PushButton("快速连词/取消连词", self)
-        self.btn_toggle_linked.setToolTip(
+        self.btn_toggle_linked = PushButton(self.tr("快速连词/取消连词"), self)
+        self.btn_toggle_linked.setToolTip(self.tr(
             "若全部未连词，则将除最后一个字符外的向后连词全部勾选；否则全部取消连词"
-        )
+        ))
         self.btn_toggle_linked.clicked.connect(self._on_toggle_all_linked)
         style_quick_link_button(self.btn_toggle_linked)
         register_row.addWidget(self.btn_toggle_linked)
@@ -933,7 +935,7 @@ class CharEditDialog(QDialog):
         layout.addWidget(ruby_split_group)
 
         # 预览区域
-        self.preview_label = CaptionLabel("预览: ")
+        self.preview_label = CaptionLabel(self.tr("预览: "))
         self.preview_label.setWordWrap(True)
         layout.addWidget(self.preview_label)
 
@@ -952,11 +954,11 @@ class CharEditDialog(QDialog):
 
         # 按钮
         btn_layout = QHBoxLayout()
-        btn_ok = PrimaryPushButton("确定", self)
+        btn_ok = PrimaryPushButton(self.tr("确定"), self)
         btn_ok.clicked.connect(self._on_accept)
-        btn_query = PushButton("查询候补字典", self)
+        btn_query = PushButton(self.tr("查询候补字典"), self)
         btn_query.clicked.connect(self._on_query_dict_candidates)
-        btn_cancel = PushButton("取消", self)
+        btn_cancel = PushButton(self.tr("取消"), self)
         btn_cancel.clicked.connect(self.reject)
         btn_layout.addStretch()
         btn_layout.addWidget(btn_ok)
@@ -994,18 +996,18 @@ class CharEditDialog(QDialog):
         lbl.setFont(char_dialog_font(FONT_CHAR_GLYPH, bold=True))
         edit_ruby = LineEdit(row_widget)
         edit_ruby.setText(ruby_str)
-        edit_ruby.setPlaceholderText("注音（逗号分隔多 RubyPart）")
+        edit_ruby.setPlaceholderText(self.tr("注音（逗号分隔多 RubyPart）"))
         edit_ruby.setFont(char_dialog_font(FONT_ROW_INPUT))
         edit_check = LineEdit(row_widget)
         edit_check.setText(check_str)
-        edit_check.setPlaceholderText("节奏点")
+        edit_check.setPlaceholderText(self.tr("节奏点"))
         edit_check.setFixedWidth(64)
         edit_check.setFont(char_dialog_font(FONT_ROW_INPUT))
-        chk_linked = CheckBox("向后连词")
+        chk_linked = CheckBox(self.tr("向后连词"))
         chk_linked.setChecked(bool(linked))
-        chk_linked.setToolTip(
+        chk_linked.setToolTip(self.tr(
             "连接到下一字符（末字/行尾不可连词，提交时将跳过并提示；句尾=停顿点，允许连词）"
-        )
+        ))
         # 监控用户手动编辑
         edit_ruby.textEdited.connect(self._on_row_user_edited)
         edit_check.textEdited.connect(self._on_row_user_edited)
@@ -1073,7 +1075,7 @@ class CharEditDialog(QDialog):
             parts = split_ruby_segments(edit_ruby.text(), check_count, mode)
             preview_items.append(f"[{','.join(parts)}]")
 
-        self.preview_label.setText(f"预览: {' '.join(preview_items)}")
+        self.preview_label.setText(self.tr("预览: {items}").format(items=' '.join(preview_items)))
 
     def _on_accept(self):
         new_text = self.edit_new_chars.text().strip()
@@ -1193,14 +1195,14 @@ class SetSingerByLineDialog(QDialog):
         # 构建 singer_id -> Singer 映射
         self._singer_map = {s.id: s for s in singers}
 
-        self.setWindowTitle("按行设置演唱者")
+        self.setWindowTitle(self.tr("按行设置演唱者"))
         self.resize(1200, 900)
         self.setFont(QFont("Microsoft YaHei", 10))
 
         layout = QVBoxLayout(self)
 
         # 提示标签
-        hint = CaptionLabel("选择要设置演唱者的行：点击切换选择，Shift+点击范围选择，然后从下方选择演唱者，点击「应用」执行：")
+        hint = CaptionLabel(self.tr("选择要设置演唱者的行：点击切换选择，Shift+点击范围选择，然后从下方选择演唱者，点击「应用」执行："))
         layout.addWidget(hint)
 
         # 行列表表格
@@ -1250,9 +1252,9 @@ class SetSingerByLineDialog(QDialog):
 
         # 全选/全不选按钮
         select_layout = QHBoxLayout()
-        btn_select_all = PushButton("全选", self)
+        btn_select_all = PushButton(self.tr("全选"), self)
         btn_select_all.clicked.connect(self._select_all)
-        btn_deselect_all = PushButton("全不选", self)
+        btn_deselect_all = PushButton(self.tr("全不选"), self)
         btn_deselect_all.clicked.connect(self._deselect_all)
         select_layout.addWidget(btn_select_all)
         select_layout.addWidget(btn_deselect_all)
@@ -1266,15 +1268,15 @@ class SetSingerByLineDialog(QDialog):
 
         # 过滤行
         sg_filter_row = QHBoxLayout()
-        sg_filter_row.addWidget(QLabel("名称:"))
+        sg_filter_row.addWidget(QLabel(self.tr("名称:")))
         self.singer_name_filter = QLineEdit(self)
-        self.singer_name_filter.setPlaceholderText("过滤名称...")
+        self.singer_name_filter.setPlaceholderText(self.tr("过滤名称..."))
         self.singer_name_filter.textChanged.connect(self._apply_singer_filter)
         sg_filter_row.addWidget(self.singer_name_filter, stretch=1)
 
-        sg_filter_row.addWidget(QLabel("分组:"))
+        sg_filter_row.addWidget(QLabel(self.tr("分组:")))
         self.singer_group_filter = QComboBox(self)
-        self.singer_group_filter.addItem("全部", "")
+        self.singer_group_filter.addItem(self.tr("全部"), "")
         _groups = sorted({s.group for s in singers if s.group})
         if any(not s.group for s in singers):
             self.singer_group_filter.addItem("（无分组）", "\x00nogroup")
@@ -1304,9 +1306,9 @@ class SetSingerByLineDialog(QDialog):
 
         # 按钮
         btn_layout = QHBoxLayout()
-        btn_apply = PrimaryPushButton("应用", self)
+        btn_apply = PrimaryPushButton(self.tr("应用"), self)
         btn_apply.clicked.connect(self._on_apply)
-        btn_close = PushButton("关闭", self)
+        btn_close = PushButton(self.tr("关闭"), self)
         btn_close.clicked.connect(self.reject)
         btn_layout.addStretch()
         btn_layout.addWidget(btn_apply)
@@ -1485,7 +1487,7 @@ class ApplySingerDialog(QDialog):
         self._all_singers = all_singers
         self._selected_singer_id = None
 
-        self.setWindowTitle("应用演唱者")
+        self.setWindowTitle(self.tr("应用演唱者"))
         self.resize(400, 500)
         self.setFont(QFont("Microsoft YaHei", 10))
 
@@ -1509,9 +1511,9 @@ class ApplySingerDialog(QDialog):
 
         # 第三行：过滤器
         filter_layout = QHBoxLayout()
-        filter_layout.addWidget(QLabel("过滤:"))
+        filter_layout.addWidget(QLabel(self.tr("过滤:")))
         self.edit_filter = QLineEdit()
-        self.edit_filter.setPlaceholderText("输入演唱者名称进行过滤")
+        self.edit_filter.setPlaceholderText(self.tr("输入演唱者名称进行过滤"))
         self.edit_filter.textChanged.connect(self._on_filter_changed)
         filter_layout.addWidget(self.edit_filter, stretch=1)
         layout.addLayout(filter_layout)
@@ -1545,11 +1547,11 @@ class ApplySingerDialog(QDialog):
         # 底部按钮
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        self.btn_apply = PrimaryPushButton("应用", self)
+        self.btn_apply = PrimaryPushButton(self.tr("应用"), self)
         self.btn_apply.clicked.connect(self._on_apply)
         self.btn_apply.setEnabled(False)
         btn_layout.addWidget(self.btn_apply)
-        btn_cancel = PushButton("取消", self)
+        btn_cancel = PushButton(self.tr("取消"), self)
         btn_cancel.clicked.connect(self.reject)
         btn_layout.addWidget(btn_cancel)
         layout.addLayout(btn_layout)
@@ -1605,7 +1607,7 @@ class CompleteTimestampDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("补全时间戳")
+        self.setWindowTitle(self.tr("补全时间戳"))
         self.resize(480, 400)
         self.setFont(QFont("Microsoft YaHei", 10))
         self._apply_clicked = False
@@ -1705,10 +1707,10 @@ class CompleteTimestampDialog(QDialog):
         # 底部按钮
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        btn_apply = PrimaryPushButton("应用", self)
+        btn_apply = PrimaryPushButton(self.tr("应用"), self)
         btn_apply.clicked.connect(self._on_apply)
         btn_layout.addWidget(btn_apply)
-        btn_cancel = PushButton("取消", self)
+        btn_cancel = PushButton(self.tr("取消"), self)
         btn_cancel.clicked.connect(self.reject)
         btn_layout.addWidget(btn_cancel)
         layout.addLayout(btn_layout)
@@ -1775,17 +1777,17 @@ class AdjustRawTimestampDialog(QDialog):
         super().__init__(parent)
         self._scope = scope
         if scope == "line":
-            self.setWindowTitle("按行调整原始时间戳")
-            scope_text = f"作用范围：{scope_label or '当前行'}"
-            tip = "正数：该行所有原始时间戳向后移；负数：向前移。"
+            self.setWindowTitle(self.tr("按行调整原始时间戳"))
+            scope_text = self.tr("作用范围：{label}").format(label=scope_label or self.tr("当前行"))
+            tip = self.tr("正数：该行所有原始时间戳向后移；负数：向前移。")
         elif scope == "selected":
-            self.setWindowTitle("调整所选字符原始时间戳")
-            scope_text = f"作用范围：{scope_label or '所选字符'}"
-            tip = "正数：所选字符原始时间戳向后移；负数：向前移。"
+            self.setWindowTitle(self.tr("调整所选字符原始时间戳"))
+            scope_text = self.tr("作用范围：{label}").format(label=scope_label or self.tr("所选字符"))
+            tip = self.tr("正数：所选字符原始时间戳向后移；负数：向前移。")
         else:
-            self.setWindowTitle("调整原始时间戳")
-            scope_text = "作用范围：所有原始时间戳"
-            tip = "正数：所有原始时间戳向后移；负数：向前移。"
+            self.setWindowTitle(self.tr("调整原始时间戳"))
+            scope_text = self.tr("作用范围：所有原始时间戳")
+            tip = self.tr("正数：所有原始时间戳向后移；负数：向前移。")
 
         self.setWindowModality(Qt.WindowModality.NonModal)
         self.resize(360, 220)
@@ -1822,10 +1824,10 @@ class AdjustRawTimestampDialog(QDialog):
 
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        self.btn_apply = PrimaryPushButton("应用", self)
+        self.btn_apply = PrimaryPushButton(self.tr("应用"), self)
         self.btn_apply.clicked.connect(self._on_apply)
         btn_layout.addWidget(self.btn_apply)
-        btn_close = PushButton("关闭", self)
+        btn_close = PushButton(self.tr("关闭"), self)
         btn_close.clicked.connect(self.close)
         btn_layout.addWidget(btn_close)
         layout.addLayout(btn_layout)
@@ -1833,7 +1835,7 @@ class AdjustRawTimestampDialog(QDialog):
     def _on_apply(self):
         delta = self.spin_delta.value()
         if delta == 0:
-            self.lbl_status.setText("偏移量为 0，未做任何修改")
+            self.lbl_status.setText(self.tr("偏移量为 0，未做任何修改"))
             return
         self.apply_requested.emit(delta)
 
@@ -1887,7 +1889,7 @@ class SeparateSymbolTimestampDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("分离符号时间戳")
+        self.setWindowTitle(self.tr("分离符号时间戳"))
         self.resize(600, 640)
         self.setFont(QFont("Microsoft YaHei", 10))
         self._apply_clicked = False
@@ -1943,9 +1945,9 @@ class SeparateSymbolTimestampDialog(QDialog):
 
         # 全选 / 全不选
         sel_row = QHBoxLayout()
-        btn_all = PushButton("全选", self)
+        btn_all = PushButton(self.tr("全选"), self)
         btn_all.clicked.connect(self._select_all)
-        btn_none = PushButton("全不选", self)
+        btn_none = PushButton(self.tr("全不选"), self)
         btn_none.clicked.connect(self._deselect_all)
         sel_row.addWidget(btn_all)
         sel_row.addWidget(btn_none)
@@ -1980,10 +1982,10 @@ class SeparateSymbolTimestampDialog(QDialog):
         # 按钮
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        btn_apply = PrimaryPushButton("应用", self)
+        btn_apply = PrimaryPushButton(self.tr("应用"), self)
         btn_apply.clicked.connect(self._on_apply)
         btn_layout.addWidget(btn_apply)
-        btn_cancel = PushButton("取消", self)
+        btn_cancel = PushButton(self.tr("取消"), self)
         btn_cancel.clicked.connect(self.reject)
         btn_layout.addWidget(btn_cancel)
         layout.addLayout(btn_layout)
