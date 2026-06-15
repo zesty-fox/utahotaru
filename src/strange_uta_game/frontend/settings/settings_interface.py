@@ -22,7 +22,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QEvent, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import (
     QHBoxLayout,
@@ -286,6 +286,22 @@ class SettingsInterface(ScrollArea):
             self.networkInterface.attach_updater_ui(self._settings)
 
         self._fully_initialized = True
+
+    # ── 热更新：Qt 自动派发的 LanguageChange ─────────────────────────
+
+    def changeEvent(self, event):
+        if event.type() == QEvent.Type.LanguageChange:
+            # 重新设置标题
+            self.settingLabel.setText(self.tr("设置"))
+            # 重新设置 Pivot 各 tab 的显示文本
+            for routeKey, raw_text in self._tab_config:
+                try:
+                    item = self.pivot.widget(routeKey)
+                    if item is not None and hasattr(item, "setText"):
+                        item.setText(self.tr(raw_text))
+                except Exception:
+                    pass
+        super().changeEvent(event)
 
     # ── 选项卡切换 ────────────────────────────────────────────────────
 

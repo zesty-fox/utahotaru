@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QProcess, QUrl
+from PyQt6.QtCore import QEvent, Qt, QProcess, QUrl
 from PyQt6.QtGui import QDesktopServices, QFont
 from PyQt6.QtWidgets import QApplication, QFileDialog, QHBoxLayout, QMessageBox, QWidget
 from qfluentwidgets import (
@@ -49,19 +49,21 @@ class AboutSubInterface(SubSettingInterface):
 
         self.about_group = SettingCardGroup(self.tr("关于"), self.scrollWidget)
 
-        about_card = SettingCard(FIF.INFO, "StrangeUtaGame - 歌词打轴软件",
-            f"版本 v{_app_version}  |  由 RhythmicaLyrics 启发", self.about_group)
+        about_card = SettingCard(FIF.INFO, self.tr("StrangeUtaGame - 歌词打轴软件"),
+            self.tr("版本 v{ver}  |  由 RhythmicaLyrics 启发").format(ver=_app_version),
+            self.about_group)
         self.about_group.addSettingCard(about_card)
 
         link_card = SettingCard(FIF.GITHUB, "GitHub",
             "https://github.com/karaoke-studio/StrangeUtaGame", self.about_group)
         self.about_group.addSettingCard(link_card)
 
-        self._path_card = SettingCard(FIF.FOLDER, "配置文件位置", "（未加载）", self.about_group)
-        btn_open = PushButton("打开目录", self._path_card)
+        self._path_card = SettingCard(FIF.FOLDER, self.tr("配置文件位置"),
+            self.tr("（未加载）"), self.about_group)
+        btn_open = PushButton(self.tr("打开目录"), self._path_card)
         btn_open.setFont(QFont("Microsoft YaHei", 10))
         btn_open.clicked.connect(self._open_config_dir)
-        btn_change = PushButton("更改位置", self._path_card)
+        btn_change = PushButton(self.tr("更改位置"), self._path_card)
         btn_change.setFont(QFont("Microsoft YaHei", 10))
         btn_change.clicked.connect(self._change_config_dir)
         self._path_card.hBoxLayout.addWidget(btn_open, 0, Qt.AlignmentFlag.AlignRight)
@@ -70,27 +72,27 @@ class AboutSubInterface(SubSettingInterface):
         self.about_group.addSettingCard(self._path_card)
 
         # FFmpeg 路径设置卡
-        self.tools_group = SettingCardGroup("工具配置", self.scrollWidget)
+        self.tools_group = SettingCardGroup(self.tr("工具配置"), self.scrollWidget)
         self._ffmpeg_card = SettingCard(
-            FIF.MOVIE, "FFmpeg 路径",
-            "用于加载视频文件时提取音频（留空则使用系统环境变量）",
+            FIF.MOVIE, self.tr("FFmpeg 路径"),
+            self.tr("用于加载视频文件时提取音频（留空则使用系统环境变量）"),
             self.tools_group,
         )
-        self._ffmpeg_path_label = PushButton("（使用环境变量）", self._ffmpeg_card)
+        self._ffmpeg_path_label = PushButton(self.tr("（使用环境变量）"), self._ffmpeg_card)
         self._ffmpeg_path_label.setFont(QFont("Microsoft YaHei", 9))
         self._ffmpeg_path_label.setEnabled(False)
         self._ffmpeg_path_label.setMaximumWidth(260)
-        btn_browse_ffmpeg = PushButton("浏览", self._ffmpeg_card)
+        btn_browse_ffmpeg = PushButton(self.tr("浏览"), self._ffmpeg_card)
         btn_browse_ffmpeg.setFont(QFont("Microsoft YaHei", 10))
         btn_browse_ffmpeg.clicked.connect(self._browse_ffmpeg)
-        btn_clear_ffmpeg = PushButton("清除", self._ffmpeg_card)
+        btn_clear_ffmpeg = PushButton(self.tr("清除"), self._ffmpeg_card)
         btn_clear_ffmpeg.setFont(QFont("Microsoft YaHei", 10))
         btn_clear_ffmpeg.clicked.connect(self._clear_ffmpeg_path)
         self._ffmpeg_card.hBoxLayout.addWidget(self._ffmpeg_path_label, 0, Qt.AlignmentFlag.AlignRight)
         self._ffmpeg_card.hBoxLayout.addWidget(btn_browse_ffmpeg, 0, Qt.AlignmentFlag.AlignRight)
         self._ffmpeg_card.hBoxLayout.addWidget(btn_clear_ffmpeg, 0, Qt.AlignmentFlag.AlignRight)
         if sys.platform == "win32":
-            self._btn_install_ffmpeg = PrimaryPushButton("一键安装", self._ffmpeg_card)
+            self._btn_install_ffmpeg = PrimaryPushButton(self.tr("一键安装"), self._ffmpeg_card)
             self._btn_install_ffmpeg.setFont(QFont("Microsoft YaHei", 10))
             self._btn_install_ffmpeg.clicked.connect(self._install_ffmpeg)
             self._ffmpeg_card.hBoxLayout.addWidget(self._btn_install_ffmpeg, 0, Qt.AlignmentFlag.AlignRight)
@@ -104,11 +106,11 @@ class AboutSubInterface(SubSettingInterface):
         btn_widget.setMinimumHeight(60)
         btn_layout = QHBoxLayout(btn_widget)
         btn_layout.setContentsMargins(0, 10, 0, 24)
-        self.btn_save = PrimaryPushButton("保存设置", btn_widget)
+        self.btn_save = PrimaryPushButton(self.tr("保存设置"), btn_widget)
         self.btn_save.setIcon(FIF.SAVE)
         self.btn_save.setMinimumHeight(36)
         self.btn_save.hide()
-        self.btn_reset = PushButton("重置为默认设置", btn_widget)
+        self.btn_reset = PushButton(self.tr("重置为默认设置"), btn_widget)
         self.btn_reset.setIcon(FIF.DELETE)
         self.btn_reset.setMinimumHeight(36)
         # btn_save 保留属性供外层 signal 连接，但不在 UI 中显示
@@ -168,55 +170,52 @@ class AboutSubInterface(SubSettingInterface):
         # 即时落盘（绕过外层 dirty 事务）
         self._settings_ref.set("ui.language", new_code)
         self._settings_ref.save()
-        # 立刻安装新 translator——之后任何 _new_ tr() 调用会走新语言。
-        # 但 Qt 的 setText(self.tr(...)) 在调用时就把翻译"烧"进了 widget；
-        # 现有标签不会自动刷新。要真正生效必须重启进程或对每个 widget 实现
-        # changeEvent(LanguageChange)→retranslateUi 的样板（工作量巨大）。
-        # 务实做法：问用户是否立即重启进程（QProcess.startDetached 复用
-        # 同一 argv，新进程读 ui.language 起来就是新语言）。
+
+        # **热更新**：apply_language → installTranslator → Qt 自动向所有
+        # top-level widget 派发 LanguageChange 事件；override 了 changeEvent
+        # 的 widget 重建/重译；没 override 的旧文本保持不变（典型为已构造的
+        # 工具栏/按钮——下次重启或重新构造时刷新）。
+        # 用户能立即看到的范围：主窗口标题、设置面板（about/所有 SubSetting）、
+        # 因为这些 override 了 changeEvent；其他页面渐进刷新。
         localization.apply_language(new_code)
 
-        msg = QMessageBox(self.window())
-        msg.setIcon(QMessageBox.Icon.Question)
-        msg.setWindowTitle(self.tr("语言已切换"))
-        msg.setText(self.tr(
-            "语言设置已保存。需要重启软件以完整应用新语言。\n是否立即重启？"
-        ))
-        btn_now = msg.addButton(self.tr("立即重启"), QMessageBox.ButtonRole.AcceptRole)
-        msg.addButton(self.tr("稍后"), QMessageBox.ButtonRole.RejectRole)
-        msg.setDefaultButton(btn_now)
-        msg.exec()
-        if msg.clickedButton() is btn_now:
-            self._restart_app()
+        InfoBar.success(
+            title=self.tr("语言已切换"),
+            content=self.tr("当前页已应用新语言；部分页面（编辑器/导出/演唱者管理）会在重新打开后刷新"),
+            orient=Qt.Orientation.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=4500,
+            parent=self,
+        )
 
-    def _restart_app(self) -> None:
-        """保存脏数据后重启进程。
+    def changeEvent(self, event):
+        """Qt 自动派发的 LanguageChange 事件——重建本子页面 UI。
 
-        - 项目脏 → 走主窗口的 ``flush_unsaved()`` 写崩溃恢复临时文件，重启后
-          会被原本的 crash-recovery 流程接住，等同"未保存的临时项目"恢复。
-        - 用 ``QProcess.startDetached(executable, argv)`` 启子进程，再
-          ``QApplication.quit()`` 退当前进程——子进程读到最新 config 后从新
-          语言起来。
+        installTranslator 后 Qt 给所有 widget 投递 LanguageChange；本类的
+        响应方式是把 expandLayout 里的 group 全部清掉再 _init_ui 一遍，
+        load_settings 同步状态。比逐个 setText 简单且不容易漏。
         """
-        main = self.window()
-        try:
-            if hasattr(main, "flush_unsaved"):
-                main.flush_unsaved()
-        except Exception:
-            pass
+        if event.type() == QEvent.Type.LanguageChange:
+            self._rebuild_ui()
+        super().changeEvent(event)
 
-        # 透传当前 sys.argv 给子进程；过滤掉首元素（脚本/exe 路径），由
-        # QProcess 自己拼回去。PyInstaller 打包后 sys.executable 就是
-        # StrangeUtaGame.exe；dev 模式下是 python.exe + main.py。
-        program = sys.executable
-        args = list(sys.argv[1:])
-        if not sys.executable.endswith((".exe", ".EXE")):
-            # dev 模式：python main.py 需要把 main.py 放回 args 首位
-            if sys.argv and not sys.argv[0].endswith(".exe"):
-                args = [sys.argv[0], *args]
-
-        QProcess.startDetached(program, args)
-        QApplication.quit()
+    def _rebuild_ui(self) -> None:
+        """清空旧 UI 并按当前语言重新构建。"""
+        # 1) 拆掉旧 widget——deleteLater 让 Qt 在事件循环中清理
+        while self.expandLayout.count():
+            item = self.expandLayout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.setParent(None)
+                w.deleteLater()
+        # 2) 重新构造（包括语言卡）
+        self._init_ui()
+        # 3) 同步状态：语言下拉位置、FFmpeg 路径、配置路径等
+        if self._settings_ref is not None:
+            self.load_settings(self._settings_ref)
+        # 4) 重新连接信号（语言下拉 → handler）
+        self.connect_signals()
 
     def _open_config_dir(self):
         if self._settings_ref is None or self._settings_ref._config_path is None:
@@ -227,7 +226,7 @@ class AboutSubInterface(SubSettingInterface):
         if self._settings_ref is None or self._settings_ref._config_path is None:
             return
         s = self._settings_ref
-        new_dir = QFileDialog.getExistingDirectory(self, "选择配置文件存储目录", str(s._config_path.parent))
+        new_dir = QFileDialog.getExistingDirectory(self, self.tr("选择配置文件存储目录"), str(s._config_path.parent))
         if not new_dir:
             return
 
@@ -245,7 +244,8 @@ class AboutSubInterface(SubSettingInterface):
             try:
                 redirect_file.write_text(str(new_dir_path), encoding="utf-8")
             except Exception as e:
-                InfoBar.error(title="更改失败", content=f"无法写入重定向文件: {e}",
+                InfoBar.error(title=self.tr("更改失败"),
+                    content=self.tr("无法写入重定向文件: {err}").format(err=e),
                     orient=Qt.Orientation.Horizontal, isClosable=True,
                     position=InfoBarPosition.TOP, duration=5000, parent=self)
                 return
@@ -263,7 +263,8 @@ class AboutSubInterface(SubSettingInterface):
                     if op.exists() and op != np:
                         shutil.copy2(str(op), str(np))
             except Exception as e:
-                InfoBar.warning(title="配置复制失败", content=f"请手动复制配置文件: {e}",
+                InfoBar.warning(title=self.tr("配置复制失败"),
+                    content=self.tr("请手动复制配置文件: {err}").format(err=e),
                     orient=Qt.Orientation.Horizontal, isClosable=True,
                     position=InfoBarPosition.TOP, duration=5000, parent=self)
 
@@ -272,7 +273,8 @@ class AboutSubInterface(SubSettingInterface):
         s._network_dict_path = new_dir_path / "network_dictionary.json"
         s._singers_path = new_dir_path / "singers.json"
         self._path_card.setContent(str(new_path))
-        InfoBar.success(title="配置位置已更改", content=f"配置文件将保存到: {new_path}",
+        InfoBar.success(title=self.tr("配置位置已更改"),
+            content=self.tr("配置文件将保存到: {path}").format(path=new_path),
             orient=Qt.Orientation.Horizontal, isClosable=True,
             position=InfoBarPosition.TOP, duration=5000, parent=self)
 
@@ -282,7 +284,7 @@ class AboutSubInterface(SubSettingInterface):
             self._ffmpeg_path_label.setText(label)
             self._ffmpeg_path_label.setToolTip(path)
         else:
-            self._ffmpeg_path_label.setText("（使用环境变量）")
+            self._ffmpeg_path_label.setText(self.tr("（使用环境变量）"))
             self._ffmpeg_path_label.setToolTip("")
 
     def _browse_ffmpeg(self):
@@ -293,8 +295,8 @@ class AboutSubInterface(SubSettingInterface):
             current = self._settings_ref.get("tools.ffmpeg_path", "") or ""
         init_dir = str(Path(current).parent) if current else ""
         path, _ = QFileDialog.getOpenFileName(
-            self, "选择 FFmpeg 可执行文件", init_dir,
-            "可执行文件 (ffmpeg.exe ffmpeg);;所有文件 (*.*)",
+            self, self.tr("选择 FFmpeg 可执行文件"), init_dir,
+            self.tr("可执行文件 (ffmpeg.exe ffmpeg);;所有文件 (*.*)"),
         )
         if not path:
             return
@@ -314,11 +316,12 @@ class AboutSubInterface(SubSettingInterface):
         self._settings_ref.save()
         self._update_ffmpeg_label(path)
         if path:
-            InfoBar.success(title="FFmpeg 路径已保存", content=path,
+            InfoBar.success(title=self.tr("FFmpeg 路径已保存"), content=path,
                 orient=Qt.Orientation.Horizontal, isClosable=True,
                 position=InfoBarPosition.TOP, duration=4000, parent=self)
         else:
-            InfoBar.success(title="FFmpeg 路径已清除", content="将使用系统环境变量中的 ffmpeg",
+            InfoBar.success(title=self.tr("FFmpeg 路径已清除"),
+                content=self.tr("将使用系统环境变量中的 ffmpeg"),
                 orient=Qt.Orientation.Horizontal, isClosable=True,
                 position=InfoBarPosition.TOP, duration=3000, parent=self)
 
@@ -339,15 +342,15 @@ class AboutSubInterface(SubSettingInterface):
         )
         if ret <= 32:
             InfoBar.error(
-                title="无法启动安装",
-                content=f"ShellExecute 返回 {ret}，请检查是否拒绝了 UAC 提权。",
+                title=self.tr("无法启动安装"),
+                content=self.tr("ShellExecute 返回 {ret}，请检查是否拒绝了 UAC 提权。").format(ret=ret),
                 orient=Qt.Orientation.Horizontal, isClosable=True,
                 position=InfoBarPosition.TOP, duration=6000, parent=self,
             )
             return
         InfoBar.info(
-            title="已请求管理员权限启动 FFmpeg 安装",
-            content="安装完成后，重启软件即可通过环境变量自动使用，或点击「浏览」手动指定路径。",
+            title=self.tr("已请求管理员权限启动 FFmpeg 安装"),
+            content=self.tr("安装完成后，重启软件即可通过环境变量自动使用，或点击「浏览」手动指定路径。"),
             orient=Qt.Orientation.Horizontal, isClosable=True,
             position=InfoBarPosition.TOP, duration=8000, parent=self,
         )

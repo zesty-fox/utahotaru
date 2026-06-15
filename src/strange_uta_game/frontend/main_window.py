@@ -316,6 +316,38 @@ class MainWindow(MSFluentWindow):
         super().changeEvent(event)
         if event.type() == QEvent.Type.WindowStateChange:
             self._schedule_geometry_save()
+        elif event.type() == QEvent.Type.LanguageChange:
+            # 切语言时（installTranslator 自动派发），刷新窗口标题；导航条 label
+            # 走 _refresh_navigation_labels（NavigationItem 持有的是 setText 后的
+            # 静态字符串，必须显式重设）。
+            self.setWindowTitle(self.tr("StrangeUtaGame - 歌词打轴工具 Bilibili@不会说话的呆轩cc"))
+            self._refresh_navigation_labels()
+
+    def _refresh_navigation_labels(self) -> None:
+        """切语言后重置侧边栏 4 个 NavigationItem 的 label。
+
+        MSFluentWindow.addSubInterface 把 text 存进 NavigationItem.setText，
+        Qt 不会自动重译。走 navigationInterface.widget(routeKey) 拿到底层
+        NavigationItem 再 setText。
+        """
+        nav = getattr(self, "navigationInterface", None)
+        if nav is None:
+            return
+        mapping = {
+            getattr(self, "editorInterface", None): self.tr("打轴"),
+            getattr(self, "exportInterface", None): self.tr("导出"),
+            getattr(self, "singerInterface", None): self.tr("演唱者"),
+            getattr(self, "settingInterface", None): self.tr("设置"),
+        }
+        for iface, label in mapping.items():
+            if iface is None:
+                continue
+            try:
+                item = nav.widget(iface.objectName())
+                if item is not None and hasattr(item, "setText"):
+                    item.setText(label)
+            except Exception:
+                pass
 
     def _on_theme_changed(self):
         """主题变化时更新 Win10 兜底背景色"""
@@ -398,15 +430,15 @@ class MainWindow(MSFluentWindow):
     def _init_navigation(self):
         """初始化侧边栏导航"""
         # 以下 interface 已废弃，仅保留初始化（部分功能被 Timing 界面复用），不注册到侧边栏
-        self.addSubInterface(self.editorInterface, FIF.PLAY, "打轴")
-        self.addSubInterface(self.exportInterface, FIF.SHARE, "导出")
-        self.addSubInterface(self.singerInterface, FIF.PEOPLE, "演唱者")
+        self.addSubInterface(self.editorInterface, FIF.PLAY, self.tr("打轴"))
+        self.addSubInterface(self.exportInterface, FIF.SHARE, self.tr("导出"))
+        self.addSubInterface(self.singerInterface, FIF.PEOPLE, self.tr("演唱者"))
 
         # 底部
         self.addSubInterface(
             self.settingInterface,
             FIF.SETTING,
-            "设置",
+            self.tr("设置"),
             position=NavigationItemPosition.BOTTOM,
         )
 
