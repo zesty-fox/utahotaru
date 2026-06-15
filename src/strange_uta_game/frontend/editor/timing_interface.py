@@ -828,8 +828,8 @@ class EditorInterface(QWidget):
                 app_settings.set("export.offset_ms", offset)
                 app_settings.save()
             InfoBar.success(
-                title="已应用项目全局偏移",
-                content=f"从项目读取到全局偏移: {offset}ms，已同步到设置",
+                title=self.tr("已应用项目全局偏移"),
+                content=self.tr("从项目读取到全局偏移: {offset}ms，已同步到设置").format(offset=offset),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -1176,8 +1176,8 @@ class EditorInterface(QWidget):
             clipboard.setText(inline_text)
 
         InfoBar.success(
-            title="已复制",
-            content=f"已复制 {total_chars} 个字符",
+            title=self.tr("已复制"),
+            content=self.tr("已复制 {n} 个字符").format(n=total_chars),
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -1331,8 +1331,8 @@ class EditorInterface(QWidget):
     def _on_save(self):
         if not self._project:
             InfoBar.warning(
-                title="无项目",
-                content="请先创建或打开项目",
+                title=self.tr("无项目"),
+                content=self.tr("请先创建或打开项目"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -1351,7 +1351,7 @@ class EditorInterface(QWidget):
         ):
             if store.save():
                 InfoBar.success(
-                    title="保存成功",
+                    title=self.tr("保存成功"),
                     content=store.save_path,
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
@@ -1362,8 +1362,8 @@ class EditorInterface(QWidget):
                 self.project_saved.emit()
             else:
                 InfoBar.error(
-                    title="保存失败",
-                    content="无法保存到 " + (store.save_path or ""),
+                    title=self.tr("保存失败"),
+                    content=self.tr("无法保存到 ") + (store.save_path or ""),
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
                     position=InfoBarPosition.TOP,
@@ -1375,7 +1375,8 @@ class EditorInterface(QWidget):
         # 无正式保存路径 / 仍是临时项目 → 弹出另存为对话框
         suggested = store.suggested_save_path(".sug") if store else ""
         path, _ = QFileDialog.getSaveFileName(
-            self, "保存项目", suggested, "StrangeUtaGame 项目 (*.sug);;所有文件 (*.*)"
+            self, self.tr("保存项目"), suggested,
+            self.tr("StrangeUtaGame 项目 (*.sug);;所有文件 (*.*)")
         )
         if not path:
             return
@@ -1399,7 +1400,7 @@ class EditorInterface(QWidget):
 
             if success:
                 InfoBar.success(
-                    title="保存成功",
+                    title=self.tr("保存成功"),
                     content=path,
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
@@ -1410,8 +1411,8 @@ class EditorInterface(QWidget):
                 self.project_saved.emit()
             else:
                 InfoBar.error(
-                    title="保存失败",
-                    content="无法保存到 " + path,
+                    title=self.tr("保存失败"),
+                    content=self.tr("无法保存到 ") + path,
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
                     position=InfoBarPosition.TOP,
@@ -1420,7 +1421,7 @@ class EditorInterface(QWidget):
                 )
         except Exception as e:
             InfoBar.error(
-                title="保存失败",
+                title=self.tr("保存失败"),
                 content=str(e),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
@@ -1436,11 +1437,11 @@ class EditorInterface(QWidget):
             # 检查是否有未保存的更改
             if store and store.dirty:
                 msg = QMessageBox(self)
-                msg.setWindowTitle("保存当前项目")
-                msg.setText("当前项目有未保存的更改，是否保存？")
-                btn_save = msg.addButton("保存", QMessageBox.ButtonRole.AcceptRole)
-                msg.addButton("放弃", QMessageBox.ButtonRole.DestructiveRole)
-                btn_cancel = msg.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+                msg.setWindowTitle(self.tr("保存当前项目"))
+                msg.setText(self.tr("当前项目有未保存的更改，是否保存？"))
+                btn_save = msg.addButton(self.tr("保存"), QMessageBox.ButtonRole.AcceptRole)
+                msg.addButton(self.tr("放弃"), QMessageBox.ButtonRole.DestructiveRole)
+                btn_cancel = msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
                 msg.setDefaultButton(btn_save)
                 msg.exec()
                 clicked = msg.clickedButton()
@@ -1463,8 +1464,8 @@ class EditorInterface(QWidget):
         """项目另存为"""
         if not self._project:
             InfoBar.warning(
-                title="无项目",
-                content="请先创建或打开项目",
+                title=self.tr("无项目"),
+                content=self.tr("请先创建或打开项目"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -1476,7 +1477,8 @@ class EditorInterface(QWidget):
         store = getattr(self, "_store", None)
         suggested = store.suggested_save_path(".sug") if store else ""
         path, _ = QFileDialog.getSaveFileName(
-            self, "另存为", suggested, "StrangeUtaGame 项目 (*.sug);;所有文件 (*.*)"
+            self, self.tr("另存为"), suggested,
+            self.tr("StrangeUtaGame 项目 (*.sug);;所有文件 (*.*)")
         )
         if not path:
             return
@@ -1499,7 +1501,7 @@ class EditorInterface(QWidget):
 
             if success:
                 InfoBar.success(
-                    title="保存成功",
+                    title=self.tr("保存成功"),
                     content=path,
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
@@ -1510,8 +1512,8 @@ class EditorInterface(QWidget):
                 self.project_saved.emit()
             else:
                 InfoBar.error(
-                    title="保存失败",
-                    content="无法保存到 " + path,
+                    title=self.tr("保存失败"),
+                    content=self.tr("无法保存到 ") + path,
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
                     position=InfoBarPosition.TOP,
@@ -1520,7 +1522,7 @@ class EditorInterface(QWidget):
                 )
         except Exception as e:
             InfoBar.error(
-                title="保存失败",
+                title=self.tr("保存失败"),
                 content=str(e),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
@@ -1586,8 +1588,8 @@ class EditorInterface(QWidget):
 
         if self.preview.is_multi_line_selection():
             InfoBar.warning(
-                title="暂不允许多行",
-                content="批量编辑暂不允许多行选择",
+                title=self.tr("暂不允许多行"),
+                content=self.tr("批量编辑暂不允许多行选择"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -1647,8 +1649,8 @@ class EditorInterface(QWidget):
 
         if self.preview.is_multi_line_selection():
             InfoBar.warning(
-                title="暂不允许多行",
-                content="修改所选字符暂不允许多行选择",
+                title=self.tr("暂不允许多行"),
+                content=self.tr("修改所选字符暂不允许多行选择"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -1866,8 +1868,8 @@ class EditorInterface(QWidget):
         ok = self._execute_structural_edit("按类型删除注音", _mutate)
         if not ok:
             InfoBar.info(
-                title="无变化",
-                content="所选类型范围内没有需要删除的注音",
+                title=self.tr("无变化"),
+                content=self.tr("所选类型范围内没有需要删除的注音"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -1880,8 +1882,9 @@ class EditorInterface(QWidget):
             label for ct, label in DeleteRubyByTypeDialog._TYPE_LABELS if ct in selected
         )
         InfoBar.success(
-            title="删除完成",
-            content=f"已删除 {removed_box[0]} 个注音（类型: {labels}）",
+            title=self.tr("删除完成"),
+            content=self.tr("已删除 {n} 个注音（类型: {labels}）").format(
+                n=removed_box[0], labels=labels),
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -1900,8 +1903,8 @@ class EditorInterface(QWidget):
             return
         if not self._project.singers:
             InfoBar.warning(
-                title="无演唱者",
-                content="项目中没有演唱者，请先添加演唱者",
+                title=self.tr("无演唱者"),
+                content=self.tr("项目中没有演唱者，请先添加演唱者"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -1946,8 +1949,8 @@ class EditorInterface(QWidget):
         ok = self._execute_structural_edit("按行设置演唱者", _mutate)
         if not ok:
             InfoBar.info(
-                title="无变化",
-                content="所选行的演唱者未发生变化",
+                title=self.tr("无变化"),
+                content=self.tr("所选行的演唱者未发生变化"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -1957,8 +1960,8 @@ class EditorInterface(QWidget):
             return
 
         InfoBar.success(
-            title="设置完成",
-            content=f"已为 {len(result_map)} 行设置演唱者",
+            title=self.tr("设置完成"),
+            content=self.tr("已为 {n} 行设置演唱者").format(n=len(result_map)),
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -1977,8 +1980,8 @@ class EditorInterface(QWidget):
             return
         if not self._project.singers:
             InfoBar.warning(
-                title="无演唱者",
-                content="项目中没有演唱者，请先添加演唱者",
+                title=self.tr("无演唱者"),
+                content=self.tr("项目中没有演唱者，请先添加演唱者"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -2105,8 +2108,8 @@ class EditorInterface(QWidget):
         ok = self._execute_structural_edit("应用演唱者", _mutate)
         if not ok:
             InfoBar.info(
-                title="无变化",
-                content="所选字符的演唱者未发生变化",
+                title=self.tr("无变化"),
+                content=self.tr("所选字符的演唱者未发生变化"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -2115,8 +2118,8 @@ class EditorInterface(QWidget):
             )
             return
         InfoBar.success(
-            title="设置完成",
-            content="已为选中字符设置演唱者",
+            title=self.tr("设置完成"),
+            content=self.tr("已为选中字符设置演唱者"),
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -2153,8 +2156,8 @@ class EditorInterface(QWidget):
         ok = self._execute_structural_edit("应用演唱者", _mutate)
         if not ok:
             InfoBar.info(
-                title="无变化",
-                content="所选字符的演唱者未发生变化",
+                title=self.tr("无变化"),
+                content=self.tr("所选字符的演唱者未发生变化"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -2164,8 +2167,8 @@ class EditorInterface(QWidget):
             return
 
         InfoBar.success(
-            title="设置完成",
-            content="已为选中字符设置演唱者",
+            title=self.tr("设置完成"),
+            content=self.tr("已为选中字符设置演唱者"),
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -2269,8 +2272,8 @@ class EditorInterface(QWidget):
         """补全时间戳功能入口"""
         if not self._project:
             InfoBar.warning(
-                title="无项目",
-                content="请先创建或打开项目",
+                title=self.tr("无项目"),
+                content=self.tr("请先创建或打开项目"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -2292,8 +2295,8 @@ class EditorInterface(QWidget):
 
         if not scope_types:
             InfoBar.warning(
-                title="未选择适用范围",
-                content="请至少选择一种字符类型",
+                title=self.tr("未选择适用范围"),
+                content=self.tr("请至少选择一种字符类型"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -2307,8 +2310,8 @@ class EditorInterface(QWidget):
 
         if count > 0:
             InfoBar.success(
-                title="补全完成",
-                content=f"已为 {count} 个字符补全时间戳",
+                title=self.tr("补全完成"),
+                content=self.tr("已为 {n} 个字符补全时间戳").format(n=count),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -2317,8 +2320,8 @@ class EditorInterface(QWidget):
             )
         else:
             InfoBar.info(
-                title="无需补全",
-                content="没有找到需要补全时间戳的字符",
+                title=self.tr("无需补全"),
+                content=self.tr("没有找到需要补全时间戳的字符"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -2330,8 +2333,8 @@ class EditorInterface(QWidget):
         """分离符号时间戳功能入口"""
         if not self._project:
             InfoBar.warning(
-                title="无项目",
-                content="请先创建或打开项目",
+                title=self.tr("无项目"),
+                content=self.tr("请先创建或打开项目"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -2352,8 +2355,8 @@ class EditorInterface(QWidget):
 
         if not symbol_chars:
             InfoBar.warning(
-                title="未选择符号分组",
-                content="请至少选择一个符号分组",
+                title=self.tr("未选择符号分组"),
+                content=self.tr("请至少选择一个符号分组"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -2369,8 +2372,9 @@ class EditorInterface(QWidget):
         total = post_count + pre_count
         if total > 0:
             InfoBar.success(
-                title="分离完成",
-                content=f"共处理 {total} 个符号（后补偿 {post_count} 个，前补偿 {pre_count} 个）",
+                title=self.tr("分离完成"),
+                content=self.tr("共处理 {total} 个符号（后补偿 {post} 个，前补偿 {pre} 个）").format(
+                    total=total, post=post_count, pre=pre_count),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -2379,8 +2383,8 @@ class EditorInterface(QWidget):
             )
         else:
             InfoBar.info(
-                title="无需处理",
-                content="没有找到符合条件的符号时间戳",
+                title=self.tr("无需处理"),
+                content=self.tr("没有找到符合条件的符号时间戳"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -2392,8 +2396,8 @@ class EditorInterface(QWidget):
         """调整原始时间戳功能入口 — 打开非模态调整窗口，允许边测试边调整"""
         if not self._project:
             InfoBar.warning(
-                title="无项目",
-                content="请先创建或打开项目",
+                title=self.tr("无项目"),
+                content=self.tr("请先创建或打开项目"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -2441,10 +2445,10 @@ class EditorInterface(QWidget):
         ok = self._execute_structural_edit("调整原始时间戳", _mutate)
         if ok:
             if hasattr(self, "_adjust_ts_dlg") and self._adjust_ts_dlg is not None:
-                self._adjust_ts_dlg.set_status(f"已成功偏移 {delta_ms:+d} ms")
+                self._adjust_ts_dlg.set_status(self.tr("已成功偏移 {delta:+d} ms").format(delta=delta_ms))
             InfoBar.success(
-                title="调整完成",
-                content=f"所有原始时间戳已整体偏移 {delta_ms:+d} ms",
+                title=self.tr("调整完成"),
+                content=self.tr("所有原始时间戳已整体偏移 {delta:+d} ms").format(delta=delta_ms),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -2453,14 +2457,14 @@ class EditorInterface(QWidget):
             )
         else:
             if hasattr(self, "_adjust_ts_dlg") and self._adjust_ts_dlg is not None:
-                self._adjust_ts_dlg.set_status("无可调整的时间戳", success=False)
+                self._adjust_ts_dlg.set_status(self.tr("无可调整的时间戳"), success=False)
 
     def _on_adjust_raw_timestamp_line(self):
         """按行调整原始时间戳 — 打开非模态调整窗口，作用于当前行。"""
         if not self._project:
             InfoBar.warning(
-                title="无项目",
-                content="请先创建或打开项目",
+                title=self.tr("无项目"),
+                content=self.tr("请先创建或打开项目"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -2472,8 +2476,8 @@ class EditorInterface(QWidget):
         line_idx = self._current_line_idx
         if line_idx < 0 or line_idx >= len(self._project.sentences):
             InfoBar.warning(
-                title="未选中行",
-                content="请先选中要调整的歌词行",
+                title=self.tr("未选中行"),
+                content=self.tr("请先选中要调整的歌词行"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -2485,12 +2489,12 @@ class EditorInterface(QWidget):
         from .timing.dialogs import AdjustRawTimestampDialog
 
         self._adjust_ts_line_target = line_idx
-        scope_label = f"第 {line_idx + 1} 行"
+        scope_label = self.tr("第 {n} 行").format(n=line_idx + 1)
         if not hasattr(self, "_adjust_ts_line_dlg") or self._adjust_ts_line_dlg is None or not self._adjust_ts_line_dlg.isVisible():
             self._adjust_ts_line_dlg = AdjustRawTimestampDialog(self, scope="line", scope_label=scope_label)
             self._adjust_ts_line_dlg.apply_requested.connect(self._on_apply_adjust_raw_timestamp_line)
         else:
-            self._adjust_ts_line_dlg.lbl_scope.setText(f"作用范围：{scope_label}")
+            self._adjust_ts_line_dlg.lbl_scope.setText(self.tr("作用范围：{label}").format(label=scope_label))
 
         self._adjust_ts_line_dlg.show()
         self._adjust_ts_line_dlg.raise_()
@@ -2504,7 +2508,7 @@ class EditorInterface(QWidget):
         line_idx = getattr(self, "_adjust_ts_line_target", -1)
         if line_idx < 0 or line_idx >= len(self._project.sentences):
             if hasattr(self, "_adjust_ts_line_dlg") and self._adjust_ts_line_dlg is not None:
-                self._adjust_ts_line_dlg.set_status("目标行已失效", success=False)
+                self._adjust_ts_line_dlg.set_status(self.tr("目标行已失效"), success=False)
             return
 
         sentence = self._project.sentences[line_idx]
@@ -2526,10 +2530,11 @@ class EditorInterface(QWidget):
         ok = self._execute_structural_edit("按行调整原始时间戳", _mutate)
         if ok:
             if hasattr(self, "_adjust_ts_line_dlg") and self._adjust_ts_line_dlg is not None:
-                self._adjust_ts_line_dlg.set_status(f"已成功偏移 {delta_ms:+d} ms")
+                self._adjust_ts_line_dlg.set_status(self.tr("已成功偏移 {delta:+d} ms").format(delta=delta_ms))
             InfoBar.success(
-                title="调整完成",
-                content=f"第 {line_idx + 1} 行原始时间戳已整体偏移 {delta_ms:+d} ms",
+                title=self.tr("调整完成"),
+                content=self.tr("第 {line} 行原始时间戳已整体偏移 {delta:+d} ms").format(
+                    line=line_idx + 1, delta=delta_ms),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -2538,14 +2543,14 @@ class EditorInterface(QWidget):
             )
         else:
             if hasattr(self, "_adjust_ts_line_dlg") and self._adjust_ts_line_dlg is not None:
-                self._adjust_ts_line_dlg.set_status("无可调整的时间戳", success=False)
+                self._adjust_ts_line_dlg.set_status(self.tr("无可调整的时间戳"), success=False)
 
     def _on_adjust_raw_timestamp_selected(self):
         """调整所选字符原始时间戳 — 打开非模态调整窗口，作用于选中字符范围。"""
         if not self._project:
             InfoBar.warning(
-                title="无项目",
-                content="请先创建或打开项目",
+                title=self.tr("无项目"),
+                content=self.tr("请先创建或打开项目"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -2557,8 +2562,8 @@ class EditorInterface(QWidget):
         ranges = self._collect_selected_char_ranges()
         if not ranges:
             InfoBar.warning(
-                title="未选中字符",
-                content="请先选择要调整的字符",
+                title=self.tr("未选中字符"),
+                content=self.tr("请先选择要调整的字符"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -2575,7 +2580,7 @@ class EditorInterface(QWidget):
             self._adjust_ts_sel_dlg = AdjustRawTimestampDialog(self, scope="selected", scope_label=scope_label)
             self._adjust_ts_sel_dlg.apply_requested.connect(self._on_apply_adjust_raw_timestamp_selected)
         else:
-            self._adjust_ts_sel_dlg.lbl_scope.setText(f"作用范围：{scope_label}")
+            self._adjust_ts_sel_dlg.lbl_scope.setText(self.tr("作用范围：{label}").format(label=scope_label))
 
         self._adjust_ts_sel_dlg.show()
         self._adjust_ts_sel_dlg.raise_()
@@ -2633,14 +2638,16 @@ class EditorInterface(QWidget):
 
     def _format_selected_scope_label(self, ranges: list[tuple[int, int, int]]) -> str:
         if not ranges:
-            return "所选字符"
+            return self.tr("所选字符")
         if len(ranges) == 1:
             li, s, e = ranges[0]
             if s == e:
-                return f"第 {li + 1} 行 第 {s + 1} 字"
-            return f"第 {li + 1} 行 第 {s + 1}-{e + 1} 字"
+                return self.tr("第 {line} 行 第 {char} 字").format(line=li + 1, char=s + 1)
+            return self.tr("第 {line} 行 第 {s}-{e} 字").format(
+                line=li + 1, s=s + 1, e=e + 1)
         total = sum(e - s + 1 for _, s, e in ranges)
-        return f"{ranges[0][0] + 1} - {ranges[-1][0] + 1} 行，共 {total} 字"
+        return self.tr("{start} - {end} 行，共 {total} 字").format(
+            start=ranges[0][0] + 1, end=ranges[-1][0] + 1, total=total)
 
     def _on_apply_adjust_raw_timestamp_selected(self, delta_ms: int):
         """处理调整所选字符原始时间戳对话框的应用请求。"""
@@ -2650,7 +2657,7 @@ class EditorInterface(QWidget):
         ranges: list[tuple[int, int, int]] = getattr(self, "_adjust_ts_selected_ranges", [])
         if not ranges:
             if hasattr(self, "_adjust_ts_sel_dlg") and self._adjust_ts_sel_dlg is not None:
-                self._adjust_ts_sel_dlg.set_status("选区已失效", success=False)
+                self._adjust_ts_sel_dlg.set_status(self.tr("选区已失效"), success=False)
             return
 
         project = self._project
@@ -2681,10 +2688,10 @@ class EditorInterface(QWidget):
         ok = self._execute_structural_edit("调整所选字符原始时间戳", _mutate)
         if ok:
             if hasattr(self, "_adjust_ts_sel_dlg") and self._adjust_ts_sel_dlg is not None:
-                self._adjust_ts_sel_dlg.set_status(f"已成功偏移 {delta_ms:+d} ms")
+                self._adjust_ts_sel_dlg.set_status(self.tr("已成功偏移 {delta:+d} ms").format(delta=delta_ms))
             InfoBar.success(
-                title="调整完成",
-                content=f"所选字符原始时间戳已偏移 {delta_ms:+d} ms",
+                title=self.tr("调整完成"),
+                content=self.tr("所选字符原始时间戳已偏移 {delta:+d} ms").format(delta=delta_ms),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -2693,7 +2700,7 @@ class EditorInterface(QWidget):
             )
         else:
             if hasattr(self, "_adjust_ts_sel_dlg") and self._adjust_ts_sel_dlg is not None:
-                self._adjust_ts_sel_dlg.set_status("无可调整的时间戳", success=False)
+                self._adjust_ts_sel_dlg.set_status(self.tr("无可调整的时间戳"), success=False)
 
     def _execute_complete_timestamp(self, scope_types: set[str], exclude_rules: list[str], head_offset_ms: int = 150, tail_offset_ms: int = 150) -> int:
         """执行补全时间戳的核心逻辑
@@ -3048,8 +3055,9 @@ class EditorInterface(QWidget):
 
         if ok:
             InfoBar.success(
-                title="演唱者已更新",
-                content=f"已将第 {line_idx + 1} 行第 {start_char + 1}~{end_char + 1} 字的演唱者更改",
+                title=self.tr("演唱者已更新"),
+                content=self.tr("已将第 {line} 行第 {start}~{end} 字的演唱者更改").format(
+                    line=line_idx + 1, start=start_char + 1, end=end_char + 1),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -3075,7 +3083,7 @@ class EditorInterface(QWidget):
         self._audio_file_path = file_path
 
         # 状态提示
-        self._audio_state_tooltip = StateToolTip("正在加载音频", "正在读取音频文件...", self)
+        self._audio_state_tooltip = StateToolTip(self.tr("正在加载音频"), self.tr("正在读取音频文件..."), self)
         green = theme.status_complete.name()
         self._audio_state_tooltip.setStyleSheet(f"""
             StateToolTip {{
@@ -3116,7 +3124,7 @@ class EditorInterface(QWidget):
         """音频后台加载完成（UI 线程）：刷新时长/波形/默认音量速度。"""
         if getattr(self, "_audio_state_tooltip", None):
             self._audio_state_tooltip.setState(True)
-            self._audio_state_tooltip.setContent("加载完成")
+            self._audio_state_tooltip.setContent(self.tr("加载完成"))
             self._audio_state_tooltip.close()
             self._audio_state_tooltip = None
 
@@ -3171,7 +3179,7 @@ class EditorInterface(QWidget):
             self._store.set_audio_path(file_path)
 
         InfoBar.success(
-            title="音频已加载",
+            title=self.tr("音频已加载"),
             content=Path(file_path).name,
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
@@ -3189,7 +3197,7 @@ class EditorInterface(QWidget):
         self._audio_file_path = None
         self._audio_loading = False
         InfoBar.error(
-            title="加载失败",
+            title=self.tr("加载失败"),
             content=error_msg,
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
@@ -3220,7 +3228,7 @@ class EditorInterface(QWidget):
             return
         playing = bool(self._timing_service and self._timing_service.is_playing())
         if playing:
-            self.lbl_mode.setText("模式：打轴")
+            self.lbl_mode.setText(self.tr("模式：打轴"))
             self.lbl_mode.setStyleSheet(
                 "font-size: 12px; padding: 2px 8px; border-radius: 4px;"
                 "background-color: #ffd54f; color: #333; font-weight: bold;"
@@ -3230,7 +3238,7 @@ class EditorInterface(QWidget):
                 self._key_map_long = self._key_map_timing_long
                 self._key_map = self._key_map_timing_short
         else:
-            self.lbl_mode.setText("模式：编辑")
+            self.lbl_mode.setText(self.tr("模式：编辑"))
             self.lbl_mode.setStyleSheet(
                 "font-size: 12px; padding: 2px 8px; border-radius: 4px;"
                 "background-color: #e0e0e0; color: #444;"
@@ -3268,7 +3276,7 @@ class EditorInterface(QWidget):
                 self.transport.set_playing(True)
                 self.preview.set_playing(True)
                 self.timeline.set_playing(True)
-                self.lbl_status.setText("播放中")
+                self.lbl_status.setText(self.tr("播放中"))
                 self._update_mode_indicator()
                 self.preview._last_auto_scroll_line_idx = -1
                 # 无论鼠标点击还是键盘快捷键触发播放，都无条件恢复自动滚动
@@ -3287,7 +3295,7 @@ class EditorInterface(QWidget):
             self.transport.set_playing(False)
             self.preview.set_playing(False)
             self.timeline.set_playing(False)
-            self.lbl_status.setText("已暂停")
+            self.lbl_status.setText(self.tr("已暂停"))
             self._update_mode_indicator()
             # 重置自动滚动状态
             self._auto_scroll_suspended = False
@@ -3306,7 +3314,7 @@ class EditorInterface(QWidget):
             self.timeline.set_playing(False)
             self.transport.set_position(0)
             self.timeline.set_position(0)
-            self.lbl_status.setText("已停止")
+            self.lbl_status.setText(self.tr("已停止"))
             self._update_mode_indicator()
             # 重置自动滚动状态
             self._auto_scroll_suspended = False
@@ -4012,8 +4020,8 @@ class EditorInterface(QWidget):
 
         if self.preview.is_multi_line_selection():
             InfoBar.warning(
-                title="暂不允许多行",
-                content="F3连词暂不允许多行选择",
+                title=self.tr("暂不允许多行"),
+                content=self.tr("F3连词暂不允许多行选择"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -4054,8 +4062,8 @@ class EditorInterface(QWidget):
         # 不能在最后一个字符上连词
         if char_idx >= len(sentence.characters) - 1:
             InfoBar.warning(
-                title="无法连词",
-                content="已是最后一个字符",
+                title=self.tr("无法连词"),
+                content=self.tr("已是最后一个字符"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -4078,8 +4086,11 @@ class EditorInterface(QWidget):
         )
 
         InfoBar.success(
-            title="连词" if new_linked else "取消连词",
-            content=f"已{'连接' if new_linked else '断开'}「{sentence.chars[char_idx]}」与「{sentence.chars[char_idx + 1]}」",
+            title=self.tr("连词") if new_linked else self.tr("取消连词"),
+            content=(
+                self.tr("已连接「{a}」与「{b}」") if new_linked
+                else self.tr("已断开「{a}」与「{b}」")
+            ).format(a=sentence.chars[char_idx], b=sentence.chars[char_idx + 1]),
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -4112,12 +4123,12 @@ class EditorInterface(QWidget):
         )
 
         InfoBar.success(
-            title="连词" if link else "取消连词",
+            title=self.tr("连词") if link else self.tr("取消连词"),
             content=(
-                f"已将第 {line_idx + 1} 句 第 {start_idx + 1}-{end_idx + 1} 字连为一个词"
+                self.tr("已将第 {line} 句 第 {s}-{e} 字连为一个词")
                 if link
-                else f"已断开第 {line_idx + 1} 句 第 {start_idx + 1}-{end_idx + 1} 字的连词"
-            ),
+                else self.tr("已断开第 {line} 句 第 {s}-{e} 字的连词")
+            ).format(line=line_idx + 1, s=start_idx + 1, e=end_idx + 1),
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -4953,15 +4964,18 @@ class EditorInterface(QWidget):
         ]
         if not marks:
             return True
-        preview = [f"第 {l + 1} 行 第 {c + 1} 字" for l, c in marks[:10]]
-        extra = f"\n...另 {len(marks) - 10} 处" if len(marks) > 10 else ""
+        preview = [
+            self.tr("第 {line} 行 第 {char} 字").format(line=l + 1, char=c + 1)
+            for l, c in marks[:10]
+        ]
+        extra = self.tr("\n...另 {n} 处").format(n=len(marks) - 10) if len(marks) > 10 else ""
         msg = QMessageBox(self)
         msg.setIcon(QMessageBox.Icon.Warning)
-        msg.setWindowTitle("仍有导唱待办未处理")
-        msg.setText(f"还剩 {len(marks)} 个标记点未添加导唱符。")
+        msg.setWindowTitle(self.tr("仍有导唱待办未处理"))
+        msg.setText(self.tr("还剩 {n} 个标记点未添加导唱符。").format(n=len(marks)))
         msg.setInformativeText("\n".join(preview) + extra)
-        btn_continue = msg.addButton("继续导出", QMessageBox.ButtonRole.AcceptRole)
-        msg.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+        btn_continue = msg.addButton(self.tr("继续导出"), QMessageBox.ButtonRole.AcceptRole)
+        msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
         msg.exec()
         return msg.clickedButton() is btn_continue
 
@@ -4969,8 +4983,8 @@ class EditorInterface(QWidget):
         """快捷导出：使用默认导出格式弹出保存对话框并导出。"""
         if not self._project:
             InfoBar.warning(
-                title="无项目",
-                content="请先创建或打开项目",
+                title=self.tr("无项目"),
+                content=self.tr("请先创建或打开项目"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -4991,8 +5005,8 @@ class EditorInterface(QWidget):
             exporter = get_exporter_by_name(format_name)
         except ValueError:
             InfoBar.error(
-                title="导出失败",
-                content=f"未知的导出格式: {format_name}",
+                title=self.tr("导出失败"),
+                content=self.tr("未知的导出格式: {fmt}").format(fmt=format_name),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -5020,7 +5034,7 @@ class EditorInterface(QWidget):
         suggested_path = str(Path(suggested_dir) / (base_name + ext)) if suggested_dir else base_name + ext
 
         file_path, _ = QFileDialog.getSaveFileName(
-            self, "快捷导出", suggested_path, file_filter
+            self, self.tr("快捷导出"), suggested_path, file_filter
         )
         if not file_path:
             return
@@ -5040,7 +5054,7 @@ class EditorInterface(QWidget):
             settings.set("export.last_export_dir", str(Path(file_path).parent))
             settings.save()
             InfoBar.success(
-                title="导出成功",
+                title=self.tr("导出成功"),
                 content=result.file_path,
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
@@ -5050,8 +5064,8 @@ class EditorInterface(QWidget):
             )
         else:
             InfoBar.error(
-                title="导出失败",
-                content=result.error_message or "未知错误",
+                title=self.tr("导出失败"),
+                content=result.error_message or self.tr("未知错误"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -5492,7 +5506,7 @@ class EditorInterface(QWidget):
             self.transport.set_playing(False)
             self.preview.set_playing(False)
             self.timeline.set_playing(False)
-            self.lbl_status.setText("播放完毕")
+            self.lbl_status.setText(self.tr("播放完毕"))
             self._update_mode_indicator()
             # 重置自动滚动状态
             self._auto_scroll_suspended = False
@@ -5694,7 +5708,7 @@ class EditorInterface(QWidget):
 
     def _show_runtime_error(self, message: str):
         InfoBar.error(
-            title="操作失败",
+            title=self.tr("操作失败"),
             content=message,
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
@@ -5726,14 +5740,17 @@ class EditorInterface(QWidget):
                     ets = ch.global_sentence_end_ts
                     m, s = divmod(ets // 1000, 60)
                     ms = ets % 1000
-                    ts_parts.append(f"句尾{m:02d}:{s:02d}.{ms:03d}")
+                    ts_parts.append(self.tr("句尾{m:02d}:{s:02d}.{ms:03d}").format(m=m, s=s, ms=ms))
                 if ts_parts:
-                    char_info = f" | 字 {char_idx + 1}/{total_chars} | 「{ch.char}」 {', '.join(ts_parts)}"
+                    char_info = self.tr(" | 字 {n}/{total} | 「{ch}」 {tags}").format(
+                        n=char_idx + 1, total=total_chars, ch=ch.char, tags=', '.join(ts_parts))
                 else:
-                    char_info = f" | 字 {char_idx + 1}/{total_chars} | 「{ch.char}」 未打轴"
-            self.lbl_line_info.setText(f"行 {idx + 1}/{total}: {preview}{char_info}")
+                    char_info = self.tr(" | 字 {n}/{total} | 「{ch}」 未打轴").format(
+                        n=char_idx + 1, total=total_chars, ch=ch.char)
+            self.lbl_line_info.setText(self.tr("行 {idx}/{total}: {preview}{char_info}").format(
+                idx=idx + 1, total=total, preview=preview, char_info=char_info))
         else:
-            self.lbl_line_info.setText("当前行: -")
+            self.lbl_line_info.setText(self.tr("当前行: -"))
 
     def _update_time_tags_display(self):
         if not self._project:
@@ -5743,7 +5760,7 @@ class EditorInterface(QWidget):
 
     def _update_status(self):
         if not self._project:
-            self.lbl_progress.setText("行: 0/0 | 进度: 0%")
+            self.lbl_progress.setText(self.tr("行: 0/0 | 进度: 0%"))
             if hasattr(self, "lbl_needs_guide"):
                 self.lbl_needs_guide.setText("")
             return
@@ -5874,7 +5891,7 @@ class EditorInterface(QWidget):
         self._ruby_analyze_thread = thread
 
         def _on_progress(current: int, total: int) -> None:
-            state_tooltip.setContent(f"已处理 {current}/{total} 行")
+            state_tooltip.setContent(self.tr("已处理 {current}/{total} 行").format(current=current, total=total))
 
         def _cleanup() -> None:
             self._ruby_analyze_worker = None
@@ -5888,7 +5905,7 @@ class EditorInterface(QWidget):
             # LLM 注音失败时已回退本地引擎，提示用户。
             if getattr(analyzer, "llm_failed", False):
                 InfoBar.warning(
-                    title="LLM 注音失败，已回退本地引擎",
+                    title=self.tr("LLM 注音失败，已回退本地引擎"),
                     content=str(getattr(analyzer, "last_error", "") or ""),
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
@@ -5924,8 +5941,8 @@ class EditorInterface(QWidget):
 
             if deleted_count > 0:
                 InfoBar.success(
-                    title="注音分析完成",
-                    content=f"已重新分析注音，并自动删除了 {deleted_count} 个注音",
+                    title=self.tr("注音分析完成"),
+                    content=self.tr("已重新分析注音，并自动删除了 {n} 个注音").format(n=deleted_count),
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
                     position=InfoBarPosition.TOP,
@@ -5934,8 +5951,8 @@ class EditorInterface(QWidget):
                 )
             else:
                 InfoBar.success(
-                    title="注音分析完成",
-                    content="已重新分析注音",
+                    title=self.tr("注音分析完成"),
+                    content=self.tr("已重新分析注音"),
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
                     position=InfoBarPosition.TOP,
@@ -5947,7 +5964,7 @@ class EditorInterface(QWidget):
             state_tooltip.setState(True)
             _cleanup()
             InfoBar.warning(
-                title="注音分析失败",
+                title=self.tr("注音分析失败"),
                 content=err,
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
@@ -5957,7 +5974,7 @@ class EditorInterface(QWidget):
             )
 
         def _on_llm_waiting() -> None:
-            state_tooltip.setContent("正在等待 LLM 返回…（整首歌词一次性发送，请稍候）")
+            state_tooltip.setContent(self.tr("正在等待 LLM 返回…（整首歌词一次性发送，请稍候）"))
 
         thread.started.connect(worker.run)
         worker.llm_waiting.connect(_on_llm_waiting)
@@ -5977,17 +5994,17 @@ class EditorInterface(QWidget):
             return
 
         msg = QMessageBox(self)
-        msg.setWindowTitle("自动分析全部注音")
-        msg.setText("请选择分析范围：")
-        msg.setInformativeText(
+        msg.setWindowTitle(self.tr("自动分析全部注音"))
+        msg.setText(self.tr("请选择分析范围："))
+        msg.setInformativeText(self.tr(
             "「全部重新分析」会覆盖现有注音。\n"
             "「仅分析未注音字符」会保留已有的人工/字典注音。"
-        )
-        btn_all = msg.addButton("全部重新分析", QMessageBox.ButtonRole.DestructiveRole)
+        ))
+        btn_all = msg.addButton(self.tr("全部重新分析"), QMessageBox.ButtonRole.DestructiveRole)
         btn_only_noruby = msg.addButton(
-            "仅分析未注音字符", QMessageBox.ButtonRole.AcceptRole
+            self.tr("仅分析未注音字符"), QMessageBox.ButtonRole.AcceptRole
         )
-        btn_cancel = msg.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+        btn_cancel = msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
         msg.setDefaultButton(btn_only_noruby)
         msg.exec()
 
@@ -6133,7 +6150,7 @@ class EditorInterface(QWidget):
             _close_tooltip()
             if getattr(analyzer, "llm_failed", False):
                 InfoBar.warning(
-                    title="LLM 注音失败，已回退本地引擎",
+                    title=self.tr("LLM 注音失败，已回退本地引擎"),
                     content=str(getattr(analyzer, "last_error", "") or ""),
                     orient=Qt.Orientation.Horizontal,
                     isClosable=True,
@@ -6187,7 +6204,7 @@ class EditorInterface(QWidget):
 
         def _on_llm_waiting() -> None:
             if subset_tooltip is not None:
-                subset_tooltip.setContent("正在等待 LLM 返回…（整首歌词一次性发送，请稍候）")
+                subset_tooltip.setContent(self.tr("正在等待 LLM 返回…（整首歌词一次性发送，请稍候）"))
 
         thread.started.connect(worker.run)
         worker.llm_waiting.connect(_on_llm_waiting)
@@ -6206,8 +6223,8 @@ class EditorInterface(QWidget):
         line_idx = self._current_line_idx
         if line_idx < 0 or line_idx >= len(self._project.sentences):
             InfoBar.warning(
-                title="未选中行",
-                content="请先在歌词中选择要分析的行",
+                title=self.tr("未选中行"),
+                content=self.tr("请先在歌词中选择要分析的行"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -6261,8 +6278,8 @@ class EditorInterface(QWidget):
         sentence = self._project.sentences[line_idx]
         if char_idx < 0 or char_idx >= len(sentence.characters):
             InfoBar.warning(
-                title="未选中字符",
-                content="请先选择要分析的字符",
+                title=self.tr("未选中字符"),
+                content=self.tr("请先选择要分析的字符"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -6292,8 +6309,8 @@ class EditorInterface(QWidget):
         """工具栏「全文本编辑」— 以对话框打开全文本注音编辑界面。"""
         if not self._project:
             InfoBar.warning(
-                title="无项目",
-                content="请先创建或打开项目",
+                title=self.tr("无项目"),
+                content=self.tr("请先创建或打开项目"),
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
