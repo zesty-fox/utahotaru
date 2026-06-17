@@ -25,6 +25,7 @@ from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import (
     RubyAnalyzer,
     RubyResult,
     _arabic_to_kanji,
+    _arabic_to_kanji_segments,
     _group_reading_for_character,
     is_all_katakana,
     is_english_reading,
@@ -532,6 +533,49 @@ class AutoCheckService:
         merged.sort(key=lambda r: r.start_idx)
         return merged, covered
 
+    def _distribute_digit_readings(
+        self,
+        num_str: str,
+        seq_start: int,
+    ) -> List[RubyResult]:
+        """将多位数字的读音分配到各个数字字符上。
+
+        使用 :func:`_arabic_to_kanji_segments` 获取每位数字对应的汉字片段，
+        再通过注音分析器获取片段读音，为每个原始数字字符创建独立的
+        :class:`RubyResult`，使节奏点能正确分配。
+
+        Args:
+            num_str: 数字字符串（如 ``"12345"``）
+            seq_start: 该数字序列在句子文本中的起始索引
+
+        Returns:
+            每位数字的 RubyResult 列表
+        """
+        kanji, segments = _arabic_to_kanji_segments(num_str)
+
+        # 对每位数字对应的汉字片段，单独调用分析器获取读音，
+        # 避免分析器将整段汉字作为单个复合词导致无法按段分组。
+        per_digit: Dict[int, str] = {}
+        for seg_start, seg_end, orig_idx in segments:
+            seg_kanji = kanji[seg_start:seg_end]
+            seg_reading = self._analyzer.get_reading(seg_kanji)
+            if seg_reading and seg_reading != seg_kanji:
+                per_digit[orig_idx] = seg_reading
+
+        # 为每位数字创建独立 RubyResult
+        results: List[RubyResult] = []
+        for i, ch in enumerate(num_str):
+            reading = per_digit.get(i, ch)  # 零位（如 105 的 0）无读音，自注音
+            results.append(
+                RubyResult(
+                    text=ch,
+                    reading=reading,
+                    start_idx=seq_start + i,
+                    end_idx=seq_start + i + 1,
+                )
+            )
+        return results
+
     def _handle_number_readings(
         self,
         text: str,
@@ -544,6 +588,8 @@ class AutoCheckService:
 
         仅当分析器对数字返回自注音（reading == text）时介入；若分析器已给出
         有效读音则保留原结果（如 ``"2024年"`` 被整体分析为 ``"にせんにじゅうよねん"``）。
+
+        多位数字（如 ``"12345"``）会按位拆分读音，每位数字获得独立注音和节奏点。
 
         Args:
             text: 原句子文本
@@ -561,6 +607,7 @@ class AutoCheckService:
             seq_start, seq_end = m.start(), m.end()
             num_str = text[seq_start:seq_end]
 
+            # 找到该数字段覆盖的所有纯数字 RubyResult
             existing = [
                 r
                 for r in new_results
@@ -570,31 +617,40 @@ class AutoCheckService:
             ]
             if not existing:
                 continue
-            if not all(r.text == r.reading for r in existing):
-                continue
 
-            kanji = _arabic_to_kanji(num_str)
-            reading = self._analyzer.get_reading(kanji)
-            if not reading or reading == kanji:
-                continue
+            # 移除旧的数字位结果
+            new_results = [r for r in new_results if r not in existing]
 
-            new_results = [
-                r
-                for r in new_results
-                if not (
-                    r.start_idx >= seq_start
-                    and r.end_idx <= seq_end
-                    and r.text.isdigit()
+            if len(num_str) <= 1:
+                # 单数字：仅当自注音时替换
+                if not all(r.text == r.reading for r in existing):
+                    new_results.extend(existing)
+                    continue
+                kanji = _arabic_to_kanji(num_str)
+                reading = self._analyzer.get_reading(kanji)
+                if reading and reading != kanji:
+                    new_results.append(
+                        RubyResult(
+                            text=num_str,
+                            reading=reading,
+                            start_idx=seq_start,
+                            end_idx=seq_end,
+                        )
+                    )
+                else:
+                    new_results.append(
+                        RubyResult(
+                            text=num_str,
+                            reading=num_str,
+                            start_idx=seq_start,
+                            end_idx=seq_end,
+                        )
+                    )
+            else:
+                # 多位数：按位拆分读音
+                new_results.extend(
+                    self._distribute_digit_readings(num_str, seq_start)
                 )
-            ]
-            new_results.append(
-                RubyResult(
-                    text=num_str,
-                    reading=reading,
-                    start_idx=seq_start,
-                    end_idx=seq_end,
-                )
-            )
 
         new_results.sort(key=lambda r: r.start_idx)
         return new_results

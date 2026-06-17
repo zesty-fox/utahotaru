@@ -79,6 +79,71 @@ def _arabic_to_kanji(num_str: str) -> str:
     return "".join(result)
 
 
+def _arabic_to_kanji_segments(
+    num_str: str,
+) -> Tuple[str, List[Tuple[int, int, int]]]:
+    """将阿拉伯数字字符串转换为漢数字，同时返回每位的汉字片段边界。
+
+    与 :func:`_arabic_to_kanji` 逻辑一致，额外记录每个非零数字位
+    产出的汉字片段在结果串中的 ``(start, end, orig_digit_idx)``。
+
+    Returns:
+        (kanji_string, segments)
+        segments 每项为 (kanji_start, kanji_end, orig_digit_idx)，
+        其中 orig_digit_idx 是对应原数字字符串中的字符索引。
+        零位（如 ``"105"`` 中间的 0）不产生片段。
+
+    Examples:
+        >>> _arabic_to_kanji_segments("12345")
+        ("一万二千三百四十五", [(0,2,0), (2,4,1), (4,6,2), (6,8,3), (8,9,4)])
+        >>> _arabic_to_kanji_segments("105")
+        ("一百五", [(0,2,0), (2,3,2)])  # 索引 1 的 0 无片段
+    """
+    import math
+
+    n = int(num_str)
+    if n == 0:
+        return "零", [(0, 1, 0)]
+
+    _kanji_digits = "零一二三四五六七八九"
+    _units = [
+        (10**12, "兆"),
+        (10**8, "億"),
+        (10**4, "万"),
+        (1000, "千"),
+        (100, "百"),
+        (10, "十"),
+        (1, ""),
+    ]
+
+    num_digits = len(num_str)
+    result: List[str] = []
+    segments: List[Tuple[int, int, int]] = []
+    remaining = n
+
+    for unit_val, unit_name in _units:
+        if remaining >= unit_val:
+            count = remaining // unit_val
+            # 计算该单位对应的原始数字位索引
+            if unit_val >= 10000:
+                exp = int(math.log10(unit_val))
+            elif unit_val > 1:
+                exp = int(math.log10(unit_val))
+            else:
+                exp = 0
+            orig_idx = num_digits - 1 - exp
+
+            start = len(result)
+            if count > 1 or unit_val >= 10000 or unit_val == 1:
+                result.append(_kanji_digits[count])
+            if unit_name:
+                result.append(unit_name)
+            segments.append((start, len(result), orig_idx))
+            remaining %= unit_val
+
+    return "".join(result), segments
+
+
 def is_english_reading(reading: str) -> bool:
     """reading 是英文读音（ASCII 字母，可含空格 / ' / -），且至少含一个字母。
 
