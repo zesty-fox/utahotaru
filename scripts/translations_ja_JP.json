@@ -1155,5 +1155,7 @@
   "已从 KS 配置导入: {items}": "KS設定からインポートしました: {items}",
   "KS 配置文件中未找到 SUG 相关的设置数据": "KS設定ファイルにSUG関連の設定データが見つかりません",
   "确定要从前 Karaoke Studio 的 settings.json 导入配置吗？\n\n将从 KS 配置中提取以下内容并合并到当前 SUG 配置：\n  - 主设置（播放、打轴、界面、快捷键等）\n  - 用户词典\n  - 演唱者预设\n  - 网络词典缓存\n  - 界面主题\n  - 更新器设置\n\nKS 来源的配置将优先覆盖同名设置。": "Karaoke Studio の settings.json から設定をインポートしますか？\n\n以下の項目を現在のSUG設定にマージします：\n  - メイン設定（再生、タイミング、UI、ショートカット等）\n  - ユーザー辞書\n  - 歌手プリセット\n  - ネット辞書キャッシュ\n  - UIテーマ\n  - アップデーター設定\n\nKS側の設定が優先されます。",
-  "未能自动找到 Karaoke Studio 的 settings.json。\n\n是否手动选择文件？": "Karaoke Studio の settings.json を自動検出できませんでした。\n\n手動でファイルを選択しますか？"
+  "未能自动找到 Karaoke Studio 的 settings.json。\n\n是否手动选择文件？": "Karaoke Studio の settings.json を自動検出できませんでした。\n\n手動でファイルを選択しますか？",
+  "隐藏焦点高亮": "フォーカスハイライトを非表示",
+  "隐藏 current 域和 focus 域的 hitbox 高亮背景；启用后仅在拖拽多选时显示 focus 域高亮": "currentドメインとfocusドメインのhitboxハイライト背景を非表示にする。有効時はドラッグ複数選択中のみfocusドメインのハイライトを表示"
 }

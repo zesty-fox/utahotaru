@@ -52,6 +52,11 @@ class TimingSubInterface(SubSettingInterface):
                 tr("关闭单击字符/节奏点延迟后跳转到目标行的功能（双击跳转不受影响）"), parent=g),
             title_source="禁用单击跳转",
             content_source="关闭单击字符/节奏点延迟后跳转到目标行的功能（双击跳转不受影响）")
+        self.card_hide_hitbox_highlights = self._tr_register(
+            SwitchSettingCard(FIF.TRANSPARENT, tr("隐藏焦点高亮"),
+                tr("隐藏 current 域和 focus 域的 hitbox 高亮背景；启用后仅在拖拽多选时显示 focus 域高亮"), parent=g),
+            title_source="隐藏焦点高亮",
+            content_source="隐藏 current 域和 focus 域的 hitbox 高亮背景；启用后仅在拖拽多选时显示 focus 域高亮")
         self.card_preview_guide = self._tr_register(
             SwitchSettingCard(FIF.VIEW, tr("打轴预览指引"),
                 tr("打轴播放时在当前行以光标为锚用过渡色提示上一个/正在/下一个打的字；具体透明度与开关可在下方「预览指引方式」中自定义"), parent=g),
@@ -83,7 +88,8 @@ class TimingSubInterface(SubSettingInterface):
             title_source="按键音风格", content_source="选择按键音音效风格")
         self.card_keysound_style.set_item_sources(["默认", "osu", "街机风", "金属感"])
         for c in [self.card_offset, self.card_speed_correction, self.card_export_offset,
-                  self.card_timing_step, self.card_disable_click_jump, self.card_preview_guide,
+                  self.card_timing_step, self.card_disable_click_jump,
+                  self.card_hide_hitbox_highlights, self.card_preview_guide,
                   self.card_preview_guide_style,
                   self.card_keysound, self.card_keysound_volume, self.card_keysound_style]:
             g.addSettingCard(c)
@@ -147,6 +153,7 @@ class TimingSubInterface(SubSettingInterface):
         self.card_export_offset.value_changed.connect(self._notify_changed)
         self.card_timing_step.value_changed.connect(self._notify_changed)
         self.card_disable_click_jump.checked_changed.connect(self._notify_changed)
+        self.card_hide_hitbox_highlights.checked_changed.connect(self._notify_changed)
         self.card_preview_guide.checked_changed.connect(self._notify_changed)
         self.card_keysound.checked_changed.connect(self._notify_changed)
         self.card_keysound_volume.value_changed.connect(self._notify_changed)
@@ -161,6 +168,7 @@ class TimingSubInterface(SubSettingInterface):
         self.card_export_offset.setValue(s.get("export.offset_ms", 0))
         self.card_timing_step.setValue(s.get("timing.timing_adjust_step_ms", 10))
         self.card_disable_click_jump.setChecked(s.get("timing.disable_click_jump", False))
+        self.card_hide_hitbox_highlights.setChecked(s.get("timing.hide_hitbox_highlights", False))
         self.card_preview_guide.setChecked(s.get("timing.preview_guide_enabled", False))
         self.card_keysound.setChecked(s.get("timing.keysound_enabled", True))
         self.card_keysound_volume.setValue(s.get("timing.keysound_volume", 100))
@@ -174,6 +182,7 @@ class TimingSubInterface(SubSettingInterface):
         s.set("export.offset_ms", self.card_export_offset.value())
         s.set("timing.timing_adjust_step_ms", self.card_timing_step.value())
         s.set("timing.disable_click_jump", self.card_disable_click_jump.isChecked())
+        s.set("timing.hide_hitbox_highlights", self.card_hide_hitbox_highlights.isChecked())
         s.set("timing.preview_guide_enabled", self.card_preview_guide.isChecked())
         s.set("timing.keysound_enabled", self.card_keysound.isChecked())
         s.set("timing.keysound_volume", self.card_keysound_volume.value())

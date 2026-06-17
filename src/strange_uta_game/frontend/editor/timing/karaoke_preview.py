@@ -279,6 +279,7 @@ class KaraokePreview(QWidget):
         self._focus_dragging: bool = False
 
         self._disable_click_jump: bool = False  # 禁用单击跳转
+        self._hide_hitbox_highlights: bool = False  # 隐藏 current/focus 域 hitbox 高亮
 
         # 单击/双击处理：快照机制
         # 单击时锁定 hitbox 快照，双击时使用快照判断，避免居中导致 hitbox 变化
@@ -460,6 +461,13 @@ class KaraokePreview(QWidget):
     def set_disable_click_jump(self, disable: bool):
         """设置是否禁用单击跳转功能。"""
         self._disable_click_jump = bool(disable)
+
+    def set_hide_hitbox_highlights(self, hide: bool):
+        """设置是否隐藏 current 域和 focus 域 hitbox 高亮。
+        启用时仅在拖拽多选过程中绘制 focus 域高亮。
+        """
+        self._hide_hitbox_highlights = bool(hide)
+        self.update()
 
     def set_preview_guide_enabled(self, enabled: bool):
         """设置走字预览指引开关（播放打轴时当前行用过渡色提示打轴进度）。"""
@@ -2416,7 +2424,7 @@ class KaraokePreview(QWidget):
                 char_w = char_widths[char_pos]
 
                 # 当前打轴位置高亮背景
-                if is_current and char_pos == self._current_char_idx:
+                if (not self._hide_hitbox_highlights) and is_current and char_pos == self._current_char_idx:
                     highlight_bg = theme.karaoke_highlight_bg
                     bg_rect = QRect(
                         int(curr_x) - 1,
@@ -2426,8 +2434,9 @@ class KaraokePreview(QWidget):
                     )
                     painter.fillRect(bg_rect, highlight_bg)
 
-                # 划词选中高亮背景
-                if _norm_sel is not None:
+                # 划词选中高亮背景（隐藏模式下仅在拖拽多选时绘制）
+                _show_sel = (not self._hide_hitbox_highlights) or self._focus_dragging
+                if _show_sel and _norm_sel is not None:
                     _sl, _sc, _el, _ec = _norm_sel
                     if _sl <= idx <= _el:
                         _lo = _sc if idx == _sl else 0
