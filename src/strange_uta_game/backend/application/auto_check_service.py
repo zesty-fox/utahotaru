@@ -667,11 +667,11 @@ class AutoCheckService:
                         split = self._try_split_to_chars(comp.text, comp.reading)
                         for idx in range(comp.start_idx, comp.end_idx):
                             pos = idx - comp.start_idx
+                            ch = text[idx] if idx < len(text) else comp.text[pos]
                             if idx == seq_start:
                                 # 数字位：用音读替换
                                 kanji = _arabic_to_kanji(num_str)
                                 on_reading = self._get_digit_on_reading(kanji)
-                                ch = text[idx] if idx < len(text) else comp.text[pos]
                                 new_results.append(
                                     RubyResult(
                                         text=ch,
@@ -681,11 +681,17 @@ class AutoCheckService:
                                     )
                                 )
                             else:
-                                ch = text[idx] if idx < len(text) else comp.text[pos]
-                                part_reading = (
-                                    split[pos] if split and pos < len(split) and split[pos]
-                                    else comp.text[pos]
-                                )
+                                # 非数字位：优先用汉字字典音读（数字后的量词通常音读），
+                                # 字典无音读时退回分析器拆分结果
+                                comp_kanji = comp.text[pos] if pos < len(comp.text) else ch
+                                non_digit_reading = self._get_digit_on_reading(comp_kanji)
+                                if non_digit_reading:
+                                    part_reading = non_digit_reading
+                                else:
+                                    part_reading = (
+                                        split[pos] if split and pos < len(split) and split[pos]
+                                        else ch
+                                    )
                                 new_results.append(
                                     RubyResult(
                                         text=ch,
