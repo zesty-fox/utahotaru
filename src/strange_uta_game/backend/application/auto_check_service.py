@@ -1894,12 +1894,16 @@ class AutoCheckService:
             # 每个字符直接携带自己的 Ruby（无需跨字符合并）
             # #11：ruby 为空、或与字符本身相同时不生成 Ruby 对象，
             # 避免 Ruby.__post_init__ 触发空文本异常，并避免导出残留 {a|a}。
+            # 例外：长音符号 ー（LONG_VOWEL）即使 reading == char，
+            # 也保留自注音 Ruby，使其能携带时序信息并可被「按类型删除」覆盖。
             # Stage 0: result.ruby 为 List[str]（来自 _group_reading_for_character），
             # 映射为 Ruby(parts=[RubyPart(text=s), ...])。
             ruby_groups = result.ruby  # List[str] | None
+            _is_long_vowel_char = get_char_type(result.char) == CharType.LONG_VOWEL
             if ruby_groups and (
                 self._romanize_ruby
                 or not (len(ruby_groups) == 1 and ruby_groups[0] == result.char)
+                or _is_long_vowel_char
             ):
                 # 处理 rubyPart 数量 > checkCount 的情况
                 from strange_uta_game.backend.infrastructure.parsers.inline_format import (
@@ -2620,8 +2624,15 @@ def delete_rubies_by_type_names(
                 continue  # 与汉字连词，视为汉字，保留注音
             ct = get_char_type(ch.char)
 
-            # 片假名（不含促音ッ，ッ/っ 由 SOKUON 路径独立处理）
-            is_kata_family = ct == CharType.KATAKANA
+            # 片假名家族：片假名本体 + 片假名形式的促音 ッ（sokuon 未被显式选中时）
+            # 和长音符号 ー（long_vowel 未被显式选中时）。hiragana 等其他类型不应
+            # 波及这些片假名性质的字符；若用户显式选 sokuon/long_vowel 类型，
+            # 则走后面 ct in extended 的通用路径，确保能被独立删除。
+            is_kata_family = (
+                ct == CharType.KATAKANA
+                or (ct == CharType.SOKUON and ch.char == "ッ" and CharType.SOKUON not in ct_selected)
+                or (ct == CharType.LONG_VOWEL and CharType.LONG_VOWEL not in ct_selected)
+            )
             if is_kata_family:
                 if delete_kata_hira or delete_kata_eng:
                     is_hira = _ruby_is_all_hiragana(ch.ruby.text)
