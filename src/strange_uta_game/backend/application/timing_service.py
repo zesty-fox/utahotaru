@@ -10,6 +10,7 @@
 5. 音频协调 - 播放控制、变速、位置同步
 """
 
+from bisect import bisect_left, bisect_right
 from dataclasses import dataclass, field
 from typing import Optional, Dict, List, Callable, Protocol, Literal
 from enum import Enum, auto
@@ -134,6 +135,8 @@ class TimingService:
 
         # 全局 Checkpoint 缓存
         self._global_checkpoints: List[CheckpointPosition] = []
+        self._global_checkpoint_keys: List[tuple[int, int, int]] = []
+        self._global_checkpoint_index: Dict[tuple[int, int, int], int] = {}
         self._global_checkpoint_idx = 0
 
         # 音频播放位置回调
@@ -257,6 +260,8 @@ class TimingService:
         生成对应数量的 CheckpointPosition。
         """
         self._global_checkpoints = []
+        self._global_checkpoint_keys = []
+        self._global_checkpoint_index = {}
 
         if not self._project:
             return
@@ -285,6 +290,13 @@ class TimingService:
         self._global_checkpoints.sort(
             key=lambda p: (p.line_idx, p.char_idx, p.checkpoint_idx)
         )
+        self._global_checkpoint_keys = [
+            (p.line_idx, p.char_idx, p.checkpoint_idx)
+            for p in self._global_checkpoints
+        ]
+        self._global_checkpoint_index = {
+            key: idx for idx, key in enumerate(self._global_checkpoint_keys)
+        }
 
     def rebuild_global_checkpoints(self) -> None:
         """公开封装：重建全局 Checkpoint 序列。"""
@@ -410,38 +422,16 @@ class TimingService:
 
         target = (line_idx, char_idx, checkpoint_idx)
 
-        if prefer_backward:
-            # 优先向前查找：找最后一个 pos_key <= target 的 checkpoint
-            # 反向遍历，找到第一个 <= target 即可 early break
-            best_idx: Optional[int] = None
-            for i in range(len(self._global_checkpoints) - 1, -1, -1):
-                pos = self._global_checkpoints[i]
-                pos_key = (pos.line_idx, pos.char_idx, pos.checkpoint_idx)
-                if pos_key == target:
-                    best_idx = i
-                    break
-                if pos_key <= target:
-                    best_idx = i
-                    break
-
-            # 向前找不到时，向后查找
-            if best_idx is None:
-                for i, pos in enumerate(self._global_checkpoints):
-                    pos_key = (pos.line_idx, pos.char_idx, pos.checkpoint_idx)
-                    if pos_key >= target:
-                        best_idx = i
-                        break
-        else:
-            # 默认行为：向后查找
-            best_idx = None
-            for i, pos in enumerate(self._global_checkpoints):
-                pos_key = (pos.line_idx, pos.char_idx, pos.checkpoint_idx)
-                if pos_key == target:
-                    best_idx = i
-                    break
-                if pos_key >= target and best_idx is None:
-                    best_idx = i
-                    break
+        best_idx = self._global_checkpoint_index.get(target)
+        keys = self._global_checkpoint_keys
+        if best_idx is None and prefer_backward:
+            # 优先向前查找：找最后一个 pos_key <= target；找不到再向后。
+            insert_at = bisect_right(keys, target) - 1
+            best_idx = insert_at if insert_at >= 0 else (0 if keys else None)
+        elif best_idx is None:
+            # 默认行为：向后查找第一个 pos_key >= target。
+            insert_at = bisect_left(keys, target)
+            best_idx = insert_at if insert_at < len(keys) else None
 
         if best_idx is not None:
             pos = self._global_checkpoints[best_idx]

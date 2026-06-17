@@ -260,6 +260,10 @@ class FileLoader:
 
         self._save_last_dir(original_path)
 
+        # 视频提取后的音频加载同样会(重)初始化 BASS 设备，使按键音样本失效；
+        # 与 _on_audio_loaded 对称地重载，确保导入新视频后即有按键音。
+        self._editor._reload_keysound_after_audio()
+
         InfoBar.success(
             title=self._editor.tr("音频已加载"),
             content=Path(original_path).name,

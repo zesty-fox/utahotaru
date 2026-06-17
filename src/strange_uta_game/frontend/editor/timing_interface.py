@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import re
 import time
+from time import perf_counter
 from copy import deepcopy
 from pathlib import Path
 from typing import Callable, Optional, Tuple
@@ -60,6 +61,13 @@ from strange_uta_game.backend.infrastructure.exporters import get_exporter_by_na
 from strange_uta_game.backend.infrastructure.parsers.text_splitter import (
     CharType,
     get_char_type,
+)
+from strange_uta_game.frontend.perf_log import (
+    log_elapsed,
+    log_perf_event,
+    log_slow_method,
+    perf_enabled,
+    start_ui_watchdog,
 )
 from strange_uta_game.frontend.theme import theme, ThemeColors
 
@@ -106,7 +114,7 @@ class EditorInterface(QWidget):
     project_saved = pyqtSignal()
     _position_changed_signal = pyqtSignal(int, int, object)
     _checkpoint_moved_signal = pyqtSignal(object)
-    _timetag_added_signal = pyqtSignal()
+    _timetag_added_signal = pyqtSignal(int)
     _timing_error_signal = pyqtSignal(str, str)
     # 渲染进度：(speed, progress)。内部从音频 worker 线程触发，经此信号
     # 自动 marshal 到 UI 线程（Qt 跨线程默认 queued connection）。
@@ -146,11 +154,19 @@ class EditorInterface(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAcceptDrops(True)
         self._bind_callback_signals()
+        start_ui_watchdog(self)
 
         # 位置主动拉取定时器（UI 线程 60fps，替代旧的回调线程+信号推送）
         self._position_poll_timer = QTimer(self)
         self._position_poll_timer.setInterval(16)  # ~60fps
         self._position_poll_timer.timeout.connect(self._poll_audio_position)
+        self._last_polled_duration_ms: Optional[int] = None
+
+        # 高频打轴时合并 timeline 标签刷新，避免每次按键都全量遍历/排序。
+        self._time_tags_update_timer = QTimer(self)
+        self._time_tags_update_timer.setSingleShot(True)
+        self._time_tags_update_timer.setInterval(33)
+        self._time_tags_update_timer.timeout.connect(self._update_time_tags_display)
 
         # 滚动模式：auto / always / never（由按钮循环切换，持久化到 config）
         self._scroll_mode: str = "auto"
@@ -277,6 +293,32 @@ class EditorInterface(QWidget):
             self._keysound_player.load(sounds_dir / press_name, sounds_dir / release_name)
         except Exception as e:
             print(f"[KeySound] 样本加载失败: {e}")
+
+    def _reload_keysound_after_audio(self) -> None:
+        """音频(重新)加载完成后按当前风格重载按键音样本。
+
+        加载/切换音频会触发 BASS 设备释放+重建：``release_resources()`` 调
+        ``BASS_Free`` 并 ``invalidate()`` 归零按键音 handle，随后引擎 ``load()``
+        又 ``BASS_Init`` 出一个新会话。旧 sample handle 在新会话里已失效，但
+        ``_on_audio_loaded`` 不会再触发 ``_apply_settings``，故仅靠「风格变化 /
+        is_loaded()」判定无法在导入新歌后自动重载——表现为必须手动切换一次
+        音效才有按键音。这里在音频加载完成后主动按当前风格重载一次。
+        """
+        if self._keysound_player is None:
+            return
+        style = self._keysound_style
+        if not style:
+            setting_iface = self._get_setting_interface()
+            if setting_iface is not None:
+                try:
+                    style = str(
+                        setting_iface.get_settings().get("timing.keysound_style", "default")
+                    )
+                except Exception:
+                    style = "default"
+        style = style or "default"
+        self._keysound_style = style
+        self._reload_keysound(style)
 
     def _bind_callback_signals(self):
         self._position_changed_signal.connect(self._handle_position_changed)
@@ -518,7 +560,7 @@ class EditorInterface(QWidget):
         elif change_type in ("rubies", "lyrics", "checkpoints"):
             self.refresh_lyric_display()
         elif change_type == "timetags":
-            self._update_time_tags_display()
+            self._schedule_time_tags_update()
             self._update_status()
         elif change_type == "settings":
             self._apply_settings()
@@ -978,6 +1020,7 @@ class EditorInterface(QWidget):
         self.timeline.clear_audio_data()
 
         self.preview.set_duration(0)
+        self._last_polled_duration_ms = 0
 
         self._audio_file_path = None
         self._audio_loading = False
@@ -3222,6 +3265,7 @@ class EditorInterface(QWidget):
             self.transport.set_duration(info.duration_ms)
             self.timeline.set_duration(info.duration_ms)
             self.preview.set_duration(info.duration_ms)
+            self._last_polled_duration_ms = info.duration_ms
             self.transport.set_position(0)
             self.timeline.set_position(0)
 
@@ -3276,6 +3320,9 @@ class EditorInterface(QWidget):
             duration=3000,
             parent=self,
         )
+        # 音频加载会(重)初始化 BASS 设备，使按键音样本失效；在此重载，
+        # 确保导入新歌后无需手动切换音效即有按键音。
+        self._reload_keysound_after_audio()
         self._audio_loading = False
 
     def _on_audio_load_error(self, error_msg: str) -> None:
@@ -3417,12 +3464,16 @@ class EditorInterface(QWidget):
             # 切换到编辑模式时校验所有行时间戳
             self._validate_all_timestamps()
 
+    @log_slow_method("editor.seek", 20, lambda self, args, kwargs: {"target_ms": args[0] if args else kwargs.get("ms")})
     def _on_seek(self, ms: int):
+        log_perf_event("editor.seek.start", target_ms=ms, line=getattr(self, "_current_line_idx", -1))
         self._suspend_auto_scroll()
         if self._timing_service:
             self._timing_service.seek(ms)
             self.transport.set_position(ms)
             self.timeline.set_position(ms)
+            self.preview.set_current_time_ms(ms)
+        log_perf_event("editor.seek.end", target_ms=ms, line=getattr(self, "_current_line_idx", -1))
 
     def _on_speed_changed(self, speed: float):
         if self._timing_service:
@@ -3543,8 +3594,7 @@ class EditorInterface(QWidget):
         # 同步 focus 和 current 字符到 cp 对应的字符
         self.preview.set_current_position(line_idx, char_idx)
         self.preview.set_focus_position(line_idx, char_idx)
-        self._update_time_tags_display()
-        self._update_status()
+        self._update_line_info()
 
     def _on_char_selected(self, line_idx: int, char_idx: int):
         """点击字符选中 — 移动到该字符的第一个 checkpoint。
@@ -3599,8 +3649,6 @@ class EditorInterface(QWidget):
             self.preview._current_char_idx = pos.char_idx
 
         self._update_line_info()
-        self._update_time_tags_display()
-        self._update_status()
 
     def _on_char_edit_requested(self, line_idx: int, char_idx: int):
         """F2 键弹出注音编辑对话框"""
@@ -4562,8 +4610,7 @@ class EditorInterface(QWidget):
                 if self._timing_service:
                     self._timing_service.move_to_checkpoint(0, 0, 0)
 
-        self._update_time_tags_display()
-        self._update_status()
+        self._update_line_info()
 
     def _on_seek_to_checkpoint(self, line_idx: int, char_idx: int, cp_idx: int):
         """双击 checkpoint → 跳转到该 checkpoint 的时间戳（无时间戳则向前查找）"""
@@ -4590,8 +4637,6 @@ class EditorInterface(QWidget):
         # 移动打轴位置到当前双击的 checkpoint
         if self._timing_service:
             self._timing_service.move_to_checkpoint(line_idx, char_idx, cp_idx)
-            self._update_time_tags_display()
-            self._update_status()
         # 同步 focus 字符到 cp 对应的字符
         self.preview.set_focus_position(line_idx, char_idx)
 
@@ -5536,8 +5581,15 @@ class EditorInterface(QWidget):
         checkpoint_idx: int,
         timestamp_ms: int,
     ) -> None:
-        _ = singer_id, line_idx, char_idx, checkpoint_idx, timestamp_ms
-        self._timetag_added_signal.emit()
+        _ = singer_id, char_idx, checkpoint_idx, timestamp_ms
+        log_perf_event(
+            "editor.timetag_added",
+            line=line_idx,
+            char=char_idx,
+            cp=checkpoint_idx,
+            ts=timestamp_ms,
+        )
+        self._timetag_added_signal.emit(line_idx)
 
     def on_position_changed(
         self, position_ms: int, duration_ms: int, singer_positions
@@ -5572,6 +5624,14 @@ class EditorInterface(QWidget):
             ),
         )
 
+    @log_slow_method(
+        "editor.poll_audio_position",
+        20,
+        lambda self, args, kwargs: {
+            "position_ms": self._timing_service.get_position_ms() if self._timing_service else None,
+            "line": self._current_line_idx,
+        },
+    )
     def _poll_audio_position(self) -> None:
         """UI 线程 QTimer 主动拉取音频位置（替代旧的回调线程+信号推送）。
 
@@ -5580,6 +5640,18 @@ class EditorInterface(QWidget):
         """
         if not self._timing_service:
             return
+        if perf_enabled():
+            now_s = perf_counter()
+            last_s = getattr(self, "_perf_last_poll_s", None)
+            if last_s is not None:
+                gap_ms = (now_s - last_s) * 1000.0
+                if gap_ms >= 80:
+                    log_perf_event(
+                        "editor.poll_gap",
+                        gap_ms=f"{gap_ms:.1f}",
+                        line=self._current_line_idx,
+                    )
+            self._perf_last_poll_s = now_s
         engine = self._timing_service._audio_engine
         position_ms = self._timing_service.get_position_ms()
         duration_ms = self._timing_service.get_duration_ms()
@@ -5587,8 +5659,11 @@ class EditorInterface(QWidget):
         # 页面切换动画期间（self.y() != 0）跳过 UI 重绘，避免与动画争抢导致控件抖动。
         # 位置读取和播放结束检测不受影响，不影响打轴精度。
         if self.y() == 0:
-            self.transport.set_duration(duration_ms)
-            self.timeline.set_duration(duration_ms)
+            if duration_ms != self._last_polled_duration_ms:
+                self.transport.set_duration(duration_ms)
+                self.timeline.set_duration(duration_ms)
+                self.preview.set_duration(duration_ms)
+                self._last_polled_duration_ms = duration_ms
             self.transport.set_position(position_ms)
             self.timeline.set_position(position_ms)
             self.preview.set_current_time_ms(position_ms)
@@ -5721,8 +5796,11 @@ class EditorInterface(QWidget):
         self._last_position_update_time = now
 
         _ = singer_positions
-        self.transport.set_duration(duration_ms)
-        self.timeline.set_duration(duration_ms)
+        if duration_ms != self._last_polled_duration_ms:
+            self.transport.set_duration(duration_ms)
+            self.timeline.set_duration(duration_ms)
+            self.preview.set_duration(duration_ms)
+            self._last_polled_duration_ms = duration_ms
         self.transport.set_position(position_ms)
         self.timeline.set_position(position_ms)
         self.preview.set_current_time_ms(position_ms)
@@ -5741,8 +5819,18 @@ class EditorInterface(QWidget):
     def _handle_center_current_line(self):
         self.preview.scroll_current_line_to_center()
 
-    def _handle_timetag_added(self):
-        self._update_time_tags_display()
+    @log_slow_method(
+        "editor.handle_timetag_added",
+        12,
+        lambda self, args, kwargs: {"line": args[0] if args else kwargs.get("line_idx")},
+    )
+    def _handle_timetag_added(self, line_idx: int):
+        if self._project:
+            line_count = len(self._project.sentences)
+            for affected_line_idx in (line_idx - 1, line_idx, line_idx + 1):
+                if 0 <= affected_line_idx < line_count:
+                    self.preview._invalidate_line(affected_line_idx)
+        self._schedule_time_tags_update()
         self._update_status()
 
     def _handle_timing_error(self, error_type: str, message: str):
@@ -5802,7 +5890,7 @@ class EditorInterface(QWidget):
         # cp 标记点击路径：跳过光标移动，保持 selected_char 不被污染。
         # 仍需要刷新 preview 显示以反映新的 selected_cp 高亮。
         if self._suppress_cp_cursor_move:
-            self.preview._update_display()
+            self.preview.request_repaint()
         else:
             self.preview.set_current_position(new_line_idx, position.char_idx)
         self._update_line_info()
@@ -5856,8 +5944,29 @@ class EditorInterface(QWidget):
     def _update_time_tags_display(self):
         if not self._project:
             return
+        _perf_start = perf_counter() if perf_enabled() else None
+        if self._time_tags_update_timer.isActive():
+            self._time_tags_update_timer.stop()
         # 使用渲染时间戳（带偏移），与波形显示对齐
-        self.timeline.set_time_tags(self._project.collect_all_global_timestamp_ms_with_chars())
+        tags = self._project.collect_all_global_timestamp_ms_with_chars()
+        self.timeline.set_time_tags(tags)
+        if _perf_start is not None:
+            log_elapsed(
+                "editor.update_time_tags_display",
+                _perf_start,
+                12,
+                tags=len(tags),
+                lines=len(self._project.sentences),
+            )
+
+    def _schedule_time_tags_update(self, delay_ms: int = 33):
+        if not self._project:
+            return
+        if delay_ms <= 0:
+            self._update_time_tags_display()
+            return
+        if not self._time_tags_update_timer.isActive():
+            self._time_tags_update_timer.start(delay_ms)
 
     def _update_status(self):
         if not self._project:

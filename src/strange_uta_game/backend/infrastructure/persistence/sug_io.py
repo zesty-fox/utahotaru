@@ -370,10 +370,13 @@ class SugProjectParser:
                 }
                 for s in project.singers
             ],
-            "sentences": [
-                SugProjectParser._sentence_to_dict(s) for s in project.sentences
-            ],
+            "sentences": [],
         }
+        placeholder_texts = pause_char_variants(get_ruby_pause_char()) | {""}
+        result["sentences"] = [
+            SugProjectParser._sentence_to_dict(s, placeholder_texts)
+            for s in project.sentences
+        ]
         # 仅当global_offset_ms有值时才写入（兼容性考虑）
         if project.global_offset_ms is not None:
             result["global_offset_ms"] = project.global_offset_ms
@@ -404,8 +407,13 @@ class SugProjectParser:
             return {}
 
     @staticmethod
-    def _sentence_to_dict(sentence: Sentence) -> Dict[str, Any]:
+    def _sentence_to_dict(
+        sentence: Sentence,
+        placeholder_texts: Optional[set] = None,
+    ) -> Dict[str, Any]:
         """将 Sentence 对象转换为字典"""
+        if placeholder_texts is None:
+            placeholder_texts = pause_char_variants(get_ruby_pause_char()) | {""}
         characters = []
         for char in sentence.characters:
             char_dict: Dict[str, Any] = {
@@ -424,7 +432,6 @@ class SugProjectParser:
                 # 占位 part（停顿符及其全/半角变体）统一写为哨兵 token，使存档
                 # 与用户的停顿符配置解耦；空串 part（历史遗留）一并规范化为哨兵，
                 # 加载时映射回当前配置的停顿符。
-                placeholder_texts = pause_char_variants(get_ruby_pause_char()) | {""}
                 char_dict["ruby"] = {
                     "parts": [
                         {
