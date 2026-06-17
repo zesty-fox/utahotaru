@@ -294,6 +294,32 @@ class EditorInterface(QWidget):
         except Exception as e:
             print(f"[KeySound] 样本加载失败: {e}")
 
+    def _reload_keysound_after_audio(self) -> None:
+        """音频(重新)加载完成后按当前风格重载按键音样本。
+
+        加载/切换音频会触发 BASS 设备释放+重建：``release_resources()`` 调
+        ``BASS_Free`` 并 ``invalidate()`` 归零按键音 handle，随后引擎 ``load()``
+        又 ``BASS_Init`` 出一个新会话。旧 sample handle 在新会话里已失效，但
+        ``_on_audio_loaded`` 不会再触发 ``_apply_settings``，故仅靠「风格变化 /
+        is_loaded()」判定无法在导入新歌后自动重载——表现为必须手动切换一次
+        音效才有按键音。这里在音频加载完成后主动按当前风格重载一次。
+        """
+        if self._keysound_player is None:
+            return
+        style = self._keysound_style
+        if not style:
+            setting_iface = self._get_setting_interface()
+            if setting_iface is not None:
+                try:
+                    style = str(
+                        setting_iface.get_settings().get("timing.keysound_style", "default")
+                    )
+                except Exception:
+                    style = "default"
+        style = style or "default"
+        self._keysound_style = style
+        self._reload_keysound(style)
+
     def _bind_callback_signals(self):
         self._position_changed_signal.connect(self._handle_position_changed)
         self._checkpoint_moved_signal.connect(self._handle_checkpoint_moved)
@@ -3294,6 +3320,9 @@ class EditorInterface(QWidget):
             duration=3000,
             parent=self,
         )
+        # 音频加载会(重)初始化 BASS 设备，使按键音样本失效；在此重载，
+        # 确保导入新歌后无需手动切换音效即有按键音。
+        self._reload_keysound_after_audio()
         self._audio_loading = False
 
     def _on_audio_load_error(self, error_msg: str) -> None:
