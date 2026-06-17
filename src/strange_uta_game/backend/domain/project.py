@@ -438,17 +438,27 @@ class Project:
                 tags_ms.extend(ch.all_global_timestamps)
         return tags_ms
 
-    def collect_all_global_timestamp_ms_with_chars(self) -> List[Tuple[int, str, int]]:
+    def collect_all_global_timestamp_ms_with_chars(self) -> List[Tuple[int, str, int, Optional[str]]]:
         """收集所有字符 checkpoint 的全局时间戳（毫秒）及对应字符，按项目文件顺序。
 
-        返回 (timestamp_ms, char_text, char_id)，其中 char_id = id(ch) 用于跨 checkpoint
+        返回 (timestamp_ms, char_text, char_id, ruby_part_text)，其中 char_id = id(ch) 用于跨 checkpoint
         去重显示：同一 Character 对象的多个 checkpoint 只标注第一个。
+        ruby_part_text 为该 checkpoint 对应的 RubyPart 文本；sentence_end_ts 及无注音时为 None。
         """
-        result: List[Tuple[int, str, int]] = []
+        result: List[Tuple[int, str, int, Optional[str]]] = []
         for sentence in self.sentences:
             for ch in sentence.characters:
-                for ts in ch.all_global_timestamps:
-                    result.append((ts, ch.char, id(ch)))
+                # 普通 checkpoint：按索引取对应 RubyPart（mora 模式下一一对应）
+                for idx, ts in enumerate(ch.global_timestamps):
+                    ruby_part_text: Optional[str] = (
+                        ch.ruby.parts[idx].text
+                        if ch.ruby and idx < len(ch.ruby.parts)
+                        else None
+                    )
+                    result.append((ts, ch.char, id(ch), ruby_part_text))
+                # sentence_end_ts 是呼吸/停顿点，无对应 RubyPart
+                if ch.is_sentence_end and ch.global_sentence_end_ts is not None:
+                    result.append((ch.global_sentence_end_ts, ch.char, id(ch), None))
         return result
 
     def find_prev_line_with_checkpoints(self, current_idx: int) -> int:
