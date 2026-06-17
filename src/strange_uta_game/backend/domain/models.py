@@ -351,7 +351,7 @@ class Character:
               * force=True  → 保留 ruby 整段（Nicokara 无 mora 格式，文本不丢失）
 
         放大行为：
-          - ruby_split_mode="direct"：追加空 RubyPart 以维持不变式
+          - ruby_split_mode="direct"：保留现有 parts 不变，新增部分追加停顿符
           - ruby_split_mode="char"：按字符重新拆分现有 ruby 文本
           - ruby_split_mode="mora"：按 mora 重新拆分现有 ruby 文本（默认）
 
@@ -405,16 +405,17 @@ class Character:
 
         # 放大：按 ruby_split_mode 重新拆分 ruby.parts 以维持不变式
         if new_count > old_count and self.ruby is not None and self.ruby.parts:
-            existing_text = "".join(p.text for p in self.ruby.parts)
-            if existing_text:
-                new_parts = Character._resplit_ruby(
-                    existing_text, new_count, ruby_split_mode
-                )
-                self.ruby.parts = [RubyPart(text=t) for t in new_parts]
-            elif ruby_split_mode == "direct":
-                # 无文本时补齐占位符 part
+            if ruby_split_mode == "direct":
+                pause = get_ruby_pause_char()
                 while len(self.ruby.parts) < new_count:
-                    self.ruby.parts.append(RubyPart(text=get_ruby_pause_char()))
+                    self.ruby.parts.append(RubyPart(text=pause))
+            else:
+                existing_text = "".join(p.text for p in self.ruby.parts)
+                if existing_text:
+                    new_parts = Character._resplit_ruby(
+                        existing_text, new_count, ruby_split_mode
+                    )
+                    self.ruby.parts = [RubyPart(text=t) for t in new_parts]
 
         # 不变式收口：无论以何参数调用（含 new_count == old_count 的修复式调用），
         # 离开本方法时必须满足 new_count >= 1 → len(ruby.parts) == new_count。
