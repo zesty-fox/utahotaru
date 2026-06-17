@@ -880,6 +880,76 @@ class KaraokePreview(QWidget):
         self._line_versions[line_idx] = self._line_versions.get(line_idx, 0) + 1
         self.update()
 
+    @staticmethod
+    def _line_blocks_next_scan(line) -> bool:
+        """行是否会终止 `_find_next_line_first_timestamp` 的向后扫描。
+
+        返回 True 表示「屏障」或「能产出 first_ts」——无论哪种，扫描都会停在此行。
+        False 表示「全 cc=0 且无任何时间戳」——扫描会跳过此行继续向后。
+        """
+        for ch in line.characters:
+            if ch.is_sentence_end and ch.global_sentence_end_ts is None:
+                return True
+            if ch.check_count > 0 and not ch.global_timestamps:
+                return True
+            if ch.global_timestamps:
+                return True
+        return False
+
+    @staticmethod
+    def _line_blocks_prev_scan(line) -> bool:
+        """行是否会终止 `_find_prev_line_last_timestamp` 的向前扫描。
+
+        prev 扫描相比 next 多一个产出来源：`is_sentence_end` 且 `global_sentence_end_ts`
+        非 None 也算 last_ts。其余规则同 next。
+        """
+        for ch in line.characters:
+            if ch.is_sentence_end and ch.global_sentence_end_ts is None:
+                return True
+            if ch.check_count > 0 and not ch.global_timestamps:
+                return True
+            if ch.is_sentence_end and ch.global_sentence_end_ts is not None:
+                return True
+            if ch.global_timestamps:
+                return True
+        return False
+
+    def _invalidate_line_and_dependents(self, changed_idx: int) -> None:
+        """失效该行及其缓存依赖闭包内的所有行。
+
+        per-line cache 不是纯行内的：每行的 wipe 计算会调
+        `_find_next_line_first_timestamp` / `_find_prev_line_last_timestamp`，
+        两者会跨过「全 cc=0 且无时间戳」的空行，直到找到能产出时间戳的行或屏障行。
+        因此 line C 的改动可影响半径任意大的相邻行 —— 只要中间隔的全是可跳过的空行。
+        这里按真实扫描语义双向扩散失效，确保 A·B(空)·C·D(空)·E 这种排布下 A/E 也被刷新。
+        """
+        if not self._project or not self._project.sentences:
+            return
+        sentences = self._project.sentences
+        total = len(sentences)
+        if not (0 <= changed_idx < total):
+            return
+
+        self._invalidate_line(changed_idx)
+
+        # 向前：L < C 的行，其 forward-scan 能否到达 C，
+        # 取决于 [L+1..C-1] 是否全为「next-scan 不阻断」。
+        idx = changed_idx - 1
+        while idx >= 0:
+            self._invalidate_line(idx)
+            if self._line_blocks_next_scan(sentences[idx]):
+                break
+            idx -= 1
+
+        # 向后：L > C 的行，其 prev-scan 能否到达 C，
+        # 取决于 [C+1..L-1] 是否全为「prev-scan 不阻断」。
+        idx = changed_idx + 1
+        while idx < total:
+            self._invalidate_line(idx)
+            if self._line_blocks_prev_scan(sentences[idx]):
+                break
+            idx += 1
+
     def _invalidate_all_lines(self):
         """使所有行的缓存失效（用于全局数据改变时）"""
         line_indices = set(self._line_versions.keys()) | set(self._sentence_cache.keys())

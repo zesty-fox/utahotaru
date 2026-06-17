@@ -90,3 +90,126 @@ def test_line_invalidation_advances_uncached_line_version(qapp, monkeypatch):
     preview._invalidate_line(0)
 
     assert preview._line_versions[0] == 1
+
+
+# ---------- _invalidate_line_and_dependents 闭包语义 ----------
+
+def _skip_line(singer_id: str) -> Sentence:
+    """全 cc=0 且无时间戳——next/prev 扫描都会跳过它。"""
+    return Sentence(
+        singer_id=singer_id,
+        characters=[Character(char="·", check_count=0, singer_id=singer_id)],
+    )
+
+
+def _stamped_line(singer_id: str, ts: int) -> Sentence:
+    """有时间戳——两种扫描都会停在此行并产出 ts。"""
+    return Sentence(
+        singer_id=singer_id,
+        characters=[
+            Character(char="あ", check_count=1, timestamps=[ts], singer_id=singer_id)
+        ],
+    )
+
+
+def _barrier_line(singer_id: str) -> Sentence:
+    """cc>0 但 timestamps 为空——两种扫描的「未完整打轴」屏障。"""
+    return Sentence(
+        singer_id=singer_id,
+        characters=[Character(char="あ", check_count=1, singer_id=singer_id)],
+    )
+
+
+def _project_from(sentences: list[Sentence]) -> Project:
+    singer = Singer(name="default", is_default=True)
+    for s in sentences:
+        s.singer_id = singer.id
+        for ch in s.characters:
+            ch.singer_id = singer.id
+    return Project(singers=[singer], sentences=sentences)
+
+
+def _versions_after_invalidate(preview, changed_idx: int) -> dict[int, int]:
+    """快照 invalidate 前后的 line_versions 增量。"""
+    before = {i: preview._line_versions.get(i, 0) for i in range(len(preview._project.sentences))}
+    preview._invalidate_line_and_dependents(changed_idx)
+    return {
+        i: preview._line_versions.get(i, 0) - before[i]
+        for i in range(len(preview._project.sentences))
+    }
+
+
+def test_invalidate_dependents_spans_skipped_lines_both_sides(qapp, monkeypatch):
+    """A · B(skip) · C · D(skip) · E：改 C 时 A、E 都应被失效。"""
+    monkeypatch.setattr(preview_module, "theme", _DummyTheme())
+    singer_id = "s"
+    sentences = [
+        _stamped_line(singer_id, 1000),  # 0 = A
+        _skip_line(singer_id),            # 1 = B (skip)
+        _stamped_line(singer_id, 3000),  # 2 = C (changed)
+        _skip_line(singer_id),            # 3 = D (skip)
+        _stamped_line(singer_id, 5000),  # 4 = E
+    ]
+    preview = preview_module.KaraokePreview()
+    preview.set_project(_project_from(sentences))
+
+    delta = _versions_after_invalidate(preview, 2)
+
+    # C 自身 + 跨 B 到 A、跨 D 到 E 全部应失效一次
+    assert delta == {0: 1, 1: 1, 2: 1, 3: 1, 4: 1}
+
+
+def test_invalidate_dependents_stops_at_yielding_neighbor(qapp, monkeypatch):
+    """A · B(stamped) · C · D(stamped) · E：改 C 时 A、E 不应被失效。"""
+    monkeypatch.setattr(preview_module, "theme", _DummyTheme())
+    singer_id = "s"
+    sentences = [
+        _stamped_line(singer_id, 1000),  # 0 = A (远端，不应受影响)
+        _stamped_line(singer_id, 2000),  # 1 = B (yields ts → next-scan 屏障)
+        _stamped_line(singer_id, 3000),  # 2 = C
+        _stamped_line(singer_id, 4000),  # 3 = D (yields ts → prev-scan 屏障)
+        _stamped_line(singer_id, 5000),  # 4 = E (远端，不应受影响)
+    ]
+    preview = preview_module.KaraokePreview()
+    preview.set_project(_project_from(sentences))
+
+    delta = _versions_after_invalidate(preview, 2)
+
+    # C 及 B、D 失效；A、E 不应被波及
+    assert delta == {0: 0, 1: 1, 2: 1, 3: 1, 4: 0}
+
+
+def test_invalidate_dependents_stops_at_barrier(qapp, monkeypatch):
+    """A · B(barrier) · C · D(barrier) · E：屏障行本身被失效，再向外不扩散。"""
+    monkeypatch.setattr(preview_module, "theme", _DummyTheme())
+    singer_id = "s"
+    sentences = [
+        _stamped_line(singer_id, 1000),  # 0 = A (远端)
+        _barrier_line(singer_id),         # 1 = B (barrier)
+        _stamped_line(singer_id, 3000),  # 2 = C
+        _barrier_line(singer_id),         # 3 = D (barrier)
+        _stamped_line(singer_id, 5000),  # 4 = E (远端)
+    ]
+    preview = preview_module.KaraokePreview()
+    preview.set_project(_project_from(sentences))
+
+    delta = _versions_after_invalidate(preview, 2)
+
+    assert delta == {0: 0, 1: 1, 2: 1, 3: 1, 4: 0}
+
+
+def test_invalidate_dependents_extends_to_list_boundary(qapp, monkeypatch):
+    """C · D(skip) · E(skip)：改 C 时 D、E 直到列表末尾都应被失效。"""
+    monkeypatch.setattr(preview_module, "theme", _DummyTheme())
+    singer_id = "s"
+    sentences = [
+        _stamped_line(singer_id, 1000),  # 0 = C (changed)
+        _skip_line(singer_id),            # 1 = D
+        _skip_line(singer_id),            # 2 = E
+    ]
+    preview = preview_module.KaraokePreview()
+    preview.set_project(_project_from(sentences))
+
+    delta = _versions_after_invalidate(preview, 0)
+
+    assert delta == {0: 1, 1: 1, 2: 1}

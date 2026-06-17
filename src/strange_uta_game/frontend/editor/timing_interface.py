@@ -5826,10 +5826,7 @@ class EditorInterface(QWidget):
     )
     def _handle_timetag_added(self, line_idx: int):
         if self._project:
-            line_count = len(self._project.sentences)
-            for affected_line_idx in (line_idx - 1, line_idx, line_idx + 1):
-                if 0 <= affected_line_idx < line_count:
-                    self.preview._invalidate_line(affected_line_idx)
+            self.preview._invalidate_line_and_dependents(line_idx)
         self._schedule_time_tags_update()
         self._update_status()
 

@@ -25,12 +25,16 @@ class _FakePreview:
     def __init__(self) -> None:
         self.current_time_ms = None
         self.invalidated_lines = []
+        self.dependents_invalidated_for = []
 
     def set_current_time_ms(self, ms: int) -> None:
         self.current_time_ms = ms
 
     def _invalidate_line(self, line_idx: int) -> None:
         self.invalidated_lines.append(line_idx)
+
+    def _invalidate_line_and_dependents(self, line_idx: int) -> None:
+        self.dependents_invalidated_for.append(line_idx)
 
 
 def test_seek_immediately_updates_preview_time():
@@ -61,7 +65,8 @@ def test_seek_immediately_updates_preview_time():
     assert preview.current_time_ms == target_ms
 
 
-def test_timetag_added_invalidates_changed_line_and_neighbors():
+def test_timetag_added_delegates_dependent_invalidation_to_preview():
+    """editor 仅负责把 changed line 转给 preview；闭包语义由 preview 自行计算。"""
     preview = _FakePreview()
     editor = SimpleNamespace(
         _project=SimpleNamespace(sentences=[object(), object(), object(), object()]),
@@ -81,6 +86,7 @@ def test_timetag_added_invalidates_changed_line_and_neighbors():
 
     EditorInterface._handle_timetag_added(editor, 2)
 
-    assert preview.invalidated_lines == [1, 2, 3]
+    assert preview.dependents_invalidated_for == [2]
+    assert preview.invalidated_lines == []  # editor 不再直接逐行 invalidate
     assert editor.time_tags_scheduled is True
     assert editor.status_updated is True
