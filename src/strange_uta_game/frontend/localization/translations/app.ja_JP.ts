@@ -1178,6 +1178,11 @@
         <source>長音符号（ー、～等）</source>
         <translation>長音符号（ー、～等）</translation>
     </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="416" />
+        <source>促音（っ/ッ）</source>
+        <translation>促音（っ/ッ）</translation>
+    </message>
 </context>
 <context>
     <name>DictCandidateDialog</name>

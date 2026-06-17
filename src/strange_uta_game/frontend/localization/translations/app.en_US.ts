@@ -1178,6 +1178,11 @@ Boundary handling: if the row head has no preceding timestamp, find the next for
         <source>長音符号（ー、～等）</source>
         <translation>Chōonpu (ー, ～ etc.)</translation>
     </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="416" />
+        <source>促音（っ/ッ）</source>
+        <translation>Sokuon (っ/ッ)</translation>
+    </message>
 </context>
 <context>
     <name>DictCandidateDialog</name>

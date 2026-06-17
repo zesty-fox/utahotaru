@@ -358,6 +358,7 @@ class DeleteRubyByTypeDialog(QDialog):
         (CharType.NUMBER, "数字"),
         (CharType.SYMBOL, "記号（符号）"),
         (CharType.LONG_VOWEL, "長音符号（ー、～等）"),
+        (CharType.SOKUON, "促音（っ/ッ）"),
         (CharType.OTHER, "その他（♪等特殊符号）"),
         (CharType.SPACE, "空格"),
     ]
@@ -413,6 +414,7 @@ class DeleteRubyByTypeDialog(QDialog):
         _tr("数字")
         _tr("記号（符号）")
         _tr("長音符号（ー、～等）")
+        _tr("促音（っ/ッ）")
         _tr("その他（♪等特殊符号）")
         _tr("空格")
 
