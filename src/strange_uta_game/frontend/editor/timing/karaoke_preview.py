@@ -2268,6 +2268,10 @@ class KaraokePreview(QWidget):
         )
 
         _norm_sel = self.get_normalized_selection() if self._focus_char_idx >= 0 else None
+        _draw_focus_selection = (
+            _norm_sel is not None
+            and (_norm_sel[0] != _norm_sel[2] or _norm_sel[1] != _norm_sel[3])
+        )
 
         for idx in range(first_visible, last_visible + 1):
             # 行中心 y 坐标
@@ -2434,8 +2438,8 @@ class KaraokePreview(QWidget):
                     )
                     painter.fillRect(bg_rect, highlight_bg)
 
-                # 划词选中高亮背景（隐藏模式下仅在拖拽多选时绘制）
-                _show_sel = (not self._hide_hitbox_highlights) or self._focus_dragging
+                # 隐藏模式下仅当存在跨字符多选时绘制 focus 高亮（拖选结束仍保持）
+                _show_sel = (not self._hide_hitbox_highlights) or _draw_focus_selection
                 if _show_sel and _norm_sel is not None:
                     _sl, _sc, _el, _ec = _norm_sel
                     if _sl <= idx <= _el:
