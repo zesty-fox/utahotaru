@@ -84,6 +84,7 @@ class MainWindow(MSFluentWindow):
         self._command_manager.set_on_state_changed(self._on_command_state_changed)
         self._timing_service = TimingService(self._audio_engine, self._command_manager)
         self._store = ProjectStore(self)
+        self._store.set_auto_save_defer_predicate(self._timing_service.is_playing)
 
         # 异步保存相关
         self._save_thread: Optional[QThread] = None

@@ -76,3 +76,17 @@ def test_position_and_focus_changes_do_not_invalidate_render_cache(qapp, monkeyp
     preview._update_display()
 
     assert preview._global_version == global_version + 1
+
+
+def test_line_invalidation_advances_uncached_line_version(qapp, monkeypatch):
+    monkeypatch.setattr(preview_module, "theme", _DummyTheme())
+
+    preview = preview_module.KaraokePreview()
+    preview.set_project(_project_with_linked_word())
+
+    assert preview._sentence_cache
+    assert preview._line_versions.get(0, 0) == 0
+
+    preview._invalidate_line(0)
+
+    assert preview._line_versions[0] == 1

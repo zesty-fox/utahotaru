@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from bisect import bisect_right
 import sys
+import time
 from typing import Optional
 
 from PyQt6.QtCore import QRect, Qt, QTimer, pyqtSignal
@@ -26,6 +27,11 @@ from PyQt6.QtWidgets import QScrollBar, QWidget
 from qfluentwidgets import Action, RoundMenu
 
 from strange_uta_game.backend.domain import Character, Project, Ruby
+from strange_uta_game.frontend.perf_log import (
+    log_elapsed,
+    log_slow_method,
+    perf_enabled,
+)
 from strange_uta_game.frontend.theme import theme
 
 
@@ -645,6 +651,16 @@ class KaraokePreview(QWidget):
         self._current_switch_idx = idx
         return points[idx][1]
 
+    @log_slow_method(
+        "preview.set_current_time_ms",
+        20,
+        lambda self, args, kwargs: {
+            "time_ms": args[0] if args else kwargs.get("time_ms"),
+            "playing": self._is_playing,
+            "line": self._current_line_idx,
+            "auto_line": self._last_auto_scroll_line_idx,
+        },
+    )
     def set_current_time_ms(self, time_ms: int):
         self._current_time_ms = time_ms
         # 播放期间按就近扩散顺序预热少量邻近行，降低视口内首帧卡顿
@@ -673,6 +689,16 @@ class KaraokePreview(QWidget):
                 if idx == self._current_line_idx:
                     self._get_sentence_render_data(idx, sentence, self._fm_current, "cur")
 
+    @log_slow_method(
+        "preview.warm_nearby_cache",
+        12,
+        lambda self, args, kwargs: {
+            "budget": args[0] if args else kwargs.get("budget", 2),
+            "line": self._current_line_idx,
+            "auto_line": self._last_auto_scroll_line_idx,
+            "cache": len(self._sentence_cache),
+        },
+    )
     def _warm_nearby_cache(self, budget: int = 2) -> None:
         """按 L, L+1, L-1, L+2, L-2, ... 的就近扩散顺序预热 _sentence_cache。
 
@@ -851,16 +877,14 @@ class KaraokePreview(QWidget):
 
     def _invalidate_line(self, line_idx: int):
         """使特定行的缓存失效（用于行内数据改变时）"""
-        if line_idx in self._line_versions:
-            self._line_versions[line_idx] += 1
-        else:
-            self._line_versions[line_idx] = 0
+        self._line_versions[line_idx] = self._line_versions.get(line_idx, 0) + 1
         self.update()
 
     def _invalidate_all_lines(self):
         """使所有行的缓存失效（用于全局数据改变时）"""
-        for line_idx in list(self._line_versions.keys()):
-            self._line_versions[line_idx] += 1
+        line_indices = set(self._line_versions.keys()) | set(self._sentence_cache.keys())
+        for line_idx in line_indices:
+            self._line_versions[line_idx] = self._line_versions.get(line_idx, 0) + 1
         self.update()
 
     # ---- 窗口大小变化 ----
@@ -1479,6 +1503,7 @@ class KaraokePreview(QWidget):
         if entry and entry["v"] == line_version and entry["gv"] == self._global_version and entry["fk"] == font_key:
             return entry
 
+        _perf_start = time.perf_counter() if perf_enabled() else None
         chars = sentence.chars
         characters = sentence.characters
         n_chars = len(chars)
@@ -1932,6 +1957,18 @@ class KaraokePreview(QWidget):
             "group_ruby_wipe": group_ruby_wipe,
         }
         self._sentence_cache[idx] = entry
+        if _perf_start is not None:
+            log_elapsed(
+                "preview.render_data",
+                _perf_start,
+                8,
+                line=idx,
+                chars=n_chars,
+                font=font_key,
+                linked_groups=len(linked_leader_groups),
+                anchors=len(start_times),
+                cache=len(self._sentence_cache),
+            )
         return entry
 
     def _find_nearest_hitbox(self, click_x: int, click_y: int) -> tuple[str, int, int, int | None] | None:
@@ -2075,6 +2112,18 @@ class KaraokePreview(QWidget):
 
     # ---- 绘制 ----
 
+    @log_slow_method(
+        "preview.paint",
+        20,
+        lambda self, args, kwargs: {
+            "time_ms": self._current_time_ms,
+            "playing": self._is_playing,
+            "line": self._current_line_idx,
+            "auto_line": self._last_auto_scroll_line_idx,
+            "visible": self._visible_lines,
+            "cache": len(self._sentence_cache),
+        },
+    )
     def paintEvent(self, a0: Optional[QPaintEvent]):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)

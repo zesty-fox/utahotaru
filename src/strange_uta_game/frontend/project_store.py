@@ -7,15 +7,17 @@ ProjectStore 是整个前端的唯一数据来源，替代之前的信号链同�
 
 import os
 import sys
+from time import perf_counter
 
 from PyQt6.QtCore import QObject, pyqtSignal, QTimer
-from typing import Optional
+from typing import Callable, Optional
 from pathlib import Path
 
 from strange_uta_game.backend.domain import Project
 from strange_uta_game.backend.infrastructure.persistence.sug_io import (
     SugProjectParser,
 )
+from strange_uta_game.frontend.perf_log import log_elapsed, log_perf_event, perf_enabled
 
 
 def _get_config_dir() -> Path:
@@ -107,6 +109,7 @@ class ProjectStore(QObject):
         self._periodic_save_timer.setInterval(5 * 60 * 1000)  # 默认 5 分钟
         self._periodic_save_timer.timeout.connect(self._do_periodic_save)
         self._periodic_save_enabled = True
+        self._auto_save_defer_predicate: Optional[Callable[[], bool]] = None
 
     # ── 属性 ──────────────────────────────────────
 
@@ -403,6 +406,21 @@ class ProjectStore(QObject):
         if self._project:
             self._start_periodic_save()
 
+    def set_auto_save_defer_predicate(
+        self, predicate: Optional[Callable[[], bool]]
+    ) -> None:
+        """Set a runtime predicate that temporarily defers automatic saves."""
+        self._auto_save_defer_predicate = predicate
+
+    def _should_defer_auto_save(self) -> bool:
+        predicate = self._auto_save_defer_predicate
+        if predicate is None:
+            return False
+        try:
+            return bool(predicate())
+        except Exception:
+            return False
+
     # ── auto-save（内部） ────────────────────────
 
     def _schedule_auto_save(self) -> None:
@@ -414,8 +432,13 @@ class ProjectStore(QObject):
         """执行 auto-save 到 ``<原路径>.autosave``。"""
         if not self._project or not self._save_path:
             return
+        if self._should_defer_auto_save():
+            log_perf_event("project.auto_save.deferred", reason="predicate")
+            self._auto_save_timer.start()
+            return
 
         autosave_path = self._save_path + ".autosave"
+        _perf_start = perf_counter() if perf_enabled() else None
         try:
             SugProjectParser.save(
                 self._project,
@@ -423,6 +446,8 @@ class ProjectStore(QObject):
                 nicokara_tags=self._get_nicokara_tags_for_save(),
                 media_path=self.get_saveable_media_path(),
             )
+            if _perf_start is not None:
+                log_elapsed("project.auto_save", _perf_start, 20)
         except Exception:
             pass  # auto-save 静默失败
 
@@ -443,8 +468,12 @@ class ProjectStore(QObject):
         """
         if not self._project:
             return
+        if self._should_defer_auto_save():
+            log_perf_event("project.periodic_save.deferred", reason="predicate")
+            return
 
         temp_path = self.get_temp_path()
+        _perf_start = perf_counter() if perf_enabled() else None
         try:
             _cache_dir().mkdir(exist_ok=True)
             SugProjectParser.save(
@@ -453,6 +482,8 @@ class ProjectStore(QObject):
                 nicokara_tags=self._get_nicokara_tags_for_save(),
                 media_path=self.get_saveable_media_path(),
             )
+            if _perf_start is not None:
+                log_elapsed("project.periodic_save", _perf_start, 20)
         except Exception:
             pass  # 定时保存静默失败
 

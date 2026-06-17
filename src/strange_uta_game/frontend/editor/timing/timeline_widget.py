@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import (
 
 from qfluentwidgets import CaptionLabel, SwitchButton
 
+from strange_uta_game.frontend.perf_log import log_slow_method
 from strange_uta_game.frontend.theme import theme
 
 
@@ -129,6 +130,11 @@ class WaveformDisplay(QWidget):
                 self.scroll_position_changed.emit(self._scroll_position)
         self.update()
 
+    @log_slow_method(
+        "timeline.set_time_tags",
+        12,
+        lambda self, args, kwargs: {"tags": len(args[0]) if args else 0},
+    )
     def set_time_tags(self, tags: List[Tuple[int, str, int]]):
         # tags: (timestamp_ms, char_text, char_id)，按项目文件顺序
         # 同一 char_id 的第一个 checkpoint 携带标签，后续不重复显示
@@ -178,6 +184,14 @@ class WaveformDisplay(QWidget):
         self._scroll_position = self._clamp_scroll(position)
         self.update()
 
+    @log_slow_method(
+        "timeline.compute_waveform_peaks",
+        20,
+        lambda self, args, kwargs: {
+            "width": args[0] if args else kwargs.get("width"),
+            "zoom": f"{self._zoom_factor:.2f}",
+        },
+    )
     def _compute_waveform_peaks(self, width: int) -> Optional[List[tuple]]:
         """计算波形峰值数据（按像素降采样），带缓存"""
         if self._samples is None or self._duration_ms <= 0 or width <= 0:
@@ -224,6 +238,14 @@ class WaveformDisplay(QWidget):
 
         return peaks
 
+    @log_slow_method(
+        "timeline.paint",
+        20,
+        lambda self, args, kwargs: {
+            "tags": len(self._time_tags) + len(self._warning_time_tags),
+            "zoom": f"{self._zoom_factor:.2f}",
+        },
+    )
     def paintEvent(self, a0: Optional[QPaintEvent]):
         _ = a0
         painter = QPainter(self)
