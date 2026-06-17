@@ -219,3 +219,28 @@ def test_sentence_end_zero_check_count_released_writes(service):
     # released 写入
     service.on_key_changed(4500, "released")
     assert c_end.sentence_end_ts == 4500
+
+
+def test_move_to_checkpoint_uses_index_for_exact_and_fallback(service):
+    project, sentence, c1, c2 = _make_project_normal_then_sentence_end()
+    service.set_project(project)
+
+    assert service._global_checkpoint_index[(0, 0, 1)] == 1
+
+    assert service.move_to_checkpoint(0, 0, 1)
+    pos = service.get_current_position()
+    assert (pos.line_idx, pos.char_idx, pos.checkpoint_idx) == (0, 0, 1)
+
+    assert service.move_to_checkpoint(0, 0, 99)
+    pos = service.get_current_position()
+    assert (pos.line_idx, pos.char_idx, pos.checkpoint_idx) == (0, 1, 0)
+
+    assert service.move_to_checkpoint(0, 0, 99, prefer_backward=True)
+    pos = service.get_current_position()
+    assert (pos.line_idx, pos.char_idx, pos.checkpoint_idx) == (0, 0, 1)
+
+    assert service.move_to_checkpoint(-1, 0, 0, prefer_backward=True)
+    pos = service.get_current_position()
+    assert (pos.line_idx, pos.char_idx, pos.checkpoint_idx) == (0, 0, 0)
+
+    assert not service.move_to_checkpoint(99, 0, 0)

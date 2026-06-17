@@ -531,7 +531,7 @@ class KaraokePreview(QWidget):
             self._prewarm_all_sentences()
         self._update_scrollbar_range()
         self._sync_scrollbar_to_scroll_center()
-        self._update_display()
+        self.request_repaint()
 
     def set_focus_position(self, line_idx:int = 0,char_idx: int = 0):
         # 用于打轴状态下更新foucs
@@ -540,7 +540,7 @@ class KaraokePreview(QWidget):
             self._focus_char_idx = char_idx
             self._focus_line_range_end = line_idx
             self._focus_char_range_end = char_idx
-            self._update_display()
+            self.request_repaint()
             return
         self._focus_line_idx = line_idx
         self._focus_char_idx = char_idx
@@ -548,13 +548,13 @@ class KaraokePreview(QWidget):
         self._focus_char_range_end = char_idx
         if self._is_playing:
             self._warm_nearby_cache(budget=2)
-        self._update_display()
+        self.request_repaint()
 
     def set_current_position(self, line_idx: int, char_idx: int = 0):
         """更新当前打轴位置（行+字符），并居中滚动。"""
         if line_idx == self._current_line_idx:
             self._current_char_idx = char_idx
-            self._update_display()
+            self.request_repaint()
             return
         self._current_line_idx = line_idx
         self._current_char_idx = char_idx
@@ -565,7 +565,7 @@ class KaraokePreview(QWidget):
         # 行切换时重新锚定预热中心（仅播放期间）
         if self._is_playing:
             self._warm_nearby_cache(budget=2)
-        self._update_display()
+        self.request_repaint()
 
     def scroll_current_line_to_center(self):
         """将当前行滚动到视口中央。
@@ -578,7 +578,7 @@ class KaraokePreview(QWidget):
             return
         self._scroll_center_line = new_line
         self._sync_scrollbar_to_scroll_center()
-        self._update_display()
+        self.request_repaint()
 
     def is_multi_line_selection(self) -> bool:
         return (
@@ -623,7 +623,7 @@ class KaraokePreview(QWidget):
             return
         self._scroll_center_line = new_line
         self._sync_scrollbar_to_scroll_center()
-        self._update_display()
+        self.request_repaint()
 
     def _find_line_for_time(self, time_ms: int) -> Optional[int]:
         """查找当前时间对应的歌词行索引（使用快照索引，O(log n)判断）。
@@ -839,6 +839,10 @@ class KaraokePreview(QWidget):
         self._needs_guide_size = size
         self._font_needs_guide = QFont("Microsoft YaHei", size, QFont.Weight.Bold)
         self._fm_needs_guide = QFontMetrics(self._font_needs_guide)
+        self.update()
+
+    def request_repaint(self):
+        """Request a repaint without invalidating sentence layout caches."""
         self.update()
 
     def _update_display(self):
