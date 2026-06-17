@@ -346,10 +346,26 @@ class _LaunchUpdaterWorker(QThread):
     def __init__(self, plan: "installer.LaunchPlan", parent=None):
         super().__init__(parent)
         self._plan = plan
+        self._cancelled = False
+
+    def request_cancel(self) -> None:
+        """由主线程调用，请求取消更新。"""
+        self._cancelled = True
 
     def run(self) -> None:
         from .. import installer as _installer
-        result = _installer.launch_updater(self._plan, progress_cb=self.progress.emit)
+
+        def _cb(text: str) -> None:
+            if self._cancelled:
+                raise _installer.UpdateCancelledError()
+            self.progress.emit(text)
+
+        try:
+            result = _installer.launch_updater(self._plan, progress_cb=_cb)
+        except _installer.UpdateCancelledError:
+            result = _installer.LaunchResult(
+                launched=False, reason="用户取消更新",
+            )
         self.done.emit(result)
 
 
@@ -421,37 +437,43 @@ def _show_update_dialog(parent: "SettingsInterface", result: CheckResult) -> Non
         proxy_url=proxy_url,
     )
 
-    # 立即给用户反馈，然后在后台线程完成"自更新 Updater + 启动"
+    # 弹出进度窗口，在后台线程完成"自更新 Updater + 启动"
     # （_update_updater_from_remote 有网络请求，同步调用会冻结 UI 数秒）
-    _prep_infobar = InfoBar.success(
-        title=_tr("正在准备更新"),
-        content=_tr("正在获取最新更新器，请稍候…"),
-        orient=Qt.Orientation.Horizontal,
-        isClosable=False,
-        position=InfoBarPosition.TOP,
-        duration=30000,  # 兜底超时，正常会被后续 InfoBar 覆盖
-        parent=parent.window(),
-    )
+    from .update_progress_window import UpdateProgressWindow
 
-    def _update_prep_text(text: str) -> None:
-        """把 progress 信号的进度字符串实时写到 InfoBar 的内容标签上。"""
-        try:
-            # InfoBar 的 contentLabel 是 BodyLabel，直接设置文本
-            if _prep_infobar is not None:
-                _prep_infobar.contentLabel.setText(text)
-        except Exception:
-            pass
+    progress_win = UpdateProgressWindow()
+    progress_win.show()
 
     # parent=None：不让 Qt 把 QThread 的生命周期绑到 SettingsInterface 上。
     # 若 parent 被销毁时线程还在运行，Qt 会 destroy 运行中的 QThread（崩溃）。
-    # 用 Python 引用（_update_launch_worker）防 GC 即可，由 os._exit(0) 统一结束。
+    # 用 Python 引用防 GC 即可，由 os._exit(0) 统一结束。
     worker = _LaunchUpdaterWorker(plan, parent=None)
     parent._update_launch_worker = worker  # type: ignore[attr-defined]
-    worker.progress.connect(_update_prep_text, Qt.ConnectionType.QueuedConnection)
+    parent._update_progress_window = progress_win  # type: ignore[attr-defined]
+
+    worker.progress.connect(
+        progress_win.update_from_text, Qt.ConnectionType.QueuedConnection,
+    )
+    progress_win.cancelled.connect(worker.request_cancel)
 
     def _on_done(launch_result: object) -> None:
         from .. import installer as _inst
         lr: _inst.LaunchResult = launch_result  # type: ignore[assignment]
+
+        progress_win.finish()
+
+        if lr.reason == "用户取消更新":
+            InfoBar.info(
+                title=_tr("更新已取消"),
+                content=_tr("您可以稍后在设置中重新检查更新"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=4000,
+                parent=parent.window(),
+            )
+            return
+
         if not lr.launched:
             InfoBar.error(
                 title=_tr("无法启动 Updater"),

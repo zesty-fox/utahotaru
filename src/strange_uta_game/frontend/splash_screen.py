@@ -57,7 +57,7 @@ class SplashWindow(QWidget):
             ver_text = f"v{__version__}"
         except Exception:
             pass
-        title_parts = ["StrangeUtaGame", "歌词打轴工具"]
+        title_parts = ["StrangeUtaGame", self.tr("歌词打轴工具")]
         if ver_text:
             title_parts.append(ver_text)
         title = QLabel("  ·  ".join(title_parts))
@@ -84,7 +84,7 @@ class SplashWindow(QWidget):
         layout.addSpacing(6)
 
         # 状态文本
-        self._status = QLabel("正在启动...")
+        self._status = QLabel(self.tr("正在启动..."))
         self._status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._status.setStyleSheet(
             "color: rgba(255,255,255,0.75); font-size: 12px;"

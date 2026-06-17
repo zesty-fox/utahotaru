@@ -58,7 +58,7 @@ class MainWindow(MSFluentWindow):
         self._settings_provider = settings_provider
         self._progress_cb = progress_callback if not embedded else None
 
-        self._report_progress(5, "正在初始化翻译器...")
+        self._report_progress(5, self.tr("正在初始化翻译器..."))
 
         # 翻译器安装：必须在 super().__init__() 与任何 widget 构造之前——
         # 否则首次构造的 widget 用源串渲染，再依赖 LanguageChange 事件二次
@@ -73,20 +73,20 @@ class MainWindow(MSFluentWindow):
                 _lang = "zh_CN"
             install_translators(_lang)
 
-        self._report_progress(10, "正在初始化窗口框架...")
+        self._report_progress(10, self.tr("正在初始化窗口框架..."))
         super().__init__()
 
         if self._embedded and self._settings_provider is not None:
             from strange_uta_game.frontend.settings.app_settings import AppSettings
             AppSettings.set_default_provider(self._settings_provider)
 
-        self._report_progress(20, "正在初始化音频引擎...")
+        self._report_progress(20, self.tr("正在初始化音频引擎..."))
         # 引擎按"启用高质量音频变速"设置选择：
         #   开（默认）→ BassTsmEngine：离线 TSM 预渲染，变速不变调、无爆音；
         #   关        → BassEngine：原版 BASS 实时变速，零缓存但可能爆音。
         self._audio_engine = self._make_audio_engine()
 
-        self._report_progress(30, "正在初始化核心服务...")
+        self._report_progress(30, self.tr("正在初始化核心服务..."))
         self._command_manager = CommandManager()
         self._command_manager.set_on_state_changed(self._on_command_state_changed)
         self._timing_service = TimingService(self._audio_engine, self._command_manager)
@@ -110,11 +110,11 @@ class MainWindow(MSFluentWindow):
             self._win_settings = None
             self._geometry_save_timer = None
 
-        self._report_progress(40, "正在初始化窗口...")
+        self._report_progress(40, self.tr("正在初始化窗口..."))
         self._init_window()
-        self._report_progress(45, "正在加载界面组件...")
+        self._report_progress(45, self.tr("正在加载界面组件..."))
         self._init_interfaces()
-        self._report_progress(88, "正在配置导航栏...")
+        self._report_progress(88, self.tr("正在配置导航栏..."))
         self._init_navigation()
         self._apply_embedded_ui_policy()
 
@@ -141,7 +141,7 @@ class MainWindow(MSFluentWindow):
         # 初始化自动保存配置
         self._apply_auto_save_settings()
 
-        self._report_progress(95, "正在完成初始化...")
+        self._report_progress(95, self.tr("正在完成初始化..."))
 
         # 启动期定时器 —— standalone 专用：
         # - 闪退恢复弹窗会抢宿主焦点，embedded 跳过；
@@ -161,7 +161,7 @@ class MainWindow(MSFluentWindow):
         # 走"兜底保存 + 直接退出"路径。
         self._force_quitting = False
 
-        self._report_progress(100, "准备就绪")
+        self._report_progress(100, self.tr("准备就绪"))
         self._progress_cb = None
 
     def _report_progress(self, value: int, text: str = "") -> None:
@@ -417,7 +417,7 @@ class MainWindow(MSFluentWindow):
         from .editor.line_interface import EditInterface
         from .online.online_interface import OnlineQueryInterface
 
-        self._report_progress(48, "正在加载主页...")
+        self._report_progress(48, self.tr("正在加载主页..."))
         self.homeInterface = HomeInterface(self)
         self.homeInterface.setObjectName("homeInterface")
         self.homeInterface.project_created.connect(self._on_project_created)
@@ -425,30 +425,30 @@ class MainWindow(MSFluentWindow):
         self.homeInterface.project_save_requested.connect(self._on_save_project)
         self.homeInterface.hide()  # 已废弃，仅保留信号连接
 
-        self._report_progress(55, "正在加载编辑器...")
+        self._report_progress(55, self.tr("正在加载编辑器..."))
         self.editorInterface = EditorInterface(self)
         self.editorInterface.setObjectName("editorInterface")
         self.editorInterface.set_timing_service(self._timing_service)
         self.editorInterface.project_saved.connect(self._update_title)
 
-        self._report_progress(63, "正在加载导出界面...")
+        self._report_progress(63, self.tr("正在加载导出界面..."))
         self.exportInterface = ExportInterface(self)
         self.exportInterface.setObjectName("exportInterface")
 
-        self._report_progress(68, "正在加载演唱者管理...")
+        self._report_progress(68, self.tr("正在加载演唱者管理..."))
         self.singerInterface = SingerManagerInterface(self)
         self.singerInterface.setObjectName("singerInterface")
 
-        self._report_progress(72, "正在加载注音界面...")
+        self._report_progress(72, self.tr("正在加载注音界面..."))
         self.rubyInterface = RubyInterface(self)
         self.rubyInterface.setObjectName("rubyInterface")
         self.rubyInterface.hide()  # 已废弃，仅保留与 Timing 共用的功能
 
-        self._report_progress(77, "正在加载设置界面...")
+        self._report_progress(77, self.tr("正在加载设置界面..."))
         self.settingInterface = SettingsInterface(self, settings_provider=self._settings_provider)
         self.settingInterface.setObjectName("settingInterface")
 
-        self._report_progress(82, "正在加载编辑视图...")
+        self._report_progress(82, self.tr("正在加载编辑视图..."))
         self.editViewInterface = EditInterface(self)
         self.editViewInterface.setObjectName("editViewInterface")
         self.editViewInterface.hide()  # 已废弃，仅保留与 Timing 共用的功能
@@ -457,7 +457,7 @@ class MainWindow(MSFluentWindow):
         self.onlineInterface.setObjectName("onlineInterface")
         self.onlineInterface.hide()  # 已废弃，占位界面
 
-        self._report_progress(85, "正在连接数据存储...")
+        self._report_progress(85, self.tr("正在连接数据存储..."))
         # 将 store 传递给所有子界面
         self.homeInterface.set_store(self._store)
         self.editorInterface.set_store(self._store)
@@ -892,23 +892,38 @@ class MainWindow(MSFluentWindow):
             # launch_updater 内部会调用 _update_updater_from_remote 发起 HTTP 请求，
             # 同步调用会冻结 UI；改为在后台线程中执行（与 update_card.py 保持一致）。
             from strange_uta_game.updater.ui.update_card import _LaunchUpdaterWorker
+            from strange_uta_game.updater.ui.update_progress_window import UpdateProgressWindow
 
-            InfoBar.info(
-                title=self.tr("正在准备更新"),
-                content=self.tr("正在获取最新更新器，请稍候…"),
-                orient=Qt.Orientation.Horizontal,
-                isClosable=False,
-                position=InfoBarPosition.TOP,
-                duration=30000,
-                parent=self,
-            )
+            progress_win = UpdateProgressWindow()
+            progress_win.show()
 
             worker = _LaunchUpdaterWorker(plan, parent=None)
             self._startup_update_launch_worker = worker  # 防 GC
+            self._startup_update_progress_win = progress_win  # 防 GC
+
+            worker.progress.connect(
+                progress_win.update_from_text, Qt.ConnectionType.QueuedConnection,
+            )
+            progress_win.cancelled.connect(worker.request_cancel)
 
             def _on_launch_done(launch_result: object) -> None:
                 from strange_uta_game.updater import installer as _inst
                 lr: _inst.LaunchResult = launch_result  # type: ignore[assignment]
+
+                progress_win.finish()
+
+                if lr.reason == "用户取消更新":
+                    InfoBar.info(
+                        title=self.tr("更新已取消"),
+                        content=self.tr("您可以稍后在设置中重新检查更新"),
+                        orient=Qt.Orientation.Horizontal,
+                        isClosable=True,
+                        position=InfoBarPosition.TOP,
+                        duration=4000,
+                        parent=self,
+                    )
+                    return
+
                 if not lr.launched:
                     InfoBar.error(
                         title=self.tr("启动 Updater 失败"),

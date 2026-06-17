@@ -33,7 +33,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from PyQt6.QtCore import QCoreApplication
+
 log = logging.getLogger(__name__)
+
+
+def _tr(s: str) -> str:
+    return QCoreApplication.translate("Installer", s)
 
 # 与主程序同目录下的 Updater.exe 名字。
 UPDATER_EXE_NAME = "Updater.exe"
@@ -89,6 +95,10 @@ class LaunchResult:
     temp_copy_path: str = ""
     pid: int = 0
     reason: str = ""
+
+
+class UpdateCancelledError(Exception):
+    """用户在更新准备阶段主动取消时抛出。"""
 
 
 # ───────────────────────── 工具 ─────────────────────────
@@ -274,6 +284,8 @@ def _update_updater_from_remote(
     # ── Step 1: 先用 manifest sha256 判断 Updater.exe 是否需要更新 ─────────────
     # 拉取远端 manifest（小 JSON），读取本地清单，对比 app part sha256。
     # 一致 → Updater.exe 未变化 → 直接返回，完全不下载 app.zip。
+    if progress_cb:
+        progress_cb(_tr("正在检查更新器版本…"))
     remote_manifest = _fetch_remote_manifest(plan, proxies_dict)
     local_manifest = _read_local_manifest(plan)
 
@@ -290,6 +302,8 @@ def _update_updater_from_remote(
                 "[self-update] app sha256 一致（%s…），Updater.exe 无需更新，跳过下载",
                 remote_app_sha[:12],
             )
+            if progress_cb:
+                progress_cb(_tr("更新器已是最新，无需更新"))
             return True
         log.info(
             "[self-update] app sha256 不同（本地 %s…, 远端 %s…），需更新 Updater.exe",
@@ -366,21 +380,42 @@ def _update_updater_from_remote(
                         total = int(resp.headers.get("Content-Length") or 0)
                         done = 0
                         last_pct = -1
+                        last_mb = -1
+                        if progress_cb:
+                            if total > 0:
+                                progress_cb(
+                                    _tr("正在下载更新器… {pct}%  ({done} / {total} MB)")
+                                    .format(pct=0, done="0.0",
+                                            total=f"{total / 1024 / 1024:.1f}")
+                                )
+                            else:
+                                progress_cb(_tr("正在下载更新器…"))
                         with open(canonical_zip, "wb") as f:
                             for chunk in resp.iter_content(chunk_size=64 * 1024):
                                 if chunk:
                                     f.write(chunk)
                                     done += len(chunk)
-                                    if total > 0 and progress_cb is not None:
-                                        pct = int(done * 100 / total)
-                                        if pct >= last_pct + 10:
-                                            last_pct = pct
-                                            progress_cb(
-                                                f"正在获取最新更新器… "
-                                                f"{pct}%  "
-                                                f"({done / 1024 / 1024:.1f} / "
-                                                f"{total / 1024 / 1024:.1f} MB)"
-                                            )
+                                    if progress_cb is not None:
+                                        if total > 0:
+                                            pct = int(done * 100 / total)
+                                            if pct != last_pct:
+                                                last_pct = pct
+                                                progress_cb(
+                                                    _tr("正在下载更新器… {pct}%  ({done} / {total} MB)")
+                                                    .format(
+                                                        pct=pct,
+                                                        done=f"{done / 1024 / 1024:.1f}",
+                                                        total=f"{total / 1024 / 1024:.1f}",
+                                                    )
+                                                )
+                                        else:
+                                            cur_mb = int(done / 1024 / 1024 * 10)
+                                            if cur_mb != last_mb:
+                                                last_mb = cur_mb
+                                                progress_cb(
+                                                    _tr("正在下载更新器… (已下载 {done} MB)")
+                                                    .format(done=f"{done / 1024 / 1024:.1f}")
+                                                )
                     downloaded = True
                     break
                 except requests.RequestException as e:
@@ -400,6 +435,8 @@ def _update_updater_from_remote(
                 continue
 
             # ── Step 3: 校验 app.zip sha256 ─────────────────────────────────
+            if progress_cb:
+                progress_cb(_tr("正在校验文件完整性…"))
             if not _verify_zip_sha256(str(canonical_zip), url, proxies_dict):
                 log.warning("[self-update] app.zip sha256 校验失败，放弃此源")
                 try:
@@ -409,6 +446,8 @@ def _update_updater_from_remote(
                 continue
 
             # ── Step 4: 提取 Updater.exe ─────────────────────────────────────
+            if progress_cb:
+                progress_cb(_tr("正在提取更新器…"))
             with zipfile.ZipFile(str(canonical_zip)) as zf:
                 updater_entry = None
                 for name in zf.namelist():
@@ -431,6 +470,8 @@ def _update_updater_from_remote(
                     "[self-update] Updater.exe 字节一致，无需替换；"
                     "app.zip 已保留在 %s 供 Updater 增量复用", canonical_zip,
                 )
+                if progress_cb:
+                    progress_cb(_tr("更新器已是最新，无需更新"))
                 return True
 
             # 写入新 Updater.exe（带重试：Windows 下句柄释放可能有短暂延迟）
@@ -449,8 +490,12 @@ def _update_updater_from_remote(
                 "app.zip 保留在 %s，Updater 增量更新时将直接复用，无需重复下载",
                 len(new_bytes), canonical_zip,
             )
+            if progress_cb:
+                progress_cb(_tr("更新器更新完毕"))
             return True
 
+        except UpdateCancelledError:
+            raise
         except Exception as e:
             log.warning("[self-update] 从 %s 下载/提取失败: %s", source_id, e)
             try:
@@ -485,8 +530,13 @@ def launch_updater(plan: LaunchPlan, progress_cb=None) -> LaunchResult:
         _update_updater_from_remote(plan, progress_cb=progress_cb)
         # 重新定位（可能已被更新）
         updater = find_updater_exe(plan.app_dir) or updater
+    except UpdateCancelledError:
+        raise
     except Exception as e:
         log.warning("自更新 Updater.exe 失败（忽略，继续使用旧版）: %s", e)
+
+    if progress_cb:
+        progress_cb(_tr("正在启动更新器…"))
 
     try:
         temp_copy = _copy_updater_to_temp(updater)
