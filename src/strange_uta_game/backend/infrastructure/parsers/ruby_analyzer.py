@@ -123,28 +123,54 @@ def _arabic_to_kanji_segments(
     result: List[str] = []
     segments: List[Tuple[int, int, int]] = []
     remaining = n
+    char_pos = 0  # 当前汉字字符位置（非 list 元素索引）
 
     for unit_val, unit_name in _units:
         if remaining >= unit_val:
             count = remaining // unit_val
-            # 计算该单位对应的原始数字位索引
+            count_digits = len(str(count))
+            # 计算该组最高位对应的原始数字索引
             if unit_val >= 10000:
                 exp = int(math.log10(unit_val))
             elif unit_val > 1:
                 exp = int(math.log10(unit_val))
             else:
                 exp = 0
-            orig_idx = num_digits - 1 - exp
+            group_orig_idx = num_digits - exp - count_digits
 
-            start = len(result)
-            if count > 1 or unit_val >= 10000 or unit_val == 1:
-                if count < 10:
-                    result.append(_kanji_digits[count])
-                else:
-                    result.append(_arabic_to_kanji(str(count)))
-            if unit_name:
-                result.append(unit_name)
-            segments.append((start, len(result), orig_idx))
+            seg_start = char_pos
+
+            if count < 10:
+                # 单数字：直接添加
+                if count > 1 or unit_val >= 10000 or unit_val == 1:
+                    digit_kanji = _kanji_digits[count]
+                    result.append(digit_kanji)
+                    char_pos += len(digit_kanji)
+                if unit_name:
+                    result.append(unit_name)
+                    char_pos += len(unit_name)
+                segments.append((seg_start, char_pos, group_orig_idx))
+            else:
+                # 多数字：递归拆分，组内每位映射到独立的原始数字索引
+                sub_kanji, sub_segments = _arabic_to_kanji_segments(
+                    str(count)
+                )
+                result.append(sub_kanji)
+                char_pos += len(sub_kanji)
+                unit_len = len(unit_name)
+                if unit_name:
+                    result.append(unit_name)
+                    char_pos += unit_len
+                for i, (sub_start, sub_end, sub_orig_idx) in enumerate(
+                    sub_segments
+                ):
+                    mapped_idx = group_orig_idx + sub_orig_idx
+                    # 末段延展到包含单位汉字（如 九万 而非仅 九）
+                    is_last = i == len(sub_segments) - 1
+                    adj_end = sub_end + (unit_len if is_last else 0)
+                    segments.append(
+                        (seg_start + sub_start, seg_start + adj_end, mapped_idx)
+                    )
             remaining %= unit_val
 
     return "".join(result), segments
