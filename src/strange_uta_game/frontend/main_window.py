@@ -4,7 +4,7 @@
 参考 March7thAssistant 的 UI 架构。
 """
 
-from PyQt6.QtCore import Qt, QThread, QTimer, QEvent
+from PyQt6.QtCore import Qt, QTimer, QEvent
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
@@ -47,7 +47,7 @@ class MainWindow(MSFluentWindow):
     # standalone 行为。
     _embedded: bool = False
 
-    def __init__(self, embedded: bool = False, settings_provider=None):
+    def __init__(self, embedded: bool = False, settings_provider=None, progress_callback=None):
         # ⚠ 必须在 super().__init__() 之前赋值！MSFluentWindow 初始化
         # 过程中可能触发 resizeEvent / changeEvent，那些 handler 会调
         # _schedule_geometry_save / _save_window_geometry / _restore_window_geometry
@@ -56,6 +56,9 @@ class MainWindow(MSFluentWindow):
         # 直接以 0xC0000409 stack-buffer-overrun 崩掉（已实测）。
         self._embedded = embedded
         self._settings_provider = settings_provider
+        self._progress_cb = progress_callback if not embedded else None
+
+        self._report_progress(5, "正在初始化翻译器...")
 
         # 翻译器安装：必须在 super().__init__() 与任何 widget 构造之前——
         # 否则首次构造的 widget 用源串渲染，再依赖 LanguageChange 事件二次
@@ -70,25 +73,25 @@ class MainWindow(MSFluentWindow):
                 _lang = "zh_CN"
             install_translators(_lang)
 
+        self._report_progress(10, "正在初始化窗口框架...")
         super().__init__()
 
         if self._embedded and self._settings_provider is not None:
             from strange_uta_game.frontend.settings.app_settings import AppSettings
             AppSettings.set_default_provider(self._settings_provider)
 
+        self._report_progress(20, "正在初始化音频引擎...")
         # 引擎按"启用高质量音频变速"设置选择：
         #   开（默认）→ BassTsmEngine：离线 TSM 预渲染，变速不变调、无爆音；
         #   关        → BassEngine：原版 BASS 实时变速，零缓存但可能爆音。
         self._audio_engine = self._make_audio_engine()
+
+        self._report_progress(30, "正在初始化核心服务...")
         self._command_manager = CommandManager()
         self._command_manager.set_on_state_changed(self._on_command_state_changed)
         self._timing_service = TimingService(self._audio_engine, self._command_manager)
         self._store = ProjectStore(self)
         self._store.set_auto_save_defer_predicate(self._timing_service.is_playing)
-
-        # 异步保存相关
-        self._save_thread: Optional[QThread] = None
-        self._save_worker = None
 
         # 跟踪当前界面（用于 switchTo 自动应用修改，必须在 _init_navigation 之前）
         self._current_interface = None
@@ -107,8 +110,11 @@ class MainWindow(MSFluentWindow):
             self._win_settings = None
             self._geometry_save_timer = None
 
+        self._report_progress(40, "正在初始化窗口...")
         self._init_window()
+        self._report_progress(45, "正在加载界面组件...")
         self._init_interfaces()
+        self._report_progress(88, "正在配置导航栏...")
         self._init_navigation()
         self._apply_embedded_ui_policy()
 
@@ -135,6 +141,8 @@ class MainWindow(MSFluentWindow):
         # 初始化自动保存配置
         self._apply_auto_save_settings()
 
+        self._report_progress(95, "正在完成初始化...")
+
         # 启动期定时器 —— standalone 专用：
         # - 闪退恢复弹窗会抢宿主焦点，embedded 跳过；
         # - 应用 updater 由宿主统一管理，embedded 跳过；
@@ -152,6 +160,18 @@ class MainWindow(MSFluentWindow):
         # 由 updater 流程主动设置；closeEvent 检测到此标志即 bypass dirty 弹窗，
         # 走"兜底保存 + 直接退出"路径。
         self._force_quitting = False
+
+        self._report_progress(100, "准备就绪")
+        self._progress_cb = None
+
+    def _report_progress(self, value: int, text: str = "") -> None:
+        """向闪屏回调报告初始化进度（无回调时静默跳过）。"""
+        cb = getattr(self, "_progress_cb", None)
+        if cb:
+            try:
+                cb(value, text)
+            except Exception:
+                pass
 
     @staticmethod
     def _find_icon_path() -> Optional[str]:
@@ -397,6 +417,7 @@ class MainWindow(MSFluentWindow):
         from .editor.line_interface import EditInterface
         from .online.online_interface import OnlineQueryInterface
 
+        self._report_progress(48, "正在加载主页...")
         self.homeInterface = HomeInterface(self)
         self.homeInterface.setObjectName("homeInterface")
         self.homeInterface.project_created.connect(self._on_project_created)
@@ -404,24 +425,30 @@ class MainWindow(MSFluentWindow):
         self.homeInterface.project_save_requested.connect(self._on_save_project)
         self.homeInterface.hide()  # 已废弃，仅保留信号连接
 
+        self._report_progress(55, "正在加载编辑器...")
         self.editorInterface = EditorInterface(self)
         self.editorInterface.setObjectName("editorInterface")
         self.editorInterface.set_timing_service(self._timing_service)
         self.editorInterface.project_saved.connect(self._update_title)
 
+        self._report_progress(63, "正在加载导出界面...")
         self.exportInterface = ExportInterface(self)
         self.exportInterface.setObjectName("exportInterface")
 
+        self._report_progress(68, "正在加载演唱者管理...")
         self.singerInterface = SingerManagerInterface(self)
         self.singerInterface.setObjectName("singerInterface")
 
+        self._report_progress(72, "正在加载注音界面...")
         self.rubyInterface = RubyInterface(self)
         self.rubyInterface.setObjectName("rubyInterface")
         self.rubyInterface.hide()  # 已废弃，仅保留与 Timing 共用的功能
 
+        self._report_progress(77, "正在加载设置界面...")
         self.settingInterface = SettingsInterface(self, settings_provider=self._settings_provider)
         self.settingInterface.setObjectName("settingInterface")
 
+        self._report_progress(82, "正在加载编辑视图...")
         self.editViewInterface = EditInterface(self)
         self.editViewInterface.setObjectName("editViewInterface")
         self.editViewInterface.hide()  # 已废弃，仅保留与 Timing 共用的功能
@@ -430,6 +457,7 @@ class MainWindow(MSFluentWindow):
         self.onlineInterface.setObjectName("onlineInterface")
         self.onlineInterface.hide()  # 已废弃，占位界面
 
+        self._report_progress(85, "正在连接数据存储...")
         # 将 store 传递给所有子界面
         self.homeInterface.set_store(self._store)
         self.editorInterface.set_store(self._store)
@@ -992,7 +1020,7 @@ class MainWindow(MSFluentWindow):
         self._on_global_save()
 
     def _on_global_save(self):
-        """全局 Ctrl+S 保存（异步）"""
+        """全局 Ctrl+S 保存（异步，委托给 ProjectStore）"""
         if not self._store.project:
             InfoBar.warning(
                 title=self.tr("无项目"),
@@ -1005,8 +1033,10 @@ class MainWindow(MSFluentWindow):
             )
             return
 
+        self._connect_store_save_signals()
+
         if self._store.save_path and not self._store.is_temp_save_path():
-            self._async_save(self._store.save_path)
+            self._store.save(self._store.save_path)
         else:
             suggested = self._store.suggested_save_path(".sug")
             path, _ = QFileDialog.getSaveFileName(
@@ -1020,7 +1050,6 @@ class MainWindow(MSFluentWindow):
             if not path.endswith(".sug"):
                 path += ".sug"
 
-            # 另存为前先清理旧的 untitled 临时文件
             old_temp = self._store.get_temp_path()
             try:
                 if old_temp.exists():
@@ -1028,50 +1057,31 @@ class MainWindow(MSFluentWindow):
             except Exception:
                 pass
 
-            # 登记新的工作目录到 config
             self._store.set_working_dir(path)
+            self._store.save(path)
 
-            self._async_save(path)
-
-    def _async_save(self, file_path: str):
-        """异步保存项目"""
-        from copy import deepcopy
-        from strange_uta_game.frontend.workers import ProjectSaveWorker
-
-        # 在主线程创建深拷贝，避免保存过程中 UI 修改 project
-        project_copy = deepcopy(self._store.project)
-        # extras 在主线程读取，保证线程安全
-        nicokara_tags = self._store._get_nicokara_tags_for_save()
-        media_path = self._store.get_saveable_media_path()
-
-        self._save_thread = QThread(self)
-        self._save_worker = ProjectSaveWorker(
-            project_copy, file_path,
-            nicokara_tags=nicokara_tags,
-            media_path=media_path,
-        )
-        self._save_worker.moveToThread(self._save_thread)
-
-        # 连接信号
-        self._save_thread.started.connect(self._save_worker.run)
-        self._save_worker.finished.connect(lambda path: self._on_save_success(path))
-        self._save_worker.error.connect(self._on_save_error)
-        self._save_worker.finished.connect(self._cleanup_save_thread)
-        self._save_worker.error.connect(self._cleanup_save_thread)
-
-        # 启动线程
-        self._save_thread.start()
+    def _connect_store_save_signals(self) -> None:
+        try:
+            self._store.save_finished.disconnect(self._on_save_success)
+        except TypeError:
+            pass
+        try:
+            self._store.save_error.disconnect(self._on_save_error)
+        except TypeError:
+            pass
+        self._store.save_finished.connect(self._on_save_success)
+        self._store.save_error.connect(self._on_save_error)
 
     def _on_save_success(self, file_path: str) -> None:
-        """保存成功回调"""
-        old_path = self._store._save_path
-        self._store._save_path = file_path
-        self._store._dirty = False
-
-        if old_path and old_path != file_path:
-            self._store._cleanup_temp_for_path(old_path)
+        try:
+            self._store.save_finished.disconnect(self._on_save_success)
+        except TypeError:
+            pass
+        try:
+            self._store.save_error.disconnect(self._on_save_error)
+        except TypeError:
+            pass
         self._store.cleanup_temp_files()
-
         InfoBar.success(
             title=self.tr("保存成功"),
             content=file_path,
@@ -1084,7 +1094,14 @@ class MainWindow(MSFluentWindow):
         self._update_title()
 
     def _on_save_error(self, error_msg: str) -> None:
-        """保存失败回调"""
+        try:
+            self._store.save_finished.disconnect(self._on_save_success)
+        except TypeError:
+            pass
+        try:
+            self._store.save_error.disconnect(self._on_save_error)
+        except TypeError:
+            pass
         InfoBar.error(
             title=self.tr("保存失败"),
             content=error_msg,
@@ -1094,16 +1111,6 @@ class MainWindow(MSFluentWindow):
             duration=3000,
             parent=self,
         )
-
-    def _cleanup_save_thread(self) -> None:
-        """清理保存线程"""
-        if self._save_thread:
-            self._save_thread.quit()
-            self._save_thread.wait()
-            self._save_thread = None
-        if self._save_worker:
-            self._save_worker.deleteLater()
-            self._save_worker = None
 
     def closeEvent(self, e):
         """关闭窗口时检查未保存变更并退出。
@@ -1146,7 +1153,7 @@ class MainWindow(MSFluentWindow):
             # 兜底保存（脏数据写到 .cache/.untitled.sug.temp 或 .项目名.sug.temp）
             try:
                 if self._store.dirty:
-                    self._store._do_periodic_save()
+                    self._store.save_sync_for_exit()
             except Exception:
                 pass
             # 释放编辑器资源（音频引擎等）
@@ -1296,7 +1303,7 @@ class MainWindow(MSFluentWindow):
         """
         try:
             if self._store and self._store.dirty:
-                self._store._do_periodic_save()
+                self._store.save_sync_for_exit()
         except Exception:
             pass
 

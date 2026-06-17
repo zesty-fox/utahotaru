@@ -62,9 +62,23 @@ mode_map = {
 }
 theme.mode = mode_map.get(theme_value, ThemeMode.AUTO)
 
+# 应用 qfluentwidgets 主题色和明暗模式（在创建任何 qfluentwidgets 控件之前）
+from qfluentwidgets import setThemeColor, setTheme, Theme
+setThemeColor("#FF6B6B", lazy=True)
+setTheme(Theme.DARK if theme.is_dark else Theme.LIGHT, lazy=True)
+
 # 在主题初始化完成后设置应用图标，避免 setTheme 内部重置图标
 if _icon_path.exists():
     app.setWindowIcon(QIcon(str(_icon_path)))
+
+# 显示启动闪屏（在 MainWindow 初始化之前，让用户看到加载进度）
+from strange_uta_game.frontend.splash_screen import SplashWindow
+_splash_icon = _icon_path.parent / "mascot.png"
+if not _splash_icon.exists():
+    _splash_icon = _icon_path
+_splash = SplashWindow(str(_splash_icon) if _splash_icon.exists() else "")
+_splash.show()
+app.processEvents()
 
 # 清理上次会话残留的 LLM 请求日志（每次启动从干净状态开始）
 try:
@@ -133,9 +147,15 @@ def main():
             initial_project = str(Path(arg).resolve())
             break
 
-    # 创建主窗口
-    window = MainWindow()
+    # 创建主窗口（通过回调驱动闪屏进度）
+    def _on_splash_progress(value: int, text: str) -> None:
+        _splash.set_progress(value, text)
+
+    window = MainWindow(progress_callback=_on_splash_progress)
     window.show()
+    window.raise_()
+    window.activateWindow()
+    _splash.finish()
 
     from PyQt6.QtCore import QTimer
 
