@@ -124,7 +124,10 @@ class UpdateProgressWindow(QWidget):
             f"color: {c.text_secondary.name()}; font-size: 13px;"
         )
 
-        # ── 进度环百分比文字 ──
+        # ── 进度环：环形用主题色，百分比文字跟随文本色 ──
+        from qfluentwidgets import themeColor
+        accent = themeColor()
+        self._ring.setCustomBarColor(accent, accent)
         text_pen_color = QColor(c.text_primary)
         self._ring._drawText = lambda painter, text: (
             painter.setFont(self._ring.font()),
@@ -134,13 +137,14 @@ class UpdateProgressWindow(QWidget):
             ),
         )
 
-        # ── 取消按钮 ──
+        # ── 取消按钮（边框跟随主题色）──
+        ac = accent.name()
         if dark:
             self._btn_cancel.setStyleSheet(
                 "QPushButton {"
                 f"  color: {c.text_primary.name()};"
                 "  background: rgba(255,255,255,0.08);"
-                "  border: 1px solid rgba(255,255,255,0.15);"
+                f"  border: 1px solid {ac};"
                 "  border-radius: 6px;"
                 "  padding: 6px 12px;"
                 "  font-size: 13px;"
@@ -153,7 +157,7 @@ class UpdateProgressWindow(QWidget):
                 "QPushButton {"
                 f"  color: {c.text_primary.name()};"
                 "  background: rgba(0,0,0,0.05);"
-                "  border: 1px solid rgba(0,0,0,0.1);"
+                f"  border: 1px solid {ac};"
                 "  border-radius: 6px;"
                 "  padding: 6px 12px;"
                 "  font-size: 13px;"
