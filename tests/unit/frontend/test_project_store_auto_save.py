@@ -16,8 +16,8 @@ def test_auto_save_is_deferred_while_predicate_is_true(monkeypatch):
 
     calls = []
     monkeypatch.setattr(
-        project_store_module.SugProjectParser,
-        "save",
+        store,
+        "_launch_save",
         lambda *args, **kwargs: calls.append((args, kwargs)),
     )
 
@@ -37,12 +37,12 @@ def test_auto_save_runs_when_defer_predicate_is_false(monkeypatch):
 
     calls = []
     monkeypatch.setattr(
-        project_store_module.SugProjectParser,
-        "save",
+        store,
+        "_launch_save",
         lambda *args, **kwargs: calls.append((args, kwargs)),
     )
 
     store._do_auto_save()
 
     assert len(calls) == 1
-    assert calls[0][0][1] == "song.sug.autosave"
+    assert calls[0][0][0] == "song.sug.autosave"

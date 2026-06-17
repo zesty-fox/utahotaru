@@ -1478,33 +1478,14 @@ class EditorInterface(QWidget):
 
         store = getattr(self, "_store", None)
 
-        # 已有正式保存路径（非 .cache 临时）→ 直接保存
+        # 已有正式保存路径（非 .cache 临时）→ 异步保存
         if (
             store is not None
             and store.save_path
             and not store.is_temp_save_path()
         ):
-            if store.save():
-                InfoBar.success(
-                    title=self.tr("保存成功"),
-                    content=store.save_path,
-                    orient=Qt.Orientation.Horizontal,
-                    isClosable=True,
-                    position=InfoBarPosition.TOP,
-                    duration=2000,
-                    parent=self,
-                )
-                self.project_saved.emit()
-            else:
-                InfoBar.error(
-                    title=self.tr("保存失败"),
-                    content=self.tr("无法保存到 ") + (store.save_path or ""),
-                    orient=Qt.Orientation.Horizontal,
-                    isClosable=True,
-                    position=InfoBarPosition.TOP,
-                    duration=3000,
-                    parent=self,
-                )
+            self._connect_save_signals(store)
+            store.save()
             return
 
         # 无正式保存路径 / 仍是临时项目 → 弹出另存为对话框
@@ -1518,42 +1499,86 @@ class EditorInterface(QWidget):
         if not path.endswith(".sug"):
             path += ".sug"
 
-        # 登记工作目录到 config
         if store:
             store.set_working_dir(path)
+            self._connect_save_signals(store)
+            store.save(path)
+        else:
+            self._fallback_sync_save(path)
 
+    def _connect_save_signals(self, store) -> None:
+        """一次性连接 store 保存结果信号。"""
         try:
-            if store:
-                success = store.save(path)
-            else:
-                from strange_uta_game.backend.infrastructure.persistence.sug_io import (
-                    SugProjectParser,
-                )
+            store.save_finished.disconnect(self._on_store_save_finished)
+        except TypeError:
+            pass
+        try:
+            store.save_error.disconnect(self._on_store_save_error)
+        except TypeError:
+            pass
+        store.save_finished.connect(self._on_store_save_finished)
+        store.save_error.connect(self._on_store_save_error)
 
-                SugProjectParser.save(self._project, path)
-                success = True
+    def _on_store_save_finished(self, saved_path: str) -> None:
+        store = getattr(self, "_store", None)
+        if store:
+            try:
+                store.save_finished.disconnect(self._on_store_save_finished)
+            except TypeError:
+                pass
+            try:
+                store.save_error.disconnect(self._on_store_save_error)
+            except TypeError:
+                pass
+        InfoBar.success(
+            title=self.tr("保存成功"),
+            content=saved_path,
+            orient=Qt.Orientation.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=2000,
+            parent=self,
+        )
+        self.project_saved.emit()
 
-            if success:
-                InfoBar.success(
-                    title=self.tr("保存成功"),
-                    content=path,
-                    orient=Qt.Orientation.Horizontal,
-                    isClosable=True,
-                    position=InfoBarPosition.TOP,
-                    duration=3000,
-                    parent=self,
-                )
-                self.project_saved.emit()
-            else:
-                InfoBar.error(
-                    title=self.tr("保存失败"),
-                    content=self.tr("无法保存到 ") + path,
-                    orient=Qt.Orientation.Horizontal,
-                    isClosable=True,
-                    position=InfoBarPosition.TOP,
-                    duration=3000,
-                    parent=self,
-                )
+    def _on_store_save_error(self, error_msg: str) -> None:
+        store = getattr(self, "_store", None)
+        if store:
+            try:
+                store.save_finished.disconnect(self._on_store_save_finished)
+            except TypeError:
+                pass
+            try:
+                store.save_error.disconnect(self._on_store_save_error)
+            except TypeError:
+                pass
+        InfoBar.error(
+            title=self.tr("保存失败"),
+            content=error_msg,
+            orient=Qt.Orientation.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=3000,
+            parent=self,
+        )
+
+    def _fallback_sync_save(self, path: str) -> None:
+        """无 store 时的同步保存回退。"""
+        try:
+            from strange_uta_game.backend.infrastructure.persistence.sug_io import (
+                SugProjectParser,
+            )
+            SugProjectParser.save(self._project, path)
+            InfoBar.success(
+                title=self.tr("保存成功"),
+                content=path,
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+            self.project_saved.emit()
         except Exception as e:
             InfoBar.error(
                 title=self.tr("保存失败"),
@@ -1624,47 +1649,11 @@ class EditorInterface(QWidget):
         if store:
             store.set_working_dir(path)
 
-        try:
-            if store:
-                success = store.save(path)
-            else:
-                from strange_uta_game.backend.infrastructure.persistence.sug_io import (
-                    SugProjectParser,
-                )
-                SugProjectParser.save(self._project, path)
-                success = True
-
-            if success:
-                InfoBar.success(
-                    title=self.tr("保存成功"),
-                    content=path,
-                    orient=Qt.Orientation.Horizontal,
-                    isClosable=True,
-                    position=InfoBarPosition.TOP,
-                    duration=3000,
-                    parent=self,
-                )
-                self.project_saved.emit()
-            else:
-                InfoBar.error(
-                    title=self.tr("保存失败"),
-                    content=self.tr("无法保存到 ") + path,
-                    orient=Qt.Orientation.Horizontal,
-                    isClosable=True,
-                    position=InfoBarPosition.TOP,
-                    duration=3000,
-                    parent=self,
-                )
-        except Exception as e:
-            InfoBar.error(
-                title=self.tr("保存失败"),
-                content=str(e),
-                orient=Qt.Orientation.Horizontal,
-                isClosable=True,
-                position=InfoBarPosition.TOP,
-                duration=5000,
-                parent=self,
-            )
+        if store:
+            self._connect_save_signals(store)
+            store.save(path)
+        else:
+            self._fallback_sync_save(path)
 
     def _on_load_project(self):
         """加载项目文件"""
