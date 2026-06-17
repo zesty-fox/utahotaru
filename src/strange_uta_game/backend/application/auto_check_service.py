@@ -2306,14 +2306,17 @@ class AutoCheckService:
         check_counts = check_counts[: len(sentence.characters)]
 
         # 根据现有 per-char 注音更新 check_count
-        # 规则：汉字的 cp 严格由它自己的 ruby parts 决定
+        # 规则：汉字/数字的 cp 严格由它自己的 ruby parts 决定
         #   - 无 ruby → cp=0（典型场景：连词块内后字，mora 已压在首字上）
         #   - 有 ruby 且非自注音 → 按 parts 的 mora 总数
         #   - 自注音（ruby==char）→ 保留默认 cp（走下游过滤规则）
-        # 非汉字（假名/字母/符号）：保留默认，由下游过滤规则处理。
+        # 假名/字母/符号：保留默认，由下游过滤规则处理。
         for i, char in enumerate(sentence.characters):
-            if len(char.char) != 1 or get_char_type(char.char) != CharType.KANJI:
-                continue  # 只对汉字按 ruby 重算
+            if len(char.char) != 1 or get_char_type(char.char) not in (
+                CharType.KANJI,
+                CharType.NUMBER,
+            ):
+                continue  # 只对汉字和数字按 ruby 重算
             if not char.ruby:
                 # 空 ruby 的汉字：cp 默认为 0（连词块内后字不打拍）
                 # 但若该字符已持有起始 timestamp（n3 加载后），保留 cp=1
