@@ -533,6 +533,23 @@ class AutoCheckService:
         merged.sort(key=lambda r: r.start_idx)
         return merged, covered
 
+    def _get_digit_on_reading(self, kanji: str) -> str:
+        """获取数字汉字对应的音读（优先汉字字典，其次分析器）。
+
+        Args:
+            kanji: 单个汉字字符（如 ``"三"``）
+
+        Returns:
+            平假名音读，获取失败时返回空字符串
+        """
+        if self._kanji_dict and kanji in self._kanji_dict:
+            on_list = self._kanji_dict[kanji].get("on", [])
+            if on_list:
+                return self._kata_to_hira(on_list[0])
+        # 字典无音读时退回到分析器
+        reading = self._analyzer.get_reading(kanji)
+        return reading if reading and reading != kanji else ""
+
     def _distribute_digit_readings(
         self,
         num_str: str,
@@ -540,9 +557,10 @@ class AutoCheckService:
     ) -> List[RubyResult]:
         """将多位数字的读音分配到各个数字字符上。
 
-        使用 :func:`_arabic_to_kanji_segments` 获取每位数字对应的汉字片段，
-        再通过注音分析器获取片段读音，为每个原始数字字符创建独立的
-        :class:`RubyResult`，使节奏点能正确分配。
+        使用 :func:`_arabic_to_kanji_segments` 获取每位数字对应的汉字片段。
+        先对完整漢数字串调用分析器获得有上下文的读音，再通过汉字字典拆分为
+        逐字读音，最后按段分组到每位原始数字。汉字字典拆分失败时退回到逐段
+        独立查询。
 
         Args:
             num_str: 数字字符串（如 ``"12345"``）
@@ -553,14 +571,32 @@ class AutoCheckService:
         """
         kanji, segments = _arabic_to_kanji_segments(num_str)
 
-        # 对每位数字对应的汉字片段，单独调用分析器获取读音，
-        # 避免分析器将整段汉字作为单个复合词导致无法按段分组。
+        # 优先：对完整漢数字串分析，获得有上下文的读音
+        full_reading = self._analyzer.get_reading(kanji)
         per_digit: Dict[int, str] = {}
-        for seg_start, seg_end, orig_idx in segments:
-            seg_kanji = kanji[seg_start:seg_end]
-            seg_reading = self._analyzer.get_reading(seg_kanji)
-            if seg_reading and seg_reading != seg_kanji:
-                per_digit[orig_idx] = seg_reading
+
+        if full_reading and full_reading != kanji:
+            # 尝试用汉字字典将全串读音拆为逐字读音
+            char_readings = self._try_split_to_chars(kanji, full_reading)
+            if char_readings is not None and len(char_readings) == len(kanji):
+                for seg_start, seg_end, orig_idx in segments:
+                    reading = "".join(char_readings[seg_start:seg_end])
+                    if reading:
+                        per_digit[orig_idx] = reading
+            else:
+                # 拆分失败，退回到逐段独立查询（保留旧行为）
+                for seg_start, seg_end, orig_idx in segments:
+                    seg_kanji = kanji[seg_start:seg_end]
+                    seg_reading = self._analyzer.get_reading(seg_kanji)
+                    if seg_reading and seg_reading != seg_kanji:
+                        per_digit[orig_idx] = seg_reading
+        else:
+            # 分析器无法给出有效读音，退回到逐段独立查询
+            for seg_start, seg_end, orig_idx in segments:
+                seg_kanji = kanji[seg_start:seg_end]
+                seg_reading = self._analyzer.get_reading(seg_kanji)
+                if seg_reading and seg_reading != seg_kanji:
+                    per_digit[orig_idx] = seg_reading
 
         # 为每位数字创建独立 RubyResult
         results: List[RubyResult] = []
@@ -615,6 +651,51 @@ class AutoCheckService:
                 and r.end_idx <= seq_end
                 and r.text.isdigit()
             ]
+
+            if not existing and len(num_str) <= 1:
+                # 单数字可能被包含在复合词结果中（如 "３人" → 分析器返回的
+                # RubyResult 覆盖 "三人" 两个字），需要从复合词中拆分出来。
+                compound = [
+                    r for r in new_results
+                    if r.start_idx <= seq_start
+                    and r.end_idx > seq_end
+                ]
+                if compound:
+                    new_results = [r for r in new_results if r not in compound]
+                    for comp in compound:
+                        # 用汉字字典拆分复合词读音
+                        split = self._try_split_to_chars(comp.text, comp.reading)
+                        for idx in range(comp.start_idx, comp.end_idx):
+                            pos = idx - comp.start_idx
+                            if idx == seq_start:
+                                # 数字位：用音读替换
+                                kanji = _arabic_to_kanji(num_str)
+                                on_reading = self._get_digit_on_reading(kanji)
+                                ch = text[idx] if idx < len(text) else comp.text[pos]
+                                new_results.append(
+                                    RubyResult(
+                                        text=ch,
+                                        reading=on_reading or ch,
+                                        start_idx=idx,
+                                        end_idx=idx + 1,
+                                    )
+                                )
+                            else:
+                                ch = text[idx] if idx < len(text) else comp.text[pos]
+                                part_reading = (
+                                    split[pos] if split and pos < len(split) and split[pos]
+                                    else comp.text[pos]
+                                )
+                                new_results.append(
+                                    RubyResult(
+                                        text=ch,
+                                        reading=part_reading,
+                                        start_idx=idx,
+                                        end_idx=idx + 1,
+                                    )
+                                )
+                continue
+
             if not existing:
                 continue
 
@@ -622,21 +703,22 @@ class AutoCheckService:
             new_results = [r for r in new_results if r not in existing]
 
             if len(num_str) <= 1:
-                # 单数字：仅当自注音时替换
-                if not all(r.text == r.reading for r in existing):
-                    new_results.extend(existing)
-                    continue
+                # 单数字：始终用汉字字典音读（数字在日语中应读音读），
+                # 避免分析器在缺上下文时返回训读（如 ３→み 而非 さん）。
                 kanji = _arabic_to_kanji(num_str)
-                reading = self._analyzer.get_reading(kanji)
-                if reading and reading != kanji:
+                on_reading = self._get_digit_on_reading(kanji)
+                if on_reading and on_reading != kanji:
                     new_results.append(
                         RubyResult(
                             text=num_str,
-                            reading=reading,
+                            reading=on_reading,
                             start_idx=seq_start,
                             end_idx=seq_end,
                         )
                     )
+                elif existing:
+                    # 字典无音读，退回原结果
+                    new_results.extend(existing)
                 else:
                     new_results.append(
                         RubyResult(

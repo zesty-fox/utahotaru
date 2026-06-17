@@ -71,7 +71,10 @@ def _arabic_to_kanji(num_str: str) -> str:
         if remaining >= unit_val:
             count = remaining // unit_val
             if count > 1 or unit_val >= 10000 or unit_val == 1:
-                result.append(_kanji_digits[count])
+                if count < 10:
+                    result.append(_kanji_digits[count])
+                else:
+                    result.append(_arabic_to_kanji(str(count)))
             if unit_name:
                 result.append(unit_name)
             remaining %= unit_val
@@ -135,7 +138,10 @@ def _arabic_to_kanji_segments(
 
             start = len(result)
             if count > 1 or unit_val >= 10000 or unit_val == 1:
-                result.append(_kanji_digits[count])
+                if count < 10:
+                    result.append(_kanji_digits[count])
+                else:
+                    result.append(_arabic_to_kanji(str(count)))
             if unit_name:
                 result.append(unit_name)
             segments.append((start, len(result), orig_idx))
