@@ -7918,4 +7918,77 @@ KS 来源的配置将优先覆盖同名设置。</translation>
         <translation>未设置</translation>
     </message>
 </context>
+<context>
+    <name>UpdaterGUI</name>
+    <message>
+        <source>正在初始化…</source>
+        <translation>正在初始化…</translation>
+    </message>
+    <message>
+        <source>关闭</source>
+        <translation>关闭</translation>
+    </message>
+    <message>
+        <source>正在下载…</source>
+        <translation>正在下载…</translation>
+    </message>
+    <message>
+        <source>正在校验…</source>
+        <translation>正在校验…</translation>
+    </message>
+    <message>
+        <source>正在解压…</source>
+        <translation>正在解压…</translation>
+    </message>
+    <message>
+        <source>正在备份…</source>
+        <translation>正在备份…</translation>
+    </message>
+    <message>
+        <source>正在写入文件…</source>
+        <translation>正在写入文件…</translation>
+    </message>
+    <message>
+        <source>正在执行增量更新…</source>
+        <translation>正在执行增量更新…</translation>
+    </message>
+    <message>
+        <source>等待主程序退出…</source>
+        <translation>等待主程序退出…</translation>
+    </message>
+    <message>
+        <source>正在启动主程序…</source>
+        <translation>正在启动主程序…</translation>
+    </message>
+    <message>
+        <source>更新完成</source>
+        <translation>更新完成</translation>
+    </message>
+    <message>
+        <source>更新完成，即将关闭…</source>
+        <translation>更新完成，即将关闭…</translation>
+    </message>
+    <message>
+        <source>更新失败（退出码 {code}），请查看日志</source>
+        <translation>更新失败（退出码 {code}），请查看日志</translation>
+    </message>
+    <message>
+        <source>确认</source>
+        <translation>确认</translation>
+    </message>
+    <message>
+        <source>更新正在进行中，确定要关闭吗？
+强制关闭可能导致程序损坏。</source>
+        <translation>更新正在进行中，确定要关闭吗？
+强制关闭可能导致程序损坏。</translation>
+    </message>
+    <message>
+        <source>正在更新到 v{version}</source>
+        <translation>正在更新到 v{version}</translation>
+    </message>
+    <message>
+        <source>正在更新…</source>
+        <translation>正在更新…</translation>
+    </message>
+</context>
 </TS>

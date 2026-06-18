@@ -7917,4 +7917,77 @@ This usually means an incomplete install; please reinstall or contact the develo
         <translation>Not set</translation>
     </message>
 </context>
+<context>
+    <name>UpdaterGUI</name>
+    <message>
+        <source>正在初始化…</source>
+        <translation>Initializing…</translation>
+    </message>
+    <message>
+        <source>关闭</source>
+        <translation>Close</translation>
+    </message>
+    <message>
+        <source>正在下载…</source>
+        <translation>Downloading…</translation>
+    </message>
+    <message>
+        <source>正在校验…</source>
+        <translation>Verifying…</translation>
+    </message>
+    <message>
+        <source>正在解压…</source>
+        <translation>Extracting…</translation>
+    </message>
+    <message>
+        <source>正在备份…</source>
+        <translation>Backing up…</translation>
+    </message>
+    <message>
+        <source>正在写入文件…</source>
+        <translation>Writing files…</translation>
+    </message>
+    <message>
+        <source>正在执行增量更新…</source>
+        <translation>Applying incremental update…</translation>
+    </message>
+    <message>
+        <source>等待主程序退出…</source>
+        <translation>Waiting for app to exit…</translation>
+    </message>
+    <message>
+        <source>正在启动主程序…</source>
+        <translation>Launching app…</translation>
+    </message>
+    <message>
+        <source>更新完成</source>
+        <translation>Update complete</translation>
+    </message>
+    <message>
+        <source>更新完成，即将关闭…</source>
+        <translation>Update complete, closing soon…</translation>
+    </message>
+    <message>
+        <source>更新失败（退出码 {code}），请查看日志</source>
+        <translation>Update failed (exit code {code}), check the log</translation>
+    </message>
+    <message>
+        <source>确认</source>
+        <translation>Confirm</translation>
+    </message>
+    <message>
+        <source>更新正在进行中，确定要关闭吗？
+强制关闭可能导致程序损坏。</source>
+        <translation>Update is in progress. Close anyway?
+Force closing may corrupt the application.</translation>
+    </message>
+    <message>
+        <source>正在更新到 v{version}</source>
+        <translation>Updating to v{version}</translation>
+    </message>
+    <message>
+        <source>正在更新…</source>
+        <translation>Updating…</translation>
+    </message>
+</context>
 </TS>

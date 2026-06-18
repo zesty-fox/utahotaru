@@ -7919,4 +7919,77 @@ KS側の設定が優先されます。</translation>
         <translation>未設定</translation>
     </message>
 </context>
+<context>
+    <name>UpdaterGUI</name>
+    <message>
+        <source>正在初始化…</source>
+        <translation>初期化中…</translation>
+    </message>
+    <message>
+        <source>关闭</source>
+        <translation>閉じる</translation>
+    </message>
+    <message>
+        <source>正在下载…</source>
+        <translation>ダウンロード中…</translation>
+    </message>
+    <message>
+        <source>正在校验…</source>
+        <translation>検証中…</translation>
+    </message>
+    <message>
+        <source>正在解压…</source>
+        <translation>展開中…</translation>
+    </message>
+    <message>
+        <source>正在备份…</source>
+        <translation>バックアップ中…</translation>
+    </message>
+    <message>
+        <source>正在写入文件…</source>
+        <translation>ファイル書き込み中…</translation>
+    </message>
+    <message>
+        <source>正在执行增量更新…</source>
+        <translation>差分更新を適用中…</translation>
+    </message>
+    <message>
+        <source>等待主程序退出…</source>
+        <translation>アプリの終了を待機中…</translation>
+    </message>
+    <message>
+        <source>正在启动主程序…</source>
+        <translation>アプリを起動中…</translation>
+    </message>
+    <message>
+        <source>更新完成</source>
+        <translation>更新完了</translation>
+    </message>
+    <message>
+        <source>更新完成，即将关闭…</source>
+        <translation>更新完了、まもなく閉じます…</translation>
+    </message>
+    <message>
+        <source>更新失败（退出码 {code}），请查看日志</source>
+        <translation>更新失敗（終了コード {code}）、ログを確認してください</translation>
+    </message>
+    <message>
+        <source>确认</source>
+        <translation>確認</translation>
+    </message>
+    <message>
+        <source>更新正在进行中，确定要关闭吗？
+强制关闭可能导致程序损坏。</source>
+        <translation>更新が進行中です。閉じますか？
+強制終了するとアプリが破損する可能性があります。</translation>
+    </message>
+    <message>
+        <source>正在更新到 v{version}</source>
+        <translation>v{version} に更新中</translation>
+    </message>
+    <message>
+        <source>正在更新…</source>
+        <translation>更新中…</translation>
+    </message>
+</context>
 </TS>
