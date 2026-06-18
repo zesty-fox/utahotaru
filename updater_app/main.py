@@ -91,6 +91,8 @@ LOCAL_MANIFEST_FILENAME = ".installed_manifest.json"
 SUPPORTED_MANIFEST_SCHEMA = 1
 # Updater 自身的文件名；自更新时 rename 为 ``<name>.old``，下次启动时清理。
 UPDATER_EXE_NAME = "Updater.exe"
+# onedir 版 Updater（v1.2.3+ 与主程序共享 _internal）。
+UPDATER_EX_NAME = "UpdaterEx.exe"
 
 
 # ───────────────────────── 数据结构 ─────────────────────────
@@ -109,6 +111,7 @@ class Args:
     proxy_url: str
     sha256: str
     launch_after: bool
+    locale: str
 
 
 # ───────────────────────── 命令行解析 ─────────────────────────
@@ -141,6 +144,7 @@ def parse_args(argv: Optional[List[str]] = None) -> Args:
         action="store_false",
         default=True,
     )
+    p.add_argument("--locale", default="", type=str, help="UI 语言代号（如 ja_JP）")
     ns = p.parse_args(argv)
 
     urls: List[Tuple[str, str]] = []
@@ -164,6 +168,7 @@ def parse_args(argv: Optional[List[str]] = None) -> Args:
         proxy_url=str(ns.proxy_url or "").strip(),
         sha256=str(ns.sha256 or "").strip().lower(),
         launch_after=bool(ns.launch_after),
+        locale=str(ns.locale or "").strip(),
     )
 
 
@@ -216,6 +221,16 @@ def _cleanup_old_files(app_dir: Path, log: logging.Logger) -> None:
             log.info("已清理旧备份: %s", p.name)
         except OSError as e:
             log.warning("清理旧备份 %s 失败（可忽略）: %s", p.name, e)
+
+    # UpdaterEx.exe 存在时，旧的 Updater.exe 已被取代，可以安全删除
+    updater_ex = app_dir / UPDATER_EX_NAME
+    old_updater = app_dir / UPDATER_EXE_NAME
+    if updater_ex.exists() and old_updater.exists():
+        try:
+            old_updater.unlink()
+            log.info("已清理旧版 %s（已被 %s 取代）", UPDATER_EXE_NAME, UPDATER_EX_NAME)
+        except OSError as e:
+            log.warning("清理旧版 %s 失败（可忽略）: %s", UPDATER_EXE_NAME, e)
 
 
 def wait_for_pid_exit(pid: int, log: logging.Logger, timeout: float = WAIT_PID_TIMEOUT) -> bool:
@@ -665,22 +680,23 @@ def apply_update(
                 pass
             return False, f"备份 EXE 失败: {e}（主程序可能未完全退出）"
 
-    # 自更新 Updater.exe：rename 为 .old（Windows 允许 rename 运行中的 exe），
-    # 复制新的；下次启动时 _cleanup_old_files 会删除 .old。
-    new_updater = new_root / UPDATER_EXE_NAME
-    cur_updater = app_dir / UPDATER_EXE_NAME
-    if new_updater.exists():
-        if cur_updater.exists():
-            log.info("自更新: rename %s → %s.old", UPDATER_EXE_NAME, UPDATER_EXE_NAME)
+    # 自更新 Updater.exe / UpdaterEx.exe：rename 为 .old（Windows 允许
+    # rename 运行中的 exe），复制新的；下次启动时 _cleanup_old_files 会删除 .old。
+    for _uname in (UPDATER_EXE_NAME, UPDATER_EX_NAME):
+        new_updater = new_root / _uname
+        cur_updater = app_dir / _uname
+        if new_updater.exists():
+            if cur_updater.exists():
+                log.info("自更新: rename %s → %s.old", _uname, _uname)
+                try:
+                    os.rename(str(cur_updater), str(cur_updater.with_suffix(".exe.old")))
+                except OSError as e:
+                    log.warning("rename %s 失败（可能未在运行，忽略）: %s", _uname, e)
             try:
-                os.rename(str(cur_updater), str(cur_updater.with_suffix(".exe.old")))
+                shutil.copy2(str(new_updater), str(cur_updater))
+                log.info("已写入新 %s", _uname)
             except OSError as e:
-                log.warning("rename %s 失败（可能未在运行，忽略）: %s", UPDATER_EXE_NAME, e)
-        try:
-            shutil.copy2(str(new_updater), str(cur_updater))
-            log.info("已写入新 %s", UPDATER_EXE_NAME)
-        except OSError as e:
-            log.warning("写入新 %s 失败（不影响主程序更新）: %s", UPDATER_EXE_NAME, e)
+                log.warning("写入新 %s 失败（不影响主程序更新）: %s", _uname, e)
 
     # 写入新内容 —— 同样带重试
     log.info("写入新 %s/", internal_name)
@@ -963,20 +979,20 @@ def _apply_part(
             orig = app_dir / rel
             is_dir = new_src.is_dir()
 
-            # 自更新 Updater.exe：rename 为 .old 而非 .bak，下次启动时清理
-            if rel == UPDATER_EXE_NAME:
+            # 自更新 Updater.exe / UpdaterEx.exe：rename 为 .old 而非 .bak
+            if rel in (UPDATER_EXE_NAME, UPDATER_EX_NAME):
                 if orig.exists():
                     old_path = orig.with_suffix(".exe.old")
-                    log.info("[%s] 自更新: rename %s → %s.old", part_id, UPDATER_EXE_NAME, UPDATER_EXE_NAME)
+                    log.info("[%s] 自更新: rename %s → %s.old", part_id, rel, rel)
                     try:
                         os.rename(str(orig), str(old_path))
                     except OSError as e:
-                        log.warning("[%s] rename %s 失败（忽略）: %s", part_id, UPDATER_EXE_NAME, e)
+                        log.warning("[%s] rename %s 失败（忽略）: %s", part_id, rel, e)
                 try:
                     shutil.copy2(str(new_src), str(orig))
-                    log.info("[%s] 已写入新 %s", part_id, UPDATER_EXE_NAME)
+                    log.info("[%s] 已写入新 %s", part_id, rel)
                 except OSError as e:
-                    log.warning("[%s] 写入新 %s 失败（不影响主程序更新）: %s", part_id, UPDATER_EXE_NAME, e)
+                    log.warning("[%s] 写入新 %s 失败（不影响主程序更新）: %s", part_id, rel, e)
                 continue
 
             bak = app_dir / (rel + ".bak")
@@ -1135,11 +1151,18 @@ def run_incremental(
 # ───────────────────────── 主流程 ─────────────────────────
 
 
-def run(args: Args) -> int:
+def run(
+    args: Args,
+    *,
+    extra_log_handler: Optional[logging.Handler] = None,
+    gui_mode: bool = False,
+) -> int:
     work_dir = Path(tempfile.gettempdir()) / TMP_DIR_NAME
     work_dir.mkdir(parents=True, exist_ok=True)
 
     log = setup_logger(work_dir / "updater.log")
+    if extra_log_handler is not None:
+        log.addHandler(extra_log_handler)
     log.info("=" * 60)
     log.info("StrangeUtaGame Updater 启动")
     log.info("目标版本: v%s  (tag: %s)", args.target_version, args.target_tag)
@@ -1172,7 +1195,7 @@ def run(args: Args) -> int:
             if args.launch_after:
                 launch_main_app(args.app_dir, args.app_exe, log)
             log.info("更新完成 ✓（已是最新）")
-            if sys.platform == "win32":
+            if not gui_mode and sys.platform == "win32":
                 try:
                     print()
                     print("已是最新版本。窗口将在 3 秒后关闭。")
@@ -1187,7 +1210,7 @@ def run(args: Args) -> int:
             if args.launch_after:
                 launch_main_app(args.app_dir, args.app_exe, log)
             log.info("更新完成 ✓（增量路径）")
-            if sys.platform == "win32":
+            if not gui_mode and sys.platform == "win32":
                 try:
                     print()
                     print("更新完成。窗口将在 3 秒后关闭。")
@@ -1255,7 +1278,7 @@ def run(args: Args) -> int:
         pass
 
     log.info("更新完成 ✓（全量路径）")
-    if sys.platform == "win32":
+    if not gui_mode and sys.platform == "win32":
         try:
             print()
             print("更新完成。窗口将在 3 秒后关闭。")
@@ -1265,8 +1288,13 @@ def run(args: Args) -> int:
     return 0
 
 
+_gui_mode_active = False
+
+
 def _exit_with_pause(code: int) -> int:
-    """失败退出前在控制台停留，等待用户确认。"""
+    """失败退出前在控制台停留，等待用户确认。GUI 模式下直接返回。"""
+    if _gui_mode_active:
+        return code
     if sys.platform == "win32":
         try:
             print()
@@ -1287,12 +1315,33 @@ def main(argv: Optional[List[str]] = None) -> int:
         args = parse_args(argv)
     except SystemExit as e:
         return int(e.code) if isinstance(e.code, int) else 2
+
+    # PyQt6 可用时走 GUI 模式
+    try:
+        from gui import run_gui
+        global _gui_mode_active
+        _gui_mode_active = True
+        return run_gui(args, run)
+    except ImportError:
+        pass
+
     return run(args)
 
 
 def _fatal_pause(exc: BaseException) -> int:
-    """顶层未处理异常的兜底：把堆栈打到控制台并 ``pause``，让用户能看到。"""
+    """顶层未处理异常的兜底：把堆栈打到控制台/对话框，让用户能看到。"""
     import traceback
+
+    if _gui_mode_active:
+        try:
+            from PyQt6.QtWidgets import QApplication, QMessageBox
+            app = QApplication.instance() or QApplication(sys.argv[:1])
+            msg = "".join(traceback.format_exception(exc))
+            QMessageBox.critical(None, "Updater 致命错误", msg)
+        except Exception:
+            pass
+        return 99
+
     try:
         print()
         print("=" * 60)
@@ -1307,18 +1356,14 @@ def _fatal_pause(exc: BaseException) -> int:
         except EOFError:
             time.sleep(10)
     except Exception:
-        # 连 print 都失败说明 stdout 都没了 —— 静默退出
         pass
     return 99
 
 
 if __name__ == "__main__":
-    # 顶层全局 catch：即便 ``main()`` 漏抛了什么也至少让用户看见错误
-    # （PyInstaller bootloader 阶段的 import 错误 catch 不住，那由控制台
-    # 一闪而过显示；运行时所有错误本兜底都能接住）。
     try:
         sys.exit(main())
     except SystemExit:
         raise
-    except BaseException as _exc:  # noqa: BLE001 — 这里是最末端兜底
+    except BaseException as _exc:  # noqa: BLE001
         sys.exit(_fatal_pause(_exc))
