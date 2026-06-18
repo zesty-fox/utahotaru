@@ -1,0 +1,10 @@
+# StrangeUtaGame —— main 变体专属：WinRT IME 日语注音（Windows only）
+# 这些包仅在 Windows 上可用，noWinIME / mac 变体不安装。
+# 用法（main 变体）：
+#   pip install -r requirements.txt -r requirements-winrt.txt
+winrt-Windows.Globalization==3.2.1
+winrt-Windows.Foundation==3.2.1
+winrt-Windows.Foundation.Collections==3.2.1
+# winrt-Windows.* 的硬传递依赖（声明为 ~=3.2.1.0，会打进 main 变体 runtime）。
+# 显式锁定，避免 CI 解析到 3.2.1.x 补丁版导致 runtime 内容哈希漂移。
+winrt-runtime==3.2.1

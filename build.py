@@ -454,7 +454,7 @@ if sys.platform == "win32":
 # ── 复制 UpdaterEx.exe（仅 Windows） ──────────────────────────────────────────
 
 if sys.platform == "win32":
-    _updater_src = PROJECT_ROOT / "updater_app" / "dist" / "UpdaterEx.exe"
+    _updater_src = PROJECT_ROOT / "updater_app" / "dist" / "UpdaterEx" / "UpdaterEx.exe"
     _updater_dst_dir = PROJECT_ROOT / "dist" / APP_NAME
     _updater_dst = _updater_dst_dir / "UpdaterEx.exe"
     if _updater_dst_dir.exists():
@@ -467,7 +467,7 @@ if sys.platform == "win32":
                 print(f"✗ 复制 UpdaterEx.exe 失败: {_e}")
         else:
             print(
-                "✗ 未找到 updater_app/dist/UpdaterEx.exe。\n"
+                "✗ 未找到 updater_app/dist/UpdaterEx/UpdaterEx.exe。\n"
                 "  自动更新功能不可用。请先运行:\n"
                 "    python updater_app/build_updater.py\n"
                 "  再重新打包主程序。"

@@ -67,7 +67,7 @@ ROOT = Path(__file__).resolve().parent.parent
 VERSION_FILE = ROOT / "src" / "strange_uta_game" / "__version__.py"
 CHANGELOG = ROOT / "CHANGELOG.md"
 UPDATER_BUILD = ROOT / "updater_app" / "build_updater.py"
-UPDATER_EXE = ROOT / "updater_app" / "dist" / "UpdaterEx.exe"
+UPDATER_EXE = ROOT / "updater_app" / "dist" / "UpdaterEx" / "UpdaterEx.exe"
 MAIN_BUILD = ROOT / "build.py"
 MAIN_DIST = ROOT / "dist" / "StrangeUtaGame"
 RELEASE_DIST = ROOT / "dist"
@@ -77,6 +77,8 @@ RUNTIME_HASH_CACHE = ROOT / "scripts" / ".runtime-hash-cache.json"
 RUNTIME_LATEST_ZIP = ROOT / "dist" / "runtime-latest.zip"
 # 只哈希这个文件来判断 runtime 是否需要重建（版本锁定文件，不含开发工具的部分）。
 REQUIREMENTS_FILE = ROOT / "requirements.txt"
+# main 变体专属的 WinRT 依赖（Windows only）。只有 main 变体才将其纳入 runtime 哈希。
+REQUIREMENTS_WINRT_FILE = ROOT / "requirements-winrt.txt"
 # 不参与 pip freeze hash 计算的包名前缀列表（纯开发工具，不会进入打包产物）。
 # 每行一个前缀（不区分大小写），以 # 开头的行视为注释。随 git 提交。
 RUNTIME_FREEZE_EXCLUDE = ROOT / "scripts" / ".runtime-freeze-exclude.txt"
@@ -522,8 +524,11 @@ def _pkg_name_normalize(raw: str) -> str:
     return raw.strip().split("==")[0].split(" @ ")[0].lower().replace("_", "-")
 
 
-def _requirements_runtime_lines() -> List[str]:
-    """读取 requirements.txt，返回属于运行时依赖的锁定行（排除开发工具）。"""
+def _requirements_runtime_lines(variant: str = "") -> List[str]:
+    """读取 requirements.txt，返回属于运行时依赖的锁定行（排除开发工具）。
+
+    variant 为 ``""`` 或 ``"main"`` 时，同时纳入 requirements-winrt.txt。
+    """
     if not REQUIREMENTS_FILE.exists():
         return []
     excludes = _load_freeze_excludes()
@@ -536,12 +541,19 @@ def _requirements_runtime_lines() -> List[str]:
         if any(pkg == ex or pkg.startswith(ex + "-") for ex in excludes):
             continue
         result.append(line)
+    # main 变体须将 WinRT 包也纳入运行时依赖（会影响 runtime 内容哈希与重建判定）
+    if variant in ("", "main") and REQUIREMENTS_WINRT_FILE.exists():
+        for raw in REQUIREMENTS_WINRT_FILE.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            result.append(line)
     return result
 
 
-def _requirements_hash() -> str:
+def _requirements_hash(variant: str = "") -> str:
     """对 requirements.txt 的运行时行取 SHA-256。"""
-    lines = _requirements_runtime_lines()
+    lines = _requirements_runtime_lines(variant)
     if not lines:
         return ""
     text = "\n".join(sorted(lines))
@@ -777,8 +789,8 @@ def _pack_parts(
 
     if not reused and not rebuild_runtime:
         cache = _load_runtime_cache(cache_path)
-        current_req_lines = _requirements_runtime_lines()
-        current_req_hash = _requirements_hash()
+        current_req_lines = _requirements_runtime_lines(vcfg.variant)
+        current_req_hash = _requirements_hash(vcfg.variant)
 
         cached_dist_pkgs: Dict[str, str] = (cache or {}).get("dist_packages", {})
         current_dist_pkgs: Dict[str, str] = _scan_dist_packages(dist_root)
@@ -865,8 +877,8 @@ def _pack_parts(
         print(f"  ✓ {runtime_zip.name}  ({runtime_zip.stat().st_size / 1024 / 1024:.1f} MB)")
         _write_sha256(runtime_zip)
         content_hash = _content_hash_of_zip(runtime_zip)
-        req_hash = _requirements_hash()
-        req_lines = _requirements_runtime_lines()
+        req_hash = _requirements_hash(vcfg.variant)
+        req_lines = _requirements_runtime_lines(vcfg.variant)
         new_dist_pkgs = _scan_dist_packages(dist_root)
         if new_dist_pkgs:
             pkg_list = ", ".join(f"{k}=={v}" for k, v in sorted(new_dist_pkgs.items()))

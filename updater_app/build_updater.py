@@ -1,7 +1,9 @@
-"""打包 ``UpdaterEx.exe`` —— 独立的 GUI 更新器可执行文件。
+"""打包 ``UpdaterEx/UpdaterEx.exe`` —— 独立的 GUI 更新器（PyInstaller --onedir 产物）。
 
-输出位置：``<repo>/updater_app/dist/UpdaterEx.exe``（PyInstaller --onefile 产物）。
-在 ``build.py`` 中会进一步复制到主程序 ``dist/StrangeUtaGame/``。
+输出位置：``<repo>/updater_app/dist/UpdaterEx/UpdaterEx.exe``。
+``UpdaterEx/`` 同目录的 ``_internal/`` 仅用于构建，不复制到主程序。
+主程序 ``dist/StrangeUtaGame/`` 已有自身的 ``_internal/``，UpdaterEx.exe 直接复用。
+在 ``build.py`` 中仅复制 UpdaterEx.exe 单文件到主程序目录。
 
 使用：
 
@@ -11,8 +13,9 @@
 
 设计权衡：
 
-* ``--onefile`` —— Updater 是一次性流程，体积比启动速度更重要；onefile 让最终
-  发布产物里只多出一个 ``UpdaterEx.exe``，不需要额外子目录。
+* ``--onedir`` —— 产出一个独立目录，但仅其中的 UpdaterEx.exe 单文件被复制到主程序。
+  UpdaterEx.exe 运行时通过同级 ``_internal/``（主程序的）加载 PyQt6 等依赖，
+  避免在 UpdaterEx 内部重复打包。
 * ``--windowed`` —— GUI 模式（PyQt6 窗口），不弹出控制台窗口。
 * 引入 PyQt6 用于 GUI 显示进度条和日志窗口；PyQt6 不可用时自动回退到控制台。
 * 命名为 ``UpdaterEx.exe`` 而非 ``Updater.exe``，使旧版 installer.py（≤v1.2.1）
@@ -68,7 +71,7 @@ def main() -> int:
     args = [
         str(PROJECT_ROOT / "main.py"),
         "--name=UpdaterEx",
-        "--onefile",
+        "--onedir",
         "--windowed",         # GUI 模式，不弹控制台窗口
         "--noconfirm",
         "--distpath", str(PROJECT_ROOT / "dist"),
@@ -130,12 +133,12 @@ def main() -> int:
     print("开始打包 UpdaterEx.exe ...")
     pi_main.run(args)
     print()
-    exe = PROJECT_ROOT / "dist" / "UpdaterEx.exe"
+    exe = PROJECT_ROOT / "dist" / "UpdaterEx" / "UpdaterEx.exe"
     if exe.exists():
         print(f"✓ 打包完成: {exe}")
         print(f"  体积: {exe.stat().st_size / 1024 / 1024:.1f} MB")
     else:
-        print("! 未在 dist/UpdaterEx.exe 找到产物，请检查 PyInstaller 输出。")
+        print("! 未在 dist/UpdaterEx/UpdaterEx.exe 找到产物，请检查 PyInstaller 输出。")
     return 0
 
 

@@ -83,7 +83,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          if [ "${{ matrix.variant }}" != "main" ]; then
+          if [ "${{ matrix.variant }}" = "main" ]; then
+            pip install -r requirements-winrt.txt
+          else
             pip install -r requirements-variants.txt
           fi
 
@@ -265,12 +267,16 @@ jobs:
 
       - name: Apply & commit runtime baseline
         run: |
+          mkdir -p scripts
           shopt -s nullglob dotglob
-          files=(_cache/scripts/.runtime-hash-cache*.json)
+          while IFS= read -r -d '' f; do
+            cp "$f" scripts/
+          done < <(find _cache -name '.runtime-hash-cache*.json' -type f -print0)
+          shopt -u nullglob
+          files=(scripts/.runtime-hash-cache*.json)
           if [ ${#files[@]} -eq 0 ]; then
             echo "没有缓存产物（可能各变体均失败），跳过回写"; exit 0
           fi
-          cp _cache/scripts/.runtime-hash-cache*.json scripts/
           if git diff --quiet -- scripts/.runtime-hash-cache*.json; then
             echo "runtime 基线无变化，跳过提交"; exit 0
           fi
