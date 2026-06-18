@@ -34,11 +34,16 @@ _BASS_ROOT = Path(__file__).resolve().parent.parent.parent.parent / "bass"
 _IS_64BIT = ctypes.sizeof(ctypes.c_void_p) == 8
 _BASS_DIR = _BASS_ROOT / "x64" if _IS_64BIT and (_BASS_ROOT / "x64").exists() else _BASS_ROOT
 
-if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
-    os.add_dll_directory(str(_BASS_DIR))
-
-_bass = ctypes.CDLL(str(_BASS_DIR / "bass.dll"))
-_bass_fx = ctypes.CDLL(str(_BASS_DIR / "bass_fx.dll"))
+if sys.platform == "win32":
+    if hasattr(os, "add_dll_directory"):
+        os.add_dll_directory(str(_BASS_DIR))
+    _bass = ctypes.CDLL(str(_BASS_DIR / "bass.dll"))
+    _bass_fx = ctypes.CDLL(str(_BASS_DIR / "bass_fx.dll"))
+else:
+    class _DummyCDLL:
+        pass
+    _bass = _DummyCDLL()
+    _bass_fx = _DummyCDLL()
 
 # ═══════════════════════════════════════════════════════════════════
 # BASS constants (from bass.h / bass_fx.h)

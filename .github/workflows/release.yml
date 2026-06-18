@@ -39,10 +39,11 @@ jobs:
         include:
           - { variant: main,     os: windows-latest, cache: '.runtime-hash-cache.json' }
           - { variant: noWinIME, os: windows-latest, cache: '.runtime-hash-cache-noWinIME.json' }
-          - { variant: mac,      os: macos-latest,   cache: '.runtime-hash-cache-mac.json' }
+          # mac 变体暂不构建：无 BASS 音频引擎 / 无更新器 / 多项功能缺失。待补齐后取消注释。
+          # - { variant: mac,      os: macos-latest,   cache: '.runtime-hash-cache-mac.json' }
     runs-on: ${{ matrix.os }}
-    # mac 从未在 CI 构建过，允许失败而不阻断 Windows 两个变体的发布。
-    continue-on-error: ${{ matrix.variant == 'mac' }}
+    # 未启用 mac 变体，所有变体均不可失败。
+    continue-on-error: false
     defaults:
       run:
         shell: bash
