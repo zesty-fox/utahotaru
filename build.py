@@ -283,8 +283,13 @@ args = [
     "--collect-all=pykakasi",
     "--collect-all=qfluentwidgets",
     "--collect-binaries=soundfile",
-    "--icon=src/strange_uta_game/resource/icon.ico",
 ]
+
+# macOS 需要 .icns 格式，Windows 用 .ico
+if sys.platform == "darwin":
+    args.append("--icon=src/strange_uta_game/resource/icon.icns")
+else:
+    args.append("--icon=src/strange_uta_game/resource/icon.ico")
 
 # ── 公共排除：清掉会被污染环境（如 Anaconda base）误收集、但本项目根本不用的包 ──
 # cryptography 会带进 libcrypto/libssl 共约 10MB，但本项目用不到它：
