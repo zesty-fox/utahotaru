@@ -67,7 +67,7 @@ ROOT = Path(__file__).resolve().parent.parent
 VERSION_FILE = ROOT / "src" / "strange_uta_game" / "__version__.py"
 CHANGELOG = ROOT / "CHANGELOG.md"
 UPDATER_BUILD = ROOT / "updater_app" / "build_updater.py"
-UPDATER_EXE = ROOT / "updater_app" / "dist" / "Updater.exe"
+UPDATER_EXE = ROOT / "updater_app" / "dist" / "UpdaterEx.exe"
 MAIN_BUILD = ROOT / "build.py"
 MAIN_DIST = ROOT / "dist" / "StrangeUtaGame"
 RELEASE_DIST = ROOT / "dist"
@@ -134,7 +134,7 @@ class VariantConfig:
     runtime_hash_cache: Path
     # dist/runtime-latest[-variant].zip
     runtime_latest_zip: Path
-    # 是否包含 Updater.exe（mac 不含）
+    # 是否包含 UpdaterEx.exe（mac 不含）
     has_updater_exe: bool
 
     @classmethod
@@ -179,7 +179,7 @@ class VariantConfig:
         exe = f"{self.app_name}.exe" if sys.platform == "win32" else self.app_name
         targets.append(exe)
         if self.has_updater_exe and sys.platform == "win32":
-            targets.append("Updater.exe")
+            targets.append("UpdaterEx.exe")
         targets.append("_internal/strange_uta_game")
         return targets
 
@@ -340,17 +340,17 @@ def _updater_sources_max_mtime() -> float:
 
 
 def _ensure_updater_exe(force: bool = False, clean: bool = False) -> None:
-    """确保 ``Updater.exe`` 存在且不落后于源代码。
+    """确保 ``UpdaterEx.exe`` 存在且不落后于源代码。
 
-    mac 变体不含 Updater.exe，调用前应由 vcfg.has_updater_exe 判断是否跳过。
+    mac 变体不含 UpdaterEx.exe，调用前应由 vcfg.has_updater_exe 判断是否跳过。
     """
     if force:
-        print("  ! --rebuild-updater 强制重打 Updater.exe …")
+        print("  ! --rebuild-updater 强制重打 UpdaterEx.exe …")
         _do_rebuild_updater(clean=clean)
         return
 
     if not UPDATER_EXE.exists():
-        print("  ! 未发现 updater_app/dist/Updater.exe，开始构建 …")
+        print("  ! 未发现 updater_app/dist/UpdaterEx.exe，开始构建 …")
         _do_rebuild_updater(clean=clean)
         return
 
@@ -361,23 +361,23 @@ def _ensure_updater_exe(force: bool = False, clean: bool = False) -> None:
         exe_dt = _dt.datetime.fromtimestamp(exe_mtime).strftime("%Y-%m-%d %H:%M:%S")
         src_dt = _dt.datetime.fromtimestamp(src_mtime).strftime("%Y-%m-%d %H:%M:%S")
         print(
-            f"  ! Updater.exe 已过期（exe mtime={exe_dt}, 源码 mtime={src_dt}），"
-            f"重新打包 Updater.exe …"
+            f"  ! UpdaterEx.exe 已过期（exe mtime={exe_dt}, 源码 mtime={src_dt}），"
+            f"重新打包 UpdaterEx.exe …"
         )
         _do_rebuild_updater(clean=clean)
         return
 
     size_mb = UPDATER_EXE.stat().st_size / 1024 / 1024
-    print(f"  ✓ 已存在 Updater.exe，源码未更新（{size_mb:.1f} MB）")
+    print(f"  ✓ 已存在 UpdaterEx.exe，源码未更新（{size_mb:.1f} MB）")
 
 
 def _do_rebuild_updater(clean: bool = False) -> None:
     extra = ["--clean"] if clean else []
     rc = _run_python(UPDATER_BUILD, extra)
     if rc != 0:
-        raise SystemExit(f"构建 Updater 失败，退出码 {rc}")
+        raise SystemExit(f"构建 UpdaterEx 失败，退出码 {rc}")
     if not UPDATER_EXE.exists():
-        raise SystemExit("构建似乎完成，但未在 updater_app/dist 下找到 Updater.exe")
+        raise SystemExit("构建似乎完成，但未在 updater_app/dist 下找到 UpdaterEx.exe")
 
 
 def _verify_release_assets(version: str, vcfg: VariantConfig, full_zip: Path) -> None:
@@ -403,9 +403,9 @@ def _verify_release_assets(version: str, vcfg: VariantConfig, full_zip: Path) ->
     if not installed_manifest.exists():
         missing.append(str(installed_manifest.relative_to(ROOT)))
 
-    # Updater.exe（仅 Windows 变体）
+    # UpdaterEx.exe（仅 Windows 变体）
     if vcfg.has_updater_exe and sys.platform == "win32":
-        updater_in_dist = dist_root / "Updater.exe"
+        updater_in_dist = dist_root / "UpdaterEx.exe"
         if not updater_in_dist.exists():
             missing.append(str(updater_in_dist.relative_to(ROOT)))
 
@@ -431,8 +431,8 @@ def _verify_release_assets(version: str, vcfg: VariantConfig, full_zip: Path) ->
         print(f"      • {rel}  ({size_mb:.2f} MB)")
     print(f"      • {installed_manifest.relative_to(ROOT)}  (出厂本地清单)")
     if vcfg.has_updater_exe and sys.platform == "win32":
-        updater_in_dist = dist_root / "Updater.exe"
-        print(f"      • {updater_in_dist.relative_to(ROOT)}  (Updater.exe 已就位)")
+        updater_in_dist = dist_root / "UpdaterEx.exe"
+        print(f"      • {updater_in_dist.relative_to(ROOT)}  (UpdaterEx.exe 已就位)")
     n_updater_files = len(list(updater_pkg.iterdir()))
     print(f"      • {updater_pkg.relative_to(ROOT)}/  (updater 子包，{n_updater_files} 文件)")
 
@@ -667,6 +667,7 @@ def _save_runtime_cache(
 
 # 注意：以下字面量需与 updater_app/main.py 中的同名常量保持同步：
 #   UPDATER_EXE_NAME          = "Updater.exe"
+#   UPDATER_EX_NAME           = "UpdaterEx.exe"
 #   LOCAL_MANIFEST_FILENAME   = ".installed_manifest.json"
 INTERNAL_NON_RUNTIME_NAMES = {
     "strange_uta_game",
@@ -964,11 +965,11 @@ def cmd_build(
     version = _read_version()
     print(f"== build for v{version}  variant={vcfg.label()} ==")
 
-    # 1. Updater.exe（仅 Windows 变体）
+    # 1. UpdaterEx.exe（仅 Windows 变体）
     if vcfg.has_updater_exe and sys.platform == "win32":
         _ensure_updater_exe(force=rebuild_updater, clean=clean)
     else:
-        print(f"  ✓ 跳过 Updater.exe 构建（variant={vcfg.label()}，当前平台={sys.platform}）")
+        print(f"  ✓ 跳过 UpdaterEx.exe 构建（variant={vcfg.label()}，当前平台={sys.platform}）")
 
     # 2. 主程序
     _run_main_build(clean=clean, variant=vcfg.variant)
@@ -1085,7 +1086,7 @@ def main(argv: Optional[list] = None) -> int:
     sp_build.add_argument(
         "--rebuild-updater",
         action="store_true",
-        help="强制重新打包 Updater.exe，即便源码 mtime 未变",
+        help="强制重新打包 UpdaterEx.exe，即便源码 mtime 未变",
     )
     sp_build.add_argument(
         "--clean",

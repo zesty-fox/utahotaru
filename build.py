@@ -348,29 +348,29 @@ if sys.platform == "win32":
         except Exception as _e:
             print(f"! 生成 ARM64 PortAudio DLL 失败: {_e}")
 
-# ── 复制 Updater.exe（仅 Windows） ───────────────────────────────────────────
+# ── 复制 UpdaterEx.exe（仅 Windows） ──────────────────────────────────────────
 
 if sys.platform == "win32":
-    _updater_src = PROJECT_ROOT / "updater_app" / "dist" / "Updater.exe"
+    _updater_src = PROJECT_ROOT / "updater_app" / "dist" / "UpdaterEx.exe"
     _updater_dst_dir = PROJECT_ROOT / "dist" / APP_NAME
-    _updater_dst = _updater_dst_dir / "Updater.exe"
+    _updater_dst = _updater_dst_dir / "UpdaterEx.exe"
     if _updater_dst_dir.exists():
         if _updater_src.exists():
             try:
                 import shutil as _shutil
                 _shutil.copy2(str(_updater_src), str(_updater_dst))
-                print(f"✓ 已复制 Updater.exe → {_updater_dst}")
+                print(f"✓ 已复制 UpdaterEx.exe → {_updater_dst}")
             except Exception as _e:
-                print(f"✗ 复制 Updater.exe 失败: {_e}")
+                print(f"✗ 复制 UpdaterEx.exe 失败: {_e}")
         else:
             print(
-                "✗ 未找到 updater_app/dist/Updater.exe。\n"
+                "✗ 未找到 updater_app/dist/UpdaterEx.exe。\n"
                 "  自动更新功能不可用。请先运行:\n"
                 "    python updater_app/build_updater.py\n"
                 "  再重新打包主程序。"
             )
     else:
-        print("! dist/{APP_NAME}/ 目录不存在，跳过 Updater.exe 复制")
+        print("! dist/{APP_NAME}/ 目录不存在，跳过 UpdaterEx.exe 复制")
 
 # ── 验证 updater 子包 ─────────────────────────────────────────────────────────
 

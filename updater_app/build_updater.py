@@ -1,8 +1,7 @@
-"""打包 ``Updater.exe`` —— 独立的小型可执行文件。
+"""打包 ``UpdaterEx.exe`` —— 独立的 GUI 更新器可执行文件。
 
-输出位置：``<repo>/updater_app/dist/Updater/Updater.exe`` 与
-``<repo>/updater_app/dist/Updater.exe`` 等 PyInstaller 默认产物。
-在 ``build.py`` 中会进一步把 ``Updater.exe`` 复制到主程序 ``dist/StrangeUtaGame/``。
+输出位置：``<repo>/updater_app/dist/UpdaterEx.exe``（PyInstaller --onefile 产物）。
+在 ``build.py`` 中会进一步复制到主程序 ``dist/StrangeUtaGame/``。
 
 使用：
 
@@ -13,9 +12,11 @@
 设计权衡：
 
 * ``--onefile`` —— Updater 是一次性流程，体积比启动速度更重要；onefile 让最终
-  发布产物里只多出一个 ``Updater.exe``，不需要额外子目录。
+  发布产物里只多出一个 ``UpdaterEx.exe``，不需要额外子目录。
 * ``--windowed`` —— GUI 模式（PyQt6 窗口），不弹出控制台窗口。
 * 引入 PyQt6 用于 GUI 显示进度条和日志窗口；PyQt6 不可用时自动回退到控制台。
+* 命名为 ``UpdaterEx.exe`` 而非 ``Updater.exe``，使旧版 installer.py（≤v1.2.1）
+  无法识别它，安全回退到磁盘上已有的旧 ``Updater.exe``。
 """
 
 from __future__ import annotations
@@ -49,7 +50,7 @@ REPO_ROOT = PROJECT_ROOT.parent
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="打包 Updater.exe")
+    ap = argparse.ArgumentParser(description="打包 UpdaterEx.exe")
     ap.add_argument(
         "--clean",
         action="store_true",
@@ -66,7 +67,7 @@ def main() -> int:
 
     args = [
         str(PROJECT_ROOT / "main.py"),
-        "--name=Updater",
+        "--name=UpdaterEx",
         "--onefile",
         "--windowed",         # GUI 模式，不弹控制台窗口
         "--noconfirm",
@@ -126,15 +127,15 @@ def main() -> int:
         args.append("--clean")
 
     import PyInstaller.__main__ as pi_main
-    print("开始打包 Updater.exe ...")
+    print("开始打包 UpdaterEx.exe ...")
     pi_main.run(args)
     print()
-    exe = PROJECT_ROOT / "dist" / "Updater.exe"
+    exe = PROJECT_ROOT / "dist" / "UpdaterEx.exe"
     if exe.exists():
         print(f"✓ 打包完成: {exe}")
         print(f"  体积: {exe.stat().st_size / 1024 / 1024:.1f} MB")
     else:
-        print("! 未在 dist/Updater.exe 找到产物，请检查 PyInstaller 输出。")
+        print("! 未在 dist/UpdaterEx.exe 找到产物，请检查 PyInstaller 输出。")
     return 0
 
 
