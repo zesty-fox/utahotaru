@@ -1,8 +1,8 @@
 {
-  "version": "1.2.1",
-  "content_hash": "f1e812be030d1dc0c37f54bd3bf4dc87a1f81044c9436e15b12e52397e666c8e",
-  "size": 121705737,
-  "requirements_hash": "38bd9adfccbba9ba77805f3bc80ed072d258d4549fecf53ffc739dd75f294aa5",
+  "version": "1.2.2",
+  "content_hash": "82b8f0bb09645a3ff624d930550847bdb9fb5a74c2b0130e8aef0b59ff9d5a29",
+  "size": 99406192,
+  "requirements_hash": "cd18b9734dc05d51fad1634c17638f6659978acb901770f5bd6946bec34f3d52",
   "req_lines": [
     "PyQt6==6.11.0",
     "PyQt6-Qt6==6.11.0",
@@ -13,9 +13,6 @@
     "pedalboard==0.9.22",
     "numpy==2.4.4",
     "pykakasi==2.3.0",
-    "winrt-Windows.Globalization==3.2.1",
-    "winrt-Windows.Foundation==3.2.1",
-    "winrt-Windows.Foundation.Collections==3.2.1",
     "jaconv==0.5.0",
     "pyphen==0.17.2",
     "requests==2.32.5",
@@ -25,12 +22,10 @@
     "idna==3.11"
   ],
   "dist_packages": {
-    "cryptography": "46.0.3",
     "numpy": "2.4.4",
     "pedalboard": "0.9.22",
     "pykakasi": "2.3.0",
     "pyqt6-fluent-widgets": "1.11.2",
-    "pyreadline3": "3.5.4",
     "sounddevice": "0.5.5",
     "soundfile": "0.13.1",
     "sudachipy": "0.6.11"
