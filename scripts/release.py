@@ -712,6 +712,7 @@ def _pack_parts(
     vcfg: VariantConfig,
     rebuild_runtime: bool = False,
     reuse_runtime: bool = False,
+    require_reuse: bool = False,
 ) -> Tuple[Path, Path, List[str], List[str]]:
     """打 app + runtime 两个 part zip 并生成各自 .sha256 文件。
 
@@ -721,6 +722,13 @@ def _pack_parts(
     * ``reuse_runtime=True``   无条件复用上次 runtime zip
     * ``rebuild_runtime=True`` 无条件重新打包
     * 两者均 False（默认）     自动比对 dist-info / requirements.txt hash
+
+    ``require_reuse=True`` 时，如果"依赖未变但找不到可复用的 runtime zip"——也就是
+    本应复用却不得不重新打包——直接报错退出，而不是静默重打。这是给 CI（GitHub
+    Actions）用的安全闸：CI 在干净环境里重打 runtime 会算出与历史不同的内容哈希，
+    令所有老用户被迫重新全量下载 runtime，使增量更新彻底失效。CI 应在 build 之前
+    把上一版的 ``*-runtime.zip`` 放到 dist/ 作为复用基准；放好了这里就能复用，没放
+    成（首次发布/依赖确实变了）则不应带此 flag。
     """
     dist_root = vcfg.dist_dir
     cache_path = vcfg.runtime_hash_cache
@@ -831,6 +839,17 @@ def _pack_parts(
             else:
                 reason_no_zip = "content_hash 缺失" if not prev_hash else "runtime-latest.zip 不存在"
                 print(f"  ! {dep_reason}，但缓存 zip 不可用（{reason_no_zip}），重新打包 runtime")
+                if require_reuse:
+                    raise SystemExit(
+                        "✗ --require-runtime-reuse：依赖未变（dist-info 与缓存一致），"
+                        f"本应复用上一版 runtime，却找不到可复用的 zip（{reason_no_zip}）。\n"
+                        "  在 CI 中这通常意味着没把上一版的 "
+                        f"{vcfg.asset_zip('<prev>', 'runtime').name} 下载到 dist/ 作为复用基准。\n"
+                        "  若重打 runtime，其内容哈希会与历史不同，导致所有老用户被迫"
+                        "重新全量下载 runtime（增量更新失效）。\n"
+                        "  修复：在 build 前把上一版的 *-runtime.zip 放到 dist/；"
+                        "若依赖确实变了或这是首次发布，请去掉 --require-runtime-reuse。"
+                    )
         else:
             print(f"  {dep_reason}，重新打包 runtime")
             if dep_diff:
@@ -960,6 +979,7 @@ def cmd_build(
     rebuild_runtime: bool = False,
     reuse_runtime: bool = False,
     variant: str = "",
+    require_reuse: bool = False,
 ) -> int:
     vcfg = VariantConfig.for_variant(variant)
     version = _read_version()
@@ -982,7 +1002,8 @@ def cmd_build(
     print()
     print("[step] 打增量分包 part zip ...")
     app_zip, runtime_zip, app_targets, runtime_targets = _pack_parts(
-        version, vcfg, rebuild_runtime=rebuild_runtime, reuse_runtime=reuse_runtime
+        version, vcfg, rebuild_runtime=rebuild_runtime, reuse_runtime=reuse_runtime,
+        require_reuse=require_reuse,
     )
 
     print()
@@ -1043,6 +1064,7 @@ def cmd_all(
     rebuild_runtime: bool = False,
     reuse_runtime: bool = False,
     variant: str = "",
+    require_reuse: bool = False,
 ) -> int:
     rc = cmd_prepare(version)
     if rc != 0:
@@ -1056,7 +1078,7 @@ def cmd_all(
     return cmd_build(
         rebuild_updater=rebuild_updater, clean=clean,
         rebuild_runtime=rebuild_runtime, reuse_runtime=reuse_runtime,
-        variant=variant,
+        variant=variant, require_reuse=require_reuse,
     )
 
 
@@ -1103,6 +1125,14 @@ def main(argv: Optional[list] = None) -> int:
         action="store_true",
         help="无条件复用上次打包的 runtime zip，跳过 hash 检查",
     )
+    sp_build.add_argument(
+        "--require-runtime-reuse",
+        action="store_true",
+        help=(
+            "依赖未变却找不到可复用的 runtime zip 时直接报错退出（而非静默重打）。"
+            "供 CI 使用：防止干净环境重打 runtime 算出新哈希、令老用户被迫全量重下。"
+        ),
+    )
 
     sp_all = sub.add_parser("all", help="prepare + build")
     sp_all.add_argument("version", help="目标版本号 X.Y.Z")
@@ -1116,6 +1146,7 @@ def main(argv: Optional[list] = None) -> int:
     sp_all.add_argument("--clean", action="store_true")
     sp_all.add_argument("--rebuild-runtime", action="store_true")
     sp_all.add_argument("--reuse-runtime", action="store_true")
+    sp_all.add_argument("--require-runtime-reuse", action="store_true")
 
     args = p.parse_args(argv)
     if args.cmd == "prepare":
@@ -1129,6 +1160,7 @@ def main(argv: Optional[list] = None) -> int:
             rebuild_runtime=args.rebuild_runtime,
             reuse_runtime=args.reuse_runtime,
             variant=args.variant,
+            require_reuse=args.require_runtime_reuse,
         )
     if args.cmd == "all":
         return cmd_all(
@@ -1138,6 +1170,7 @@ def main(argv: Optional[list] = None) -> int:
             rebuild_runtime=args.rebuild_runtime,
             reuse_runtime=args.reuse_runtime,
             variant=args.variant,
+            require_reuse=args.require_runtime_reuse,
         )
     p.print_help()
     return 1

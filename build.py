@@ -286,6 +286,63 @@ args = [
     "--icon=src/strange_uta_game/resource/icon.ico",
 ]
 
+# ── 公共排除：清掉会被污染环境（如 Anaconda base）误收集、但本项目根本不用的包 ──
+# cryptography 会带进 libcrypto/libssl 共约 10MB，但本项目用不到它：
+# requests→urllib3 默认走标准库 ssl，不需要 cryptography / pyOpenSSL。
+# pyreadline3 / humanfriendly 同理是环境附带。把它们显式排除，保证无论在哪台机器
+# （污染的开发环境 or 干净的 CI）打包，runtime 内容都一致、可复现，增量更新才稳。
+_COMMON_EXCLUDES = [
+    "--exclude-module=cryptography",
+    "--exclude-module=OpenSSL",        # pyOpenSSL 的 import 名
+    "--exclude-module=pyreadline3",
+    "--exclude-module=humanfriendly",
+]
+args.extend(_COMMON_EXCLUDES)
+
+# ── 公共排除：用不到的 Qt6 模块 ──────────────────────────────────────────────
+# 经核查（src/ + updater_app/ 与 qfluentwidgets 全包 import 扫描），本项目实际只用到
+#   QtCore / QtGui / QtWidgets / QtSvg / QtXml
+# 其中 **QtSvg 与 QtXml 必须保留** —— qfluentwidgets 用 QtXml.QDomDocument 解析 SVG、
+# 用 QtSvg 渲染图标，排掉会让所有 Fluent 图标失效。
+#
+# QtMultimedia / QtMultimediaWidgets 仅被 qfluentwidgets.multimedia 子模块引用，而
+# qfluentwidgets.__init__ 不会 eager 导入它，本项目也没有任何媒体/视频组件，运行时
+# 不会加载 —— 排掉可省下 Qt6Multimedia.dll + 一整套 FFmpeg（avcodec/avformat/avutil/
+# swscale ≈ 20MB）。QtNetwork 同样无人引用（requests 走标准库，不用 Qt 网络）。
+# 其余模块在本项目里完全没人 import，一并排除以防未来环境误收集而悄悄变大。
+_QT_EXCLUDES = [
+    "--exclude-module=PyQt6.QtMultimedia",
+    "--exclude-module=PyQt6.QtMultimediaWidgets",
+    "--exclude-module=PyQt6.QtNetwork",
+    "--exclude-module=PyQt6.QtQml",
+    "--exclude-module=PyQt6.QtQuick",
+    "--exclude-module=PyQt6.QtQuickWidgets",
+    "--exclude-module=PyQt6.QtWebEngineCore",
+    "--exclude-module=PyQt6.QtWebEngineWidgets",
+    "--exclude-module=PyQt6.QtWebChannel",
+    "--exclude-module=PyQt6.QtWebSockets",
+    "--exclude-module=PyQt6.QtCharts",
+    "--exclude-module=PyQt6.QtOpenGL",
+    "--exclude-module=PyQt6.QtOpenGLWidgets",
+    "--exclude-module=PyQt6.QtSql",
+    "--exclude-module=PyQt6.QtPrintSupport",
+    "--exclude-module=PyQt6.QtPdf",
+    "--exclude-module=PyQt6.QtPdfWidgets",
+    "--exclude-module=PyQt6.QtSvgWidgets",
+    "--exclude-module=PyQt6.QtTextToSpeech",
+    "--exclude-module=PyQt6.QtSpatialAudio",
+    "--exclude-module=PyQt6.QtBluetooth",
+    "--exclude-module=PyQt6.QtNfc",
+    "--exclude-module=PyQt6.QtPositioning",
+    "--exclude-module=PyQt6.QtSensors",
+    "--exclude-module=PyQt6.QtSerialPort",
+    "--exclude-module=PyQt6.QtDBus",
+    "--exclude-module=PyQt6.QtTest",
+    "--exclude-module=PyQt6.QtDesigner",
+    "--exclude-module=PyQt6.QtHelp",
+]
+args.extend(_QT_EXCLUDES)
+
 # 追加变体专属参数
 args.extend(_cfg["hidden_imports"])
 args.extend(_cfg["collect_all"])
@@ -333,6 +390,52 @@ with _patch_version_variant("" if VARIANT == "main" else VARIANT):
     PyInstaller.__main__.run(args)
 
 print(f"\n✓ 打包完成: {APP_NAME}")
+
+# ── 精简 Qt：删掉用不到的大文件 ───────────────────────────────────────────────
+# 这些是 PyInstaller 的 PyQt6 hook 当“附带二进制/数据”塞进来的，--exclude-module
+# 删不掉（它们不挂在某个 Python 模块 import 上），只能 post-build 物理删除：
+#   • Qt6Pdf.dll      —— QtPdf 模块本项目无人引用（app + qfluentwidgets 均 0）。
+#   • translations/   —— Qt 自带 ~40 语言 .qm（仅本地化 Qt 内置字串，如右键“复制”），
+#                        本项目有自己的 i18n，只保留 zh/ja/en，其余删除。
+# 注意：**保留 opengl32sw.dll**（软件 OpenGL 回退），删它在无 GPU/虚拟机/RDP 上可能黑屏。
+def _slim_qt(internal_dir: Path) -> None:
+    qt6 = internal_dir / "PyQt6" / "Qt6"
+    if not qt6.is_dir():
+        cands = list(internal_dir.rglob("PyQt6/Qt6"))
+        qt6 = cands[0] if cands else None
+    if not qt6 or not qt6.is_dir():
+        print("  ! 未找到 PyQt6/Qt6，跳过 Qt 精简")
+        return
+    freed = 0
+    # 1) 删 Qt6Pdf*（DLL 及可能的伴生文件）
+    bindir = qt6 / "bin"
+    for p in list(bindir.glob("Qt6Pdf*")) + list(qt6.glob("Qt6Pdf*")):
+        try:
+            freed += p.stat().st_size
+            p.unlink()
+            print(f"  ✓ 删除 {p.name}")
+        except OSError as _e:
+            print(f"  ! 删除 {p.name} 失败: {_e}")
+    # 2) translations 只留 zh / ja / en
+    tdir = qt6 / "translations"
+    if tdir.is_dir():
+        kept = removed = 0
+        for qm in tdir.glob("*.qm"):
+            locale = qm.stem.split("_", 1)[1].lower() if "_" in qm.stem else ""
+            if locale.startswith(("zh", "ja", "en")):
+                kept += 1
+                continue
+            try:
+                freed += qm.stat().st_size
+                qm.unlink()
+                removed += 1
+            except OSError:
+                pass
+        print(f"  ✓ Qt 翻译：保留 {kept} 个（zh/ja/en），删除 {removed} 个")
+    print(f"  ✓ Qt 精简释放约 {freed / 1024 / 1024:.1f} MB")
+
+
+_slim_qt(PROJECT_ROOT / "dist" / APP_NAME / "_internal")
 
 # ── ARM64 Windows PortAudio DLL 修复 ─────────────────────────────────────────
 

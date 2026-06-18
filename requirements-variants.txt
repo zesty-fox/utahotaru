@@ -1,0 +1,17 @@
+# StrangeUtaGame —— noWinIME / mac 变体专属依赖（锁定版本）
+#
+# main 变体用 WinRT 做日语注音（见 requirements.txt 的 winrt-* 行）；
+# noWinIME / mac 变体不含 WinRT，改用 sudachi 做注音，因此需要额外安装下面的包。
+#
+# 这些包会被打进变体的 runtime part，**版本必须锁定**——否则 CI 在不同时间
+# 装到不同版本，runtime 内容哈希会变，导致老用户被迫全量重新下载 runtime
+# （增量更新失效）。与 scripts/.runtime-hash-cache-noWinIME.json 中记录的
+# dist_packages 版本保持一致。
+#
+# 用法：
+#   pip install -r requirements.txt -r requirements-variants.txt
+
+sudachipy==0.6.11
+# 小字典：纯数据包，随 sudachipy 一起收集。暂不强锁版本（数据极少更新，
+# 即便更新也只会让 runtime 合理变化一次）。如需完全可复现可在此追加 == 版本。
+sudachidict_small
