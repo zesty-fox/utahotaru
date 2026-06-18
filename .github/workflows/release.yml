@@ -37,9 +37,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { variant: main,     os: windows-latest }
-          - { variant: noWinIME, os: windows-latest }
-          - { variant: mac,      os: macos-latest }
+          - { variant: main,     os: windows-latest, cache: '.runtime-hash-cache.json' }
+          - { variant: noWinIME, os: windows-latest, cache: '.runtime-hash-cache-noWinIME.json' }
+          - { variant: mac,      os: macos-latest,   cache: '.runtime-hash-cache-mac.json' }
     runs-on: ${{ matrix.os }}
     # mac 从未在 CI 构建过，允许失败而不阻断 Windows 两个变体的发布。
     continue-on-error: ${{ matrix.variant == 'mac' }}
@@ -169,6 +169,17 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      # 把本变体构建后（可能已更新的）runtime 缓存交给 update-cache 作业写回 main。
+      # include-hidden-files 必须开：.runtime-hash-cache*.json 以点开头，v4 默认会跳过隐藏文件。
+      - name: Upload runtime cache (for write-back)
+        uses: actions/upload-artifact@v4
+        with:
+          name: cache-${{ matrix.variant }}
+          path: scripts/${{ matrix.cache }}
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7
+
   release:
     name: Create draft release
     needs: build
@@ -225,3 +236,53 @@ jobs:
           fi
           gh release upload "$TAG" "${ASSETS[@]}" --clobber
           echo "✓ 资产已上传到 draft release $TAG。请到 GitHub 核对后手动 Publish。"
+
+  update-cache:
+    name: Commit refreshed runtime baseline to main
+    needs: build
+    runs-on: ubuntu-latest
+    # 把各变体构建产出的 runtime 基线缓存写回 main。这是“全自动”的关键：
+    # 维护者无需（也无法，比如没有 mac）在本地手动刷新缓存——CI 统一回写。
+    # 依赖未变的版本里缓存内容基本只是版本号前移，回写也无害；依赖变了时，回写
+    # 让下一版能正确判定并复用新基线。
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main          # 必须检出分支（而非触发的 tag）才能提交回去
+          fetch-depth: 0
+          # persist-credentials 默认 true → 后续 git push 用内置 GITHUB_TOKEN
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: _cache
+          pattern: cache-*
+          merge-multiple: true
+
+      - name: Apply & commit runtime baseline
+        run: |
+          shopt -s nullglob dotglob
+          files=(_cache/scripts/.runtime-hash-cache*.json)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "没有缓存产物（可能各变体均失败），跳过回写"; exit 0
+          fi
+          cp _cache/scripts/.runtime-hash-cache*.json scripts/
+          if git diff --quiet -- scripts/.runtime-hash-cache*.json; then
+            echo "runtime 基线无变化，跳过提交"; exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/.runtime-hash-cache*.json
+          git commit -m "chore(ci): 刷新 runtime 基线缓存（${{ github.ref_name }}）[skip ci]"
+          # 防与维护者并发推送竞争：先 rebase 再推。失败时重试一次。
+          for attempt in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              echo "✓ runtime 基线已回写 main"; exit 0
+            fi
+            echo "推送冲突，重试 $attempt …"; sleep 3
+          done
+          echo "::warning::runtime 基线回写失败（可能 main 受保护或并发冲突）。下次发布前可本地手动刷新缓存。"
