@@ -43,6 +43,8 @@ def _tr(s: str) -> str:
 
 # 与主程序同目录下的 Updater.exe 名字。
 UPDATER_EXE_NAME = "Updater.exe"
+# onedir 版 Updater（v1.2.3+ 与主程序共享 _internal）。
+UPDATER_EX_NAME = "UpdaterEx.exe"
 # 临时目录名（在 %TEMP% 下）。
 TMP_DIR_NAME = "StrangeUtaGameUpdater"
 
@@ -60,6 +62,7 @@ class LaunchPlan:
     internal_dir_name: str = "_internal"            # PyInstaller 内部目录名
     expected_sha256: str = ""                       # 可选：发布方提供的 SHA256
     launch_after_update: bool = True                # 安装完是否自动启动主程序
+    locale: str = ""                                # UI 语言（如 "ja_JP"），空=自动
 
     # 仅供 LaunchPlan.command_args 内部使用
     extras: List[str] = field(default_factory=list)
@@ -80,6 +83,8 @@ class LaunchPlan:
             args += ["--sha256", self.expected_sha256]
         if not self.launch_after_update:
             args += ["--no-launch"]
+        if self.locale:
+            args += ["--locale", self.locale]
         # ``--url`` 允许重复，按用户配置的源排序提供
         for source_id, url in self.download_urls:
             args += ["--url", f"{source_id}|{url}"]
@@ -124,11 +129,12 @@ def find_app_exe_name() -> str:
 
 
 def find_updater_exe(app_dir: Optional[Path] = None) -> Optional[Path]:
-    """定位与主程序同目录的 ``Updater.exe``；找不到返回 ``None``。"""
+    """定位 Updater；优先 ``UpdaterEx.exe``，回退 ``Updater.exe``。"""
     app_dir = app_dir or find_app_dir()
-    p = app_dir / UPDATER_EXE_NAME
-    if p.exists():
-        return p
+    for name in (UPDATER_EX_NAME, UPDATER_EXE_NAME):
+        p = app_dir / name
+        if p.exists():
+            return p
     # 兼容：放在 _internal/updater/ 下的版本
     p2 = app_dir / "_internal" / "updater" / UPDATER_EXE_NAME
     if p2.exists():
@@ -136,18 +142,72 @@ def find_updater_exe(app_dir: Optional[Path] = None) -> Optional[Path]:
     return None
 
 
+def _read_pe_subsystem(exe_path: Path) -> int:
+    """读取 PE 头的 Subsystem 字段：2=GUI, 3=Console。失败返回 0。"""
+    try:
+        with open(exe_path, "rb") as f:
+            f.seek(0x3C)
+            pe_offset = int.from_bytes(f.read(4), "little")
+            f.seek(pe_offset + 0x5C)
+            return int.from_bytes(f.read(2), "little")
+    except Exception:
+        return 0
+
+
+def _remove_dir_link(link: Path) -> None:
+    """安全移除 junction/symlink，不跟随删除目标内容。"""
+    try:
+        if sys.platform == "win32":
+            os.rmdir(str(link))
+        else:
+            os.unlink(str(link))
+    except OSError:
+        pass
+
+
+def _create_dir_link(target: Path, link: Path) -> None:
+    """创建目录 junction（Windows）或 symlink（其他平台）。"""
+    if sys.platform == "win32":
+        try:
+            subprocess.run(
+                ["cmd", "/c", "mklink", "/J", str(link), str(target)],
+                capture_output=True,
+                creationflags=0x08000000,  # CREATE_NO_WINDOW
+            )
+        except OSError:
+            pass
+    else:
+        try:
+            os.symlink(str(target), str(link), target_is_directory=True)
+        except OSError:
+            pass
+
+
 def _copy_updater_to_temp(updater_exe: Path) -> Path:
-    """把 Updater.exe 复制到临时目录，避免自身被锁。"""
+    """把 Updater EXE 复制到临时目录，避免自身被锁。
+
+    同时创建 ``_internal`` junction/symlink（对 onefile 无害，onedir 必需）。
+    """
     tmp_dir = Path(tempfile.gettempdir()) / TMP_DIR_NAME
     tmp_dir.mkdir(parents=True, exist_ok=True)
-    dest = tmp_dir / UPDATER_EXE_NAME
-    # 已存在的副本可能正被另一次更新流程占用 —— 用唯一时间戳后缀兜底
+    dest = tmp_dir / updater_exe.name
     try:
         shutil.copy2(str(updater_exe), str(dest))
     except PermissionError:
         import time
         dest = tmp_dir / f"Updater-{int(time.time())}.exe"
         shutil.copy2(str(updater_exe), str(dest))
+
+    # 创建 _internal link（对 onefile 打包无害，onedir 需要它来定位运行时）
+    app_internal = updater_exe.parent / "_internal"
+    tmp_internal = tmp_dir / "_internal"
+    if app_internal.is_dir():
+        # 先安全移除旧的 junction/symlink（不跟随删除内容）
+        if tmp_internal.is_symlink() or tmp_internal.exists():
+            _remove_dir_link(tmp_internal)
+        if not tmp_internal.exists():
+            _create_dir_link(app_internal, tmp_internal)
+
     return dest
 
 
@@ -278,7 +338,6 @@ def _update_updater_from_remote(
     import requests
 
     app_dir = plan.app_dir
-    local_updater = app_dir / UPDATER_EXE_NAME
     proxies_dict = {"http": plan.proxy_url, "https": plan.proxy_url} if plan.proxy_url else None
 
     # ── Step 1: 先用 manifest sha256 判断 Updater.exe 是否需要更新 ─────────────
@@ -445,17 +504,23 @@ def _update_updater_from_remote(
                     pass
                 continue
 
-            # ── Step 4: 提取 Updater.exe ─────────────────────────────────────
+            # ── Step 4: 提取 Updater.exe / UpdaterEx.exe ──────────────────
             if progress_cb:
                 progress_cb(_tr("正在提取更新器…"))
             with zipfile.ZipFile(str(canonical_zip)) as zf:
+                # 优先 UpdaterEx.exe，回退 Updater.exe
                 updater_entry = None
-                for name in zf.namelist():
-                    if name.endswith(UPDATER_EXE_NAME) and not name.endswith("/"):
-                        updater_entry = name
+                found_name = ""
+                for target_name in (UPDATER_EX_NAME, UPDATER_EXE_NAME):
+                    for name in zf.namelist():
+                        if name.endswith(target_name) and not name.endswith("/"):
+                            updater_entry = name
+                            found_name = target_name
+                            break
+                    if updater_entry:
                         break
                 if updater_entry is None:
-                    log.warning("[self-update] app part zip 中未找到 %s，放弃此源", UPDATER_EXE_NAME)
+                    log.warning("[self-update] app part zip 中未找到 Updater，放弃此源")
                     try:
                         canonical_zip.unlink()
                     except OSError:
@@ -464,21 +529,23 @@ def _update_updater_from_remote(
 
                 new_bytes = zf.read(updater_entry)
 
+            local_target = app_dir / found_name
             # 双重保险：字节级对比（应对 manifest 不可用时的兜底路径）
-            if local_updater.exists() and local_updater.read_bytes() == new_bytes:
+            if local_target.exists() and local_target.read_bytes() == new_bytes:
                 log.info(
-                    "[self-update] Updater.exe 字节一致，无需替换；"
-                    "app.zip 已保留在 %s 供 Updater 增量复用", canonical_zip,
+                    "[self-update] %s 字节一致，无需替换；"
+                    "app.zip 已保留在 %s 供 Updater 增量复用",
+                    found_name, canonical_zip,
                 )
                 if progress_cb:
                     progress_cb(_tr("更新器已是最新，无需更新"))
                 return True
 
-            # 写入新 Updater.exe（带重试：Windows 下句柄释放可能有短暂延迟）
+            # 写入新 Updater（带重试：Windows 下句柄释放可能有短暂延迟）
             import time as _time
             for _attempt in range(3):
                 try:
-                    local_updater.write_bytes(new_bytes)
+                    local_target.write_bytes(new_bytes)
                     break
                 except PermissionError:
                     if _attempt < 2:
@@ -486,9 +553,9 @@ def _update_updater_from_remote(
                     else:
                         raise
             log.info(
-                "[self-update] 已更新 Updater.exe（%d bytes）；"
+                "[self-update] 已更新 %s（%d bytes）；"
                 "app.zip 保留在 %s，Updater 增量更新时将直接复用，无需重复下载",
-                len(new_bytes), canonical_zip,
+                found_name, len(new_bytes), canonical_zip,
             )
             if progress_cb:
                 progress_cb(_tr("更新器更新完毕"))
@@ -549,17 +616,16 @@ def launch_updater(plan: LaunchPlan, progress_cb=None) -> LaunchResult:
 
     args = plan.command_args(temp_copy, os.getpid())
 
-    # Windows 下，必须给 Updater 一个**可见的新控制台**（不能用 DETACHED_PROCESS）：
-    #
-    # * ``DETACHED_PROCESS (0x08)``  会让进程完全无控制台，print/log 全部消失 —— 用户
-    #   什么都看不到，万一报错也无从排查。
-    # * ``CREATE_NEW_CONSOLE (0x10)`` 为新进程开一个独立 cmd 窗口（与主程序解耦），
-    #   用户能实时看到下载进度与错误信息。这才符合"控制台 UI Updater"的设计意图。
-    # * ``CREATE_NEW_PROCESS_GROUP (0x200)`` 让新进程独立于父进程的进程组，
-    #   主程序退出时不会连带把 Updater 杀掉。
+    # 根据 PE Subsystem 选择启动方式：
+    #   GUI (Subsystem=2) → DETACHED_PROCESS，不弹控制台
+    #   Console (Subsystem=3) → CREATE_NEW_CONSOLE，让用户能看到输出
     flags = 0
     if sys.platform == "win32":
-        flags = 0x00000010 | 0x00000200  # CREATE_NEW_CONSOLE | CREATE_NEW_PROCESS_GROUP
+        subsystem = _read_pe_subsystem(temp_copy)
+        if subsystem == 2:  # IMAGE_SUBSYSTEM_WINDOWS_GUI
+            flags = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+        else:
+            flags = 0x00000010 | 0x00000200  # CREATE_NEW_CONSOLE | CREATE_NEW_PROCESS_GROUP
 
     try:
         proc = subprocess.Popen(  # noqa: S603 — 受信任的本地 EXE
@@ -591,3 +657,15 @@ def launch_updater(plan: LaunchPlan, progress_cb=None) -> LaunchResult:
 def is_updater_available() -> bool:
     """便利方法：用于 UI 决定"立即更新"按钮是否可用。"""
     return find_updater_exe() is not None
+
+
+def _get_current_locale() -> str:
+    """获取当前生效的 UI 语言代号（如 ``"ja_JP"``），用于传给 Updater ``--locale``。"""
+    try:
+        from strange_uta_game.frontend.localization.manager import localization
+        code = localization.effective_code
+        if code and code not in ("auto", "pseudo"):
+            return code
+    except Exception:
+        pass
+    return ""

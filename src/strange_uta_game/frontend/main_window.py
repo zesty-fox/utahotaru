@@ -887,6 +887,7 @@ class MainWindow(MSFluentWindow):
                 asset_name=result.primary_asset_name,
                 download_urls=list(result.download_candidates),
                 proxy_url=proxy_url,
+                locale=upd_installer._get_current_locale(),
             )
 
             # launch_updater 内部会调用 _update_updater_from_remote 发起 HTTP 请求，

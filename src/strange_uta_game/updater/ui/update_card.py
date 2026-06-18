@@ -427,6 +427,7 @@ def _show_update_dialog(parent: "SettingsInterface", result: CheckResult) -> Non
     info, _ = resolve_proxy(proxy.proxy_mode, proxy.proxy_manual_url)
     proxy_url = info.url if info and info.is_valid else ""
 
+    from ..installer import _get_current_locale
     plan = _installer.LaunchPlan(
         app_dir=app_dir,
         app_exe_name=app_exe,
@@ -435,6 +436,7 @@ def _show_update_dialog(parent: "SettingsInterface", result: CheckResult) -> Non
         asset_name=result.primary_asset_name,
         download_urls=list(result.download_candidates),
         proxy_url=proxy_url,
+        locale=_get_current_locale(),
     )
 
     # 弹出进度窗口，在后台线程完成"自更新 Updater + 启动"
