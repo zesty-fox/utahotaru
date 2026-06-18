@@ -338,7 +338,6 @@ class WaveformDisplay(QWidget):
         painter.setFont(font)
         fm = painter.fontMetrics()
         label_y = fm.ascent() + 1  # 所有标签统一贴顶显示，竖线在其下方展开
-        ruby_y = label_y + fm.height()  # ruby 显示在 char 下方第二行
 
         # 正常时间标签
         normal_color = theme.accent_warning
@@ -350,11 +349,11 @@ class WaveformDisplay(QWidget):
                 painter.drawLine(x, int(h * 0.2), x, int(h * 0.8))
                 painter.setPen(normal_color)
                 if label:
-                    painter.drawText(x + 2, label_y, label)
+                    display_text = label
                     if ruby_text:
-                        painter.drawText(x + 2, ruby_y, self._format_ruby_label(ruby_text))
+                        display_text += self._format_ruby_label(ruby_text)
+                    painter.drawText(x + 2, label_y, display_text)
                 elif ruby_text:
-                    # 重复字符：不显示汉字，直接在顶部显示 ruby
                     painter.drawText(x + 2, label_y, self._format_ruby_label(ruby_text))
 
         # 非单调时间标签：更高更粗、警告色
@@ -368,9 +367,10 @@ class WaveformDisplay(QWidget):
                     painter.drawLine(x, int(h * 0.1), x, int(h * 0.9))
                     painter.setPen(warn_color)
                     if label:
-                        painter.drawText(x + 2, label_y, label)
+                        display_text = label
                         if ruby_text:
-                            painter.drawText(x + 2, ruby_y, self._format_ruby_label(ruby_text))
+                            display_text += self._format_ruby_label(ruby_text)
+                        painter.drawText(x + 2, label_y, display_text)
                     elif ruby_text:
                         painter.drawText(x + 2, label_y, self._format_ruby_label(ruby_text))
 
