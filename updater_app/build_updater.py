@@ -14,8 +14,8 @@
 
 * ``--onefile`` —— Updater 是一次性流程，体积比启动速度更重要；onefile 让最终
   发布产物里只多出一个 ``Updater.exe``，不需要额外子目录。
-* ``--console`` —— 用户能在 cmd 窗口看到进度（与 March7thAssistant 一致）。
-* 不引入 PyQt6 等重依赖；只走标准库 + ``requests``，约 12~16 MB。
+* ``--windowed`` —— GUI 模式（PyQt6 窗口），不弹出控制台窗口。
+* 引入 PyQt6 用于 GUI 显示进度条和日志窗口；PyQt6 不可用时自动回退到控制台。
 """
 
 from __future__ import annotations
@@ -68,13 +68,18 @@ def main() -> int:
         str(PROJECT_ROOT / "main.py"),
         "--name=Updater",
         "--onefile",
-        "--console",          # Updater 走控制台 UI，让用户能看到进度
+        "--windowed",         # GUI 模式，不弹控制台窗口
         "--noconfirm",
         "--distpath", str(PROJECT_ROOT / "dist"),
         "--workpath", str(PROJECT_ROOT / "build"),
         "--specpath", str(PROJECT_ROOT),
-        # 仅依赖标准库 + requests
+        # 标准库 + requests + PyQt6 + qfluentwidgets（GUI）
         "--hidden-import=requests",
+        "--hidden-import=gui",
+        "--hidden-import=PyQt6.QtCore",
+        "--hidden-import=PyQt6.QtGui",
+        "--hidden-import=PyQt6.QtWidgets",
+        "--hidden-import=qfluentwidgets",
         "--hidden-import=urllib3",
         "--hidden-import=charset_normalizer",
         "--hidden-import=idna",
@@ -98,9 +103,6 @@ def main() -> int:
         "--hidden-import=ssl",
         "--hidden-import=_ssl",
         # ── 排除主程序的重型依赖，缩小体积 ──
-        # 注意：不要 exclude PyQt6 子模块以外的间接小标准库（colorsys 等）
-        "--exclude-module=PyQt6",
-        "--exclude-module=qfluentwidgets",
         "--exclude-module=numpy",
         "--exclude-module=sounddevice",
         "--exclude-module=soundfile",

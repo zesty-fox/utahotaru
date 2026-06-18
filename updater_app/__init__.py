@@ -2,10 +2,9 @@
 
 本目录与主程序源码完全解耦：
 
-* 不依赖 PyQt6 / qfluentwidgets；
-* 仅依赖标准库 + ``requests`` —— 与主程序完全相同的运行时栈，方便复用
-  ``requirements.txt``；
-* 控制台输出（``windowed=False`` 打包，弹一个 cmd 窗口给用户看进度）。
+* 依赖标准库 + ``requests`` + ``PyQt6`` + ``qfluentwidgets``（GUI 模式）；
+* qfluentwidgets 可用时自动启用 GUI 窗口（进度环 + 日志），不可用时回退控制台；
+* ``--windowed`` 打包，不弹出控制台窗口。
 
 打包通过 ``build_updater.py`` 完成，产物 ``dist/Updater/Updater.exe`` 应该被
 ``build.py`` 复制到主程序产物目录。
