@@ -369,6 +369,7 @@ class LineDetailDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
         self.btn_save = PrimaryPushButton(self.tr("保存修改"), self)
+        self.btn_save.setDefault(True)
         self.btn_save.clicked.connect(self._on_save)
         btn_layout.addWidget(self.btn_save)
         self.btn_close = PushButton(self.tr("关闭"), self)

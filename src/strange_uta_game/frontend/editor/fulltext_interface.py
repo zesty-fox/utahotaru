@@ -429,6 +429,7 @@ class DeleteRubyByTypeDialog(QDialog):
 
         btn_layout = QHBoxLayout()
         btn_ok = PrimaryPushButton(self.tr("删除选中类型"), self)
+        btn_ok.setDefault(True)
         btn_ok.clicked.connect(self.accept)
         btn_cancel = PushButton(self.tr("取消"), self)
         btn_cancel.clicked.connect(self.reject)

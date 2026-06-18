@@ -160,6 +160,7 @@ class BulkChangeDialog(QDialog):
         btn_row = QHBoxLayout()
         btn_row.addStretch()
         self.btn_exec = PrimaryPushButton(self.tr("执行"), self)
+        self.btn_exec.setDefault(True)
         self.btn_exec.clicked.connect(self._on_execute)
         btn_row.addWidget(self.btn_exec)
         self.btn_query = PushButton(self.tr("查询候补字典"), self)

@@ -176,6 +176,7 @@ class DictCandidateDialog(QDialog):
         btn_row = QHBoxLayout()
         btn_row.addStretch()
         self.btn_apply = PrimaryPushButton(self.tr("应用"), self)
+        self.btn_apply.setDefault(True)
         self.btn_apply.clicked.connect(self._on_apply)
         self.btn_apply.setEnabled(bool(self._candidates))
         btn_row.addWidget(self.btn_apply)
