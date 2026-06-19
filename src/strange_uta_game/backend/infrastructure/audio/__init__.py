@@ -15,19 +15,26 @@ from .profile import AudioProfile
 from .factory import AudioBackend, create_audio_engine
 from .sounddevice_engine import SoundDeviceEngine
 
-if sys.platform == "win32":
-    from .bass_engine import BassEngine
-    from .bass_tsm_engine import BassTsmEngine
-else:
-    class BassEngine:
-        """Compatibility export for the unavailable Windows BASS backend."""
+class BassEngine:
+    """Lazy compatibility constructor for the opt-in Windows BASS preview."""
 
-        def __init__(self, *args, **kwargs) -> None:
+    def __new__(cls, *args, **kwargs):
+        if sys.platform != "win32":
             raise AudioPlaybackError("BASS audio backend is only available on Windows")
+        from .bass_engine import BassEngine as Implementation
+
+        return Implementation(*args, **kwargs)
 
 
-    class BassTsmEngine(BassEngine):
-        """Compatibility export for the unavailable Windows BASS TSM backend."""
+class BassTsmEngine:
+    """Lazy compatibility constructor for the opt-in BASS TSM preview."""
+
+    def __new__(cls, *args, **kwargs):
+        if sys.platform != "win32":
+            raise AudioPlaybackError("BASS audio backend is only available on Windows")
+        from .bass_tsm_engine import BassTsmEngine as Implementation
+
+        return Implementation(*args, **kwargs)
 
 __all__ = [
     "IAudioEngine",

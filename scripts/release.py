@@ -441,13 +441,12 @@ def _verify_release_assets(version: str, vcfg: VariantConfig, full_zip: Path) ->
     print(f"      • {updater_pkg.relative_to(ROOT)}/  (updater 子包，{n_updater_files} 文件)")
 
 
-def _run_main_build(clean: bool = False, variant: str = "") -> None:
-    print(f"  构建主程序 (PyInstaller --onedir, variant={variant or 'main'}) …")
-    extra: List[str] = []
+def _run_main_build(clean: bool = False, target: BuildTarget | None = None) -> None:
+    target = target or BuildTarget.from_legacy_alias("main")
+    print(f"  构建共享主程序 (target={target.id}) …")
+    extra: List[str] = ["--target", target.id]
     if clean:
         extra.append("--clean")
-    if variant and variant != "main":
-        extra.extend(["--variant", variant])
     rc = _run_python(MAIN_BUILD, extra)
     if rc != 0:
         raise SystemExit(f"主程序构建失败，退出码 {rc}")
@@ -1016,7 +1015,7 @@ def cmd_build(
         print(f"  ✓ 跳过 UpdaterEx.exe 构建（variant={vcfg.label()}，当前平台={sys.platform}）")
 
     # 2. 主程序
-    _run_main_build(clean=clean, variant=vcfg.variant)
+    _run_main_build(clean=clean, target=build_target)
 
     # 关键顺序：
     #   1) 打 app + runtime part zip（不含 .installed_manifest.json）→ 算 sha256

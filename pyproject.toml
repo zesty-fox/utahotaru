@@ -55,7 +55,11 @@ strange-uta-game = "strange_uta_game.main:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-strange_uta_game = ["resource/*", "config/*", "bass/*.dll", "bass/x64/*.dll"]
+strange_uta_game = [
+    "resource/*",
+    "resource/sounds/*.wav",
+    "config/*",
+]
 
 [tool.black]
 line-length = 88

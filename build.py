@@ -1,493 +1,151 @@
-"""打包脚本 - 使用 PyInstaller 打包 StrangeUtaGame
+"""Build the shared PyInstaller application payload for one native target."""
 
-变体（--variant）：
-  main      Windows（共享 Sudachi 回退 + 可选 WinRT 增强）
-  mac       macOS（共享 Sudachi 回退）
-
-注意事项：
-1. sounddevice 和 soundfile 依赖 PortAudio / libsndfile，需要确保 DLL 被打包
-2. PyQt6 有平台插件需要处理
-3. 所有变体使用共享 Sudachi/pykakasi 回退，Windows 可额外使用 WinRT IME
-4. numpy 是音频引擎核心依赖，不可排除
-5. 使用 --onedir 模式避免单文件解压问题
-"""
+from __future__ import annotations
 
 import argparse
-import contextlib
 import importlib.util
-import re
+import os
+import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
-import PyInstaller.__main__
+from scripts.release_tools.targets import SUPPORTED_TARGETS, BuildTarget
+
+PROJECT_ROOT = Path(__file__).resolve().parent
 
 
-def _force_utf8_stdio() -> None:
-    for stream_name in ("stdout", "stderr"):
-        stream = getattr(sys, stream_name, None)
-        if stream is None or not hasattr(stream, "reconfigure"):
-            continue
-        try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except Exception:
-            pass
+@dataclass(frozen=True)
+class OsBuildConfig:
+    os: str
+    collect_all: tuple[str, ...]
+    collect_submodules: tuple[str, ...]
+    optional_collect_all: tuple[str, ...] = ()
 
 
-_force_utf8_stdio()
+@dataclass(frozen=True)
+class BuildConfig:
+    targets: tuple[OsBuildConfig, ...]
 
-# 命令行参数
-parser = argparse.ArgumentParser(description="PyInstaller 打包脚本")
-parser.add_argument("--clean", action="store_true", help="传给 PyInstaller --clean，完整重建")
-parser.add_argument(
-    "--variant",
-    choices=["main", "mac"],
-    default="main",
-    help="构建变体：main（默认）/ mac",
+    def for_os(self, os_name: str) -> OsBuildConfig:
+        for target in self.targets:
+            if target.os == os_name:
+                return target
+        raise ValueError(f"unsupported build OS: {os_name}")
+
+
+_SHARED_COLLECT_ALL = (
+    "sounddevice",
+    "soundfile",
+    "pedalboard",
+    "sudachipy",
 )
-_cli_args = parser.parse_args()
+_SHARED_SUBMODULES = ("strange_uta_game.updater",)
+BUILD_CONFIG = BuildConfig(
+    (
+        OsBuildConfig(
+            "windows",
+            _SHARED_COLLECT_ALL,
+            _SHARED_SUBMODULES,
+            optional_collect_all=("winrt",),
+        ),
+        OsBuildConfig("macos", _SHARED_COLLECT_ALL, _SHARED_SUBMODULES),
+        OsBuildConfig("linux", _SHARED_COLLECT_ALL, _SHARED_SUBMODULES),
+    )
+)
 
-VARIANT = _cli_args.variant
 
-PROJECT_ROOT = Path(__file__).parent.absolute()
-VERSION_FILE = PROJECT_ROOT / "src" / "strange_uta_game" / "__version__.py"
+def _native_os() -> str:
+    if sys.platform == "win32":
+        return "windows"
+    if sys.platform == "darwin":
+        return "macos"
+    if sys.platform.startswith("linux"):
+        return "linux"
+    raise RuntimeError(f"unsupported build platform: {sys.platform}")
 
-# ── 防呆：让本地 src/ 屏蔽任何旧的 editable install ──────────────────────────
-# 历史上 strange_uta_game 曾以独立仓库 E:\KaraMaker\StrangeUtaGame\ 形式存在并
-# 被 `pip install -e .`，迁移到 krok_helper/lyrics_timing 之后那份 editable
-# install 仍会留在 Python 环境的 sys.path 里。PyInstaller 做 import 分析时
-# 命中的就是旧路径，最终 PYZ 里打进去的是旧 bytecode；--add-data 复制进
-# dist/_internal/strange_uta_game/ 的新源码只是陪跑，运行时不会被加载，
-# 表现就是"源码改了、dist 里也有新文件，可装好的 EXE 行为却照旧"。
-#
-# 把本地 src 放到 sys.path 最前并打印实际命中路径，让每次打包都能在控制台
-# 立刻看出"这次打的是哪份 strange_uta_game"。
-_SRC_DIR = str(PROJECT_ROOT / "src")
-while _SRC_DIR in sys.path:
-    sys.path.remove(_SRC_DIR)
-sys.path.insert(0, _SRC_DIR)
-try:
-    import strange_uta_game as _sug_probe
 
-    _sug_path = Path(_sug_probe.__file__).resolve()
-    _expected = (PROJECT_ROOT / "src" / "strange_uta_game" / "__init__.py").resolve()
-    if _sug_path != _expected:
-        raise SystemExit(
-            "✗ 打包前自检失败：import strange_uta_game 命中的不是本仓库源码。\n"
-            f"  期望: {_expected}\n"
-            f"  实际: {_sug_path}\n"
-            "  常见原因：环境里有旧位置的 `pip install -e .`（例如\n"
-            "  E:\\KaraMaker\\StrangeUtaGame\\）。先 `pip uninstall strange-uta-game`\n"
-            "  或确认 sys.path 头部为当前 src/ 后重试。"
-        )
-    print(f"✓ 打包将使用: {_sug_path}")
-    del _sug_probe
-except ImportError:
-    # 还没装/没找到都没关系，sys.path 已经放进去了，PyInstaller 自己也能找到
-    print(f"  (尚未 import strange_uta_game，将走 sys.path 首项: {_SRC_DIR})")
+def _add_data(source: Path, destination: str) -> str:
+    return f"--add-data={source}{os.pathsep}{destination}"
 
-# ── 变体配置 ──────────────────────────────────────────────────────────────────
 
-_WINRT_INSTALLED = importlib.util.find_spec("winrt") is not None
-_WINRT_HIDDEN_IMPORTS = (
-    [
-        "--hidden-import=winrt.windows.globalization",
-        "--hidden-import=winrt.windows.foundation",
-        "--hidden-import=winrt.windows.foundation.collections",
+def make_pyinstaller_args(
+    target: BuildTarget,
+    project_root: Path = PROJECT_ROOT,
+    *,
+    clean: bool = False,
+) -> list[str]:
+    if target.os != _native_os():
+        raise ValueError(f"target {target.id} must be built on native {target.os}")
+    os_config = BUILD_CONFIG.for_os(target.os)
+    package_root = project_root / "src" / "strange_uta_game"
+    args = [
+        str(project_root / "main.py"),
+        "--noconfirm",
+        "--onedir",
+        "--windowed",
+        "--name=StrangeUtaGame",
+        f"--paths={project_root / 'src'}",
+        f"--additional-hooks-dir={project_root / 'pyinstaller_hooks'}",
+        _add_data(package_root / "config", "strange_uta_game/config"),
+        _add_data(package_root / "resource", "strange_uta_game/resource"),
+        "--collect-data=sudachidict_small",
+        "--exclude-module=strange_uta_game.backend.infrastructure.audio.bass_engine",
+        "--exclude-module=strange_uta_game.backend.infrastructure.audio.bass_tsm_engine",
     ]
-    if _WINRT_INSTALLED
-    else []
-)
-_WINRT_COLLECT = ["--collect-all=winrt"] if _WINRT_INSTALLED else []
-
-# 每个变体的 PyInstaller 额外参数（在公共参数基础上叠加）
-_VARIANT_CONFIGS = {
-    "main": {
-        "hidden_imports": _WINRT_HIDDEN_IMPORTS + [
-            "--hidden-import=sudachipy",
-            "--hidden-import=sudachidict_small",
-        ],
-        "collect_all": _WINRT_COLLECT + [
-            "--collect-all=sudachipy",
-            "--collect-data=sudachidict_small",
-        ],
-        "exclude_modules": [
-            "--exclude-module=sudachidict_core",
-            "--exclude-module=sudachidict_full",
-        ],
-        "hooks_dir": str(PROJECT_ROOT / "pyinstaller_hooks"),
-        "required_deps": [],
-    },
-    "mac": {
-        "hidden_imports": [
-            "--hidden-import=sudachipy",
-            "--hidden-import=sudachidict_small",
-        ],
-        "collect_all": [
-            "--collect-all=sudachipy",
-            "--collect-data=sudachidict_small",
-        ],
-        "exclude_modules": [
-            "--exclude-module=winrt",
-            "--exclude-module=winrt.windows.globalization",
-            "--exclude-module=winrt.windows.foundation",
-            # 只使用 sudachidict_small，排除大字典以减小包体积
-            "--exclude-module=sudachidict_core",
-            "--exclude-module=sudachidict_full",
-        ],
-        # 自定义 hook 覆盖系统 hook-sudachipy.py，阻止自动收集 core/full 字典
-        "hooks_dir": str(PROJECT_ROOT / "pyinstaller_hooks"),
-        "required_deps": [],
-    },
-}
-
-_cfg = _VARIANT_CONFIGS[VARIANT]
-
-# ── 输出名称 ──────────────────────────────────────────────────────────────────
-
-APP_NAME = "StrangeUtaGame" if VARIANT == "main" else f"StrangeUtaGame-{VARIANT}"
-
-# ── 依赖检查 ──────────────────────────────────────────────────────────────────
-
-print(f"构建变体: {VARIANT}  →  {APP_NAME}")
-print("检查依赖...")
-
-_common_deps = [
-    ("PyQt6", "PyQt6"),
-    ("sounddevice", "sounddevice"),
-    ("soundfile", "soundfile"),
-    ("pedalboard", "pedalboard"),
-    ("pykakasi", "pykakasi"),
-    ("sudachipy", "sudachipy"),
-    ("sudachidict_small", "sudachidict_small"),
-    ("qfluentwidgets", "qfluentwidgets"),
-    ("numpy", "numpy"),
-    ("jaconv", "jaconv"),
-]
-
-_failed = False
-for _label, _mod in _common_deps:
-    try:
-        __import__(_mod)
-    except ImportError:
-        print(f"✗ 缺少依赖: {_label}")
-        _failed = True
-
-for _mod in _cfg["required_deps"]:
-    try:
-        __import__(_mod)
-    except ImportError:
-        print(f"✗ 缺少变体依赖: {_mod}")
-        _failed = True
-
-if _failed:
-    print("请先安装缺少的依赖后重试。")
-    sys.exit(1)
-
-import PyQt6
-import sounddevice
-import soundfile
-import pedalboard
-import numpy
-
-print("✓ 所有依赖已安装")
-print(f"  PyQt6: {PyQt6.QtCore.PYQT_VERSION_STR}")
-print(f"  sounddevice: {sounddevice.__version__}")
-print(f"  soundfile: {soundfile.__version__}")
-print(f"  pedalboard: {pedalboard.__version__}")
-print(f"  numpy: {numpy.__version__}")
-
-# ── VARIANT patch 上下文管理器 ────────────────────────────────────────────────
-
-
-@contextlib.contextmanager
-def _patch_version_variant(variant: str):
-    """临时将 __version__.py 中的 VARIANT 值改为 variant，构建后还原。"""
-    original = VERSION_FILE.read_text(encoding="utf-8")
-    patched = re.sub(
-        r'^(VARIANT\s*=\s*)"[^"]*"',
-        rf'\1"{variant}"',
-        original,
-        flags=re.MULTILINE,
+    if clean:
+        args.append("--clean")
+    icon = package_root / "resource" / (
+        "icon.icns" if target.os == "macos" else "icon.ico"
     )
-    if patched == original and variant != "":
-        print(f"! 警告：未能在 __version__.py 中找到 VARIANT 行，将原样构建")
-    try:
-        VERSION_FILE.write_text(patched, encoding="utf-8")
-        yield
-    finally:
-        VERSION_FILE.write_text(original, encoding="utf-8")
+    args.append(f"--icon={icon}")
+    for package in os_config.collect_all:
+        args.append(f"--collect-all={package}")
+    for package in os_config.collect_submodules:
+        args.append(f"--collect-submodules={package}")
+    for package in os_config.optional_collect_all:
+        if importlib.util.find_spec(package) is not None:
+            args.append(f"--collect-all={package}")
+    if target.os == "macos":
+        args.append("--target-architecture=universal2")
+    return args
 
 
-# ── PyInstaller 参数（公共部分） ──────────────────────────────────────────────
-
-_src_sep = ";" if sys.platform == "win32" else ":"
-
-args = [
-    "main.py",
-    f"--name={APP_NAME}",
-    "--onedir",
-    "--windowed",
-    "--noconfirm",
-    # 数据文件
-    f"--add-data=src/strange_uta_game{_src_sep}strange_uta_game",
-    f"--add-data=src/strange_uta_game/resource/icon.ico{_src_sep}strange_uta_game/resource",
-    f"--add-data=src/strange_uta_game/config/config.json{_src_sep}strange_uta_game/config",
-    f"--add-data=src/strange_uta_game/config/dictionary.json{_src_sep}strange_uta_game/config",
-    f"--add-data=src/strange_uta_game/config/singers.json{_src_sep}strange_uta_game/config",
-    f"--add-data=src/strange_uta_game/config/e2k.txt{_src_sep}strange_uta_game/config",
-    f"--add-data=src/strange_uta_game/config/cmudict-0.7b{_src_sep}strange_uta_game/config",
-    # 公共隐藏导入
-    "--hidden-import=sounddevice",
-    "--hidden-import=soundfile",
-    "--hidden-import=pedalboard",
-    "--hidden-import=pedalboard.io",
-    "--hidden-import=pedalboard.io.AudioFile",
-    "--hidden-import=pedalboard.io.StreamResampler",
-    "--hidden-import=pedalboard.time_stretch",
-    "--hidden-import=numpy",
-    "--hidden-import=numpy.core",
-    "--hidden-import=numpy.fft",
-    "--hidden-import=numpy.lib",
-    "--hidden-import=pykakasi",
-    "--hidden-import=pykakasi.kakasi",
-    "--hidden-import=jaconv",
-    "--hidden-import=qfluentwidgets",
-    "--hidden-import=PyQt6.sip",
-    "--hidden-import=PyQt6.QtCore",
-    "--hidden-import=PyQt6.QtGui",
-    "--hidden-import=PyQt6.QtWidgets",
-    "--hidden-import=encodings.idna",
-    "--hidden-import=pkg_resources",
-    "--hidden-import=colorsys",
-    "--collect-submodules=strange_uta_game.updater",
-    "--collect-all=sounddevice",
-    "--collect-all=soundfile",
-    "--collect-all=pedalboard",
-    "--collect-all=pykakasi",
-    "--collect-all=qfluentwidgets",
-    "--collect-binaries=soundfile",
-]
-
-# macOS 需要 .icns 格式，Windows 用 .ico
-if sys.platform == "darwin":
-    args.append("--icon=src/strange_uta_game/resource/icon.icns")
-else:
-    args.append("--icon=src/strange_uta_game/resource/icon.ico")
-
-# ── 公共排除：清掉会被污染环境（如 Anaconda base）误收集、但本项目根本不用的包 ──
-# cryptography 会带进 libcrypto/libssl 共约 10MB，但本项目用不到它：
-# requests→urllib3 默认走标准库 ssl，不需要 cryptography / pyOpenSSL。
-# pyreadline3 / humanfriendly 同理是环境附带。把它们显式排除，保证无论在哪台机器
-# （污染的开发环境 or 干净的 CI）打包，runtime 内容都一致、可复现，增量更新才稳。
-_COMMON_EXCLUDES = [
-    "--exclude-module=cryptography",
-    "--exclude-module=OpenSSL",        # pyOpenSSL 的 import 名
-    "--exclude-module=pyreadline3",
-    "--exclude-module=humanfriendly",
-]
-args.extend(_COMMON_EXCLUDES)
-
-# ── 公共排除：用不到的 Qt6 模块 ──────────────────────────────────────────────
-# 经核查（src/ + updater_app/ 与 qfluentwidgets 全包 import 扫描），本项目实际只用到
-#   QtCore / QtGui / QtWidgets / QtSvg / QtXml
-# 其中 **QtSvg 与 QtXml 必须保留** —— qfluentwidgets 用 QtXml.QDomDocument 解析 SVG、
-# 用 QtSvg 渲染图标，排掉会让所有 Fluent 图标失效。
-#
-# QtMultimedia / QtMultimediaWidgets 仅被 qfluentwidgets.multimedia 子模块引用，而
-# qfluentwidgets.__init__ 不会 eager 导入它，本项目也没有任何媒体/视频组件，运行时
-# 不会加载 —— 排掉可省下 Qt6Multimedia.dll + 一整套 FFmpeg（avcodec/avformat/avutil/
-# swscale ≈ 20MB）。QtNetwork 同样无人引用（requests 走标准库，不用 Qt 网络）。
-# 其余模块在本项目里完全没人 import，一并排除以防未来环境误收集而悄悄变大。
-_QT_EXCLUDES = [
-    "--exclude-module=PyQt6.QtMultimedia",
-    "--exclude-module=PyQt6.QtMultimediaWidgets",
-    "--exclude-module=PyQt6.QtNetwork",
-    "--exclude-module=PyQt6.QtQml",
-    "--exclude-module=PyQt6.QtQuick",
-    "--exclude-module=PyQt6.QtQuickWidgets",
-    "--exclude-module=PyQt6.QtWebEngineCore",
-    "--exclude-module=PyQt6.QtWebEngineWidgets",
-    "--exclude-module=PyQt6.QtWebChannel",
-    "--exclude-module=PyQt6.QtWebSockets",
-    "--exclude-module=PyQt6.QtCharts",
-    "--exclude-module=PyQt6.QtOpenGL",
-    "--exclude-module=PyQt6.QtOpenGLWidgets",
-    "--exclude-module=PyQt6.QtSql",
-    "--exclude-module=PyQt6.QtPrintSupport",
-    "--exclude-module=PyQt6.QtPdf",
-    "--exclude-module=PyQt6.QtPdfWidgets",
-    "--exclude-module=PyQt6.QtSvgWidgets",
-    "--exclude-module=PyQt6.QtTextToSpeech",
-    "--exclude-module=PyQt6.QtSpatialAudio",
-    "--exclude-module=PyQt6.QtBluetooth",
-    "--exclude-module=PyQt6.QtNfc",
-    "--exclude-module=PyQt6.QtPositioning",
-    "--exclude-module=PyQt6.QtSensors",
-    "--exclude-module=PyQt6.QtSerialPort",
-    "--exclude-module=PyQt6.QtDBus",
-    "--exclude-module=PyQt6.QtTest",
-    "--exclude-module=PyQt6.QtDesigner",
-    "--exclude-module=PyQt6.QtHelp",
-]
-args.extend(_QT_EXCLUDES)
-
-# 追加变体专属参数
-args.extend(_cfg["hidden_imports"])
-args.extend(_cfg["collect_all"])
-args.extend(_cfg["exclude_modules"])
-if _cfg.get("hooks_dir"):
-    args.append(f"--additional-hooks-dir={_cfg['hooks_dir']}")
-
-if _cli_args.clean:
-    args.append("--clean")
-    print("启用 PyInstaller --clean（完整重建）")
-
-# ── 平台特定配置 ──────────────────────────────────────────────────────────────
-
-if sys.platform == "win32":
-    print("检测到 Windows 平台")
-    try:
-        import sounddevice as _sd
-        sd_path = Path(_sd.__file__).parent
-        portaudio_dll = (
-            sd_path / "_sounddevice_data" / "portaudio-binaries" / "libportaudio64bit.dll"
-        )
-        if not portaudio_dll.exists():
-            portaudio_dll = sd_path / "_sounddevice_data" / "portaudio.dll"
-        if portaudio_dll.exists():
-            args.append(f"--add-binary={portaudio_dll};.")
-            print(f"✓ 找到 PortAudio DLL: {portaudio_dll}")
-        else:
-            print("! 未找到独立的 portaudio.dll，依赖 --collect-all=sounddevice 自动加载")
-    except Exception:
-        pass
-
-elif sys.platform == "darwin":
-    print("检测到 macOS 平台")
-    args.extend(["--osx-bundle-identifier=com.xuancc.strangeutagame"])
-
-else:
-    print("检测到 Linux 平台")
-
-# ── 构建 ──────────────────────────────────────────────────────────────────────
-
-print(f"\n开始打包 {APP_NAME}...")
-print(f"输出目录: {PROJECT_ROOT / 'dist' / APP_NAME}")
-
-with _patch_version_variant("" if VARIANT == "main" else VARIANT):
-    PyInstaller.__main__.run(args)
-
-print(f"\n✓ 打包完成: {APP_NAME}")
-
-# ── 精简 Qt：删掉用不到的大文件 ───────────────────────────────────────────────
-# 这些是 PyInstaller 的 PyQt6 hook 当“附带二进制/数据”塞进来的，--exclude-module
-# 删不掉（它们不挂在某个 Python 模块 import 上），只能 post-build 物理删除：
-#   • Qt6Pdf.dll      —— QtPdf 模块本项目无人引用（app + qfluentwidgets 均 0）。
-#   • translations/   —— Qt 自带 ~40 语言 .qm（仅本地化 Qt 内置字串，如右键“复制”），
-#                        本项目有自己的 i18n，只保留 zh/ja/en，其余删除。
-# 注意：**保留 opengl32sw.dll**（软件 OpenGL 回退），删它在无 GPU/虚拟机/RDP 上可能黑屏。
-def _slim_qt(internal_dir: Path) -> None:
-    qt6 = internal_dir / "PyQt6" / "Qt6"
-    if not qt6.is_dir():
-        cands = list(internal_dir.rglob("PyQt6/Qt6"))
-        qt6 = cands[0] if cands else None
-    if not qt6 or not qt6.is_dir():
-        print("  ! 未找到 PyQt6/Qt6，跳过 Qt 精简")
-        return
-    freed = 0
-    # 1) 删 Qt6Pdf*（DLL 及可能的伴生文件）
-    bindir = qt6 / "bin"
-    for p in list(bindir.glob("Qt6Pdf*")) + list(qt6.glob("Qt6Pdf*")):
-        try:
-            freed += p.stat().st_size
-            p.unlink()
-            print(f"  ✓ 删除 {p.name}")
-        except OSError as _e:
-            print(f"  ! 删除 {p.name} 失败: {_e}")
-    # 2) translations 只留 zh / ja / en
-    tdir = qt6 / "translations"
-    if tdir.is_dir():
-        kept = removed = 0
-        for qm in tdir.glob("*.qm"):
-            locale = qm.stem.split("_", 1)[1].lower() if "_" in qm.stem else ""
-            if locale.startswith(("zh", "ja", "en")):
-                kept += 1
-                continue
-            try:
-                freed += qm.stat().st_size
-                qm.unlink()
-                removed += 1
-            except OSError:
-                pass
-        print(f"  ✓ Qt 翻译：保留 {kept} 个（zh/ja/en），删除 {removed} 个")
-    print(f"  ✓ Qt 精简释放约 {freed / 1024 / 1024:.1f} MB")
+def _verify_universal_python() -> None:
+    result = subprocess.run(
+        ["lipo", "-archs", sys.executable],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    architectures = set(result.stdout.split())
+    if not {"arm64", "x86_64"}.issubset(architectures):
+        raise RuntimeError("macOS Universal builds require a universal2 Python interpreter")
 
 
-_slim_qt(PROJECT_ROOT / "dist" / APP_NAME / "_internal")
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    target_group = parser.add_mutually_exclusive_group(required=True)
+    target_group.add_argument("--target", choices=sorted(SUPPORTED_TARGETS))
+    target_group.add_argument("--variant", choices=("main", "noWinIME", "mac"))
+    parser.add_argument("--clean", action="store_true")
+    return parser.parse_args(argv)
 
-# ── ARM64 Windows PortAudio DLL 修复 ─────────────────────────────────────────
 
-if sys.platform == "win32":
-    _internal = PROJECT_ROOT / "dist" / APP_NAME / "_internal"
-    _pa_64bit = _internal / "libportaudio64bit.dll"
-    _pa_arm64 = _internal / "libportaudioarm64.dll"
-    if _pa_64bit.exists() and not _pa_arm64.exists():
-        try:
-            import shutil as _shutil
-            _shutil.copy2(str(_pa_64bit), str(_pa_arm64))
-            print(f"✓ 已生成 ARM64 PortAudio DLL: {_pa_arm64}")
-        except Exception as _e:
-            print(f"! 生成 ARM64 PortAudio DLL 失败: {_e}")
-
-# ── 复制 UpdaterEx.exe（仅 Windows） ──────────────────────────────────────────
-
-if sys.platform == "win32":
-    _updater_src = PROJECT_ROOT / "updater_app" / "dist" / "UpdaterEx" / "UpdaterEx.exe"
-    _updater_dst_dir = PROJECT_ROOT / "dist" / APP_NAME
-    _updater_dst = _updater_dst_dir / "UpdaterEx.exe"
-    if _updater_dst_dir.exists():
-        if _updater_src.exists():
-            try:
-                import shutil as _shutil
-                _shutil.copy2(str(_updater_src), str(_updater_dst))
-                print(f"✓ 已复制 UpdaterEx.exe → {_updater_dst}")
-            except Exception as _e:
-                print(f"✗ 复制 UpdaterEx.exe 失败: {_e}")
-        else:
-            print(
-                "✗ 未找到 updater_app/dist/UpdaterEx/UpdaterEx.exe。\n"
-                "  自动更新功能不可用。请先运行:\n"
-                "    python updater_app/build_updater.py\n"
-                "  再重新打包主程序。"
-            )
+def main(argv: list[str] | None = None) -> int:
+    args = _parse_args(argv)
+    if args.target:
+        target = BuildTarget.parse(args.target)
     else:
-        print("! dist/{APP_NAME}/ 目录不存在，跳过 UpdaterEx.exe 复制")
+        target = BuildTarget.from_legacy_alias(args.variant)
+        print(f"! --variant {args.variant} 已弃用；请改用 --target {target.id}")
+    if target.os == "macos":
+        _verify_universal_python()
+    from PyInstaller.__main__ import run
 
-# ── 验证 updater 子包 ─────────────────────────────────────────────────────────
+    run(make_pyinstaller_args(target, clean=args.clean))
+    return 0
 
-_updater_pkg = (
-    PROJECT_ROOT / "dist" / APP_NAME / "_internal"
-    / "strange_uta_game" / "updater"
-)
-if _updater_pkg.is_dir():
-    _n = len(list(_updater_pkg.iterdir()))
-    print(f"✓ strange_uta_game.updater 子包已收集（{_n} 文件）")
-else:
-    print(
-        "✗ strange_uta_game.updater 子包未被打包!\n"
-        "  请确认 build.py 中包含 --collect-submodules=strange_uta_game.updater."
-    )
 
-# ── 打包后说明 ────────────────────────────────────────────────────────────────
-
-print("\n" + "=" * 60)
-print(f"打包后注意事项（{APP_NAME}）：")
-print("=" * 60)
-print("1. 测试音频功能是否正常（播放/暂停/变速）")
-print("2. 检查项目保存和打开功能")
-print("3. 验证导出功能（LRC/KRA/ASS 等）")
-print("4. 测试日语注音（Sudachi 回退应始终可用；Windows 可选 WinRT 增强）")
-if sys.platform == "win32":
-    print("5. 如缺少 DLL，请安装 Visual C++ Redistributable")
-    print("   https://aka.ms/vs/17/release/vc_redist.x64.exe")
-print("=" * 60)
+if __name__ == "__main__":
+    raise SystemExit(main())

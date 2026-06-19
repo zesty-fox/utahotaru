@@ -1,3 +1,0 @@
-# Compatibility shim for older build commands.
-# Shared reading dependencies now live in requirements.txt for every platform.
--r requirements.txt
