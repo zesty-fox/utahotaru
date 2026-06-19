@@ -60,8 +60,12 @@ class TestTSMRenderCacheBasic:
         assert rendered is not None
         assert rendered.dtype == np.float32
         assert rendered.shape[1] == pcm.shape[1]
-        # 1.5x 理论输出长度 ≈ 原长 / 1.5
-        expected = pcm.shape[0] / 1.5
+        # 1.5x 理论输出长度 ≈ 1x 源长度 / 1.5。
+        # 基准必须取「实际 1x 源」（解码后的源 MP3）长度，而非重采样前的输入帧数：
+        # 22050Hz 输入会被重采样到 MP3 支持档 32000Hz，源长度随之变化。切点表也是
+        # 在这份解码源上规划的，故渲染输出覆盖完整源、长度以它为准。
+        src_1x = c.get(1.0)
+        expected = src_1x.shape[0] / 1.5
         assert abs(rendered.shape[0] - expected) / expected < 0.2
 
     def test_lru_evicts_oldest(self):

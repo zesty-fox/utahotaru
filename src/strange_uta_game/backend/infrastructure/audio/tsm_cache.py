@@ -77,6 +77,10 @@ _RMS_FRAME_SIZE = 2048         # ~46ms @ 44.1kHz
 _RMS_HOP_SIZE = 512            # ~12ms @ 44.1kHz
 _ZERO_CROSS_SEARCH = 16        # 零交叉对齐搜索半径（样本），防 click
 
+# 接缝处理参数（在渲染域，非源域）
+_SEAM_ZC_SEARCH = 64           # 渲染域切点过零重对齐搜索半径（样本，~1.5ms @44.1k）
+_SEAM_XFADE_SECONDS = 0.008    # 接缝等功率微淡化时长（8ms），用各块已渲染的 overlap
+
 
 def _get_max_workers() -> int:
     """根据 CPU 核心数计算全局最大 worker 数，不超过 70%。"""
@@ -418,11 +422,23 @@ class TSMRenderCache:
             self._sample_rate = actual_sr
             self._channels = channels
 
-            # 用源 PCM 在 set_source 阶段一次性算好切点表。
-            # 若已重采样，直接基于原始 pcm 算误差可以忽略（节奏/RMS 形态在重采样
-            # 前后等价，切点位置即使有 ±10ms 偏移也仍然落在低能量段内）。
+            # 切点表必须在「解码后的源 MP3」上计算——它正是 _render_chunk 后续要切的
+            # 同一份数组（采样率 = actual_sr、长度 N_src，含 MP3 编解码延迟/补齐）。
+            # 不能用入参 original_pcm（原始采样率 sample_rate、长度 N_orig），否则切点
+            # 产出的样本下标与被切数组不在同一索引空间，会出现两类错位：
+            #   1. 文件采样率不在 MP3 支持档（32k/44.1k/48k）被重采样时，_plan_chunks
+            #      用 actual_sr 算块长却套在原始采样率数组上，切点整体按
+            #      actual_sr/sample_rate 缩放错位，末块 core_end=N_orig≠N_src，
+            #      源 MP3 尾部整段被丢弃（或下标越界导致 total_rendered 计算偏大）；
+            #   2. 即使不重采样，MP3 编码延迟也让两份数组整体错位 ~26ms，切点偏离真实
+            #      RMS 最低点。
+            # _load_source_pcm() 解码后缓存（key=1.0），调度线程随后取用直接命中缓存，
+            # 无额外解码开销。解码失败才退回 original_pcm。
             try:
-                self._chunk_plan = _plan_chunks(original_pcm, actual_sr)
+                plan_pcm = self._load_source_pcm()
+                if plan_pcm is None:
+                    plan_pcm = original_pcm
+                self._chunk_plan = _plan_chunks(plan_pcm, actual_sr)
                 if len(self._chunk_plan) > 1:
                     print(
                         f"[TSM缓存] 已规划 {len(self._chunk_plan)} 块（音乐感知切点，"
@@ -919,47 +935,87 @@ class TSMRenderCache:
                     del self._active_tasks[task.speed]
 
     def _merge_chunks(self, task: SpeedTask) -> np.ndarray:
-        """拼接所有块（无交叉淡化，直接硬切）。
+        """拼接所有块：渲染域过零重对齐 + 8ms 等功率微淡化。
 
-        渲染时每个块向两侧扩展 10% overlap 保证 TSM 质量，
-        此处仅提取 core 区域直接拼接。
+        渲染时每个块向两侧扩展 10% overlap 保证 TSM 端点质量。此处不再"取 core
+        硬切"——硬切的去 click 依赖 _plan_chunks 在源域选的过零切点，而 time_stretch
+        之后该点既不再过零、两块在边界的相位也各自独立，硬切在密集编曲处会周期性
+        爆 click。改为：
 
-        使用 np.empty + 逐段 copyto 代替 np.concatenate：
-        - np.concatenate 会先构建 view 列表再一次性分配，内存峰值 ≈ 输入之和 + 输出
-        - np.empty 预分配输出缓冲区后逐段 copyto，内存峰值只有输出大小一份
+        1. 把每块 core 的接缝侧切点在【渲染域】重新吸附到最近过零点（_SEAM_ZC_SEARCH），
+           令切点本身落在零值附近；
+        2. 用各块已渲染、原本被丢弃的 overlap，在接缝处做 8ms 等功率交叉淡化。
+           前一块多取 8ms 进入它的右 overlap、后一块的头 8ms 与之 overlap-add——两者
+           覆盖的是边界【同一段源音频】，故只补相位、不串内容、不引入时长漂移。
+
+        内存：仍预分配一次输出缓冲区逐段写入；交叉淡化只读已写入的尾部就地混合，
+        不额外分配大数组。
         """
         sorted_chunks = sorted(task.chunks, key=lambda c: c.index)
+        last = len(sorted_chunks) - 1
 
-        # 预先计算输出总帧数，一次性分配目标缓冲区
         total_core_samples = sum(c.core_end - c.core_start for c in sorted_chunks)
         total_rendered = int(total_core_samples / task.speed)
         if total_rendered <= 0:
             return np.zeros((0, self._channels), dtype=np.float32)
 
-        result = np.empty((total_rendered, self._channels), dtype=np.float32)
+        xfade = max(0, int(_SEAM_XFADE_SECONDS * self._sample_rate))
+        # core 段相加 ≈ total_rendered；处理中最多有一段未消化的 overlap 扩展 +
+        # 过零吸附偏移，留出余量防越界，末尾截断。
+        cap = total_rendered + xfade + _SEAM_ZC_SEARCH + 16
+        result = np.empty((cap, self._channels), dtype=np.float32)
         write_pos = 0
+        prev_ext = 0  # 上一块尾部已写入、待与本块头交叉淡化的样本数
 
-        for chunk in sorted_chunks:
+        for k, chunk in enumerate(sorted_chunks):
             rendered = task.results[chunk.index]
             if rendered is None:
                 raise ValueError(f"Chunk {chunk.index} is None")
 
-            # 从渲染结果中提取 core 区域（去掉两侧 overlap）
+            n_r = len(rendered)
+            # 按 ratio 把源域 core 边界映射到渲染域（time_stretch 对稳态内容近似线性）
             src_len = chunk.src_end - chunk.src_start
-            core_start_ratio = (chunk.core_start - chunk.src_start) / src_len
-            core_end_ratio = (chunk.core_end - chunk.src_start) / src_len
+            core_start = int(n_r * ((chunk.core_start - chunk.src_start) / src_len))
+            core_end = int(n_r * ((chunk.core_end - chunk.src_start) / src_len))
 
-            core_start = int(len(rendered) * core_start_ratio)
-            core_end = int(len(rendered) * core_end_ratio)
-            segment = rendered[core_start:core_end]  # view，不分配新内存
+            # 接缝侧切点在渲染域吸附到最近过零点（外缘——首块左、末块右——不动）
+            mono = rendered.mean(axis=1) if rendered.ndim > 1 and rendered.shape[1] > 1 \
+                else rendered.reshape(-1)
+            if k > 0:
+                core_start = _snap_zero_crossing(mono, core_start, _SEAM_ZC_SEARCH)
+            if k < last:
+                core_end = _snap_zero_crossing(mono, core_end, _SEAM_ZC_SEARCH)
+            core_start = max(0, min(core_start, n_r))
+            core_end = max(core_start, min(core_end, n_r))
 
-            seg_len = min(len(segment), total_rendered - write_pos)
+            # 非末块向右多取 xfade 进入右 overlap，供与下一块头部 overlap-add（同源区域）
+            ext = min(xfade, n_r - core_end) if k < last else 0
+            segment = rendered[core_start : core_end + ext]
+            seg_len = len(segment)
             if seg_len <= 0:
-                break
-            np.copyto(result[write_pos : write_pos + seg_len], segment[:seg_len])
-            write_pos += seg_len
+                continue
 
-        # 若实际写入比预计少（浮点对齐），截断
+            if write_pos == 0:
+                m = min(seg_len, cap)
+                np.copyto(result[:m], segment[:m])
+                write_pos = m
+            else:
+                # 本块头 x 样本与上一块尾部 prev_ext 样本等功率交叉淡化（就地混合）
+                x = min(prev_ext, seg_len, write_pos)
+                if x > 0:
+                    t = np.linspace(0.0, 1.0, x, dtype=np.float32)
+                    fade_out = np.cos(t * (np.pi / 2.0))[:, None]  # 1→0 等功率
+                    fade_in = np.sin(t * (np.pi / 2.0))[:, None]   # 0→1
+                    blended = (result[write_pos - x : write_pos] * fade_out
+                               + segment[:x] * fade_in)
+                    np.copyto(result[write_pos - x : write_pos], blended)
+                rest = segment[x:]
+                m = min(len(rest), cap - write_pos)
+                if m > 0:
+                    np.copyto(result[write_pos : write_pos + m], rest[:m])
+                    write_pos += m
+            prev_ext = ext
+
         return result[:write_pos]
 
     def _save_as_mp3(self, pcm: np.ndarray, path: Path) -> None:
