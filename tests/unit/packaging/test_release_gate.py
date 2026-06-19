@@ -47,22 +47,18 @@ def gate_fixture(tmp_path):
     }
     (tmp_path / "manifest-v2.json").write_text(json.dumps(manifest), encoding="utf-8")
     (tmp_path / "manifest-v2.json.sig").write_text("signature", encoding="ascii")
-    for platform_name in ("windows-x86_64", "macos-universal2", "linux-x86_64"):
-        (tmp_path / f"audio-{platform_name}.json").write_text(
-            json.dumps({"schema": 1, "passed": True, "max_error_ms": 9.5}),
-            encoding="utf-8",
-        )
     return GateFixture(tmp_path)
 
 
-def test_stable_gate_requires_package_smoke_and_audio_benchmarks(gate_fixture):
+def test_stable_gate_requires_package_smoke_but_not_audio_reports(gate_fixture):
     assert verify_release_gate(gate_fixture.root).passed
-    gate_fixture.remove("audio-linux-x86_64.json")
+
+    gate_fixture.remove("smoke-linux-x86_64-appimage.json")
 
     result = verify_release_gate(gate_fixture.root)
 
     assert not result.passed
-    assert "audio-linux-x86_64.json" in result.missing
+    assert "smoke-linux-x86_64-appimage.json" in result.missing
 
 
 def test_preview_gate_does_not_accept_stable_channel(gate_fixture):

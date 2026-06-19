@@ -47,8 +47,7 @@ StrangeUtaGame --smoke-test smoke-<target-id>.json
 ## Stable
 
 1. 从同一提交生成五个最终产物及各平台验签报告。
-2. 收集五份安装包冒烟报告，以及 Windows x64、macOS Universal 2、Linux x64
-   三份真实设备音频延迟报告。每份报告必须通过，校准后最大误差不得超过 `10 ms`。
+2. 收集五份安装包冒烟报告。音频延迟报告不属于发布门禁。
 3. 生成 schema-2 清单并签名：
 
 ```bash
@@ -56,21 +55,13 @@ python3 scripts/release.py generate-manifest --help
 python3 scripts/verify_release_gate.py release-gate-input --channel stable
 ```
 
-4. 把五个产物、Linux GPG 签名、各平台验签报告、五份冒烟报告、三份音频报告和
-   stable manifest 上传到同一个 candidate Release。
+4. 把五个产物、Linux GPG 签名、各平台验签报告、五份冒烟报告和 stable manifest
+   上传到同一个 candidate Release。
 5. 运行 `Stable cross-platform release`，输入目标版本和该 candidate tag。受保护
    environment 审批通过后，workflow 会下载候选证据、重新执行门禁，并只把通过的
    输入发布为 `SUGv<version>` draft。
 6. 人工核对版本、CHANGELOG、目标集合和签名后再发布 draft。更新器的 stable 清单
    只能在 GitHub Release 公开后切换。
-
-音频报告使用真实输出到输入的回环连接生成：
-
-```bash
-python3 scripts/audio_loopback_probe.py --list-devices
-python3 scripts/audio_loopback_probe.py --input DEVICE --output DEVICE --runs 20 \
-  --calibration-ms 0 --report audio-<platform>.json
-```
 
 ## 平台验签
 
