@@ -144,6 +144,31 @@ def clear_cache_for_song(song_name: str) -> None:
     print(f"[TSM缓存] 已清空歌曲缓存: {song_name}")
 
 
+def _atomic_write_bytes(path: Path, data: bytes) -> None:
+    """原子写文件：先写同目录临时文件，再 ``os.replace`` 改名到目标路径。
+
+    缓存 MP3 直接 ``open(final_path, "wb")`` 写会留下一段"文件已存在但内容
+    未写完"的窗口；此时 UI 线程靠 ``path.exists()`` 判断渲染就绪并用 BASS
+    打开，会读到 0 字节/截断的 MP3，导致变速音频偶发损坏。``os.replace``
+    在同一卷上是原子的，读端要么看到旧文件、要么看到完整新文件。
+
+    临时文件名带 pid + 线程 id，避免多个写入者撞名；扩展名 ``.tmp`` 不匹配
+    ``clear_cache`` 的 ``*.mp3`` glob，不会被误当作缓存清理。
+    """
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        with open(tmp, "wb") as f:
+            f.write(data)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            if tmp.exists():
+                tmp.unlink()
+        except Exception:
+            pass
+        raise
+
+
 @dataclass
 class ChunkInfo:
     """分块信息"""
@@ -450,8 +475,7 @@ class TSMRenderCache:
         )
         if progress_cb:
             progress_cb("保存文件...", 0.9)
-        with open(path, "wb") as f:
-            f.write(mp3_bytes)
+        _atomic_write_bytes(path, mp3_bytes)
 
         return target_sr
 
@@ -670,19 +694,49 @@ class TSMRenderCache:
             with self._lock:
                 current_version = self._render_version
 
-            # 等待有空闲速度槽位
+            # 占位 + 等待空闲速度槽位（原子）。
+            # 任务一旦出队，必须在放进 _active_tasks 之前完成耗时的 _load_source_pcm
+            # 解码，否则这段窗口内该速度既不在队列也不在 active 表，并发的 ensure()
+            # 会判定它"未在渲染"而重复派发 → 同一速度渲染两遍、向同一缓存文件写两次。
+            # 这里在确认有空槽的同一把 _active_lock 内立即登记一个空 SpeedTask 占位，
+            # 关闭该窗口；chunks 稍后填充（占位时尚未知）。
+            speed_task = SpeedTask(
+                speed=speed,
+                priority=priority,
+                progress_cb=progress_cb,
+                done_cb=done_cb,
+                version=current_version,
+            )
+            reserved = False
             while not self._scheduler_stop.is_set():
                 with self._active_lock:
+                    if speed in self._active_tasks:
+                        # 已被占（正常情况下 ensure 会先拦截重复派发）；放弃本次。
+                        break
                     if len(self._active_tasks) < _MAX_SPEEDS:
+                        self._active_tasks[speed] = speed_task
+                        reserved = True
                         break
                 time.sleep(0.05)
 
+            if not reserved:
+                if self._scheduler_stop.is_set():
+                    break
+                continue
+
+            def _release_reservation() -> None:
+                with self._active_lock:
+                    if self._active_tasks.get(speed) is speed_task:
+                        del self._active_tasks[speed]
+
             if self._scheduler_stop.is_set():
+                _release_reservation()
                 break
 
             # 读取源 PCM 并取得切点表
             source_pcm = self._load_source_pcm()
             if source_pcm is None:
+                _release_reservation()
                 continue
 
             chunks = self._chunk_plan
@@ -700,19 +754,15 @@ class TSMRenderCache:
                 self._chunk_plan = chunks
             print(f"[TSM渲染] 速度 {speed}x 开始渲染，共 {len(chunks)} 块，提交至线程池")
 
-            # 创建速度任务
-            speed_task = SpeedTask(
-                speed=speed,
-                priority=priority,
-                progress_cb=progress_cb,
-                done_cb=done_cb,
-                version=current_version,
-                chunks=chunks,
-                pending_chunks=set(range(len(chunks))),
-            )
+            # 填充占位任务的分块信息（占位时 chunks 尚未知）。
+            with speed_task.lock:
+                speed_task.chunks = chunks
+                speed_task.pending_chunks = set(range(len(chunks)))
 
-            with self._active_lock:
-                self._active_tasks[speed] = speed_task
+            # 占位到此可能已被抢占/全局取消：此时不提交任何块，释放占位后跳过。
+            if speed_task.cancelled or self._render_version != current_version:
+                _release_reservation()
+                continue
 
             # 将所有块提交到全局线程池
             # 使用闭包回调，直接绑定 speed_task 引用，避免通过 chunk_index
@@ -861,7 +911,12 @@ class TSMRenderCache:
             print(f"[TSM渲染] 速度 {task.speed}x 合并出错: {e}")
         finally:
             with self._active_lock:
-                self._active_tasks.pop(task.speed, None)
+                # 仅当 active 表里登记的就是本 task 时才移除：被抢占后本 task 已
+                # 被 _preempt_active 从表中删除，调度器可能已为同一速度新建并登记
+                # 了下一代 task。speed 作 key 无法区分代次，按身份比对避免误删
+                # 仍在渲染的新任务（否则后续 ensure 会判定该速度未在渲染而重复派发）。
+                if self._active_tasks.get(task.speed) is task:
+                    del self._active_tasks[task.speed]
 
     def _merge_chunks(self, task: SpeedTask) -> np.ndarray:
         """拼接所有块（无交叉淡化，直接硬切）。
@@ -908,7 +963,7 @@ class TSMRenderCache:
         return result[:write_pos]
 
     def _save_as_mp3(self, pcm: np.ndarray, path: Path) -> None:
-        """将 PCM 数据保存为 MP3 文件。"""
+        """将 PCM 数据保存为 MP3 文件（原子写，避免读端读到半截文件）。"""
         mp3_bytes = AudioFile.encode(
             pcm.T,
             samplerate=self._sample_rate,
@@ -916,8 +971,7 @@ class TSMRenderCache:
             num_channels=self._channels,
             quality=_MP3_QUALITY,
         )
-        with open(path, "wb") as f:
-            f.write(mp3_bytes)
+        _atomic_write_bytes(path, mp3_bytes)
 
     def _cancel_all_and_wait(self) -> None:
         """取消所有渲染任务并等待完成。"""
