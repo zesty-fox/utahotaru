@@ -51,6 +51,7 @@ from .base import (
     PlaybackState,
 )
 from .profile import AudioProfile
+from .effects import EffectMixer
 from .ring_buffer import RingBuffer
 from .tsm_cache import TSMRenderCache, LoadProgressCallback, _quantize
 
@@ -139,6 +140,10 @@ class SoundDeviceEngine(IAudioEngine):
         self._actual_latency_seconds: float = 0.0
         self._underruns: int = 0
         self._recoveries: int = 0
+        self._effects = EffectMixer(
+            channels=self._channels,
+            block_frames=self._profile.block_frames,
+        )
 
         # ---- 热重载标志位 ----
         # 当音频回调检测到底层设备异常时置位，由 producer 线程执行恢复
@@ -192,6 +197,11 @@ class SoundDeviceEngine(IAudioEngine):
 
             # 时长基于 MP3 实际数据（确保位置计算一致）
             self._duration_ms = int(len(cached_pcm) / self._sample_rate * 1000)
+
+            self._effects = EffectMixer(
+                channels=self._channels,
+                block_frames=self._profile.block_frames,
+            )
 
             # 重建 ring
             cap = max(
@@ -503,6 +513,39 @@ class SoundDeviceEngine(IAudioEngine):
             recoveries=self._recoveries,
         )
 
+    def load_effect(
+        self,
+        name: str,
+        samples: np.ndarray,
+        sample_rate: int,
+    ) -> None:
+        data = np.asarray(samples, dtype=np.float32)
+        if data.ndim == 1:
+            data = data.reshape(-1, 1)
+        if sample_rate != self._sample_rate and len(data):
+            target_length = max(1, round(len(data) * self._sample_rate / sample_rate))
+            source_axis = np.arange(len(data), dtype=np.float64)
+            target_axis = np.linspace(0, len(data) - 1, target_length)
+            data = np.column_stack(
+                [np.interp(target_axis, source_axis, data[:, index]) for index in range(data.shape[1])]
+            ).astype(np.float32)
+        if data.shape[1] == 1 and self._channels > 1:
+            data = np.repeat(data, self._channels, axis=1)
+        elif self._channels == 1 and data.shape[1] > 1:
+            data = data.mean(axis=1, keepdims=True)
+        elif data.shape[1] != self._channels:
+            data = data[:, : self._channels]
+        self._effects.load(name, data)
+
+    def trigger_effect(self, name: str, volume: float = 1.0) -> None:
+        self._effects.trigger(name, volume)
+
+    def has_effect(self, name: str) -> bool:
+        return self._effects.has(name)
+
+    def clear_effects(self) -> None:
+        self._effects.clear()
+
     # ==================== 内部：流 / Producer / 回调 ====================
 
     def _start_streaming(self) -> None:
@@ -588,11 +631,13 @@ class SoundDeviceEngine(IAudioEngine):
 
         if self._state != PlaybackState.PLAYING:
             outdata.fill(0)
+            self._effects.mix_into(outdata)
             return
 
         ring = self._ring
         if ring is None:
             outdata.fill(0)
+            self._effects.mix_into(outdata)
             return
 
         n = ring.read_into(outdata)
@@ -606,6 +651,7 @@ class SoundDeviceEngine(IAudioEngine):
 
         if self._volume != 1.0:
             outdata *= self._volume
+        self._effects.mix_into(outdata)
 
     def _producer_loop(self) -> None:
         """生产者：把 active PCM 切片送进 ring；处理速度切换 / EOF。"""

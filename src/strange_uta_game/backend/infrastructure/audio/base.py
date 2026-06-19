@@ -231,3 +231,20 @@ class IAudioEngine(ABC):
             underruns=0,
             recoveries=0,
         )
+
+    def load_effect(
+        self,
+        name: str,
+        samples: np.ndarray,
+        sample_rate: int,
+    ) -> None:
+        """Load an effect when the backend supports shared-output mixing."""
+
+    def trigger_effect(self, name: str, volume: float = 1.0) -> None:
+        """Trigger a preloaded effect when supported."""
+
+    def has_effect(self, name: str) -> bool:
+        return False
+
+    def clear_effects(self) -> None:
+        """Discard preloaded effects when supported."""

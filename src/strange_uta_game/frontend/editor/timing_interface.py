@@ -120,8 +120,9 @@ class EditorInterface(QWidget):
     # 自动 marshal 到 UI 线程（Qt 跨线程默认 queued connection）。
     _render_progress_signal = pyqtSignal(float, float)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, audio_engine=None):
         super().__init__(parent)
+        self._audio_engine = audio_engine
         self._project: Optional[Project] = None
         self._timing_service: Optional[TimingService] = None
         self._audio_file_path: Optional[str] = None
@@ -184,7 +185,7 @@ class EditorInterface(QWidget):
         # eventFilter 中鼠标拖拽检测
         self._auto_scroll_mouse_press_pos = None
 
-        # 按键音播放器（低延迟，基于 BASS Sample API）
+        # 按键音播放器（混入共享音频输出）
         self._keysound_player = None
         self._keysound_enabled: bool = True
         # None 表示"尚未加载过任何风格"，确保 _apply_settings 首次调用时强制加载
@@ -269,7 +270,9 @@ class EditorInterface(QWidget):
         """创建播放器并预加载默认风格样本（失败时静默跳过，不影响主功能）。"""
         try:
             from ...backend.infrastructure.audio.keysound_player import KeySoundPlayer
-            self._keysound_player = KeySoundPlayer()
+            if self._audio_engine is None:
+                return
+            self._keysound_player = KeySoundPlayer(self._audio_engine)
             self._reload_keysound("default")  # 预热：先加载默认风格
         except Exception as e:
             print(f"[KeySound] 初始化失败: {e}")
@@ -1001,8 +1004,7 @@ class EditorInterface(QWidget):
         """释放音频资源"""
         if self._timing_service:
             self._timing_service.release()
-        # timing_service.release() 会调用 BASS_Free，使 keysound sample handle 失效。
-        # 在此归零 handle（避免野指针），并重置风格标记，确保下次 _apply_settings 强制重新加载。
+        # 清除共享混音器中的按键音，并重置风格标记。
         if self._keysound_player is not None:
             self._keysound_player.invalidate()
         self._keysound_style = None

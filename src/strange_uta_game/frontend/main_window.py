@@ -441,7 +441,7 @@ class MainWindow(MSFluentWindow):
         self.homeInterface.hide()  # 已废弃，仅保留信号连接
 
         self._report_progress(55, self.tr("正在加载编辑器..."))
-        self.editorInterface = EditorInterface(self)
+        self.editorInterface = EditorInterface(self, audio_engine=self._audio_engine)
         self.editorInterface.setObjectName("editorInterface")
         self.editorInterface.set_timing_service(self._timing_service)
         self.editorInterface.project_saved.connect(self._update_title)
