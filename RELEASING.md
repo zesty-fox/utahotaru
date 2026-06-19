@@ -52,7 +52,7 @@ StrangeUtaGame --smoke-test smoke-<target-id>.json
 3. 生成 schema-2 清单并签名：
 
 ```bash
-python3 scripts/release.py manifest --help
+python3 scripts/release.py generate-manifest --help
 python3 scripts/verify_release_gate.py release-gate-input --channel stable
 ```
 
