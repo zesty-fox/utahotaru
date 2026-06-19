@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
+import hashlib
+import hmac
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 from urllib.parse import urlparse
+
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from .model import (
     InstallAction,
@@ -24,6 +33,14 @@ class ManifestError(ValueError):
 
 
 class ManifestTargetError(ManifestError):
+    pass
+
+
+class ManifestSignatureError(ManifestError):
+    pass
+
+
+class ArtifactHashError(ManifestError):
     pass
 
 
@@ -137,3 +154,47 @@ def parse_manifest(payload: Mapping[str, Any]) -> SignedManifest:
     if not generated_at or not channels:
         raise ManifestError("manifest has no channels")
     return SignedManifest(generated_at, MappingProxyType(channels))
+
+
+def verify_manifest_signature(
+    payload: bytes,
+    signature: bytes | str,
+    public_key: Ed25519PublicKey | bytes,
+) -> None:
+    """Verify a detached Ed25519 signature over exact manifest bytes."""
+
+    if isinstance(public_key, bytes):
+        try:
+            loaded_key = serialization.load_pem_public_key(public_key)
+        except (TypeError, ValueError) as error:
+            raise ManifestSignatureError("invalid update public key") from error
+        if not isinstance(loaded_key, Ed25519PublicKey):
+            raise ManifestSignatureError("update public key is not Ed25519")
+        public_key = loaded_key
+    raw_signature: bytes
+    if isinstance(signature, str):
+        signature = signature.encode("ascii")
+    if len(signature) == 64:
+        raw_signature = signature
+    else:
+        try:
+            raw_signature = base64.b64decode(signature.strip(), validate=True)
+        except (binascii.Error, ValueError) as error:
+            raise ManifestSignatureError("invalid detached signature encoding") from error
+    try:
+        public_key.verify(raw_signature, payload)
+    except (InvalidSignature, ValueError) as error:
+        raise ManifestSignatureError("manifest signature verification failed") from error
+
+
+def verify_artifact_hash(path: Path, expected_sha256: str) -> None:
+    """Verify an artifact with bounded memory and constant-time comparison."""
+
+    if not _SHA256.fullmatch(expected_sha256):
+        raise ArtifactHashError("invalid expected artifact hash")
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        while chunk := stream.read(1024 * 1024):
+            digest.update(chunk)
+    if not hmac.compare_digest(digest.hexdigest(), expected_sha256):
+        raise ArtifactHashError("artifact hash verification failed")

@@ -20,6 +20,7 @@ requests==2.32.5
 urllib3==2.6.1
 charset-normalizer==3.4.4
 certifi==2025.11.12
+cryptography==49.0.0
 idna==3.11
 
 # ── 打包 ──
