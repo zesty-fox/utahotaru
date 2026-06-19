@@ -161,6 +161,19 @@ pytest tests/
 pytest tests/ --cov=src --cov-report=html
 ```
 
+### 音频回环验收
+
+稳定候选版需在 Windows WASAPI、macOS CoreAudio 与 Linux PipeWire/PulseAudio
+参考设备上生成 schema-1 回环报告。先连接输出到输入并列出设备，再执行测量：
+
+```bash
+python scripts/audio_loopback_probe.py --list-devices
+python scripts/audio_loopback_probe.py --input DEVICE --output DEVICE --runs 20 \
+  --calibration-ms 0 --report audio-report.json
+```
+
+校准后的每次误差都不得超过 `10 ms`；任一测量超限时命令返回非零退出码。
+
 ## 使用指南
 
 ### 1. 加载文件
