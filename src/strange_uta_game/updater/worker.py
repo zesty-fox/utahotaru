@@ -19,6 +19,8 @@ from .proxy import resolve_proxy
 from .settings import UpdaterSettings
 from .sources import SourceId
 from .version import is_newer_version
+from .model import ReleaseChannel, UpdateError, UpdateOffer, UpdateTarget
+from .service import UpdateCheckError, UpdateService
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +51,58 @@ class CheckResult:
             self.attempts = []
         if self.all_releases is None:
             self.all_releases = []
+
+
+@dataclass(frozen=True)
+class ServiceCheckResult:
+    offer: UpdateOffer | None = None
+    error: UpdateError | None = None
+
+    @property
+    def ok(self) -> bool:
+        return self.error is None
+
+    @property
+    def has_update(self) -> bool:
+        return self.offer is not None
+
+
+class _ServiceCheckRunnable(QObject):
+    finished = pyqtSignal(object)
+
+    def __init__(
+        self,
+        service: UpdateService,
+        target: UpdateTarget,
+        channel: ReleaseChannel,
+        current_version: str,
+    ) -> None:
+        super().__init__()
+        self._service = service
+        self._target = target
+        self._channel = channel
+        self._current_version = current_version
+
+    def run(self) -> None:
+        try:
+            offer = self._service.check(
+                self._channel,
+                self._target,
+                current_version=self._current_version,
+            )
+            result = ServiceCheckResult(offer=offer)
+        except UpdateCheckError as error:
+            result = ServiceCheckResult(error=error.error)
+        except Exception as error:
+            result = ServiceCheckResult(
+                error=UpdateError(
+                    "check_failed",
+                    "检查更新失败",
+                    str(error),
+                    True,
+                )
+            )
+        self.finished.emit(result)
 
 
 class _CheckRunnable(QObject):
@@ -161,29 +215,63 @@ class UpdateChecker(QObject):
     """
 
     finished = pyqtSignal(object)  # CheckResult
+    check_finished = pyqtSignal(object)  # ServiceCheckResult
 
     def __init__(
         self,
-        settings: UpdaterSettings,
+        settings: UpdaterSettings | None = None,
         manual: bool = False,
         parent: Optional[QObject] = None,
+        *,
+        service: UpdateService | None = None,
+        target: UpdateTarget | None = None,
+        channel: ReleaseChannel = ReleaseChannel.STABLE,
+        current_version: str = __version__,
     ):
         super().__init__(parent)
         self._settings = settings
         self._manual = bool(manual)
+        self._service = service
+        self._target = target
+        self._channel = channel
+        self._current_version = current_version
         self._thread: Optional[QThread] = None
-        self._worker: Optional[_CheckRunnable] = None
+        self._worker: Optional[QObject] = None
+
+    def check_now(self) -> None:
+        """Run one shared-service check immediately and emit a typed result."""
+        if self._service is None or self._target is None:
+            raise RuntimeError("service and target are required for check_now")
+        worker = _ServiceCheckRunnable(
+            self._service,
+            self._target,
+            self._channel,
+            self._current_version,
+        )
+        worker.finished.connect(self.check_finished.emit)
+        worker.run()
 
     def start(self) -> None:
         if self._thread is not None and self._thread.isRunning():
             return  # 已在跑
         self._thread = QThread()
-        self._worker = _CheckRunnable(self._settings, manual=self._manual)
+        if self._service is not None and self._target is not None:
+            self._worker = _ServiceCheckRunnable(
+                self._service,
+                self._target,
+                self._channel,
+                self._current_version,
+            )
+            self._worker.finished.connect(self._on_service_finished)  # type: ignore[attr-defined]
+        else:
+            if self._settings is None:
+                raise RuntimeError("settings are required for legacy update checks")
+            self._worker = _CheckRunnable(self._settings, manual=self._manual)
+            self._worker.finished.connect(self._on_worker_finished)  # type: ignore[attr-defined]
         self._worker.moveToThread(self._thread)
 
         self._thread.started.connect(self._worker.run)
-        self._worker.finished.connect(self._on_worker_finished)
-        self._worker.finished.connect(self._thread.quit)
+        self._worker.finished.connect(self._thread.quit)  # type: ignore[attr-defined]
         self._thread.finished.connect(self._worker.deleteLater)
         self._thread.finished.connect(self._cleanup_thread)
 
@@ -192,6 +280,9 @@ class UpdateChecker(QObject):
     def _on_worker_finished(self, result: object) -> None:
         # 把信号转发给外部连接者
         self.finished.emit(result)
+
+    def _on_service_finished(self, result: object) -> None:
+        self.check_finished.emit(result)
 
     def _cleanup_thread(self) -> None:
         if self._thread is not None:
