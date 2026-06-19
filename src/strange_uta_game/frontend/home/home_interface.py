@@ -512,41 +512,33 @@ class HomeInterface(QWidget):
                             delete_types=delete_types or None,
                         )
                     else:
-                        # LLM 注音激活时不需要本地日语 IME，跳过 WinRT 引导。
-                        _proceed = True
-                        if not llm_active:
-                            from strange_uta_game.frontend.winrt_japanese_guide import (
-                                ensure_winrt_japanese,
+                        # LLM 整首一次发送：传入全部行文本以保留上下文。
+                        lines = [s.text for s in project.sentences]
+                        analyzer = app_settings.build_ruby_analyzer(
+                            lines,
+                            annotate_katakana_with_english=annotate_katakana_with_english,
+                        )
+                        auto_check = AutoCheckService(
+                            ruby_analyzer=analyzer,
+                            auto_check_flags=auto_check_flags,
+                            user_dictionary=user_dict,
+                            annotate_katakana_with_english=annotate_katakana_with_english,
+                        )
+                        auto_check.analyze_and_apply_pipeline(
+                            project, only_noruby=True,
+                            apply_user_dict=_apply_user_dict,
+                            delete_types=delete_types or None,
+                        )
+                        if getattr(analyzer, "llm_failed", False):
+                            InfoBar.warning(
+                                title=self.tr("LLM 注音失败，已回退本地引擎"),
+                                content=str(getattr(analyzer, "last_error", "") or ""),
+                                orient=Qt.Orientation.Horizontal,
+                                isClosable=True,
+                                position=InfoBarPosition.TOP,
+                                duration=5000,
+                                parent=self,
                             )
-                            _proceed = ensure_winrt_japanese(self)
-                        if _proceed:
-                            # LLM 整首一次发送：传入全部行文本以保留上下文。
-                            lines = [s.text for s in project.sentences]
-                            analyzer = app_settings.build_ruby_analyzer(
-                                lines,
-                                annotate_katakana_with_english=annotate_katakana_with_english,
-                            )
-                            auto_check = AutoCheckService(
-                                ruby_analyzer=analyzer,
-                                auto_check_flags=auto_check_flags,
-                                user_dictionary=user_dict,
-                                annotate_katakana_with_english=annotate_katakana_with_english,
-                            )
-                            auto_check.analyze_and_apply_pipeline(
-                                project, only_noruby=True,
-                                apply_user_dict=_apply_user_dict,
-                                delete_types=delete_types or None,
-                            )
-                            if getattr(analyzer, "llm_failed", False):
-                                InfoBar.warning(
-                                    title=self.tr("LLM 注音失败，已回退本地引擎"),
-                                    content=str(getattr(analyzer, "last_error", "") or ""),
-                                    orient=Qt.Orientation.Horizontal,
-                                    isClosable=True,
-                                    position=InfoBarPosition.TOP,
-                                    duration=5000,
-                                    parent=self,
-                                )
             except Exception:
                 pass  # 注音分析失败不阻止项目创建
 

@@ -930,14 +930,6 @@ class RubyInterface(QWidget):
         from strange_uta_game.frontend.settings.settings_interface import AppSettings
 
         _llm_active = AppSettings().llm_ruby_active()
-        # LLM 注音激活时不需要本地日语 IME，跳过 WinRT 安装引导。
-        if not _llm_active:
-            from strange_uta_game.frontend.winrt_japanese_guide import (
-                ensure_winrt_japanese,
-            )
-
-            if not ensure_winrt_japanese(self):
-                return
 
         # 三选项对话框
         msg = QMessageBox(self)

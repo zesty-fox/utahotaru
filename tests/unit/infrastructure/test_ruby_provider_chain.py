@@ -8,6 +8,7 @@ from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import (
     RubyAnalyzer,
     RubyResult,
     build_provider_chain,
+    create_analyzer,
 )
 
 
@@ -55,6 +56,16 @@ def test_shared_chain_works_without_winrt():
     providers = build_provider_chain(winrt_available=False)
 
     assert [provider.name for provider in providers] == ["sudachi", "pykakasi"]
+
+
+def test_shared_analyzer_reads_japanese_when_winrt_is_unavailable(monkeypatch):
+    monkeypatch.setattr(
+        "strange_uta_game.backend.infrastructure.parsers.ruby_analyzer."
+        "winrt_japanese_status",
+        lambda: (False, "unsupported_platform"),
+    )
+
+    assert create_analyzer().get_reading("日本語")
 
 
 def test_provider_failure_falls_through():
