@@ -180,6 +180,50 @@ class TestParseToSentences:
         assert chars[1].linked_to_next is False
 
 
+class TestSetUtatenCharRuby:
+    """_set_utaten_char_ruby：cc 必须跟注音段自身的 mora 数，而非参考句 cc。"""
+
+    def test_cc_follows_segment_mora_not_reference(self):
+        # 回归：当て字场景下 reference（对原文跑分析器）的 cc 比 utaten 注音段的
+        # mora 数大时，旧实现用 reference.check_count 当目标拍数，set_check_count
+        # 会用停顿符把不足的拍补齐，导致字符上凭空多出占位符（rubyparts != cc 失配）。
+        from strange_uta_game.frontend.editor.timing.lyric_loader import (
+            _set_utaten_char_ruby,
+        )
+        from strange_uta_game.backend.domain import Character
+        from strange_uta_game.backend.domain.models import get_ruby_pause_char
+
+        # 新時代→はじまり：utaten 给「新」的注音段只有 1 mora「は」，
+        # 而分析器对原文「新」给出 2 mora（しん），reference.check_count=2。
+        ch = Character(char="新")
+        reference = Character(char="新", check_count=2)
+        _set_utaten_char_ruby(ch, "は", reference)
+
+        assert ch.ruby is not None
+        # cc 跟注音段 mora 数（1），不被 reference 的 2 撑大
+        assert ch.check_count == 1
+        # 不变式：parts 段数 == cc，且没有凭空补出的停顿符
+        assert len(ch.ruby.parts) == ch.check_count
+        pause = get_ruby_pause_char()
+        assert all(p.text != pause for p in ch.ruby.parts)
+        assert ch.ruby.text == "は"
+
+    def test_multi_mora_segment_keeps_all_moras(self):
+        # 注音段本身 2 mora「きょ」+「う」→ きょう（2 mora），reference 缺失时
+        # 也应按段自身 mora 数切，cc=2。
+        from strange_uta_game.frontend.editor.timing.lyric_loader import (
+            _set_utaten_char_ruby,
+        )
+        from strange_uta_game.backend.domain import Character
+
+        ch = Character(char="今")
+        _set_utaten_char_ruby(ch, "きょう", None)
+
+        assert ch.ruby is not None
+        assert ch.check_count == len(ch.ruby.parts) == 2
+        assert ch.ruby.text == "きょう"
+
+
 class TestApplyRubyEntries:
     """测试 @Ruby 注音应用（含位置范围消歧）"""
 

@@ -155,7 +155,12 @@ def _set_utaten_char_ruby(ch: Character, segment: str, reference: Optional[Chara
     if ref_count is None:
         ref_count = len(split_into_moras(segment)) if segment else 0
     if ch.ruby:
-        ch.set_check_count(max(1, ref_count), ruby_split_mode="mora")
+        # cc 必须等于注音段自身的 mora 数：utaten 注音段是权威读音，而
+        # reference.check_count 来自对原文汉字跑分析器得到的读音拍数。当て字等
+        # 场景下二者 mora 数不一致，若用 ref_count 当目标拍数，set_check_count 会
+        # 用停顿符（占位符）把不足的拍补齐，导致字符上凭空多出空拍。
+        seg_moras = len(split_into_moras(segment))
+        ch.set_check_count(max(1, seg_moras), ruby_split_mode="mora")
     else:
         ch.set_check_count(max(0, ref_count), force=True)
 
