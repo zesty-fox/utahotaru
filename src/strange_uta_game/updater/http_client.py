@@ -16,6 +16,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from typing import Callable, Dict, Iterable, List, Optional, Tuple
+from pathlib import Path
 
 import requests
 
@@ -104,6 +105,28 @@ def get_text(
     if resp.status_code != 200:
         return HttpResult(ok=False, status=resp.status_code, error=f"HTTP {resp.status_code}")
     return HttpResult(ok=True, status=resp.status_code, body=resp.text)
+
+
+def get_bytes(
+    url: str,
+    *,
+    proxies: Optional[Dict[str, str]] = None,
+    timeout: Tuple[float, float] = DEFAULT_TIMEOUT,
+) -> HttpResult:
+    """GET exact response bytes for signature-sensitive payloads."""
+    try:
+        resp = requests.get(
+            url,
+            headers=_headers(),
+            proxies=proxies,
+            timeout=timeout,
+            allow_redirects=True,
+        )
+    except requests.RequestException as e:
+        return HttpResult(ok=False, error=f"网络错误: {e}")
+    if resp.status_code != 200:
+        return HttpResult(ok=False, status=resp.status_code, error=f"HTTP {resp.status_code}")
+    return HttpResult(ok=True, status=resp.status_code, body=resp.content)
 
 
 def download(
@@ -248,3 +271,27 @@ class SourceTrialRunner:
                 + (f" {a.error}" if a.error else "")
             )
         return " | ".join(parts)
+
+
+class RequestsHttpClient:
+    """Exception-based adapter consumed by the shared update service."""
+
+    def __init__(self, proxies: Optional[Dict[str, str]] = None):
+        self._proxies = proxies
+
+    def get_bytes(self, url: str) -> bytes:
+        result = get_bytes(url, proxies=self._proxies)
+        if not result.ok or not isinstance(result.body, bytes):
+            raise RuntimeError(result.error or "empty HTTP response")
+        return result.body
+
+    def download_to(self, url: str, path: Path, **kwargs) -> None:
+        result = download(
+            url,
+            str(path),
+            proxies=self._proxies,
+            progress_cb=kwargs.get("progress_cb"),
+            cancel_check=kwargs.get("cancel_check"),
+        )
+        if not result.ok:
+            raise RuntimeError(result.error or "download failed")
