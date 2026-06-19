@@ -5,9 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from .capabilities import CapabilityRegistry
+from .capabilities import Capability, CapabilityRegistry, CapabilityStatus
 from .migration import migrate_legacy_data
 from .paths import AppPaths, build_app_paths, legacy_roots
+from .winrt import winrt_japanese_status
 
 
 @dataclass(frozen=True)
@@ -28,4 +29,14 @@ def build_runtime_context(
 
     paths = (app_paths or build_app_paths()).ensure()
     migrate_legacy_data(paths, legacy_roots(program_dir, cwd))
-    return RuntimeContext(paths=paths, capabilities=CapabilityRegistry())
+    winrt_available, winrt_reason = winrt_japanese_status()
+    capabilities = CapabilityRegistry(
+        {
+            Capability.RUBY_WINRT: CapabilityStatus(
+                available=winrt_available,
+                provider="winrt" if winrt_available else "",
+                reason=winrt_reason,
+            )
+        }
+    )
+    return RuntimeContext(paths=paths, capabilities=capabilities)

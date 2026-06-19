@@ -1,20 +1,20 @@
 """打包脚本 - 使用 PyInstaller 打包 StrangeUtaGame
 
 变体（--variant）：
-  main      Windows + WinRT 日语注音（默认，已分发版本）
-  noWinIME  Windows，无 WinRT，内置 sudachi-mini 注音
-  mac       macOS，无 WinRT，内置 sudachi-mini 注音
+  main      Windows（共享 Sudachi 回退 + 可选 WinRT 增强）
+  mac       macOS（共享 Sudachi 回退）
 
 注意事项：
 1. sounddevice 和 soundfile 依赖 PortAudio / libsndfile，需要确保 DLL 被打包
 2. PyQt6 有平台插件需要处理
-3. main 变体：日语注音用 WinRT IME；noWinIME/mac 变体：使用 sudachi-mini
+3. 所有变体使用共享 Sudachi/pykakasi 回退，Windows 可额外使用 WinRT IME
 4. numpy 是音频引擎核心依赖，不可排除
 5. 使用 --onedir 模式避免单文件解压问题
 """
 
 import argparse
 import contextlib
+import importlib.util
 import re
 import sys
 from pathlib import Path
@@ -40,9 +40,9 @@ parser = argparse.ArgumentParser(description="PyInstaller 打包脚本")
 parser.add_argument("--clean", action="store_true", help="传给 PyInstaller --clean，完整重建")
 parser.add_argument(
     "--variant",
-    choices=["main", "noWinIME", "mac"],
+    choices=["main", "mac"],
     default="main",
-    help="构建变体：main（默认）/ noWinIME / mac",
+    help="构建变体：main（默认）/ mac",
 )
 _cli_args = parser.parse_args()
 
@@ -87,44 +87,33 @@ except ImportError:
 
 # ── 变体配置 ──────────────────────────────────────────────────────────────────
 
+_WINRT_INSTALLED = importlib.util.find_spec("winrt") is not None
+_WINRT_HIDDEN_IMPORTS = (
+    [
+        "--hidden-import=winrt.windows.globalization",
+        "--hidden-import=winrt.windows.foundation",
+        "--hidden-import=winrt.windows.foundation.collections",
+    ]
+    if _WINRT_INSTALLED
+    else []
+)
+_WINRT_COLLECT = ["--collect-all=winrt"] if _WINRT_INSTALLED else []
+
 # 每个变体的 PyInstaller 额外参数（在公共参数基础上叠加）
 _VARIANT_CONFIGS = {
     "main": {
-        # WinRT 相关
-        "hidden_imports": [
-            "--hidden-import=winrt.windows.globalization",
-            "--hidden-import=winrt.windows.foundation",
-            "--hidden-import=winrt.windows.foundation.collections",
-        ],
-        "collect_all": ["--collect-all=winrt"],
-        # 主版本不含 sudachi：即便构建机器上恰好装了 sudachipy，也不打进包里
-        "exclude_modules": [
-            "--exclude-module=sudachipy",
-            "--exclude-module=sudachidict_small",
-            "--exclude-module=sudachidict_core",
-            "--exclude-module=sudachidict_full",
-        ],
-        # 额外检查的依赖（import 名）
-        "required_deps": ["winrt.windows.globalization"],
-    },
-    "noWinIME": {
-        "hidden_imports": [
+        "hidden_imports": _WINRT_HIDDEN_IMPORTS + [
             "--hidden-import=sudachipy",
             "--hidden-import=sudachidict_small",
         ],
-        "collect_all": [
+        "collect_all": _WINRT_COLLECT + [
             "--collect-all=sudachipy",
             "--collect-data=sudachidict_small",
         ],
         "exclude_modules": [
-            "--exclude-module=winrt",
-            "--exclude-module=winrt.windows.globalization",
-            "--exclude-module=winrt.windows.foundation",
-            # 只使用 sudachidict_small，排除大字典以减小包体积
             "--exclude-module=sudachidict_core",
             "--exclude-module=sudachidict_full",
         ],
-        # 自定义 hook 覆盖系统 hook-sudachipy.py，阻止自动收集 core/full 字典
         "hooks_dir": str(PROJECT_ROOT / "pyinstaller_hooks"),
         "required_deps": [],
     },
@@ -168,6 +157,8 @@ _common_deps = [
     ("soundfile", "soundfile"),
     ("pedalboard", "pedalboard"),
     ("pykakasi", "pykakasi"),
+    ("sudachipy", "sudachipy"),
+    ("sudachidict_small", "sudachidict_small"),
     ("qfluentwidgets", "qfluentwidgets"),
     ("numpy", "numpy"),
     ("jaconv", "jaconv"),
@@ -187,14 +178,6 @@ for _mod in _cfg["required_deps"]:
     except ImportError:
         print(f"✗ 缺少变体依赖: {_mod}")
         _failed = True
-
-if VARIANT in ("noWinIME", "mac"):
-    for _sudachi_pkg in ("sudachipy", "sudachidict_small"):
-        try:
-            __import__(_sudachi_pkg)
-        except ImportError:
-            print(f"✗ 缺少依赖: {_sudachi_pkg}（请 pip install sudachipy sudachidict_small）")
-            _failed = True
 
 if _failed:
     print("请先安装缺少的依赖后重试。")
@@ -503,10 +486,7 @@ print("=" * 60)
 print("1. 测试音频功能是否正常（播放/暂停/变速）")
 print("2. 检查项目保存和打开功能")
 print("3. 验证导出功能（LRC/KRA/ASS 等）")
-if VARIANT == "main":
-    print("4. 测试日语注音（WinRT IME；缺日语功能时应弹出安装引导）")
-else:
-    print("4. 测试日语注音（sudachi-mini；注音应直接可用，无需安装额外组件）")
+print("4. 测试日语注音（Sudachi 回退应始终可用；Windows 可选 WinRT 增强）")
 if sys.platform == "win32":
     print("5. 如缺少 DLL，请安装 Visual C++ Redistributable")
     print("   https://aka.ms/vs/17/release/vc_redist.x64.exe")

@@ -11,7 +11,9 @@ soundfile==0.13.1
 pedalboard==0.9.22
 numpy==2.4.4
 pykakasi==2.3.0
-# 日语注音引擎见 requirements-winrt.txt（main 变体）或 requirements-variants.txt（noWinIME/mac）
+sudachipy==0.6.11
+sudachidict_small
+# Windows 可通过 requirements-winrt.txt 增加可选的 WinRT 首选提供者。
 jaconv==0.5.0
 pyphen==0.17.2
 requests==2.32.5

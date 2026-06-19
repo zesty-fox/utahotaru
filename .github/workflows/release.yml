@@ -38,7 +38,6 @@ jobs:
       matrix:
         include:
           - { variant: main,     os: windows-latest, cache: '.runtime-hash-cache.json' }
-          - { variant: noWinIME, os: windows-latest, cache: '.runtime-hash-cache-noWinIME.json' }
           # mac 变体暂不构建：无 BASS 音频引擎 / 无更新器 / 多项功能缺失。待补齐后取消注释。
           # - { variant: mac,      os: macos-latest,   cache: '.runtime-hash-cache-mac.json' }
     runs-on: ${{ matrix.os }}
@@ -87,11 +86,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          if [ "${{ matrix.variant }}" = "main" ]; then
-            pip install -r requirements-winrt.txt
-          else
-            pip install -r requirements-variants.txt
-          fi
+          pip install -r requirements-winrt.txt
 
       - name: Validate CHANGELOG section
         run: |
