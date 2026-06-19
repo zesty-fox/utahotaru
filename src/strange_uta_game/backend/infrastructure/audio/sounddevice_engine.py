@@ -88,12 +88,14 @@ _PRODUCER_TICK = 0.005
 # WASAPI Shared 模式硬下限约 20ms，传更小值会被 clamp 到硬件最小值。
 # 传 0.1 让 PortAudio 申请标准低缓冲，实际值由 stream.latency 读回。
 _TARGET_LATENCY = 0.1
+StreamFactory = Callable[..., sd.OutputStream]
 
 
 class SoundDeviceEngine(IAudioEngine):
     """音频引擎（离线预渲染 + RingBuffer）。"""
 
-    def __init__(self) -> None:
+    def __init__(self, stream_factory: StreamFactory = sd.OutputStream) -> None:
+        self._stream_factory = stream_factory
         # ---- 音频元数据 ----
         self._original_data: Optional[np.ndarray] = None  # (n, channels) float32（原始文件，仅用于波形显示）
         self._original_sample_rate: int = 44100  # 原始文件采样率（用于时长/位置计算）
@@ -504,7 +506,7 @@ class SoundDeviceEngine(IAudioEngine):
 
         # 启动 stream
         try:
-            self._stream = sd.OutputStream(
+            self._stream = self._stream_factory(
                 samplerate=self._sample_rate,
                 channels=self._channels,
                 dtype="float32",
@@ -722,7 +724,7 @@ class SoundDeviceEngine(IAudioEngine):
             return
 
         try:
-            self._stream = sd.OutputStream(
+            self._stream = self._stream_factory(
                 samplerate=self._sample_rate,
                 channels=self._channels,
                 dtype="float32",
@@ -750,5 +752,4 @@ class SoundDeviceEngine(IAudioEngine):
             self._stream_latency_frames = 0
             # 如果实在救不回来，暂停播放，让用户后续手动点击播放重试
             self._state = PlaybackState.PAUSED
-
 
