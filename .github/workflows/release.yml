@@ -54,6 +54,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      - name: Check platform boundaries
+        run: python scripts/check_platform_boundaries.py
+
       - name: Resolve tag & version
         id: ver
         run: |

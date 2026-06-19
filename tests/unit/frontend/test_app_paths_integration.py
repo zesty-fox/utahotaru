@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QCoreApplication
-
 from strange_uta_game.backend.infrastructure.audio import tsm_cache, video_converter
 from strange_uta_game.frontend.project_store import ProjectStore
 from strange_uta_game.frontend.settings.app_settings import AppSettings
@@ -39,9 +37,8 @@ def test_explicit_config_path_wins_over_injected_paths(tmp_path):
     assert not (paths.config / "config.json").exists()
 
 
-def test_project_store_uses_injected_cache_directory(tmp_path):
-    app = QCoreApplication.instance() or QCoreApplication([])
-    _ = app
+def test_project_store_uses_injected_cache_directory(tmp_path, qapp):
+    _ = qapp
     paths = _paths(tmp_path)
 
     store = ProjectStore(app_paths=paths)

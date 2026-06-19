@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 from pathlib import Path
 
 from PyQt6.QtCore import QEvent, Qt, QTimer, pyqtSignal
@@ -43,6 +42,7 @@ from qfluentwidgets import (
     SettingCard,
     SettingCardGroup,
 )
+from strange_uta_game.runtime.platform_info import is_windows
 
 from strange_uta_game.__version__ import __version__ as _app_version
 
@@ -508,7 +508,7 @@ class SettingsInterface(ScrollArea):
 
         for name in (app_name, "Karaoke Helper", "Karaoke Studio Dev"):
             appdata = os.getenv("APPDATA")
-            if os.name == "nt" and appdata:
+            if is_windows() and appdata:
                 candidates.append(Path(appdata) / name / "settings.json")
 
             config_home = os.getenv("XDG_CONFIG_HOME")

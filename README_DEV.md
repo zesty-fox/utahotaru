@@ -513,6 +513,13 @@ pyinstaller --noconfirm --onedir --windowed \
 - **依赖方向**：始终向内（Presentation → Application → Domain）
 - **领域层**：零外部依赖，纯 Python 数据类
 - **命令模式**：所有编辑操作通过 Command 对象执行，支持撤销/重做
+- **平台边界**：`frontend`、`backend/application` 和 `backend/domain` 不得直接检查
+  `sys.platform`、`os.name` 或 `platform.system()`；平台探测放在 `runtime` 或
+  `backend/infrastructure`，共享代码只消费能力或适配结果。
+
+运行 `python scripts/check_platform_boundaries.py` 可在本地检查此约束，发布工作流也会
+在打包前执行同一检查。`main.py` 中创建 `QApplication` 前设置 Windows 任务栏标识属于
+启动引导例外，因为该调用必须早于 Qt 应用对象创建，且不会进入业务层。
 
 ## 许可
 

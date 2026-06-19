@@ -21,6 +21,7 @@ from strange_uta_game.frontend.localization import (
     DEFAULT_LANGUAGE,
     localization,
 )
+from strange_uta_game.runtime.platform_info import is_windows
 from ..cards import ComboSettingCard
 from .base import SubSettingInterface
 
@@ -91,7 +92,7 @@ class AboutSubInterface(SubSettingInterface):
         self._ffmpeg_card.hBoxLayout.addWidget(self._ffmpeg_path_label, 0, Qt.AlignmentFlag.AlignRight)
         self._ffmpeg_card.hBoxLayout.addWidget(self._btn_browse_ffmpeg, 0, Qt.AlignmentFlag.AlignRight)
         self._ffmpeg_card.hBoxLayout.addWidget(self._btn_clear_ffmpeg, 0, Qt.AlignmentFlag.AlignRight)
-        if sys.platform == "win32":
+        if is_windows():
             self._btn_install_ffmpeg = PrimaryPushButton(self.tr("一键安装"), self._ffmpeg_card)
             self._btn_install_ffmpeg.setFont(QFont("Microsoft YaHei", 10))
             self._btn_install_ffmpeg.clicked.connect(self._install_ffmpeg)

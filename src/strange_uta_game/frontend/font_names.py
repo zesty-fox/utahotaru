@@ -15,8 +15,9 @@ from __future__ import annotations
 import glob
 import os
 import struct
-import sys
 from functools import lru_cache
+
+from strange_uta_game.runtime.platform_info import is_windows
 
 # OpenType name 表 nameID
 _NAME_FAMILY = 1          # Font Family name
@@ -178,7 +179,7 @@ def localized_alias_map() -> dict[str, dict[int, str]]:
 
     仅 Windows 下扫描；解析失败的文件跳过。结果缓存（首次调用约 1~2 秒）。
     """
-    if not sys.platform.startswith("win"):
+    if not is_windows():
         return {}
     result: dict[str, dict[int, str]] = {}
     for path in _font_files():

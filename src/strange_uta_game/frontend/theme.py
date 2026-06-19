@@ -16,13 +16,17 @@
 
 from __future__ import annotations
 
-import sys
 from enum import Enum, auto
 from typing import Callable, List, Optional
 
 from PyQt6.QtCore import Qt, pyqtSignal, QObject, QTimer
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QApplication, QWidget
+
+from strange_uta_game.runtime.platform_theme import (
+    detect_theme_hints,
+    windows_apps_use_dark_theme,
+)
 
 
 class ThemeMode(Enum):
@@ -324,7 +328,8 @@ class Theme(QObject):
         self._system_is_dark: bool = False
         self._listeners: List[Callable] = []
         self._poll_timer: Optional[QTimer] = None
-        self._is_win10: bool = self._detect_windows_version()
+        self._theme_hints = detect_theme_hints()
+        self._is_win10: bool = self._theme_hints.is_windows_10
         self._refreshing_widgets: bool = False
         self._refresh_widgets_pending: bool = False
 
@@ -334,43 +339,10 @@ class Theme(QObject):
         # 监听系统主题变化
         self._setup_system_theme_listener()
 
-    @staticmethod
-    def _detect_windows_version() -> bool:
-        """检测是否为 Windows 10。
-
-        Returns:
-            True 表示 Win10，False 表示 Win11 或非 Windows 系统。
-        """
-        if sys.platform != "win32":
-            return False
-        try:
-            import winreg
-            key = winreg.OpenKey(
-                winreg.HKEY_LOCAL_MACHINE,
-                r"SOFTWARE\Microsoft\Windows NT\CurrentVersion"
-            )
-            build_str, _ = winreg.QueryValueEx(key, "CurrentBuildNumber")
-            winreg.CloseKey(key)
-            build = int(build_str)
-            # Win10: 10240-22000, Win11: >= 22000
-            return build < 22000
-        except Exception:
-            return False
-
     def _detect_system_theme(self) -> None:
         """检测系统主题"""
-        if sys.platform == "win32":
-            try:
-                import winreg
-                key = winreg.OpenKey(
-                    winreg.HKEY_CURRENT_USER,
-                    r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
-                )
-                value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
-                winreg.CloseKey(key)
-                self._system_is_dark = (value == 0)
-            except Exception:
-                self._system_is_dark = False
+        if self._theme_hints.use_windows_registry:
+            self._system_is_dark = windows_apps_use_dark_theme()
         else:
             app = QApplication.instance()
             if app:
