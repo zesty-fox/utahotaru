@@ -30,6 +30,7 @@ from qfluentwidgets import (
 )
 
 from ..manifest import LatestRelease
+from ..model import UpdateError
 
 
 class UpdateAvailableDialog(MessageBoxBase):
@@ -130,6 +131,7 @@ class UpdateAvailableDialog(MessageBoxBase):
 
         # 替换 MessageBoxBase 默认的 yes/cancel 按钮
         self.yesButton.setText(_tr("立即更新"))
+        self.install_button = self.yesButton
         self.cancelButton.setText(_tr("稍后再说"))
         # 增加"跳过此版本"按钮
         self.skip_btn = PushButton(_tr("跳过此版本"), self.buttonGroup)
@@ -142,6 +144,15 @@ class UpdateAvailableDialog(MessageBoxBase):
         self.cancelButton.clicked.connect(self._on_later_clicked)
 
         self.setMinimumWidth(560)
+
+    def show_error(self, error: UpdateError) -> None:
+        """Display a structured update error and enforce its recovery policy."""
+        label = BodyLabel(error.user_message, self)
+        label.setWordWrap(True)
+        label.setStyleSheet("color: #c42b1c;")
+        self.viewLayout.addWidget(label)
+        if not error.recoverable:
+            self.install_button.setEnabled(False)
 
     # ── 槽 ──
 

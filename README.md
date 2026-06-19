@@ -141,8 +141,8 @@
   <td width="60" align="center">⚡</td>
   <td>
     <b>低延迟、高精度打轴 / Frame-accurate timing</b><br/>
-    <sub>基于 <b>BASS 音频库</b> + <code>sounddevice</code> 的低延迟回放管线，按键 → 音频指针 → 时间戳一气呵成；可配置 <code>tag_offset_ms</code> 全局补偿与每首歌偏移。<br/>
-    Powered by the <b>BASS audio library</b> with a tuned <code>sounddevice</code> output path; per-tag offset and per-song global offset are both adjustable.</sub>
+    <sub>基于跨平台 <code>sounddevice</code> / PortAudio 的低延迟回放管线，按键 → 音频指针 → 时间戳一气呵成；可配置 <code>tag_offset_ms</code> 全局补偿与每首歌偏移。Windows preview 可选择 BASS 增强后端。<br/>
+    Powered by a cross-platform <code>sounddevice</code> / PortAudio path; per-tag and per-song offsets are adjustable. A BASS enhancement backend is optional in Windows previews.</sub>
   </td>
 </tr>
 <tr>
@@ -248,6 +248,9 @@
 ## 📦 安装与运行 / Installation
 
 > 🪟 **支持系统 / Supported OS：** Windows 10 / 11
+>
+> macOS Universal 2 与 Linux x86_64（AppImage / Flatpak / Debian）安装包正在 preview
+> 通道完成签名和安装验证；在 stable 门禁全部通过前，官方支持 badge 保持 Windows。
 
 ### 🚀 方式一 · 直接运行（推荐） / Pre-built release (recommended)
 

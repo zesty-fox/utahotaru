@@ -4,7 +4,7 @@
 
 一款由 RhythmicaLyrics 启发的歌词打轴软件，专注于低延迟、高精度的卡拉OK时间标签制作。
 
-**当前版本**：v0.3.0 | **许可证**：GPL-3.0 | **平台**：Windows 10/11
+**许可证**：GPL-3.0 | **目标平台**：Windows x64、macOS Universal 2、Linux x64
 
 ## 核心特性
 
@@ -117,7 +117,7 @@ StrangeUtaGame/
 
 ### 环境要求
 
-- **操作系统**：Windows 10/11（主要开发平台）
+- **操作系统**：Windows 10/11、macOS、Linux（打包必须在对应原生系统执行）
 - **Python**：3.11+
 - **音频设备**：支持音频输出的设备
 
@@ -159,6 +159,28 @@ pytest tests/
 
 # 运行测试并生成覆盖率报告
 pytest tests/ --cov=src --cov-report=html
+```
+
+### 安装包冒烟验收
+
+每个原生安装包必须验证应用可启动、旧版 `.sug` 可读取、SRT 可导出并能干净退出：
+
+```bash
+StrangeUtaGame --smoke-test smoke-<target-id>.json
+```
+
+完整 target ID、签名验证和 preview/stable 流程见 [RELEASING.md](RELEASING.md)。
+冒烟检查不初始化或播放音频。
+
+### 可选音频延迟诊断
+
+音频延迟报告不属于发布门禁。需要排查设备或后端延迟时，可在 Windows WASAPI、
+macOS CoreAudio 或 Linux PipeWire/PulseAudio 环境生成回环诊断报告：
+
+```bash
+python3 scripts/audio_loopback_probe.py --list-devices
+python3 scripts/audio_loopback_probe.py --input DEVICE --output DEVICE --runs 20 \
+  --calibration-ms 0 --report audio-<platform>.json
 ```
 
 ## 使用指南
@@ -513,6 +535,13 @@ pyinstaller --noconfirm --onedir --windowed \
 - **依赖方向**：始终向内（Presentation → Application → Domain）
 - **领域层**：零外部依赖，纯 Python 数据类
 - **命令模式**：所有编辑操作通过 Command 对象执行，支持撤销/重做
+- **平台边界**：`frontend`、`backend/application` 和 `backend/domain` 不得直接检查
+  `sys.platform`、`os.name` 或 `platform.system()`；平台探测放在 `runtime` 或
+  `backend/infrastructure`，共享代码只消费能力或适配结果。
+
+运行 `python scripts/check_platform_boundaries.py` 可在本地检查此约束，发布工作流也会
+在打包前执行同一检查。`main.py` 中创建 `QApplication` 前设置 Windows 任务栏标识属于
+启动引导例外，因为该调用必须早于 Qt 应用对象创建，且不会进入业务层。
 
 ## 许可
 

@@ -19,6 +19,8 @@ from typing import Any, ClassVar, Dict, Optional, Protocol, runtime_checkable
 import json
 import sys
 
+from strange_uta_game.runtime.paths import AppPaths
+
 
 @runtime_checkable
 class SettingsProvider(Protocol):
@@ -70,6 +72,7 @@ class AppSettings:
     """应用设置管理"""
 
     _default_provider: ClassVar[Optional[SettingsProvider]] = None
+    _default_app_paths: ClassVar[Optional[AppPaths]] = None
 
     DEFAULT_SETTINGS = {
         "audio": {
@@ -317,6 +320,12 @@ class AppSettings:
         """
         cls._default_provider = provider
 
+    @classmethod
+    def set_default_app_paths(cls, app_paths: Optional[AppPaths]) -> None:
+        """Set canonical standalone paths for deep ``AppSettings()`` calls."""
+
+        cls._default_app_paths = app_paths
+
     @staticmethod
     def get_config_dir() -> Path:
         """获取配置文件目录（默认为程序所在目录）。
@@ -354,6 +363,7 @@ class AppSettings:
         config_path: Optional[str] = None,
         *,
         provider: Optional[SettingsProvider] = None,
+        app_paths: Optional[AppPaths] = None,
     ):
         """初始化 AppSettings。
 
@@ -374,13 +384,18 @@ class AppSettings:
         else:
             effective_provider = None
         self._provider = effective_provider
+        effective_app_paths = app_paths or self.__class__._default_app_paths
 
         if effective_provider is None:
             # ── standalone 模式：保持原有文件型行为 ──
             if config_path is None:
-                config_dir = self.get_config_dir()
+                config_dir = (
+                    effective_app_paths.config
+                    if effective_app_paths is not None
+                    else self.get_config_dir()
+                )
                 try:
-                    config_dir.mkdir(exist_ok=True)
+                    config_dir.mkdir(parents=True, exist_ok=True)
                 except OSError:
                     # 程序目录不可写时回退到用户目录
                     config_dir = Path.home() / ".strange_uta_game"

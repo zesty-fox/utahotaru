@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 from pathlib import Path
 
 from PyQt6.QtCore import QEvent, Qt, QTimer, pyqtSignal
@@ -43,6 +42,7 @@ from qfluentwidgets import (
     SettingCard,
     SettingCardGroup,
 )
+from strange_uta_game.runtime.platform_info import is_windows
 
 from strange_uta_game.__version__ import __version__ as _app_version
 
@@ -120,11 +120,12 @@ class SettingsInterface(ScrollArea):
     _SHORTCUT_ACTIONS = ShortcutSubInterface._SHORTCUT_ACTIONS
     _SHORTCUT_MODES   = ShortcutSubInterface._SHORTCUT_MODES
 
-    def __init__(self, parent=None, settings_provider=None):
+    def __init__(self, parent=None, settings_provider=None, app_paths=None):
         super().__init__(parent)
         self._store = None
         self._settings_provider = settings_provider
-        self._settings = AppSettings(provider=settings_provider)
+        self._app_paths = app_paths
+        self._settings = AppSettings(provider=settings_provider, app_paths=app_paths)
         self._embedded = settings_provider is not None
         self._tab_config = [
             item for item in self.TAB_CONFIG
@@ -462,13 +463,16 @@ class SettingsInterface(ScrollArea):
         if msg.clickedButton() is btn_yes:
             try:
                 if self._settings_provider is not None:
-                    self._settings = AppSettings(provider=self._settings_provider)
+                    self._settings = AppSettings(
+                        provider=self._settings_provider,
+                        app_paths=self._app_paths,
+                    )
                     self._settings._settings = self._settings._load_packaged_defaults()
                     self._settings.save()
                 else:
                     if self._settings._config_path.exists():
                         self._settings._config_path.unlink()
-                    self._settings = AppSettings()
+                    self._settings = AppSettings(app_paths=self._app_paths)
                 self._load_current_settings()
                 InfoBar.success(title=self.tr("设置已重置"), content=self.tr("所有设置已恢复为默认值"),
                     orient=Qt.Orientation.Horizontal, isClosable=True,
@@ -504,7 +508,7 @@ class SettingsInterface(ScrollArea):
 
         for name in (app_name, "Karaoke Helper", "Karaoke Studio Dev"):
             appdata = os.getenv("APPDATA")
-            if os.name == "nt" and appdata:
+            if is_windows() and appdata:
                 candidates.append(Path(appdata) / name / "settings.json")
 
             config_home = os.getenv("XDG_CONFIG_HOME")

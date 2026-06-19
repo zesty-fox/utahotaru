@@ -23,9 +23,10 @@ from typing import Optional
 
 from strange_uta_game.backend.application import CommandManager, TimingService
 from strange_uta_game.backend.domain import Project
-from strange_uta_game.backend.infrastructure.audio import BassEngine, BassTsmEngine
+from strange_uta_game.backend.infrastructure.audio import create_audio_engine
 from strange_uta_game.frontend.project_store import ProjectStore
 from strange_uta_game.frontend.theme import theme
+from strange_uta_game.runtime.context import RuntimeContext
 
 
 class MainWindow(MSFluentWindow):
@@ -47,7 +48,19 @@ class MainWindow(MSFluentWindow):
     # standalone 行为。
     _embedded: bool = False
 
-    def __init__(self, embedded: bool = False, settings_provider=None, progress_callback=None):
+    def _set_runtime_context(self, context: RuntimeContext | None) -> None:
+        """Store bootstrap state before Qt base-class initialization."""
+
+        self._runtime_context = context
+
+    def __init__(
+        self,
+        embedded: bool = False,
+        settings_provider=None,
+        progress_callback=None,
+        runtime_context: RuntimeContext | None = None,
+        audio_engine_factory=None,
+    ):
         # ⚠ 必须在 super().__init__() 之前赋值！MSFluentWindow 初始化
         # 过程中可能触发 resizeEvent / changeEvent，那些 handler 会调
         # _schedule_geometry_save / _save_window_geometry / _restore_window_geometry
@@ -55,8 +68,12 @@ class MainWindow(MSFluentWindow):
         # AttributeError，而 Qt C++ 事件分发无法捕获 Python 异常，进程
         # 直接以 0xC0000409 stack-buffer-overrun 崩掉（已实测）。
         self._embedded = embedded
+        self._set_runtime_context(runtime_context)
         self._settings_provider = settings_provider
         self._progress_cb = progress_callback if not embedded else None
+        self._audio_engine_factory = audio_engine_factory or create_audio_engine
+        app_paths = runtime_context.paths if runtime_context is not None else None
+        self._app_paths = app_paths
 
         self._report_progress(5, self.tr("正在初始化翻译器..."))
 
@@ -68,7 +85,7 @@ class MainWindow(MSFluentWindow):
             from strange_uta_game.frontend.settings.app_settings import AppSettings
             from strange_uta_game.frontend.localization import install_translators
             try:
-                _lang = AppSettings().get("ui.language", "auto")
+                _lang = AppSettings(app_paths=app_paths).get("ui.language", "auto")
             except Exception:
                 _lang = "zh_CN"
             install_translators(_lang)
@@ -81,16 +98,14 @@ class MainWindow(MSFluentWindow):
             AppSettings.set_default_provider(self._settings_provider)
 
         self._report_progress(20, self.tr("正在初始化音频引擎..."))
-        # 引擎按"启用高质量音频变速"设置选择：
-        #   开（默认）→ BassTsmEngine：离线 TSM 预渲染，变速不变调、无爆音；
-        #   关        → BassEngine：原版 BASS 实时变速，零缓存但可能爆音。
+        # 稳定版始终使用共享音频引擎；测试和预览后端通过工厂显式注入。
         self._audio_engine = self._make_audio_engine()
 
         self._report_progress(30, self.tr("正在初始化核心服务..."))
         self._command_manager = CommandManager()
         self._command_manager.set_on_state_changed(self._on_command_state_changed)
         self._timing_service = TimingService(self._audio_engine, self._command_manager)
-        self._store = ProjectStore(self)
+        self._store = ProjectStore(self, app_paths=app_paths)
         self._store.set_auto_save_defer_predicate(self._timing_service.is_playing)
 
         # 跟踪当前界面（用于 switchTo 自动应用修改，必须在 _init_navigation 之前）
@@ -101,7 +116,7 @@ class MainWindow(MSFluentWindow):
         # embedded 模式由宿主管理几何，跳过这一整套。
         if not self._embedded:
             from strange_uta_game.frontend.settings.app_settings import AppSettings
-            self._win_settings = AppSettings()
+            self._win_settings = AppSettings(app_paths=app_paths)
             self._geometry_save_timer = QTimer(self)
             self._geometry_save_timer.setSingleShot(True)
             self._geometry_save_timer.setInterval(400)
@@ -426,7 +441,7 @@ class MainWindow(MSFluentWindow):
         self.homeInterface.hide()  # 已废弃，仅保留信号连接
 
         self._report_progress(55, self.tr("正在加载编辑器..."))
-        self.editorInterface = EditorInterface(self)
+        self.editorInterface = EditorInterface(self, audio_engine=self._audio_engine)
         self.editorInterface.setObjectName("editorInterface")
         self.editorInterface.set_timing_service(self._timing_service)
         self.editorInterface.project_saved.connect(self._update_title)
@@ -445,7 +460,11 @@ class MainWindow(MSFluentWindow):
         self.rubyInterface.hide()  # 已废弃，仅保留与 Timing 共用的功能
 
         self._report_progress(77, self.tr("正在加载设置界面..."))
-        self.settingInterface = SettingsInterface(self, settings_provider=self._settings_provider)
+        self.settingInterface = SettingsInterface(
+            self,
+            settings_provider=self._settings_provider,
+            app_paths=self._app_paths,
+        )
         self.settingInterface.setObjectName("settingInterface")
 
         self._report_progress(82, self.tr("正在加载编辑视图..."))
@@ -571,7 +590,17 @@ class MainWindow(MSFluentWindow):
             nicokara_tags = AppSettings.DEFAULT_SETTINGS.get("nicokara_tags", {})
         try:
             setting_iface = getattr(self, "settingInterface", None)
-            settings = setting_iface.get_settings() if setting_iface else AppSettings()
+            settings = (
+                setting_iface.get_settings()
+                if setting_iface
+                else AppSettings(
+                    app_paths=(
+                        self._runtime_context.paths
+                        if self._runtime_context is not None
+                        else None
+                    )
+                )
+            )
             settings.set("nicokara_tags", nicokara_tags)
             settings.save()
         except Exception:
@@ -664,49 +693,24 @@ class MainWindow(MSFluentWindow):
                 return bool(setting_iface.get_settings().get("audio.hq_speed_change", True))
             from strange_uta_game.frontend.settings.app_settings import AppSettings
 
-            return bool(AppSettings().get("audio.hq_speed_change", True))
+            app_paths = (
+                self._runtime_context.paths
+                if self._runtime_context is not None
+                else None
+            )
+            return bool(
+                AppSettings(app_paths=app_paths).get("audio.hq_speed_change", True)
+            )
         except Exception:
             return True
 
     def _make_audio_engine(self):
-        """按设置创建音频引擎。"""
-        return BassTsmEngine() if self._hq_speed_enabled() else BassEngine()
+        """Create the configured shared audio service."""
+        return self._audio_engine_factory()
 
     def _apply_audio_engine_setting(self):
-        """设置变更时按"高质量音频变速"开关切换引擎。
-
-        仅在引擎类型实际改变时重建：释放旧引擎、接入新引擎，并重载当前曲目
-        （位置重置为 0）。切换是用户在设置里的低频操作，可接受短暂中断。
-        """
-        desired = BassTsmEngine if self._hq_speed_enabled() else BassEngine
-        if isinstance(self._audio_engine, desired):
-            return
-
-        editor = getattr(self, "editorInterface", None)
-        audio_path = getattr(editor, "_audio_file_path", None) if editor else None
-
-        new_engine = desired()
-        self._timing_service.swap_audio_engine(new_engine)
-        self._audio_engine = new_engine
-        # 仅换引擎实例（swap_audio_engine）只迁移了位置/渲染回调，编辑器侧的其它
-        # 接线（服务回调、焦点/居中信号、preview 引擎引用）不会自动跟到新引擎，
-        # 表现为切换后回调丢失、跳转不准、数据未重新初始化。这里重走一遍完整接线
-        # （set_timing_service 已做成幂等）并完整重载当前曲目，等价于一次干净的加载。
-        if editor is not None:
-            editor.set_timing_service(self._timing_service)
-            # 重载当前曲目到新引擎（清空守卫与路径以放行重载）
-            if audio_path:
-                editor._audio_loading = False
-                editor._audio_file_path = None
-                editor.load_audio(audio_path)
-
-        InfoBar.success(
-            title=self.tr("音频引擎已切换"),
-            content=(self.tr("已启用高质量变速（离线预渲染）") if desired is BassTsmEngine
-                     else self.tr("已关闭高质量变速（实时变速，可能爆音）")),
-            orient=Qt.Orientation.Horizontal, isClosable=True,
-            position=InfoBarPosition.TOP, duration=3000, parent=self,
-        )
+        """Apply shared-engine quality preferences without replacing the engine."""
+        self._audio_engine.set_high_quality_speed_enabled(self._hq_speed_enabled())
 
     # ==================== 自动保存配置 ====================
 
@@ -719,10 +723,9 @@ class MainWindow(MSFluentWindow):
 
     # ==================== 闪退恢复 ====================
 
-    @staticmethod
-    def has_pending_crash_recovery() -> bool:
+    def has_pending_crash_recovery(self) -> bool:
         """是否存在待恢复的闪退临时文件（公开 API，供宿主在弹窗前查询）。"""
-        return ProjectStore.has_crash_recovery()
+        return self._store.has_crash_recovery()
 
     def check_crash_recovery(self, dialog_parent: "Optional[object]" = None) -> bool:
         """检查是否有闪退恢复文件，并询问用户是否加载。
@@ -735,7 +738,7 @@ class MainWindow(MSFluentWindow):
             True 表示用户选择恢复且成功加载了项目；其余情况均为 False
             （包括没有恢复文件、用户拒绝、加载失败）。
         """
-        if not ProjectStore.has_crash_recovery():
+        if not self._store.has_crash_recovery():
             return False
 
         parent = dialog_parent if dialog_parent is not None else self
@@ -748,7 +751,7 @@ class MainWindow(MSFluentWindow):
         msg.exec()
         clicked = msg.clickedButton()
         if clicked is btn_yes:
-            recovered = ProjectStore.load_crash_recovery()
+            recovered = self._store.load_crash_recovery()
             if recovered:
                 project, temp_path = recovered
                 self._store.load_project(project)
@@ -766,7 +769,7 @@ class MainWindow(MSFluentWindow):
                     parent=self,
                 )
                 # 恢复后删除临时文件
-                ProjectStore.delete_crash_recovery()
+                self._store.delete_crash_recovery()
                 return True
             else:
                 InfoBar.error(
@@ -778,11 +781,11 @@ class MainWindow(MSFluentWindow):
                     duration=3000,
                     parent=self,
                 )
-                ProjectStore.delete_crash_recovery()
+                self._store.delete_crash_recovery()
                 return False
         else:
             # 用户拒绝恢复 → 删除临时文件
-            ProjectStore.delete_crash_recovery()
+            self._store.delete_crash_recovery()
             return False
 
     # ==================== 自动更新检查 ====================
@@ -971,7 +974,12 @@ class MainWindow(MSFluentWindow):
         def _worker() -> None:
             try:
                 from strange_uta_game.frontend.settings.app_settings import AppSettings
-                AppSettings().maybe_auto_update_network_dictionary()
+                app_paths = (
+                    self._runtime_context.paths
+                    if self._runtime_context is not None
+                    else None
+                )
+                AppSettings(app_paths=app_paths).maybe_auto_update_network_dictionary()
             except Exception:
                 import logging
                 logging.getLogger(__name__).warning(

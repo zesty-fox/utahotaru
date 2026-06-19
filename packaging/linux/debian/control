@@ -1,0 +1,9 @@
+Package: strangeutagame
+Version: 0.0.0
+Section: sound
+Priority: optional
+Architecture: amd64
+Maintainer: Karaoke Studio <maintainers@example.invalid>
+Depends: libportaudio2, libgl1, libegl1, libxkbcommon-x11-0
+Description: Cross-platform karaoke lyric timing editor
+ StrangeUtaGame creates and edits precisely timed karaoke lyric projects.

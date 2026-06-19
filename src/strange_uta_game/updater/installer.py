@@ -106,6 +106,20 @@ class UpdateCancelledError(Exception):
     """用户在更新准备阶段主动取消时抛出。"""
 
 
+def launch_verified_installer(artifact: Path) -> LaunchResult:
+    """Launch an already downloaded and verified Windows installer artifact."""
+
+    try:
+        process = subprocess.Popen([str(artifact)], shell=False)
+    except OSError as error:
+        return LaunchResult(launched=False, reason=str(error))
+    return LaunchResult(
+        launched=True,
+        updater_path=str(artifact),
+        pid=process.pid,
+    )
+
+
 # ───────────────────────── 工具 ─────────────────────────
 
 

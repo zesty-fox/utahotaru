@@ -1,13 +1,14 @@
 """音频引擎测试。"""
 
-import pytest
+import sys
+
 import numpy as np
+import pytest
 import soundfile as sf
-from pathlib import Path
 
 from strange_uta_game.backend.infrastructure.audio import (
-    BassEngine,
     AudioLoadError,
+    BassEngine,
     PlaybackState,
 )
 
@@ -28,6 +29,7 @@ def test_audio_file(tmp_path):
     return str(file_path)
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="BASS backend is Windows-only")
 class TestBassEngine:
     """测试 BASS 音频引擎"""
 

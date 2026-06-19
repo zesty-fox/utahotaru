@@ -6,12 +6,13 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 from strange_uta_game.backend.domain import Ruby, RubyPart, Sentence
 from strange_uta_game.backend.infrastructure.parsers.inline_format import (
     split_ruby_for_checkpoints,
 )
+from strange_uta_game.runtime.winrt import winrt_japanese_status
 
 
 @dataclass
@@ -192,6 +193,11 @@ def is_english_reading(reading: str) -> bool:
 class RubyAnalyzer(ABC):
     """注音分析器抽象基类"""
 
+    name = "analyzer"
+
+    def available(self) -> bool:
+        return True
+
     @abstractmethod
     def analyze(self, text: str) -> List[RubyResult]:
         """分析文本并返回注音结果"""
@@ -232,18 +238,15 @@ class KanaDistributingAnalyzer(RubyAnalyzer):
         """
         if not text:
             return []
+        modified_text, replacements = _replace_digits_with_kanji(text)
         try:
-            modified_text, replacements = _replace_digits_with_kanji(text)
             pairs = self._get_pairs(modified_text)
-            results = self._results_from_pairs(pairs)
-            if replacements:
-                results = _map_results_to_original(results, replacements, text)
-            return results
-        except Exception:
-            return [
-                RubyResult(text=c, reading=c, start_idx=i, end_idx=i + 1)
-                for i, c in enumerate(text)
-            ]
+        except Exception as error:
+            raise ProviderUnavailableError(str(error)) from error
+        results = self._results_from_pairs(pairs)
+        if replacements:
+            results = _map_results_to_original(results, replacements, text)
+        return results
 
     def _results_from_pairs(
         self, pairs: List[Tuple[str, str]]
@@ -546,6 +549,7 @@ class WinRTAnalyzer(KanaDistributingAnalyzer):
     """
 
     _MAX_LEN = 100
+    name = "winrt"
 
     def __init__(self):
         available, reason = winrt_japanese_status()
@@ -610,8 +614,8 @@ class WinRTAnalyzer(KanaDistributingAnalyzer):
             return ""
         try:
             return "".join(r for _, r in self._get_pairs(text))
-        except Exception:
-            return text
+        except Exception as error:
+            raise ProviderUnavailableError(str(error)) from error
 
 
 # ──────────────────────────────────────────────
@@ -628,6 +632,8 @@ class SudachiAnalyzer(KanaDistributingAnalyzer):
 
     reading_form() 返回表层形读音（非字典形），可直接用于假名注音。
     """
+
+    name = "sudachi"
 
     def __init__(self):
         try:
@@ -682,8 +688,8 @@ class SudachiAnalyzer(KanaDistributingAnalyzer):
             return ""
         try:
             return "".join(r for _, r in self._get_pairs(text))
-        except Exception:
-            return text
+        except Exception as error:
+            raise ProviderUnavailableError(str(error)) from error
 
 
 # ──────────────────────────────────────────────
@@ -693,6 +699,8 @@ class SudachiAnalyzer(KanaDistributingAnalyzer):
 
 class PykakasiAnalyzer(RubyAnalyzer):
     """基于 pykakasi 的注音分析器"""
+
+    name = "pykakasi"
 
     def __init__(self):
         """初始化 pykakasi 转换器"""
@@ -713,8 +721,8 @@ class PykakasiAnalyzer(RubyAnalyzer):
             return ""
         try:
             return self.conv.do(text)
-        except Exception:
-            return text
+        except Exception as error:
+            raise ProviderUnavailableError(str(error)) from error
 
     def analyze(self, text: str) -> List[RubyResult]:
         """分析文本并返回注音结果"""
@@ -790,6 +798,8 @@ class PykakasiAnalyzer(RubyAnalyzer):
 class DummyAnalyzer(RubyAnalyzer):
     """虚拟注音分析器（用于测试）"""
 
+    name = "dummy"
+
     def analyze(self, text: str) -> List[RubyResult]:
         return [
             RubyResult(text=char, reading=char, start_idx=i, end_idx=i + 1)
@@ -806,39 +816,6 @@ class DummyAnalyzer(RubyAnalyzer):
 
 # 日语「Basic」语言功能（含微软日语 IME），JapanesePhoneticAnalyzer 的注音引擎来源
 WINRT_JA_CAPABILITY = "Language.Basic~~~ja-JP~0.0.1.0"
-
-
-def winrt_japanese_status() -> Tuple[bool, str]:
-    """探测 WinRT 日语注音引擎是否可用。
-
-    返回 (available, reason)。reason 取值：
-      - "ok"                  引擎可用
-      - "no_winrt_package"    未安装 winrt-Windows.Globalization
-      - "engine_unavailable"  缺少日语 IME 功能（GetWords 返回空/无假名）
-      - "error:<类型>"        其他异常
-
-    探测方式：对确定含汉字读音的 "日本語" 调 GetWords，引擎缺失时会返回空
-    或读音等于原文（无假名），据此判定。
-    """
-    try:
-        from winrt._winrt import init_apartment, STA  # type: ignore
-    except ImportError:
-        return (False, "no_winrt_package")
-    try:
-        try:
-            init_apartment(STA)
-        except OSError:
-            pass  # 线程已初始化为某 apartment
-        from winrt.windows.globalization import JapanesePhoneticAnalyzer  # type: ignore
-
-        words = JapanesePhoneticAnalyzer.get_words("日本語")
-        reading = "".join(w.yomi_text or "" for w in words)
-        has_kana = any("぀" <= c <= "ヿ" for c in reading)
-        if words and reading and reading != "日本語" and has_kana:
-            return (True, "ok")
-        return (False, "engine_unavailable")
-    except Exception as e:  # noqa: BLE001
-        return (False, f"error:{type(e).__name__}")
 
 
 def winrt_install_guidance() -> str:
@@ -904,36 +881,93 @@ def install_winrt_japanese(timeout: int = 600) -> Tuple[bool, str]:
     return (False, f"install_failed:{proc.returncode}")
 
 
-def create_analyzer(use_pykakasi: bool = True) -> RubyAnalyzer:
-    """创建注音分析器。
+class ProviderUnavailableError(RuntimeError):
+    """A reading provider cannot operate in the current environment."""
 
-    回退链：WinRTAnalyzer → SudachiAnalyzer → PykakasiAnalyzer → DummyAnalyzer。
 
-    - main 变体：WinRT 可用则直接使用；缺日语 IME 由 UI 引导安装后再用。
-    - noWinIME / mac 变体：winrt 包不存在，直接跳至 Sudachi。
-    """
-    try:
-        return WinRTAnalyzer()
-    except WinRTJapaneseUnavailable:
-        # 缺日语 IME 引擎：UI 层引导安装；此处先降级
-        pass
-    except ImportError:
-        # 缺 winrt 包（noWinIME / mac 变体）：直接降级
-        pass
+class LazyAnalyzerProvider(RubyAnalyzer):
+    """Delay optional dependency imports until a provider is actually used."""
 
-    try:
-        return SudachiAnalyzer()
-    except ImportError:
-        pass
+    def __init__(self, name: str, factory: Callable[[], RubyAnalyzer]):
+        self.name = name
+        self._factory = factory
+        self._instance: RubyAnalyzer | None = None
+        self._unavailable = False
 
-    if use_pykakasi:
+    def _get(self) -> RubyAnalyzer:
+        if self._unavailable:
+            raise ProviderUnavailableError(f"{self.name} is unavailable")
+        if self._instance is None:
+            try:
+                self._instance = self._factory()
+            except ImportError as error:
+                self._unavailable = True
+                raise ProviderUnavailableError(str(error)) from error
+        return self._instance
+
+    def available(self) -> bool:
         try:
-            return PykakasiAnalyzer()
-        except ImportError:
-            pass
+            self._get()
+        except ProviderUnavailableError:
+            return False
+        return True
 
-    print("Warning: all analyzers unavailable, using DummyAnalyzer")
-    return DummyAnalyzer()
+    def analyze(self, text: str) -> List[RubyResult]:
+        return self._get().analyze(text)
+
+    def get_reading(self, text: str) -> str:
+        return self._get().get_reading(text)
+
+
+class ProviderChain(RubyAnalyzer):
+    """Try ordered reading providers, falling through only when unavailable."""
+
+    name = "provider_chain"
+
+    def __init__(self, providers: tuple[RubyAnalyzer, ...]):
+        if not providers:
+            raise ValueError("at least one reading provider is required")
+        self.providers = providers
+
+    def analyze(self, text: str) -> List[RubyResult]:
+        for provider in self.providers:
+            try:
+                return provider.analyze(text)
+            except ProviderUnavailableError:
+                continue
+        raise ProviderUnavailableError("all reading providers are unavailable")
+
+    def get_reading(self, text: str) -> str:
+        for provider in self.providers:
+            try:
+                return provider.get_reading(text)
+            except ProviderUnavailableError:
+                continue
+        raise ProviderUnavailableError("all reading providers are unavailable")
+
+
+def build_provider_chain(
+    winrt_available: bool | None = None,
+    use_pykakasi: bool = True,
+) -> tuple[RubyAnalyzer, ...]:
+    """Build the shared provider order from runtime capability availability."""
+
+    if winrt_available is None:
+        winrt_available, _ = winrt_japanese_status()
+    providers: list[RubyAnalyzer] = []
+    if winrt_available:
+        providers.append(LazyAnalyzerProvider("winrt", WinRTAnalyzer))
+    providers.append(LazyAnalyzerProvider("sudachi", SudachiAnalyzer))
+    if use_pykakasi:
+        providers.append(LazyAnalyzerProvider("pykakasi", PykakasiAnalyzer))
+    return tuple(providers)
+
+
+def create_analyzer(use_pykakasi: bool = True) -> RubyAnalyzer:
+    """Create the capability-driven shared reading provider chain."""
+
+    providers = build_provider_chain(use_pykakasi=use_pykakasi)
+    return ProviderChain((*providers, DummyAnalyzer()))
 
 
 def _replace_digits_with_kanji(text: str) -> Tuple[str, List[Tuple[int, int, int, int]]]:

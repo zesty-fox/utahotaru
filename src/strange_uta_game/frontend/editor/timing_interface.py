@@ -120,8 +120,9 @@ class EditorInterface(QWidget):
     # 自动 marshal 到 UI 线程（Qt 跨线程默认 queued connection）。
     _render_progress_signal = pyqtSignal(float, float)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, audio_engine=None):
         super().__init__(parent)
+        self._audio_engine = audio_engine
         self._project: Optional[Project] = None
         self._timing_service: Optional[TimingService] = None
         self._audio_file_path: Optional[str] = None
@@ -184,7 +185,7 @@ class EditorInterface(QWidget):
         # eventFilter 中鼠标拖拽检测
         self._auto_scroll_mouse_press_pos = None
 
-        # 按键音播放器（低延迟，基于 BASS Sample API）
+        # 按键音播放器（混入共享音频输出）
         self._keysound_player = None
         self._keysound_enabled: bool = True
         # None 表示"尚未加载过任何风格"，确保 _apply_settings 首次调用时强制加载
@@ -269,7 +270,9 @@ class EditorInterface(QWidget):
         """创建播放器并预加载默认风格样本（失败时静默跳过，不影响主功能）。"""
         try:
             from ...backend.infrastructure.audio.keysound_player import KeySoundPlayer
-            self._keysound_player = KeySoundPlayer()
+            if self._audio_engine is None:
+                return
+            self._keysound_player = KeySoundPlayer(self._audio_engine)
             self._reload_keysound("default")  # 预热：先加载默认风格
         except Exception as e:
             print(f"[KeySound] 初始化失败: {e}")
@@ -1001,8 +1004,7 @@ class EditorInterface(QWidget):
         """释放音频资源"""
         if self._timing_service:
             self._timing_service.release()
-        # timing_service.release() 会调用 BASS_Free，使 keysound sample handle 失效。
-        # 在此归零 handle（避免野指针），并重置风格标记，确保下次 _apply_settings 强制重新加载。
+        # 清除共享混音器中的按键音，并重置风格标记。
         if self._keysound_player is not None:
             self._keysound_player.invalidate()
         self._keysound_style = None
@@ -6028,14 +6030,6 @@ class EditorInterface(QWidget):
             and is_chinese_lyrics("".join(s.text for s in self._project.sentences))
         )
 
-        # LLM 注音激活时不需要本地日语 IME，跳过 WinRT 安装引导。中文模式同样跳过。
-        if not chinese_mode and not llm_active:
-            from strange_uta_game.frontend.winrt_japanese_guide import (
-                ensure_winrt_japanese,
-            )
-            if not ensure_winrt_japanese(self):
-                return
-
         # AutoCheckService（含 WinRTAnalyzer / LLMRubyAnalyzer）在主线程创建，
         # 确保 WinRT STA apartment 正确；LLM 整首一次发送需传入全部行文本。
         if chinese_mode:
@@ -6249,7 +6243,7 @@ class EditorInterface(QWidget):
         Args:
             specs: list of (line_idx, restrict_indices | None)
             label: 用于 InfoBar 标题和 undo 描述
-            show_winrt_dialog: False 时 WinRT 不可用则静默跳过（粘贴触发时用）
+            show_winrt_dialog: 兼容旧调用；共享 provider chain 会自动选择可用引擎。
         """
         if not self._project or not specs:
             return
@@ -6266,24 +6260,8 @@ class EditorInterface(QWidget):
         app_settings = AppSettings()
         llm_active = app_settings.llm_ruby_active()
 
-        # LLM 注音激活时不依赖本地日语 IME，跳过 WinRT 检查/引导。
         # 用户主动触发的按行/按选定字符分析：不做中文检测——按下"注音分析"按钮
         # 即表示需要注音，避免纯汉字日文行被误判为中文跳过。
-        if not llm_active:
-            from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import (
-                winrt_japanese_status,
-            )
-            from strange_uta_game.frontend.winrt_japanese_guide import (
-                ensure_winrt_japanese,
-            )
-
-            if show_winrt_dialog:
-                if not ensure_winrt_japanese(self):
-                    return
-            else:
-                available, _ = winrt_japanese_status()
-                if not available:
-                    return
 
         auto_check_flags = app_settings.get_all().get("auto_check", {})
         user_dict = app_settings.load_effective_dictionary()

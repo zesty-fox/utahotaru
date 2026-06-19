@@ -1,152 +1,104 @@
-# 发布指南（Releasing）
+# 跨平台发布指南
 
-本项目用 **GitHub Actions 自动打包 + draft 草稿发布**。你只需要：改版本号 → 填
-CHANGELOG → 提交 → 打 tag 推送，CI 会构建三个变体、生成增量更新 manifest、把全部
-资产传到一个 **draft Release**；你核对无误后手动点 **Publish**。
+发布分为 `preview` 和 `stable` 两个通道。所有平台使用同一套应用代码和
+PyInstaller 配置，只在原生 runner 上套薄平台安装层。
 
-> 本地手动流程（`python scripts/release.py build` + 手动上传）仍然可用，见文末。
+## 发布目标
 
----
+| Target ID | Runner | 产物 |
+|---|---|---|
+| `windows-x86_64-windows-installer` | Windows x64 | Inno Setup `.exe` |
+| `macos-universal2-macos-dmg` | macOS Universal 2 | 公证 `.dmg` |
+| `linux-x86_64-appimage` | Linux x64 | `.AppImage` |
+| `linux-x86_64-flatpak` | Linux x64 | `.flatpak` |
+| `linux-x86_64-deb` | Linux x64 | Debian `.deb` |
 
-## TL;DR
+`--variant main/noWinIME/mac` 仅保留一个发布周期的兼容映射，新脚本必须使用
+`--target`。WinRT 是 Windows 上的可选注音增强，不是独立产品。
 
-```bash
-# 1) 改版本号 + 注入 CHANGELOG 占位段落
-python scripts/release.py prepare 1.2.2
+## 受保护凭据
 
-# 2) 编辑 CHANGELOG.md，把 [1.2.2] 段落写完整（不能留“（待补充）”）
+在 GitHub `stable-release` environment 中配置：
 
-# 3) 提交（版本号、CHANGELOG、以及 build 后更新的 runtime 缓存都要进 git）
-git add -A
-git commit -m "release v1.2.2"
+- Windows：`WINDOWS_CERTIFICATE_PFX_BASE64`、`WINDOWS_CERTIFICATE_PASSWORD`
+- Apple：`APPLE_CERTIFICATE_P12_BASE64`、`APPLE_CERTIFICATE_PASSWORD`、
+  `APPLE_SIGNING_IDENTITY`、`APPLE_ID`、`APPLE_TEAM_ID`、`APPLE_APP_PASSWORD`
+- 更新清单：`UPDATE_ED25519_PRIVATE_KEY_B64`
+- Linux：`LINUX_GPG_PRIVATE_KEY_B64`
 
-# 4) 打 tag 并推送 —— 这一步触发 CI
-git tag SUGv1.2.2
-git push origin main --tags
+`src/strange_uta_game/config/update-public-key.pem` 必须是受保护 Ed25519 私钥对应
+的公钥。私钥不得提交到仓库；生成清单时会校验密钥是否匹配。
 
-# 5) 等 CI 跑完 → 打开仓库的 Releases → 找到 draft SUGv1.2.2 → 核对资产/正文 → Publish
-```
+## Preview
 
----
+从 Actions 手动运行 `Cross-platform preview`，输入版本号。五个原生任务构建应用、
+套安装包并发布 `preview-<version>` prerelease。Preview 可以用于安装兼容性验证，
+不能写入 stable 更新通道。
 
-## 三条铁律（违反任意一条都会出问题）
-
-### 1. `__version__` 必须等于 tag 去掉 `SUGv` 后的版本号
-tag `SUGv1.2.2` ⇒ `src/strange_uta_game/__version__.py` 里 `__version__ = "1.2.2"`。
-CI 第一步就会校验，不一致直接失败。`prepare` 会帮你写好，别再手动改回去。
-
-### 2. 每个发布的 tag 都要有对应的、**填好的** CHANGELOG 段落
-- Release 正文由 CI 从 `CHANGELOG.md` 的 `## [X.Y.Z]` 段落**自动抽取**——
-  你不需要、也不应该手动往 Release 正文里粘贴。这样就杜绝了“正文和 CHANGELOG
-  对不上 / 粘错版本 / 忘了填”这一类操作失误。
-- 段落里若还留着模板占位符 `（待补充）`，CI 会**直接失败**，逼你补全。
-- 更新器在跨版本升级时会聚合**中间每一个版本**的 changelog（`fetch_releases_since`）。
-  所以哪怕某个版本只是小修，也要给它留一个 CHANGELOG 段落，否则用户在更新弹窗里
-  会看到那一版“空白无说明”。
-
-### 3. runtime 缓存文件要随版本一起提交
-`scripts/.runtime-hash-cache*.json` 记录了上次 runtime 的内容哈希与依赖指纹，
-**必须提交进 git**。CI 靠它判断“依赖有没有变、该不该复用上一版 runtime”。
-本地跑过 `release.py build` 后，这些文件可能被更新，记得 `git add`。
-
----
-
-## 增量更新是怎么在 CI 里保持有效的（原理，排障时看）
-
-更新器把每个发布拆成两个增量分包：
-- **app**（`*-app.zip`）：主程序 EXE + Updater + `_internal/strange_uta_game`，每版都变，必下。
-- **runtime**（`*-runtime.zip`）：第三方库 + Python 运行时，约 80 MB，**依赖不变就不该重下**。
-
-是否需要下载某个分包，取决于 manifest 里该分包的 `sha256`（**内容哈希**）与用户本地
-`_internal/.installed_manifest.json` 是否一致。
-
-**陷阱**：干净环境（CI runner、新克隆）重新打包 runtime，即使依赖完全相同，算出的
-内容哈希也会变（`base_library.zip`、`.pyc` 里有时间戳），于是所有老用户的 runtime
-哈希对不上 → 被迫重新全量下载 80 MB → 增量更新形同虚设。
-
-**对策**（已写进 `.github/workflows/release.yml`）：build 之前，CI 用
-`scripts/.runtime-hash-cache*.json` 里记录的版本号，从**上一个 Release** 下载它的
-`*-runtime.zip` 放到 `dist/`。`release.py` 检测到依赖未变时会**直接复制这份旧 zip 的
-字节**作为本次 runtime，于是哈希原样保留，老用户的 runtime 命中、跳过下载。
-此时 build 带 `--require-runtime-reuse`：万一复用基准没到位却又本应复用，直接报错，
-绝不静默重打。
-
-什么时候会“合理地”重打一次 runtime（老用户一次性全量，之后恢复稳定）：
-- **首次用 CI 发布**：上一版的 Release 里没有 `*-runtime.zip` 可供下载（比如之前停过
-  增量），CI 拿不到复用基准 → 重打、重建基线。下一版起就稳了。
-- **依赖真的变了**：改了 `requirements.txt` / `requirements-winrt.txt` / `requirements-variants.txt` 里打进包的库，
-  dist-info 指纹变化 → runtime 内容确实变了，本就该让用户更新。
-
----
-
-## 依赖变化 / 清理后：刷新 runtime 基线（重要）
-
-CI 拿提交在 git 里的 `scripts/.runtime-hash-cache*.json` 当“依赖指纹基线”，比对本次
-干净构建的 `dist-info`，一致才复用上一版 runtime。**只要你动了会打进包的依赖**——
-改 `requirements.txt` / `requirements-winrt.txt` / `requirements-variants.txt`、增删 `build.py` 的 `--exclude-module`
-等——这份基线就过期了，必须刷新一次，否则 CI 会每版都判定“依赖变了”而重打 runtime，
-增量更新形同虚设。
-
-一次性刷新步骤：
+对每个已安装产物运行：
 
 ```bash
-# 1) 本地各打一次（build.py 的排除已生效，产出的就是干净 runtime）
-python scripts/release.py build --variant main
-python scripts/release.py build --variant noWinIME
-# → 这会重写 scripts/.runtime-hash-cache.json 与 -noWinIME.json
-
-# 2) 把刷新后的缓存连同其它改动一起提交
-git add scripts/.runtime-hash-cache*.json
-git commit -m "chore: 刷新 runtime 依赖基线"
+StrangeUtaGame --smoke-test smoke-<target-id>.json
 ```
 
-刷新后发布的**那一版**，CI 仍会重打一次 runtime（上一版没有“干净 runtime”可复用），
-用户一次性全量下载；CI 把这版的干净 `*-runtime.zip` 发出去后，**从下一版起就稳定复用**。
+报告必须为 schema 1，且 `started`、`opened_legacy_project`、`exported_srt`、
+`clean_exit` 均为 `true`。该检查不播放音频，也不修改测试项目。
 
-> ⚠ 别删除“当前基线版本”的 `*-runtime.zip` 资产——CI 靠它当复用源。老版本的全量 zip
-> 可以清，但基线那版的 runtime 分包要留着。
+## Stable
 
-> 注：CI 不会把构建中更新的缓存提交回仓库（它只发 draft，不 push 代码）。所以
-> “依赖没变”的普通版本里，基线一直冻结在你上次提交的那版——这没问题：依赖一致，
-> 比对就一致，CI 会一路复用同一份 runtime。只有依赖真的变了，才需要按上面重刷一次。
-
-## 变体与依赖
-
-| 变体 | runner | 注音引擎 | 额外依赖 |
-|------|--------|---------|---------|
-| `main` | windows-latest | WinRT IME | `requirements.txt` + `requirements-winrt.txt`（WinRT 单独文件，mac/noWinIME 不装） |
-| `noWinIME` | windows-latest | sudachi-mini | `requirements.txt` + `requirements-variants.txt` |
-| `mac` | macos-latest | sudachi-mini | 同上；**CI 中允许失败**，不阻断 Windows 发布 |
-
-`requirements-variants.txt` 里的 `sudachipy` **锁定了版本**——因为它会打进 noWinIME/mac
-的 runtime，版本一漂就会改变 runtime 哈希、破坏增量。改它等同于改 runtime 基线。
-
----
-
-## 手动触发与重跑
-
-- 正常路径：`git push --tags` 推 `SUGv*` tag 自动触发。
-- 补救/重跑：仓库 Actions 页 → `Release (draft)` → `Run workflow`，填入已存在的 tag
-  （如 `SUGv1.2.2`）。CI 会复用已有 draft Release 并 `--clobber` 覆盖资产。
-
----
-
-## 本地手动流程（备用）
-
-不走 CI 时仍可本地出包：
+1. 从同一提交生成五个最终产物及各平台验签报告。
+2. 收集五份安装包冒烟报告。音频延迟报告不属于发布门禁。
+3. 生成 schema-2 清单并签名：
 
 ```bash
-python scripts/release.py prepare 1.2.2
-# 编辑 CHANGELOG.md
-python scripts/release.py build --variant main
-python scripts/release.py build --variant noWinIME
-# （可选）python scripts/release.py build --variant mac   # 需在 macOS 上
+python3 scripts/release.py generate-manifest --help
+python3 scripts/verify_release_gate.py release-gate-input --channel stable
 ```
 
-产物在 `dist/`：全量 zip、`*-app.zip`、`*-runtime.zip`、各自 `.sha256`、
-`manifest-*.json`、`release_notes-*.md`。手动到 GitHub 新建 Release（tag `SUGvX.Y.Z`），
-**把上面所有资产都传上去**（尤其 `manifest-*.json` 和两个 part zip，缺了增量更新就不工作），
-正文粘 `release_notes-*.md` 全文。
+4. 把五个产物、Linux GPG 签名、各平台验签报告、五份冒烟报告和 stable manifest
+   上传到同一个 candidate Release。
+5. 运行 `Stable cross-platform release`，输入目标版本和该 candidate tag。受保护
+   environment 审批通过后，workflow 会下载候选证据、重新执行门禁，并只把通过的
+   输入发布为 `SUGv<version>` draft。
+6. 人工核对版本、CHANGELOG、目标集合和签名后再发布 draft。更新器的 stable 清单
+   只能在 GitHub Release 公开后切换。
 
-> ⚠ 本地 build 后**不要**再单独跑 `python build.py`——`--noconfirm` 会清空
-> `dist/<app>/`，把刚写好的 `.installed_manifest.json` 一并删掉。
+## 平台验签
+
+Windows（PowerShell）：
+
+```powershell
+Get-AuthenticodeSignature .\StrangeUtaGame-*-windows-x86_64.exe | Format-List
+packaging\windows\verify.ps1 .\StrangeUtaGame-*-windows-x86_64.exe
+```
+
+macOS：
+
+```bash
+codesign --verify --deep --strict --verbose=2 StrangeUtaGame.app
+xcrun stapler validate StrangeUtaGame-*-macos-universal2.dmg
+spctl --assess --type open --context context:primary-signature --verbose=2 StrangeUtaGame-*-macos-universal2.dmg
+```
+
+Linux：
+
+```bash
+gpg --verify StrangeUtaGame-*-linux-x86_64.AppImage.asc StrangeUtaGame-*-linux-x86_64.AppImage
+gpg --verify StrangeUtaGame-*-linux-x86_64.flatpak.asc StrangeUtaGame-*-linux-x86_64.flatpak
+gpg --verify strangeutagame_*_amd64.deb.asc strangeutagame_*_amd64.deb
+```
+
+## Linux 支持边界
+
+官方构建边界是 x86_64：AppImage 面向通用桌面发行版，Flatpak 使用 Freedesktop
+24.08 runtime，Debian 包面向当前 Debian/Ubuntu 系。支持 Wayland，并保留 X11
+fallback；音频使用 PipeWire 的 PulseAudio 兼容层或 PulseAudio。其他架构、发行版
+私有包格式和源码自行构建属于社区支持范围。
+
+## 回滚
+
+1. 在 GitHub Releases 将问题版本标记为 draft 或删除公开资产。
+2. 把 stable schema-2 清单恢复为上一个已签名版本；不要复用或伪造旧签名。
+3. 重新运行清单验签和 release gate，再发布恢复后的清单。
+4. 在问题版本 CHANGELOG 和 Release 正文中写明回滚原因；修复版使用新版本号，禁止
+   覆盖已分发的安装包。

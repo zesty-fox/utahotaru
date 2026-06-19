@@ -23,7 +23,7 @@ if sys.platform == "win32":
 
 # 必须先创建 QApplication，再导入任何 QWidget
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QCoreApplication, Qt
 from PyQt6.QtGui import QIcon
 
 # 启用 DPI 缩放
@@ -32,7 +32,33 @@ QApplication.setHighDpiScaleFactorRoundingPolicy(
 )
 
 # 创建应用实例
+QCoreApplication.setOrganizationName("KaraokeStudio")
+QCoreApplication.setApplicationName("StrangeUtaGame")
 app = QApplication(sys.argv)
+
+from strange_uta_game.runtime.context import build_runtime_context
+
+_runtime_context = build_runtime_context(
+    program_dir=Path(__file__).resolve().parent,
+    cwd=Path.cwd(),
+)
+
+
+def _smoke_report_argument(arguments: list[str]) -> Path | None:
+    try:
+        index = arguments.index("--smoke-test")
+    except ValueError:
+        return None
+    if index + 1 >= len(arguments):
+        raise SystemExit("--smoke-test requires a report path")
+    return Path(arguments[index + 1]).resolve()
+
+
+_smoke_report = _smoke_report_argument(sys.argv[1:])
+if _smoke_report is not None:
+    from scripts.smoke_test_installed_app import execute_installed_smoke
+
+    raise SystemExit(execute_installed_smoke(app, _smoke_report))
 
 # 确定图标路径（后续多次使用）
 _icon_path = (
@@ -46,9 +72,14 @@ if not _icon_path.exists():
 # 初始化主题管理器（必须在创建主窗口之前）
 from strange_uta_game.frontend.theme import theme
 from strange_uta_game.frontend.settings.app_settings import AppSettings
+from strange_uta_game.backend.infrastructure.audio import tsm_cache, video_converter
+
+AppSettings.set_default_app_paths(_runtime_context.paths)
+tsm_cache.set_cache_root(_runtime_context.paths.cache)
+video_converter.set_cache_root(_runtime_context.paths.cache)
 
 # 从配置文件读取主题设置并应用
-settings = AppSettings()
+settings = AppSettings(app_paths=_runtime_context.paths)
 
 # 翻译器安装迁移到 MainWindow.__init__（在 super().__init__() 之前）——
 # 让入口对语言初始化无感、嵌入式场景也能正常工作。
@@ -151,7 +182,10 @@ def main():
     def _on_splash_progress(value: int, text: str) -> None:
         _splash.set_progress(value, text)
 
-    window = MainWindow(progress_callback=_on_splash_progress)
+    window = MainWindow(
+        progress_callback=_on_splash_progress,
+        runtime_context=_runtime_context,
+    )
     window.show()
     window.raise_()
     window.activateWindow()

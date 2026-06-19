@@ -62,6 +62,7 @@ def _set_worker_thread_priority() -> None:
 
 _SPEED_QUANT = 2  # round(speed, 2)，0.01 精度
 _CACHE_DIR_NAME = ".cache"
+_cache_root: Optional[Path] = None
 _MP3_QUALITY = 128  # MP3 比特率 (kbps)
 
 # 分块渲染参数
@@ -93,6 +94,12 @@ def _quantize(speed: float) -> float:
     return round(float(speed), _SPEED_QUANT)
 
 
+def set_cache_root(path: Optional[Path]) -> None:
+    """Configure the canonical cache root used outside portable mode."""
+    global _cache_root
+    _cache_root = Path(path) if path is not None else None
+
+
 def _get_cache_dir() -> Path:
     """获取缓存目录（程序所在目录下的 .cache 文件夹）"""
     env_dir = os.environ.get("SUG_CACHE_DIR")
@@ -100,8 +107,10 @@ def _get_cache_dir() -> Path:
         cache_dir = Path(env_dir)
         cache_dir.mkdir(parents=True, exist_ok=True)
         return cache_dir
-    program_dir = Path(sys.argv[0]).resolve().parent
-    cache_dir = program_dir / _CACHE_DIR_NAME
+    cache_dir = _cache_root
+    if cache_dir is None:
+        program_dir = Path(sys.argv[0]).resolve().parent
+        cache_dir = program_dir / _CACHE_DIR_NAME
     cache_dir.mkdir(parents=True, exist_ok=True)
     return cache_dir
 

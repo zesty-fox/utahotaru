@@ -1,0 +1,35 @@
+{
+  "version": "2.0",
+  "id": "packaged-smoke-legacy-v2",
+  "metadata": {},
+  "audio_duration_ms": 0,
+  "singers": [
+    {
+      "id": "s1",
+      "name": "Default",
+      "color": "#FF6B6B",
+      "is_default": true,
+      "display_priority": 0,
+      "enabled": true,
+      "backend_number": 1
+    }
+  ],
+  "sentences": [
+    {
+      "id": "line1",
+      "singer_id": "s1",
+      "characters": [
+        {
+          "char": "Smoke test",
+          "check_count": 2,
+          "timestamps": [1000, 6000],
+          "linked_to_next": false,
+          "is_line_end": true,
+          "is_sentence_end": true,
+          "is_rest": false,
+          "singer_id": "s1"
+        }
+      ]
+    }
+  ]
+}

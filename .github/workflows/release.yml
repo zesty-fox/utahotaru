@@ -1,295 +1,60 @@
-name: Release (draft)
-
-# 推送 SUGv* tag 即触发：在 CI 里打包三个变体、生成 manifest 与增量分包，
-# 把全部资产传到一个 **draft** Release。检查无误后由人工点 Publish。
-#
-# 关键设计——让增量更新在 CI 里也成立：
-#   runtime part 的内容哈希必须与历史保持一致，否则所有老用户被迫重新全量下载
-#   runtime。干净的 CI runner 重打 runtime 一定会算出不同的哈希，所以本工作流在
-#   build 之前，会把"上一版"的 *-runtime.zip 下载到 dist/ 作为复用基准
-#   （release.py 检测到依赖未变时直接复制其字节，哈希保持不变）。
-#   首次发布或依赖确实变化时，会重打一次 runtime（老用户一次性全量），之后即稳定。
+name: Stable cross-platform release
 
 on:
-  push:
-    tags:
-      - 'SUGv*'
   workflow_dispatch:
     inputs:
-      tag:
-        description: '要构建的 tag，例如 SUGv1.2.2（须已存在对应 __version__ 与 CHANGELOG 段落）'
+      version:
+        description: Stable version
+        required: true
+      candidate_tag:
+        description: Candidate Release tag containing all gate inputs
         required: true
 
 permissions:
   contents: write
 
-concurrency:
-  group: release-${{ github.event.inputs.tag || github.ref_name }}
-  cancel-in-progress: false
-
-env:
-  PYTHON_VERSION: '3.13'
-
 jobs:
-  build:
-    name: build (${{ matrix.variant }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { variant: main,     os: windows-latest, cache: '.runtime-hash-cache.json' }
-          - { variant: noWinIME, os: windows-latest, cache: '.runtime-hash-cache-noWinIME.json' }
-          # mac 变体暂不构建：无 BASS 音频引擎 / 无更新器 / 多项功能缺失。待补齐后取消注释。
-          # - { variant: mac,      os: macos-latest,   cache: '.runtime-hash-cache-mac.json' }
-    runs-on: ${{ matrix.os }}
-    # 未启用 mac 变体，所有变体均不可失败。
-    continue-on-error: false
-    defaults:
-      run:
-        shell: bash
+  gate:
+    runs-on: ubuntu-24.04
+    environment: stable-release
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Resolve tag & version
-        id: ver
+          python-version: '3.13'
+      - name: Install release tooling
+        run: pip install -r requirements.txt
+      - name: Verify source quality
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ github.event.inputs.tag }}"
-          else
-            TAG="${{ github.ref_name }}"
-          fi
-          echo "tag=$TAG"           >> "$GITHUB_OUTPUT"
-          echo "version=${TAG#SUGv}" >> "$GITHUB_OUTPUT"
-          echo "Tag=$TAG  Version=${TAG#SUGv}"
-
-      - name: Verify __version__ matches tag
+          python scripts/check_platform_boundaries.py
+          python -m pytest tests/unit tests/integration -q
+      - name: Require protected release inputs
+        env:
+          WINDOWS_CERTIFICATE_PFX_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          UPDATE_ED25519_PRIVATE_KEY_B64: ${{ secrets.UPDATE_ED25519_PRIVATE_KEY_B64 }}
+          LINUX_GPG_PRIVATE_KEY_B64: ${{ secrets.LINUX_GPG_PRIVATE_KEY_B64 }}
         run: |
-          FILEVER=$(python - <<'PY'
-          import re, pathlib
-          t = pathlib.Path('src/strange_uta_game/__version__.py').read_text(encoding='utf-8')
-          print(re.search(r'__version__\s*=\s*"([^"]+)"', t).group(1))
-          PY
-          )
-          echo "__version__.py = $FILEVER ; tag = ${{ steps.ver.outputs.version }}"
-          if [ "$FILEVER" != "${{ steps.ver.outputs.version }}" ]; then
-            echo "::error::__version__ ($FILEVER) 与 tag (${{ steps.ver.outputs.version }}) 不一致。请让二者相同后重新打 tag。"
-            exit 1
-          fi
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          if [ "${{ matrix.variant }}" = "main" ]; then
-            pip install -r requirements-winrt.txt
-          else
-            pip install -r requirements-variants.txt
-          fi
-
-      - name: Validate CHANGELOG section
-        run: |
-          NOTES=$(python scripts/release.py extract-notes "${{ steps.ver.outputs.version }}")
-          printf '%s\n' "$NOTES"
-          if printf '%s' "$NOTES" | grep -q "（待补充）"; then
-            echo "::error::CHANGELOG.md 的 [${{ steps.ver.outputs.version }}] 段落仍是占位符（待补充），请补全后再发布。"
-            exit 1
-          fi
-
-      - name: Seed runtime reuse base from previous release
-        id: seed
+          for name in WINDOWS_CERTIFICATE_PFX_BASE64 WINDOWS_CERTIFICATE_PASSWORD APPLE_CERTIFICATE_P12_BASE64 APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_TEAM_ID APPLE_APP_PASSWORD UPDATE_ED25519_PRIVATE_KEY_B64 LINUX_GPG_PRIVATE_KEY_B64; do
+            test -n "${!name}" || { echo "Missing protected secret: $name"; exit 1; }
+          done
+      - name: Download collected candidate evidence
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # 复用基准 = git 里提交的 runtime 缓存所记录的那一版（其内容哈希正是要保持的）。
-          VARIANT="${{ matrix.variant }}"
-          if [ "$VARIANT" = "main" ]; then
-            CACHE="scripts/.runtime-hash-cache.json"; APP="StrangeUtaGame"
-          else
-            CACHE="scripts/.runtime-hash-cache-$VARIANT.json"; APP="StrangeUtaGame-$VARIANT"
-          fi
-          mkdir -p dist
-          SEEDED=false
-          if [ -f "$CACHE" ]; then
-            PREV=$(python -c "import json;print(json.load(open('$CACHE',encoding='utf-8')).get('version',''))")
-            if [ -n "$PREV" ] && [ "$PREV" != "${{ steps.ver.outputs.version }}" ]; then
-              ASSET="$APP-v$PREV-runtime.zip"
-              echo "尝试下载上一版 runtime 复用基准: SUGv$PREV / $ASSET"
-              if gh release download "SUGv$PREV" --pattern "$ASSET" --dir dist 2>/dev/null; then
-                echo "✓ 已下载 $ASSET，本次将强制复用（--require-runtime-reuse）"
-                SEEDED=true
-              else
-                echo "! 上一版未提供 $ASSET（首发或曾停用增量），本次重打 runtime（老用户一次性全量）"
-              fi
-            else
-              echo "! 缓存版本为空或与当前一致，跳过 seeding"
-            fi
-          else
-            echo "! 未找到 $CACHE，跳过 seeding"
-          fi
-          echo "seeded=$SEEDED" >> "$GITHUB_OUTPUT"
-
-      - name: Build ${{ matrix.variant }}
-        run: |
-          EXTRA=""
-          if [ "${{ steps.seed.outputs.seeded }}" = "true" ]; then
-            EXTRA="--require-runtime-reuse"
-          fi
-          echo "release.py build --variant ${{ matrix.variant }} $EXTRA"
-          python scripts/release.py build --variant "${{ matrix.variant }}" $EXTRA
-
-      - name: Collect release assets
-        run: |
-          VARIANT="${{ matrix.variant }}"
-          VER="${{ steps.ver.outputs.version }}"
-          if [ "$VARIANT" = "main" ]; then
-            APP="StrangeUtaGame"; MAN="manifest-v$VER.json"
-          else
-            APP="StrangeUtaGame-$VARIANT"; MAN="manifest-$VARIANT-v$VER.json"
-          fi
-          OUT="release-assets"
-          mkdir -p "$OUT"
-          for f in \
-            "$APP-v$VER.zip" "$APP-v$VER.zip.sha256" \
-            "$APP-v$VER-app.zip" "$APP-v$VER-app.zip.sha256" \
-            "$APP-v$VER-runtime.zip" "$APP-v$VER-runtime.zip.sha256" \
-            "$MAN"; do
-            if [ -f "dist/$f" ]; then
-              cp "dist/$f" "$OUT/"
-            else
-              echo "::warning::缺少产物 dist/$f"
-            fi
-          done
-          ls -la "$OUT"
-
-      - uses: actions/upload-artifact@v4
+          mkdir -p release-gate-input
+          gh release download "${{ inputs.candidate_tag }}" \
+            --dir release-gate-input
+      - name: Verify collected stable gate inputs
+        run: python scripts/verify_release_gate.py release-gate-input --channel stable
+      - uses: softprops/action-gh-release@v2
         with:
-          name: release-${{ matrix.variant }}
-          path: release-assets/
-          if-no-files-found: error
-          retention-days: 7
-
-      # 把本变体构建后（可能已更新的）runtime 缓存交给 update-cache 作业写回 main。
-      # include-hidden-files 必须开：.runtime-hash-cache*.json 以点开头，v4 默认会跳过隐藏文件。
-      - name: Upload runtime cache (for write-back)
-        uses: actions/upload-artifact@v4
-        with:
-          name: cache-${{ matrix.variant }}
-          path: scripts/${{ matrix.cache }}
-          include-hidden-files: true
-          if-no-files-found: warn
-          retention-days: 7
-
-  release:
-    name: Create draft release
-    needs: build
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Resolve tag & version
-        id: ver
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ github.event.inputs.tag }}"
-          else
-            TAG="${{ github.ref_name }}"
-          fi
-          echo "tag=$TAG"            >> "$GITHUB_OUTPUT"
-          echo "version=${TAG#SUGv}" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          pattern: release-*
-          merge-multiple: true
-
-      - name: Extract release notes
-        run: |
-          python scripts/release.py extract-notes "${{ steps.ver.outputs.version }}" -o notes.md
-          echo "---- notes.md ----"
-          cat notes.md
-
-      - name: Create / update draft release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          TAG="${{ steps.ver.outputs.tag }}"
-          TITLE="StrangeUtaGame_v${{ steps.ver.outputs.version }}"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "release $TAG 已存在 → 改为 draft 并更新 notes"
-            gh release edit "$TAG" --draft --title "$TITLE" --notes-file notes.md
-          else
-            gh release create "$TAG" --draft --title "$TITLE" --notes-file notes.md
-          fi
-          shopt -s nullglob
-          ASSETS=(artifacts/*)
-          if [ ${#ASSETS[@]} -eq 0 ]; then
-            echo "::error::没有任何待上传的资产"; exit 1
-          fi
-          gh release upload "$TAG" "${ASSETS[@]}" --clobber
-          echo "✓ 资产已上传到 draft release $TAG。请到 GitHub 核对后手动 Publish。"
-
-  update-cache:
-    name: Commit refreshed runtime baseline to main
-    needs: build
-    runs-on: ubuntu-latest
-    # 把各变体构建产出的 runtime 基线缓存写回 main。这是“全自动”的关键：
-    # 维护者无需（也无法，比如没有 mac）在本地手动刷新缓存——CI 统一回写。
-    # 依赖未变的版本里缓存内容基本只是版本号前移，回写也无害；依赖变了时，回写
-    # 让下一版能正确判定并复用新基线。
-    permissions:
-      contents: write
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main          # 必须检出分支（而非触发的 tag）才能提交回去
-          fetch-depth: 0
-          # persist-credentials 默认 true → 后续 git push 用内置 GITHUB_TOKEN
-
-      - uses: actions/download-artifact@v4
-        with:
-          path: _cache
-          pattern: cache-*
-          merge-multiple: true
-
-      - name: Apply & commit runtime baseline
-        run: |
-          mkdir -p scripts
-          shopt -s nullglob dotglob
-          while IFS= read -r -d '' f; do
-            cp "$f" scripts/
-          done < <(find _cache -name '.runtime-hash-cache*.json' -type f -print0)
-          shopt -u nullglob
-          files=(scripts/.runtime-hash-cache*.json)
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "没有缓存产物（可能各变体均失败），跳过回写"; exit 0
-          fi
-          if git diff --quiet -- scripts/.runtime-hash-cache*.json; then
-            echo "runtime 基线无变化，跳过提交"; exit 0
-          fi
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add scripts/.runtime-hash-cache*.json
-          git commit -m "chore(ci): 刷新 runtime 基线缓存（${{ github.ref_name }}）[skip ci]"
-          # 防与维护者并发推送竞争：先 rebase 再推。失败时重试一次。
-          for attempt in 1 2 3; do
-            if git pull --rebase origin main && git push origin HEAD:main; then
-              echo "✓ runtime 基线已回写 main"; exit 0
-            fi
-            echo "推送冲突，重试 $attempt …"; sleep 3
-          done
-          echo "::warning::runtime 基线回写失败（可能 main 受保护或并发冲突）。下次发布前可本地手动刷新缓存。"
+          tag_name: SUGv${{ inputs.version }}
+          draft: true
+          files: release-gate-input/*

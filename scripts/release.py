@@ -48,6 +48,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+from release_tools.targets import BuildTarget, SUPPORTED_TARGETS
+
 
 def _force_utf8_stdio() -> None:
     """强制 stdout/stderr 使用 UTF-8。Windows 默认 cp1252/cp936 都会令中文 print 抛错。"""
@@ -439,13 +441,12 @@ def _verify_release_assets(version: str, vcfg: VariantConfig, full_zip: Path) ->
     print(f"      • {updater_pkg.relative_to(ROOT)}/  (updater 子包，{n_updater_files} 文件)")
 
 
-def _run_main_build(clean: bool = False, variant: str = "") -> None:
-    print(f"  构建主程序 (PyInstaller --onedir, variant={variant or 'main'}) …")
-    extra: List[str] = []
+def _run_main_build(clean: bool = False, target: BuildTarget | None = None) -> None:
+    target = target or BuildTarget.from_legacy_alias("main")
+    print(f"  构建共享主程序 (target={target.id}) …")
+    extra: List[str] = ["--target", target.id]
     if clean:
         extra.append("--clean")
-    if variant and variant != "main":
-        extra.extend(["--variant", variant])
     rc = _run_python(MAIN_BUILD, extra)
     if rc != 0:
         raise SystemExit(f"主程序构建失败，退出码 {rc}")
@@ -992,10 +993,20 @@ def cmd_build(
     reuse_runtime: bool = False,
     variant: str = "",
     require_reuse: bool = False,
+    target: str | None = None,
 ) -> int:
+    if target is not None:
+        build_target = BuildTarget.parse(target)
+        variant = build_target.legacy_build_variant
+    elif variant:
+        build_target = BuildTarget.from_legacy_alias(variant)
+        print(f"! --variant {variant} 已弃用；请改用 --target {build_target.id}")
+    else:
+        build_target = BuildTarget.from_legacy_alias("main")
+        variant = ""
     vcfg = VariantConfig.for_variant(variant)
     version = _read_version()
-    print(f"== build for v{version}  variant={vcfg.label()} ==")
+    print(f"== build for v{version}  target={build_target.id} ==")
 
     # 1. UpdaterEx.exe（仅 Windows 变体）
     if vcfg.has_updater_exe and sys.platform == "win32":
@@ -1004,7 +1015,7 @@ def cmd_build(
         print(f"  ✓ 跳过 UpdaterEx.exe 构建（variant={vcfg.label()}，当前平台={sys.platform}）")
 
     # 2. 主程序
-    _run_main_build(clean=clean, variant=vcfg.variant)
+    _run_main_build(clean=clean, target=build_target)
 
     # 关键顺序：
     #   1) 打 app + runtime part zip（不含 .installed_manifest.json）→ 算 sha256
@@ -1077,6 +1088,7 @@ def cmd_all(
     reuse_runtime: bool = False,
     variant: str = "",
     require_reuse: bool = False,
+    target: str | None = None,
 ) -> int:
     rc = cmd_prepare(version)
     if rc != 0:
@@ -1090,13 +1102,32 @@ def cmd_all(
     return cmd_build(
         rebuild_updater=rebuild_updater, clean=clean,
         rebuild_runtime=rebuild_runtime, reuse_runtime=reuse_runtime,
-        variant=variant, require_reuse=require_reuse,
+        variant=variant, require_reuse=require_reuse, target=target,
     )
+
+
+def cmd_generate_manifest(
+    version: str,
+    channel: str,
+    artifacts: list[str],
+    base_url: str,
+    output_dir: Path,
+    gpg_sign_linux: bool = False,
+) -> int:
+    from generate_release_manifest import main as generate_main
+
+    argv = [version, channel, "--base-url", base_url, "--output-dir", str(output_dir)]
+    for artifact in artifacts:
+        argv.extend(["--artifact", artifact])
+    if gpg_sign_linux:
+        argv.append("--gpg-sign-linux")
+    return generate_main(argv)
 
 
 # ───────────────────────── entry ─────────────────────────
 
 _VARIANT_CHOICES = ["main", "noWinIME", "mac"]
+_TARGET_CHOICES = sorted(SUPPORTED_TARGETS)
 
 
 def main(argv: Optional[list] = None) -> int:
@@ -1110,12 +1141,26 @@ def main(argv: Optional[list] = None) -> int:
     sp_extract.add_argument("version", help="版本号 X.Y.Z")
     sp_extract.add_argument("-o", "--output", type=Path, default=None)
 
+    sp_manifest = sub.add_parser("generate-manifest", help="生成并签名 schema-2 清单")
+    sp_manifest.add_argument("version")
+    sp_manifest.add_argument("channel", choices=("stable", "preview"))
+    sp_manifest.add_argument("--artifact", action="append", required=True)
+    sp_manifest.add_argument("--base-url", required=True)
+    sp_manifest.add_argument("--output-dir", type=Path, required=True)
+    sp_manifest.add_argument("--gpg-sign-linux", action="store_true")
+
     sp_build = sub.add_parser("build", help="跑完整构建（Updater + 主程序 + zip）")
-    sp_build.add_argument(
+    build_target_group = sp_build.add_mutually_exclusive_group()
+    build_target_group.add_argument(
+        "--target",
+        choices=_TARGET_CHOICES,
+        help="平台、架构和包渠道组成的发布目标",
+    )
+    build_target_group.add_argument(
         "--variant",
         choices=_VARIANT_CHOICES,
-        default="main",
-        help="构建变体：main（默认，Windows+WinRT）/ noWinIME（Windows,无WinRT）/ mac",
+        default=None,
+        help="已弃用：main / noWinIME / mac",
     )
     sp_build.add_argument(
         "--rebuild-updater",
@@ -1148,11 +1193,13 @@ def main(argv: Optional[list] = None) -> int:
 
     sp_all = sub.add_parser("all", help="prepare + build")
     sp_all.add_argument("version", help="目标版本号 X.Y.Z")
-    sp_all.add_argument(
+    all_target_group = sp_all.add_mutually_exclusive_group()
+    all_target_group.add_argument("--target", choices=_TARGET_CHOICES)
+    all_target_group.add_argument(
         "--variant",
         choices=_VARIANT_CHOICES,
-        default="main",
-        help="构建变体",
+        default=None,
+        help="已弃用的构建变体",
     )
     sp_all.add_argument("--rebuild-updater", action="store_true")
     sp_all.add_argument("--clean", action="store_true")
@@ -1165,6 +1212,15 @@ def main(argv: Optional[list] = None) -> int:
         return cmd_prepare(args.version)
     if args.cmd == "extract-notes":
         return cmd_extract_notes(args.version, args.output)
+    if args.cmd == "generate-manifest":
+        return cmd_generate_manifest(
+            args.version,
+            args.channel,
+            args.artifact,
+            args.base_url,
+            args.output_dir,
+            args.gpg_sign_linux,
+        )
     if args.cmd == "build":
         return cmd_build(
             rebuild_updater=args.rebuild_updater,
@@ -1173,6 +1229,7 @@ def main(argv: Optional[list] = None) -> int:
             reuse_runtime=args.reuse_runtime,
             variant=args.variant,
             require_reuse=args.require_runtime_reuse,
+            target=args.target,
         )
     if args.cmd == "all":
         return cmd_all(
@@ -1183,6 +1240,7 @@ def main(argv: Optional[list] = None) -> int:
             reuse_runtime=args.reuse_runtime,
             variant=args.variant,
             require_reuse=args.require_runtime_reuse,
+            target=args.target,
         )
     p.print_help()
     return 1

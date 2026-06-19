@@ -20,6 +20,7 @@ from strange_uta_game.backend.infrastructure.persistence.sug_io import (
 )
 from strange_uta_game.frontend.perf_log import log_elapsed, log_perf_event, perf_enabled
 from strange_uta_game.frontend.workers import ProjectSaveWorker
+from strange_uta_game.runtime.paths import AppPaths
 
 
 def _get_config_dir() -> Path:
@@ -89,8 +90,16 @@ class ProjectStore(QObject):
     save_finished = pyqtSignal(str)   # saved_path
     save_error = pyqtSignal(str)      # error_msg
 
-    def __init__(self, parent: Optional[QObject] = None):
+    def __init__(
+        self,
+        parent: Optional[QObject] = None,
+        *,
+        app_paths: Optional[AppPaths] = None,
+    ):
         super().__init__(parent)
+
+        self._app_paths = app_paths
+        self._cache_root = app_paths.cache if app_paths is not None else _get_cache_dir()
 
         self._project: Optional[Project] = None
         self._save_path: Optional[str] = None
@@ -191,13 +200,19 @@ class ProjectStore(QObject):
 
     # ── 工作目录（默认保存/导出位置） ─────────────
 
-    @staticmethod
-    def _is_in_cache_dir(path: Optional[str]) -> bool:
+    def _cache_dir(self) -> Path:
+        self._cache_root.mkdir(parents=True, exist_ok=True)
+        return self._cache_root
+
+    def _untitled_temp_path(self) -> Path:
+        return self._cache_dir() / ".untitled.sug.temp"
+
+    def _is_in_cache_dir(self, path: Optional[str]) -> bool:
         """判断路径是否位于 .cache 临时目录下。"""
         if not path:
             return False
         try:
-            return Path(path).resolve().is_relative_to(_cache_dir().resolve())
+            return Path(path).resolve().is_relative_to(self._cache_dir().resolve())
         except (ValueError, OSError):
             return False
 
@@ -233,7 +248,7 @@ class ProjectStore(QObject):
             return self._last_lyric_dir
         try:
             from strange_uta_game.frontend.settings.app_settings import AppSettings
-            settings = AppSettings()
+            settings = AppSettings(app_paths=self._app_paths)
             default_dir = settings.get("export.default_export_dir", "") or ""
             if default_dir and Path(default_dir).is_dir():
                 return default_dir
@@ -285,8 +300,7 @@ class ProjectStore(QObject):
         self._last_lyric_dir = parent
         self._persist_last_export_dir(parent)
 
-    @staticmethod
-    def _persist_last_export_dir(parent: str) -> None:
+    def _persist_last_export_dir(self, parent: str) -> None:
         """把目录写入 config.json 的 export.last_export_dir 并立即持久化。
 
         .cache 目录（含临时音频/临时项目）一律不写入，避免污染默认路径。
@@ -294,11 +308,11 @@ class ProjectStore(QObject):
         if not parent:
             return
         # 过滤 .cache 目录（临时提取的音频、临时项目都在这里）
-        if ProjectStore._is_in_cache_dir(parent):
+        if self._is_in_cache_dir(parent):
             return
         try:
             from strange_uta_game.frontend.settings.app_settings import AppSettings
-            settings = AppSettings()
+            settings = AppSettings(app_paths=self._app_paths)
             current = settings.get("export.last_export_dir", "")
             if current == parent:
                 return
@@ -561,7 +575,7 @@ class ProjectStore(QObject):
             log_perf_event("project.periodic_save.deferred", reason="predicate")
             return
 
-        _cache_dir().mkdir(exist_ok=True)
+        self._cache_dir()
         temp_path = str(self.get_temp_path())
         _perf_start = perf_counter() if perf_enabled() else None
 
@@ -580,7 +594,7 @@ class ProjectStore(QObject):
         """同步保存到 .sug.temp，仅用于强制退出兜底。"""
         if not self._project:
             return
-        _cache_dir().mkdir(exist_ok=True)
+        self._cache_dir()
         temp_path = str(self.get_temp_path())
         try:
             SugProjectParser.save(
@@ -598,14 +612,14 @@ class ProjectStore(QObject):
             p = Path(self._save_path)
             # 使用项目文件名作为临时文件名，存放在 .cache 目录
             temp_filename = "." + p.name + ".temp"
-            return _cache_dir() / temp_filename
-        return _untitled_temp_path()
+            return self._cache_dir() / temp_filename
+        return self._untitled_temp_path()
 
     def _cleanup_temp_for_path(self, save_path: str) -> None:
         """删除指定保存路径关联的临时文件（.cache/.xxx.sug.temp 与 autosave）。"""
         sp = Path(save_path)
         temp_name = "." + sp.name + ".temp"
-        temp_path = _cache_dir() / temp_name
+        temp_path = self._cache_dir() / temp_name
         try:
             if temp_path.exists():
                 temp_path.unlink()
@@ -648,14 +662,12 @@ class ProjectStore(QObject):
                 except Exception:
                     pass
 
-    @staticmethod
-    def has_crash_recovery() -> bool:
+    def has_crash_recovery(self) -> bool:
         """检查是否有闪退恢复文件（检查 .cache 目录下的所有 .sug.temp 文件）。"""
-        cache_dir = _cache_dir()
-        return _untitled_temp_path().exists() or any(cache_dir.glob(".*.sug.temp"))
+        cache_dir = self._cache_dir()
+        return self._untitled_temp_path().exists() or any(cache_dir.glob(".*.sug.temp"))
 
-    @staticmethod
-    def load_crash_recovery() -> Optional[tuple[Project, str]]:
+    def load_crash_recovery(self) -> Optional[tuple[Project, str]]:
         """加载闪退恢复文件（优先加载未命名项目的恢复文件）。
 
         Returns:
@@ -663,7 +675,7 @@ class ProjectStore(QObject):
             调用方可借此读取 nicokara_tags / media_path 等 extras。失败时返回 None。
         """
         # 优先检查未命名项目的恢复文件
-        untitled_temp = _untitled_temp_path()
+        untitled_temp = self._untitled_temp_path()
         if untitled_temp.exists():
             try:
                 return SugProjectParser.load(str(untitled_temp)), str(untitled_temp)
@@ -671,25 +683,24 @@ class ProjectStore(QObject):
                 pass
 
         # 检查其他项目的恢复文件
-        for temp_file in _cache_dir().glob(".*.sug.temp"):
+        for temp_file in self._cache_dir().glob(".*.sug.temp"):
             try:
                 return SugProjectParser.load(str(temp_file)), str(temp_file)
             except Exception:
                 continue
         return None
 
-    @staticmethod
-    def delete_crash_recovery() -> None:
+    def delete_crash_recovery(self) -> None:
         """删除闪退恢复文件（删除 .cache 目录下的所有 .sug.temp 文件）。"""
         try:
-            untitled_temp = _untitled_temp_path()
+            untitled_temp = self._untitled_temp_path()
             if untitled_temp.exists():
                 untitled_temp.unlink()
         except Exception:
             pass
         
         # 删除其他项目的恢复文件
-        for temp_file in _cache_dir().glob(".*.sug.temp"):
+        for temp_file in self._cache_dir().glob(".*.sug.temp"):
             try:
                 temp_file.unlink()
             except Exception:

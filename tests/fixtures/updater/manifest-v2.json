@@ -1,0 +1,28 @@
+{
+  "schema": 2,
+  "generated_at": "2026-06-20T00:00:00Z",
+  "channels": {
+    "stable": {
+      "version": "2.0.0",
+      "minimum_version": "1.2.3",
+      "targets": {
+        "windows-x86_64-windows-installer": {"name": "StrangeUtaGame-2.0.0.exe", "url": "https://example.invalid/stable.exe", "size": 1, "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "action": "run-installer"},
+        "macos-universal2-macos-dmg": {"name": "StrangeUtaGame-2.0.0.dmg", "url": "https://example.invalid/stable.dmg", "size": 1, "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "action": "open-package"},
+        "linux-x86_64-appimage": {"name": "StrangeUtaGame-2.0.0-x86_64.AppImage", "url": "https://example.invalid/stable.AppImage", "size": 1, "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "action": "replace-appimage-on-exit"},
+        "linux-x86_64-flatpak": {"name": "io.github.karaoke_studio.StrangeUtaGame.flatpakref", "url": "https://example.invalid/stable.flatpakref", "size": 1, "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "action": "flatpak-update"},
+        "linux-x86_64-deb": {"name": "strangeutagame_2.0.0_amd64.deb", "url": "https://example.invalid/stable.deb", "size": 1, "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "action": "open-package"}
+      }
+    },
+    "preview": {
+      "version": "2.1.0-beta.1",
+      "minimum_version": "1.2.3",
+      "targets": {
+        "windows-x86_64-windows-installer": {"name": "StrangeUtaGame-2.1.0-beta.1.exe", "url": "https://example.invalid/preview.exe", "size": 1, "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "action": "run-installer"},
+        "macos-universal2-macos-dmg": {"name": "StrangeUtaGame-2.1.0-beta.1.dmg", "url": "https://example.invalid/preview.dmg", "size": 1, "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "action": "open-package"},
+        "linux-x86_64-appimage": {"name": "StrangeUtaGame-2.1.0-beta.1-x86_64.AppImage", "url": "https://example.invalid/preview.AppImage", "size": 1, "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "action": "replace-appimage-on-exit"},
+        "linux-x86_64-flatpak": {"name": "io.github.karaoke_studio.StrangeUtaGame-beta.flatpakref", "url": "https://example.invalid/preview.flatpakref", "size": 1, "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "action": "flatpak-update"},
+        "linux-x86_64-deb": {"name": "strangeutagame_2.1.0-beta.1_amd64.deb", "url": "https://example.invalid/preview.deb", "size": 1, "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "action": "open-package"}
+      }
+    }
+  }
+}
