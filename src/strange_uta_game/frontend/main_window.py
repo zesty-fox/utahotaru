@@ -26,6 +26,7 @@ from strange_uta_game.backend.domain import Project
 from strange_uta_game.backend.infrastructure.audio import BassEngine, BassTsmEngine
 from strange_uta_game.frontend.project_store import ProjectStore
 from strange_uta_game.frontend.theme import theme
+from strange_uta_game.runtime.context import RuntimeContext
 
 
 class MainWindow(MSFluentWindow):
@@ -47,7 +48,18 @@ class MainWindow(MSFluentWindow):
     # standalone 行为。
     _embedded: bool = False
 
-    def __init__(self, embedded: bool = False, settings_provider=None, progress_callback=None):
+    def _set_runtime_context(self, context: RuntimeContext | None) -> None:
+        """Store bootstrap state before Qt base-class initialization."""
+
+        self._runtime_context = context
+
+    def __init__(
+        self,
+        embedded: bool = False,
+        settings_provider=None,
+        progress_callback=None,
+        runtime_context: RuntimeContext | None = None,
+    ):
         # ⚠ 必须在 super().__init__() 之前赋值！MSFluentWindow 初始化
         # 过程中可能触发 resizeEvent / changeEvent，那些 handler 会调
         # _schedule_geometry_save / _save_window_geometry / _restore_window_geometry
@@ -55,6 +67,7 @@ class MainWindow(MSFluentWindow):
         # AttributeError，而 Qt C++ 事件分发无法捕获 Python 异常，进程
         # 直接以 0xC0000409 stack-buffer-overrun 崩掉（已实测）。
         self._embedded = embedded
+        self._set_runtime_context(runtime_context)
         self._settings_provider = settings_provider
         self._progress_cb = progress_callback if not embedded else None
 

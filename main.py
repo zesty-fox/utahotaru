@@ -23,7 +23,7 @@ if sys.platform == "win32":
 
 # 必须先创建 QApplication，再导入任何 QWidget
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QCoreApplication, Qt
 from PyQt6.QtGui import QIcon
 
 # 启用 DPI 缩放
@@ -32,7 +32,16 @@ QApplication.setHighDpiScaleFactorRoundingPolicy(
 )
 
 # 创建应用实例
+QCoreApplication.setOrganizationName("KaraokeStudio")
+QCoreApplication.setApplicationName("StrangeUtaGame")
 app = QApplication(sys.argv)
+
+from strange_uta_game.runtime.context import build_runtime_context
+
+_runtime_context = build_runtime_context(
+    program_dir=Path(__file__).resolve().parent,
+    cwd=Path.cwd(),
+)
 
 # 确定图标路径（后续多次使用）
 _icon_path = (
@@ -151,7 +160,10 @@ def main():
     def _on_splash_progress(value: int, text: str) -> None:
         _splash.set_progress(value, text)
 
-    window = MainWindow(progress_callback=_on_splash_progress)
+    window = MainWindow(
+        progress_callback=_on_splash_progress,
+        runtime_context=_runtime_context,
+    )
     window.show()
     window.raise_()
     window.activateWindow()
