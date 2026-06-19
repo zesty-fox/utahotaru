@@ -4,7 +4,7 @@
 
 一款由 RhythmicaLyrics 启发的歌词打轴软件，专注于低延迟、高精度的卡拉OK时间标签制作。
 
-**当前版本**：v0.3.0 | **许可证**：GPL-3.0 | **平台**：Windows 10/11
+**许可证**：GPL-3.0 | **目标平台**：Windows x64、macOS Universal 2、Linux x64
 
 ## 核心特性
 
@@ -117,7 +117,7 @@ StrangeUtaGame/
 
 ### 环境要求
 
-- **操作系统**：Windows 10/11（主要开发平台）
+- **操作系统**：Windows 10/11、macOS、Linux（打包必须在对应原生系统执行）
 - **Python**：3.11+
 - **音频设备**：支持音频输出的设备
 
@@ -161,18 +161,16 @@ pytest tests/
 pytest tests/ --cov=src --cov-report=html
 ```
 
-### 音频回环验收
+### 安装包冒烟验收
 
-稳定候选版需在 Windows WASAPI、macOS CoreAudio 与 Linux PipeWire/PulseAudio
-参考设备上生成 schema-1 回环报告。先连接输出到输入并列出设备，再执行测量：
+每个原生安装包必须验证应用可启动、旧版 `.sug` 可读取、SRT 可导出并能干净退出：
 
 ```bash
-python scripts/audio_loopback_probe.py --list-devices
-python scripts/audio_loopback_probe.py --input DEVICE --output DEVICE --runs 20 \
-  --calibration-ms 0 --report audio-report.json
+StrangeUtaGame --smoke-test smoke-<target-id>.json
 ```
 
-校准后的每次误差都不得超过 `10 ms`；任一测量超限时命令返回非零退出码。
+完整 target ID、签名验证和 preview/stable 流程见 [RELEASING.md](RELEASING.md)。
+冒烟检查不初始化或播放音频。
 
 ## 使用指南
 

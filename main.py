@@ -43,6 +43,23 @@ _runtime_context = build_runtime_context(
     cwd=Path.cwd(),
 )
 
+
+def _smoke_report_argument(arguments: list[str]) -> Path | None:
+    try:
+        index = arguments.index("--smoke-test")
+    except ValueError:
+        return None
+    if index + 1 >= len(arguments):
+        raise SystemExit("--smoke-test requires a report path")
+    return Path(arguments[index + 1]).resolve()
+
+
+_smoke_report = _smoke_report_argument(sys.argv[1:])
+if _smoke_report is not None:
+    from scripts.smoke_test_installed_app import execute_installed_smoke
+
+    raise SystemExit(execute_installed_smoke(app, _smoke_report))
+
 # 确定图标路径（后续多次使用）
 _icon_path = (
     Path(__file__).parent / "src" / "strange_uta_game" / "resource" / "icon.ico"
