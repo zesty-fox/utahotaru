@@ -47,7 +47,8 @@ StrangeUtaGame --smoke-test smoke-<target-id>.json
 ## Stable
 
 1. 从同一提交生成五个最终产物及各平台验签报告。
-2. 收集五份安装包冒烟报告。需要音频验收时另行附加报告；本流程不运行性能基准。
+2. 收集五份安装包冒烟报告，以及 Windows x64、macOS Universal 2、Linux x64
+   三份真实设备音频延迟报告。每份报告必须通过，校准后最大误差不得超过 `10 ms`。
 3. 生成 schema-2 清单并签名：
 
 ```bash
@@ -59,6 +60,14 @@ python3 scripts/verify_release_gate.py release-gate-input --channel stable
    门禁的输入发布为 `SUGv<version>` draft。
 5. 人工核对版本、CHANGELOG、目标集合和签名后再发布 draft。更新器的 stable 清单
    只能在 GitHub Release 公开后切换。
+
+音频报告使用真实输出到输入的回环连接生成：
+
+```bash
+python3 scripts/audio_loopback_probe.py --list-devices
+python3 scripts/audio_loopback_probe.py --input DEVICE --output DEVICE --runs 20 \
+  --calibration-ms 0 --report audio-<platform>.json
+```
 
 ## 平台验签
 

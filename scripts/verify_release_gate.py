@@ -92,6 +92,21 @@ def verify_release_gate(root: Path, channel: str = "stable") -> GateResult:
         ):
             invalid.append(smoke_name)
 
+    if channel == "stable":
+        for platform_name in (
+            "windows-x86_64",
+            "macos-universal2",
+            "linux-x86_64",
+        ):
+            name = f"audio-{platform_name}.json"
+            audio = _read_json(root / name, missing, invalid)
+            if audio is not None and (
+                audio.get("schema") != 1
+                or audio.get("passed") is not True
+                or float(audio.get("max_error_ms", float("inf"))) > 10.0
+            ):
+                invalid.append(name)
+
     missing_result = tuple(sorted(set(missing)))
     invalid_result = tuple(sorted(set(invalid)))
     return GateResult(

@@ -172,6 +172,17 @@ StrangeUtaGame --smoke-test smoke-<target-id>.json
 完整 target ID、签名验证和 preview/stable 流程见 [RELEASING.md](RELEASING.md)。
 冒烟检查不初始化或播放音频。
 
+### 音频延迟验收
+
+Stable 候选还需在 Windows WASAPI、macOS CoreAudio、Linux PipeWire/PulseAudio
+真实设备上分别生成回环报告。校准后最大误差必须不超过 `10 ms`：
+
+```bash
+python3 scripts/audio_loopback_probe.py --list-devices
+python3 scripts/audio_loopback_probe.py --input DEVICE --output DEVICE --runs 20 \
+  --calibration-ms 0 --report audio-<platform>.json
+```
+
 ## 使用指南
 
 ### 1. 加载文件

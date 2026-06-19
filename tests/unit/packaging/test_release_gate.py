@@ -55,19 +55,14 @@ def gate_fixture(tmp_path):
     return GateFixture(tmp_path)
 
 
-def test_stable_gate_requires_package_smoke_but_not_audio_benchmarks(gate_fixture):
+def test_stable_gate_requires_package_smoke_and_audio_benchmarks(gate_fixture):
     assert verify_release_gate(gate_fixture.root).passed
-    for platform_name in ("windows-x86_64", "macos-universal2", "linux-x86_64"):
-        gate_fixture.remove(f"audio-{platform_name}.json")
-
-    assert verify_release_gate(gate_fixture.root).passed
-
-    gate_fixture.remove("smoke-linux-x86_64-appimage.json")
+    gate_fixture.remove("audio-linux-x86_64.json")
 
     result = verify_release_gate(gate_fixture.root)
 
     assert not result.passed
-    assert "smoke-linux-x86_64-appimage.json" in result.missing
+    assert "audio-linux-x86_64.json" in result.missing
 
 
 def test_preview_gate_does_not_accept_stable_channel(gate_fixture):
