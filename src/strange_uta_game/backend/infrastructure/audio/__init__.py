@@ -12,6 +12,8 @@ from .base import (
     PlaybackState,
 )
 from .profile import AudioProfile
+from .factory import AudioBackend, create_audio_engine
+from .sounddevice_engine import SoundDeviceEngine
 
 if sys.platform == "win32":
     from .bass_engine import BassEngine
@@ -36,6 +38,9 @@ __all__ = [
     "AudioInfo",
     "AudioDiagnostics",
     "AudioProfile",
+    "AudioBackend",
+    "create_audio_engine",
+    "SoundDeviceEngine",
     "BassEngine",
     "BassTsmEngine",
 ]

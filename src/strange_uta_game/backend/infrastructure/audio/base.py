@@ -248,3 +248,6 @@ class IAudioEngine(ABC):
 
     def clear_effects(self) -> None:
         """Discard preloaded effects when supported."""
+
+    def set_high_quality_speed_enabled(self, enabled: bool) -> None:
+        """Set optional background preparation for high-quality speed changes."""

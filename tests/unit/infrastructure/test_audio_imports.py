@@ -19,11 +19,13 @@ def test_audio_package_imports_without_loading_windows_bass_backend():
 import sys
 
 from strange_uta_game.backend.infrastructure import BassEngine
-from strange_uta_game.backend.infrastructure.audio import AudioPlaybackError
+from strange_uta_game.backend.infrastructure.audio import AudioPlaybackError, create_audio_engine
 from strange_uta_game.backend.infrastructure.audio.keysound_player import KeySoundPlayer
 
 assert "strange_uta_game.backend.infrastructure.audio.bass_engine" not in sys.modules
 assert KeySoundPlayer.__name__ == "KeySoundPlayer"
+create_audio_engine()
+assert "strange_uta_game.backend.infrastructure.audio.bass_engine" not in sys.modules
 
 try:
     BassEngine()

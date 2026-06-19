@@ -144,6 +144,7 @@ class SoundDeviceEngine(IAudioEngine):
             channels=self._channels,
             block_frames=self._profile.block_frames,
         )
+        self._high_quality_speed_enabled = True
 
         # ---- 热重载标志位 ----
         # 当音频回调检测到底层设备异常时置位，由 producer 线程执行恢复
@@ -243,7 +244,7 @@ class SoundDeviceEngine(IAudioEngine):
         speed_max: float = 2.0,
     ) -> None:
         """预渲染常用速度到磁盘缓存（后台进行，不阻塞加载）"""
-        if self._original_data is None:
+        if self._original_data is None or not self._high_quality_speed_enabled:
             return
 
         # 预渲染速度列表（按优先级排序，优先级越小越优先）
@@ -545,6 +546,9 @@ class SoundDeviceEngine(IAudioEngine):
 
     def clear_effects(self) -> None:
         self._effects.clear()
+
+    def set_high_quality_speed_enabled(self, enabled: bool) -> None:
+        self._high_quality_speed_enabled = bool(enabled)
 
     # ==================== 内部：流 / Producer / 回调 ====================
 
