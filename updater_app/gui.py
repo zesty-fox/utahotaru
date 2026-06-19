@@ -460,7 +460,8 @@ def run_gui(args: object, run_func: Callable) -> int:
     win = _UpdaterWindow(title, icon_path)
     win.show()
 
-    from main import DATE_FORMAT, LOG_FORMAT
+    LOG_FORMAT = "[%(asctime)s] %(levelname)s %(message)s"
+    DATE_FORMAT = "%H:%M:%S"
 
     bridge = _SignalBridge(win)
     handler = _SignalLogHandler(bridge)
