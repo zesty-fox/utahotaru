@@ -1,15 +1,29 @@
 """Audio module."""
 
+import sys
+
 from .base import (
-    IAudioEngine,
     AudioError,
+    AudioInfo,
     AudioLoadError,
     AudioPlaybackError,
+    IAudioEngine,
     PlaybackState,
-    AudioInfo,
 )
-from .bass_engine import BassEngine
-from .bass_tsm_engine import BassTsmEngine
+
+if sys.platform == "win32":
+    from .bass_engine import BassEngine
+    from .bass_tsm_engine import BassTsmEngine
+else:
+    class BassEngine:
+        """Compatibility export for the unavailable Windows BASS backend."""
+
+        def __init__(self, *args, **kwargs) -> None:
+            raise AudioPlaybackError("BASS audio backend is only available on Windows")
+
+
+    class BassTsmEngine(BassEngine):
+        """Compatibility export for the unavailable Windows BASS TSM backend."""
 
 __all__ = [
     "IAudioEngine",
