@@ -43,12 +43,14 @@ import sounddevice as sd
 import soundfile as sf
 
 from .base import (
+    AudioDiagnostics,
     AudioInfo,
     AudioLoadError,
     AudioPlaybackError,
     IAudioEngine,
     PlaybackState,
 )
+from .profile import AudioProfile
 from .ring_buffer import RingBuffer
 from .tsm_cache import TSMRenderCache, LoadProgressCallback, _quantize
 
@@ -74,28 +76,21 @@ def _set_thread_priority(priority: int) -> None:
 
 # ---- 常量 ----
 
-# 回调块大小：1024 帧（@ 44.1kHz ≈ 23ms），远小于旧版 4410（100ms），
-# 显著降低 underrun 概率与延迟。
-_BLOCK_FRAMES = 1024
-
-# Ring buffer 容量：~500ms 缓冲，足以吸收任何 GIL/调度抖动。
-_RING_SECONDS = 0.5
-
 # Producer tick：达到目标余量后睡眠的间隔（秒）
 _PRODUCER_TICK = 0.005
-
-# 目标硬件延迟：传给 PortAudio 的建议值（秒）。
-# WASAPI Shared 模式硬下限约 20ms，传更小值会被 clamp 到硬件最小值。
-# 传 0.1 让 PortAudio 申请标准低缓冲，实际值由 stream.latency 读回。
-_TARGET_LATENCY = 0.1
 StreamFactory = Callable[..., sd.OutputStream]
 
 
 class SoundDeviceEngine(IAudioEngine):
     """音频引擎（离线预渲染 + RingBuffer）。"""
 
-    def __init__(self, stream_factory: StreamFactory = sd.OutputStream) -> None:
+    def __init__(
+        self,
+        stream_factory: StreamFactory = sd.OutputStream,
+        profile: AudioProfile | None = None,
+    ) -> None:
         self._stream_factory = stream_factory
+        self._profile = profile or AudioProfile.default()
         # ---- 音频元数据 ----
         self._original_data: Optional[np.ndarray] = None  # (n, channels) float32（原始文件，仅用于波形显示）
         self._original_sample_rate: int = 44100  # 原始文件采样率（用于时长/位置计算）
@@ -141,6 +136,9 @@ class SoundDeviceEngine(IAudioEngine):
         # load() 建流后从 stream.latency 读取实际值，转换为帧数。
         # 用于 get_position_ms() 补偿"数据进 ring → 从硬件输出"之间的固定延迟。
         self._stream_latency_frames: int = 0
+        self._actual_latency_seconds: float = 0.0
+        self._underruns: int = 0
+        self._recoveries: int = 0
 
         # ---- 热重载标志位 ----
         # 当音频回调检测到底层设备异常时置位，由 producer 线程执行恢复
@@ -196,7 +194,10 @@ class SoundDeviceEngine(IAudioEngine):
             self._duration_ms = int(len(cached_pcm) / self._sample_rate * 1000)
 
             # 重建 ring
-            cap = max(_BLOCK_FRAMES * 4, int(_RING_SECONDS * self._sample_rate))
+            cap = max(
+                self._profile.block_frames * 4,
+                int(self._profile.ring_seconds * self._sample_rate),
+            )
             self._ring = RingBuffer(cap, self._channels)
 
             with self._state_lock:
@@ -482,14 +483,34 @@ class SoundDeviceEngine(IAudioEngine):
         """
         return self._cache.get(1.0)
 
+    def get_diagnostics(self) -> AudioDiagnostics:
+        backend = "PortAudio"
+        try:
+            hostapis = sd.query_hostapis()
+            if hostapis:
+                backend = str(hostapis[0].get("name", backend))
+        except Exception:
+            pass
+        device = str(getattr(self._stream, "device", ""))
+        return AudioDiagnostics(
+            backend=backend,
+            device=device,
+            sample_rate=self._sample_rate,
+            block_frames=self._profile.block_frames,
+            requested_latency_ms=self._profile.requested_latency_seconds * 1000,
+            actual_latency_ms=self._actual_latency_seconds * 1000,
+            underruns=self._underruns,
+            recoveries=self._recoveries,
+        )
+
     # ==================== 内部：流 / Producer / 回调 ====================
 
     def _start_streaming(self) -> None:
         """启动 PortAudio stream + producer 线程。
 
         流建立后保持存活直到 release() 或热重载，play/pause/stop 均不销毁它。
-        建流时指定 latency=_TARGET_LATENCY（建议值），实际分配值由 stream.latency
-        读回并存入 _stream_latency_frames，用于 get_position_ms() 补偿。
+        建流时使用 profile 的建议延迟，实际分配值由 stream.latency 读回并存入
+        _stream_latency_frames，用于 get_position_ms() 补偿。
         """
         if self._ring is None or self._original_data is None:
             return
@@ -510,18 +531,19 @@ class SoundDeviceEngine(IAudioEngine):
                 samplerate=self._sample_rate,
                 channels=self._channels,
                 dtype="float32",
-                blocksize=_BLOCK_FRAMES,
-                latency=_TARGET_LATENCY,
+                blocksize=self._profile.block_frames,
+                latency=self._profile.requested_latency_seconds,
                 callback=self._audio_callback,
             )
             self._stream.start()
             # 读回 PortAudio 实际分配的硬件延迟并转换为帧数，用于位置补偿。
             # stream.latency 是输出延迟（秒），即"回调写入 → 硬件实际播出"的固定延迟。
             actual_latency_s = self._stream.latency
+            self._actual_latency_seconds = actual_latency_s
             self._stream_latency_frames = int(actual_latency_s * self._sample_rate)
             print(
                 f"[SoundDeviceEngine] stream ready: "
-                f"requested latency={_TARGET_LATENCY*1000:.1f}ms, "
+                f"requested latency={self._profile.requested_latency_seconds*1000:.1f}ms, "
                 f"actual={actual_latency_s*1000:.1f}ms "
                 f"({self._stream_latency_frames} frames)"
             )
@@ -530,6 +552,7 @@ class SoundDeviceEngine(IAudioEngine):
             self._producer_stop.set()
             self._stream = None
             self._stream_latency_frames = 0
+            self._actual_latency_seconds = 0.0
 
     def _stop_streaming(self) -> None:
         # 先停 stream（保证回调不再被调用）
@@ -555,7 +578,7 @@ class SoundDeviceEngine(IAudioEngine):
         if status:
             if status.output_underflow:
                 # underflow 只是说明 Python 喂数据慢了，属于正常性能抖动，不用管
-                pass
+                self._underruns += 1
             else:
                 # 遇到了设备断开、采样率突变等致命状态
                 print(f"[SoundDeviceEngine] 底层设备状态异常，请求热重载: {status}")
@@ -588,13 +611,14 @@ class SoundDeviceEngine(IAudioEngine):
         """生产者：把 active PCM 切片送进 ring；处理速度切换 / EOF。"""
         # 提升本线程优先级，防止被 TSMWorker 等 CPU 密集线程抢占。
         # ABOVE_NORMAL 足够保证 ring 持续喂饱，不需要 HIGHEST（避免影响 UI）。
-        _set_thread_priority(_THREAD_PRIORITY_ABOVE_NORMAL)
+        if self._profile.thread_priority is not None:
+            _set_thread_priority(self._profile.thread_priority)
 
         if self._ring is None:
             return
 
-        # 目标余量：保持 ring 至少有 _BLOCK_FRAMES * 2 帧可读
-        target_low = _BLOCK_FRAMES * 2
+        # 目标余量：保持 ring 至少有两个回调块可读
+        target_low = self._profile.block_frames * 2
 
         while not self._producer_stop.is_set():
             # 0) 看门狗：检测是否需要热重载 (设备切换、流崩溃或抛出异常)
@@ -728,14 +752,15 @@ class SoundDeviceEngine(IAudioEngine):
                 samplerate=self._sample_rate,
                 channels=self._channels,
                 dtype="float32",
-                blocksize=_BLOCK_FRAMES,
-                latency=_TARGET_LATENCY,
+                blocksize=self._profile.block_frames,
+                latency=self._profile.requested_latency_seconds,
                 callback=self._audio_callback,
             )
             self._stream.start()
 
             # 更新硬件延迟补偿帧数（新设备的 latency 可能与旧设备不同）
             actual_latency_s = self._stream.latency
+            self._actual_latency_seconds = actual_latency_s
             self._stream_latency_frames = int(actual_latency_s * self._sample_rate)
             print(
                 f"[SoundDeviceEngine] 热重载 stream: "
@@ -745,11 +770,12 @@ class SoundDeviceEngine(IAudioEngine):
 
             # 恢复播放头位置，内部会调用 self._ring.reset() 并清空旧的废弃缓冲
             self.set_position_ms(current_ms)
+            self._recoveries += 1
 
             print("[SoundDeviceEngine] 热重载成功！已恢复播放。")
         except Exception as e:
             print(f"[SoundDeviceEngine] 热重载失败: {e}")
             self._stream_latency_frames = 0
+            self._actual_latency_seconds = 0.0
             # 如果实在救不回来，暂停播放，让用户后续手动点击播放重试
             self._state = PlaybackState.PAUSED
-

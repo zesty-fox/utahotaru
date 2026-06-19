@@ -47,6 +47,18 @@ class AudioInfo:
     channels: int
 
 
+@dataclass(frozen=True)
+class AudioDiagnostics:
+    backend: str
+    device: str
+    sample_rate: int
+    block_frames: int
+    requested_latency_ms: float
+    actual_latency_ms: float
+    underruns: int
+    recoveries: int
+
+
 class IAudioEngine(ABC):
     """音频引擎接口
 
@@ -205,3 +217,17 @@ class IAudioEngine(ABC):
         在不再需要音频引擎时调用，释放相关资源。
         """
         pass
+
+    def get_diagnostics(self) -> AudioDiagnostics:
+        """Return backend diagnostics when supported by the implementation."""
+
+        return AudioDiagnostics(
+            backend=self.__class__.__name__,
+            device="",
+            sample_rate=0,
+            block_frames=0,
+            requested_latency_ms=0.0,
+            actual_latency_ms=0.0,
+            underruns=0,
+            recoveries=0,
+        )

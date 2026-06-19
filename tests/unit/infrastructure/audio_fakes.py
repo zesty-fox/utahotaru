@@ -38,6 +38,7 @@ class FakeStreamFactory:
         self.streams: list[FakeOutputStream] = []
 
     def __call__(self, **kwargs) -> FakeOutputStream:
+        kwargs.pop("latency", None)
         stream = FakeOutputStream(latency=self.latency, **kwargs)
         self.streams.append(stream)
         return stream

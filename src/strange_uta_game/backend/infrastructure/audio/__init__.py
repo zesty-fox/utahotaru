@@ -3,6 +3,7 @@
 import sys
 
 from .base import (
+    AudioDiagnostics,
     AudioError,
     AudioInfo,
     AudioLoadError,
@@ -10,6 +11,7 @@ from .base import (
     IAudioEngine,
     PlaybackState,
 )
+from .profile import AudioProfile
 
 if sys.platform == "win32":
     from .bass_engine import BassEngine
@@ -32,6 +34,8 @@ __all__ = [
     "AudioPlaybackError",
     "PlaybackState",
     "AudioInfo",
+    "AudioDiagnostics",
+    "AudioProfile",
     "BassEngine",
     "BassTsmEngine",
 ]

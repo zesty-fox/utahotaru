@@ -12,6 +12,7 @@ def test_position_stays_on_original_timeline(wav_file, fake_stream_factory):
     engine = SoundDeviceEngine(stream_factory=fake_stream_factory)
     try:
         engine.load(wav_file)
+        assert fake_stream_factory.streams[-1].active
         engine.set_speed(0.5)
         engine.set_position_ms(500)
         assert engine.get_position_ms() == 500
