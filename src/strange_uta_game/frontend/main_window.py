@@ -70,6 +70,8 @@ class MainWindow(MSFluentWindow):
         self._set_runtime_context(runtime_context)
         self._settings_provider = settings_provider
         self._progress_cb = progress_callback if not embedded else None
+        app_paths = runtime_context.paths if runtime_context is not None else None
+        self._app_paths = app_paths
 
         self._report_progress(5, self.tr("正在初始化翻译器..."))
 
@@ -81,7 +83,7 @@ class MainWindow(MSFluentWindow):
             from strange_uta_game.frontend.settings.app_settings import AppSettings
             from strange_uta_game.frontend.localization import install_translators
             try:
-                _lang = AppSettings().get("ui.language", "auto")
+                _lang = AppSettings(app_paths=app_paths).get("ui.language", "auto")
             except Exception:
                 _lang = "zh_CN"
             install_translators(_lang)
@@ -103,7 +105,7 @@ class MainWindow(MSFluentWindow):
         self._command_manager = CommandManager()
         self._command_manager.set_on_state_changed(self._on_command_state_changed)
         self._timing_service = TimingService(self._audio_engine, self._command_manager)
-        self._store = ProjectStore(self)
+        self._store = ProjectStore(self, app_paths=app_paths)
         self._store.set_auto_save_defer_predicate(self._timing_service.is_playing)
 
         # 跟踪当前界面（用于 switchTo 自动应用修改，必须在 _init_navigation 之前）
@@ -114,7 +116,7 @@ class MainWindow(MSFluentWindow):
         # embedded 模式由宿主管理几何，跳过这一整套。
         if not self._embedded:
             from strange_uta_game.frontend.settings.app_settings import AppSettings
-            self._win_settings = AppSettings()
+            self._win_settings = AppSettings(app_paths=app_paths)
             self._geometry_save_timer = QTimer(self)
             self._geometry_save_timer.setSingleShot(True)
             self._geometry_save_timer.setInterval(400)
@@ -458,7 +460,11 @@ class MainWindow(MSFluentWindow):
         self.rubyInterface.hide()  # 已废弃，仅保留与 Timing 共用的功能
 
         self._report_progress(77, self.tr("正在加载设置界面..."))
-        self.settingInterface = SettingsInterface(self, settings_provider=self._settings_provider)
+        self.settingInterface = SettingsInterface(
+            self,
+            settings_provider=self._settings_provider,
+            app_paths=self._app_paths,
+        )
         self.settingInterface.setObjectName("settingInterface")
 
         self._report_progress(82, self.tr("正在加载编辑视图..."))
@@ -584,7 +590,17 @@ class MainWindow(MSFluentWindow):
             nicokara_tags = AppSettings.DEFAULT_SETTINGS.get("nicokara_tags", {})
         try:
             setting_iface = getattr(self, "settingInterface", None)
-            settings = setting_iface.get_settings() if setting_iface else AppSettings()
+            settings = (
+                setting_iface.get_settings()
+                if setting_iface
+                else AppSettings(
+                    app_paths=(
+                        self._runtime_context.paths
+                        if self._runtime_context is not None
+                        else None
+                    )
+                )
+            )
             settings.set("nicokara_tags", nicokara_tags)
             settings.save()
         except Exception:
@@ -677,7 +693,14 @@ class MainWindow(MSFluentWindow):
                 return bool(setting_iface.get_settings().get("audio.hq_speed_change", True))
             from strange_uta_game.frontend.settings.app_settings import AppSettings
 
-            return bool(AppSettings().get("audio.hq_speed_change", True))
+            app_paths = (
+                self._runtime_context.paths
+                if self._runtime_context is not None
+                else None
+            )
+            return bool(
+                AppSettings(app_paths=app_paths).get("audio.hq_speed_change", True)
+            )
         except Exception:
             return True
 
@@ -732,10 +755,9 @@ class MainWindow(MSFluentWindow):
 
     # ==================== 闪退恢复 ====================
 
-    @staticmethod
-    def has_pending_crash_recovery() -> bool:
+    def has_pending_crash_recovery(self) -> bool:
         """是否存在待恢复的闪退临时文件（公开 API，供宿主在弹窗前查询）。"""
-        return ProjectStore.has_crash_recovery()
+        return self._store.has_crash_recovery()
 
     def check_crash_recovery(self, dialog_parent: "Optional[object]" = None) -> bool:
         """检查是否有闪退恢复文件，并询问用户是否加载。
@@ -748,7 +770,7 @@ class MainWindow(MSFluentWindow):
             True 表示用户选择恢复且成功加载了项目；其余情况均为 False
             （包括没有恢复文件、用户拒绝、加载失败）。
         """
-        if not ProjectStore.has_crash_recovery():
+        if not self._store.has_crash_recovery():
             return False
 
         parent = dialog_parent if dialog_parent is not None else self
@@ -761,7 +783,7 @@ class MainWindow(MSFluentWindow):
         msg.exec()
         clicked = msg.clickedButton()
         if clicked is btn_yes:
-            recovered = ProjectStore.load_crash_recovery()
+            recovered = self._store.load_crash_recovery()
             if recovered:
                 project, temp_path = recovered
                 self._store.load_project(project)
@@ -779,7 +801,7 @@ class MainWindow(MSFluentWindow):
                     parent=self,
                 )
                 # 恢复后删除临时文件
-                ProjectStore.delete_crash_recovery()
+                self._store.delete_crash_recovery()
                 return True
             else:
                 InfoBar.error(
@@ -791,11 +813,11 @@ class MainWindow(MSFluentWindow):
                     duration=3000,
                     parent=self,
                 )
-                ProjectStore.delete_crash_recovery()
+                self._store.delete_crash_recovery()
                 return False
         else:
             # 用户拒绝恢复 → 删除临时文件
-            ProjectStore.delete_crash_recovery()
+            self._store.delete_crash_recovery()
             return False
 
     # ==================== 自动更新检查 ====================
@@ -984,7 +1006,12 @@ class MainWindow(MSFluentWindow):
         def _worker() -> None:
             try:
                 from strange_uta_game.frontend.settings.app_settings import AppSettings
-                AppSettings().maybe_auto_update_network_dictionary()
+                app_paths = (
+                    self._runtime_context.paths
+                    if self._runtime_context is not None
+                    else None
+                )
+                AppSettings(app_paths=app_paths).maybe_auto_update_network_dictionary()
             except Exception:
                 import logging
                 logging.getLogger(__name__).warning(

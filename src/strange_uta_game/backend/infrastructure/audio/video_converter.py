@@ -27,6 +27,13 @@ VIDEO_EXTENSIONS = {
 _MP3_QUALITY = 128  # kbps
 _TARGET_SAMPLE_RATE = 44100  # Hz
 _CACHE_DIR_NAME = ".cache"
+_cache_root: Path | None = None
+
+
+def set_cache_root(path: Path | None) -> None:
+    """Configure the canonical cache root used outside portable mode."""
+    global _cache_root
+    _cache_root = Path(path) if path is not None else None
 
 
 def _get_cache_dir() -> Path:
@@ -43,8 +50,11 @@ def _get_cache_dir() -> Path:
         cache_dir = Path(env_dir) / "extracted"
         cache_dir.mkdir(parents=True, exist_ok=True)
         return cache_dir
-    program_dir = Path(sys.argv[0]).resolve().parent
-    cache_dir = program_dir / _CACHE_DIR_NAME / "extracted"
+    root = _cache_root
+    if root is None:
+        program_dir = Path(sys.argv[0]).resolve().parent
+        root = program_dir / _CACHE_DIR_NAME
+    cache_dir = root / "extracted"
     cache_dir.mkdir(parents=True, exist_ok=True)
     return cache_dir
 

@@ -55,9 +55,14 @@ if not _icon_path.exists():
 # 初始化主题管理器（必须在创建主窗口之前）
 from strange_uta_game.frontend.theme import theme
 from strange_uta_game.frontend.settings.app_settings import AppSettings
+from strange_uta_game.backend.infrastructure.audio import tsm_cache, video_converter
+
+AppSettings.set_default_app_paths(_runtime_context.paths)
+tsm_cache.set_cache_root(_runtime_context.paths.cache)
+video_converter.set_cache_root(_runtime_context.paths.cache)
 
 # 从配置文件读取主题设置并应用
-settings = AppSettings()
+settings = AppSettings(app_paths=_runtime_context.paths)
 
 # 翻译器安装迁移到 MainWindow.__init__（在 super().__init__() 之前）——
 # 让入口对语言初始化无感、嵌入式场景也能正常工作。
