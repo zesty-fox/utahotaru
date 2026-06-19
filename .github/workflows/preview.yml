@@ -1,0 +1,73 @@
+name: Cross-platform preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Preview version
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: windows-x86_64-windows-installer, os: windows-latest }
+          - { target: macos-universal2-macos-dmg, os: macos-latest }
+          - { target: linux-x86_64-appimage, os: ubuntu-22.04 }
+          - { target: linux-x86_64-flatpak, os: ubuntu-22.04 }
+          - { target: linux-x86_64-deb, os: ubuntu-22.04 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install dependencies
+        shell: bash
+        run: |
+          pip install -r requirements.txt
+          if [ "${{ runner.os }}" = "Windows" ]; then pip install -r requirements-winrt.txt; fi
+      - name: Build shared payload
+        run: python build.py --target "${{ matrix.target }}"
+      - name: Package target
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          mkdir -p dist/release
+          case "${{ matrix.target }}" in
+            windows-*) iscc "/DAppVersion=$VERSION" packaging/windows/StrangeUtaGame.iss ;;
+            macos-*) packaging/macos/sign_and_package.sh dist/StrangeUtaGame.app "dist/release/StrangeUtaGame-$VERSION-macos-universal2.dmg" ;;
+            linux-x86_64-appimage) packaging/linux/build_appimage.sh dist/StrangeUtaGame dist/release ;;
+            linux-x86_64-flatpak) flatpak-builder --force-clean build-flatpak packaging/linux/io.github.karaoke_studio.StrangeUtaGame.yml && flatpak build-bundle repo "dist/release/StrangeUtaGame-$VERSION-linux-x86_64.flatpak" io.github.karaoke_studio.StrangeUtaGame ;;
+            linux-x86_64-deb) packaging/linux/build_deb.sh dist/StrangeUtaGame "$VERSION" dist/release ;;
+          esac
+      - uses: actions/upload-artifact@v4
+        with:
+          name: preview-${{ matrix.target }}
+          path: dist/release/*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          pattern: preview-*
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: preview-${{ inputs.version }}
+          prerelease: true
+          files: release/*
