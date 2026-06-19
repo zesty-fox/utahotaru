@@ -225,7 +225,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ steps.ver.outputs.tag }}"
-          TITLE="v${{ steps.ver.outputs.version }}"
+          TITLE="StrangeUtaGame_v${{ steps.ver.outputs.version }}"
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "release $TAG 已存在 → 改为 draft 并更新 notes"
             gh release edit "$TAG" --draft --title "$TITLE" --notes-file notes.md
