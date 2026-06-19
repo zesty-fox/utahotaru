@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=StrangeUtaGame
+Comment=Karaoke lyric timing editor
+Exec=StrangeUtaGame %F
+Icon=io.github.karaoke_studio.StrangeUtaGame
+Terminal=false
+Categories=AudioVideo;Audio;
+MimeType=application/x-strangeutagame;

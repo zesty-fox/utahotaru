@@ -1,0 +1,34 @@
+{
+  "app-id": "io.github.karaoke_studio.StrangeUtaGame",
+  "runtime": "org.freedesktop.Platform",
+  "runtime-version": "24.08",
+  "sdk": "org.freedesktop.Sdk",
+  "command": "StrangeUtaGame",
+  "finish-args": [
+    "--share=ipc",
+    "--socket=wayland",
+    "--socket=fallback-x11",
+    "--socket=pulseaudio",
+    "--device=dri",
+    "--filesystem=xdg-documents",
+    "--filesystem=xdg-music",
+    "--filesystem=xdg-videos"
+  ],
+  "modules": [
+    {
+      "name": "strangeutagame",
+      "buildsystem": "simple",
+      "build-commands": [
+        "install -d /app/bin /app/share/applications /app/share/metainfo",
+        "cp -a payload/. /app/bin/",
+        "install -Dm644 strangeutagame.desktop /app/share/applications/io.github.karaoke_studio.StrangeUtaGame.desktop",
+        "install -Dm644 io.github.karaoke_studio.StrangeUtaGame.metainfo.xml /app/share/metainfo/io.github.karaoke_studio.StrangeUtaGame.metainfo.xml"
+      ],
+      "sources": [
+        {"type": "dir", "path": "../../dist/StrangeUtaGame", "dest": "payload"},
+        {"type": "file", "path": "strangeutagame.desktop"},
+        {"type": "file", "path": "io.github.karaoke_studio.StrangeUtaGame.metainfo.xml"}
+      ]
+    }
+  ]
+}
