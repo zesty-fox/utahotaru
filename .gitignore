@@ -225,3 +225,6 @@ dictionary.json
 singers.json
 network_dictionary.json
 scripts/_sources.txt
+
+# Local Superpowers brainstorming companion
+.superpowers/
