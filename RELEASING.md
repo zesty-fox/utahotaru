@@ -56,9 +56,12 @@ python3 scripts/release.py manifest --help
 python3 scripts/verify_release_gate.py release-gate-input --channel stable
 ```
 
-4. 运行 `Stable cross-platform release`。受保护 environment 审批通过后，仅把已通过
-   门禁的输入发布为 `SUGv<version>` draft。
-5. 人工核对版本、CHANGELOG、目标集合和签名后再发布 draft。更新器的 stable 清单
+4. 把五个产物、Linux GPG 签名、各平台验签报告、五份冒烟报告、三份音频报告和
+   stable manifest 上传到同一个 candidate Release。
+5. 运行 `Stable cross-platform release`，输入目标版本和该 candidate tag。受保护
+   environment 审批通过后，workflow 会下载候选证据、重新执行门禁，并只把通过的
+   输入发布为 `SUGv<version>` draft。
+6. 人工核对版本、CHANGELOG、目标集合和签名后再发布 draft。更新器的 stable 清单
    只能在 GitHub Release 公开后切换。
 
 音频报告使用真实输出到输入的回环连接生成：

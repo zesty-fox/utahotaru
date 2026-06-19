@@ -6,6 +6,9 @@ on:
       version:
         description: Stable version
         required: true
+      candidate_tag:
+        description: Candidate Release tag containing all gate inputs
+        required: true
 
 permissions:
   contents: write
@@ -41,6 +44,13 @@ jobs:
           for name in WINDOWS_CERTIFICATE_PFX_BASE64 WINDOWS_CERTIFICATE_PASSWORD APPLE_CERTIFICATE_P12_BASE64 APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_TEAM_ID APPLE_APP_PASSWORD UPDATE_ED25519_PRIVATE_KEY_B64 LINUX_GPG_PRIVATE_KEY_B64; do
             test -n "${!name}" || { echo "Missing protected secret: $name"; exit 1; }
           done
+      - name: Download collected candidate evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p release-gate-input
+          gh release download "${{ inputs.candidate_tag }}" \
+            --dir release-gate-input
       - name: Verify collected stable gate inputs
         run: python scripts/verify_release_gate.py release-gate-input --channel stable
       - uses: softprops/action-gh-release@v2
