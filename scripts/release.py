@@ -48,6 +48,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+from release_tools.targets import BuildTarget, SUPPORTED_TARGETS
+
 
 def _force_utf8_stdio() -> None:
     """强制 stdout/stderr 使用 UTF-8。Windows 默认 cp1252/cp936 都会令中文 print 抛错。"""
@@ -992,10 +994,20 @@ def cmd_build(
     reuse_runtime: bool = False,
     variant: str = "",
     require_reuse: bool = False,
+    target: str | None = None,
 ) -> int:
+    if target is not None:
+        build_target = BuildTarget.parse(target)
+        variant = build_target.legacy_build_variant
+    elif variant:
+        build_target = BuildTarget.from_legacy_alias(variant)
+        print(f"! --variant {variant} 已弃用；请改用 --target {build_target.id}")
+    else:
+        build_target = BuildTarget.from_legacy_alias("main")
+        variant = ""
     vcfg = VariantConfig.for_variant(variant)
     version = _read_version()
-    print(f"== build for v{version}  variant={vcfg.label()} ==")
+    print(f"== build for v{version}  target={build_target.id} ==")
 
     # 1. UpdaterEx.exe（仅 Windows 变体）
     if vcfg.has_updater_exe and sys.platform == "win32":
@@ -1077,6 +1089,7 @@ def cmd_all(
     reuse_runtime: bool = False,
     variant: str = "",
     require_reuse: bool = False,
+    target: str | None = None,
 ) -> int:
     rc = cmd_prepare(version)
     if rc != 0:
@@ -1090,13 +1103,14 @@ def cmd_all(
     return cmd_build(
         rebuild_updater=rebuild_updater, clean=clean,
         rebuild_runtime=rebuild_runtime, reuse_runtime=reuse_runtime,
-        variant=variant, require_reuse=require_reuse,
+        variant=variant, require_reuse=require_reuse, target=target,
     )
 
 
 # ───────────────────────── entry ─────────────────────────
 
 _VARIANT_CHOICES = ["main", "noWinIME", "mac"]
+_TARGET_CHOICES = sorted(SUPPORTED_TARGETS)
 
 
 def main(argv: Optional[list] = None) -> int:
@@ -1111,11 +1125,17 @@ def main(argv: Optional[list] = None) -> int:
     sp_extract.add_argument("-o", "--output", type=Path, default=None)
 
     sp_build = sub.add_parser("build", help="跑完整构建（Updater + 主程序 + zip）")
-    sp_build.add_argument(
+    build_target_group = sp_build.add_mutually_exclusive_group()
+    build_target_group.add_argument(
+        "--target",
+        choices=_TARGET_CHOICES,
+        help="平台、架构和包渠道组成的发布目标",
+    )
+    build_target_group.add_argument(
         "--variant",
         choices=_VARIANT_CHOICES,
-        default="main",
-        help="构建变体：main（默认，Windows+WinRT）/ noWinIME（Windows,无WinRT）/ mac",
+        default=None,
+        help="已弃用：main / noWinIME / mac",
     )
     sp_build.add_argument(
         "--rebuild-updater",
@@ -1148,11 +1168,13 @@ def main(argv: Optional[list] = None) -> int:
 
     sp_all = sub.add_parser("all", help="prepare + build")
     sp_all.add_argument("version", help="目标版本号 X.Y.Z")
-    sp_all.add_argument(
+    all_target_group = sp_all.add_mutually_exclusive_group()
+    all_target_group.add_argument("--target", choices=_TARGET_CHOICES)
+    all_target_group.add_argument(
         "--variant",
         choices=_VARIANT_CHOICES,
-        default="main",
-        help="构建变体",
+        default=None,
+        help="已弃用的构建变体",
     )
     sp_all.add_argument("--rebuild-updater", action="store_true")
     sp_all.add_argument("--clean", action="store_true")
@@ -1173,6 +1195,7 @@ def main(argv: Optional[list] = None) -> int:
             reuse_runtime=args.reuse_runtime,
             variant=args.variant,
             require_reuse=args.require_runtime_reuse,
+            target=args.target,
         )
     if args.cmd == "all":
         return cmd_all(
@@ -1183,6 +1206,7 @@ def main(argv: Optional[list] = None) -> int:
             reuse_runtime=args.reuse_runtime,
             variant=args.variant,
             require_reuse=args.require_runtime_reuse,
+            target=args.target,
         )
     p.print_help()
     return 1
