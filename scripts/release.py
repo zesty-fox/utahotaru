@@ -1106,6 +1106,24 @@ def cmd_all(
     )
 
 
+def cmd_generate_manifest(
+    version: str,
+    channel: str,
+    artifacts: list[str],
+    base_url: str,
+    output_dir: Path,
+    gpg_sign_linux: bool = False,
+) -> int:
+    from generate_release_manifest import main as generate_main
+
+    argv = [version, channel, "--base-url", base_url, "--output-dir", str(output_dir)]
+    for artifact in artifacts:
+        argv.extend(["--artifact", artifact])
+    if gpg_sign_linux:
+        argv.append("--gpg-sign-linux")
+    return generate_main(argv)
+
+
 # ───────────────────────── entry ─────────────────────────
 
 _VARIANT_CHOICES = ["main", "noWinIME", "mac"]
@@ -1122,6 +1140,14 @@ def main(argv: Optional[list] = None) -> int:
     sp_extract = sub.add_parser("extract-notes", help="抽取 CHANGELOG 段落")
     sp_extract.add_argument("version", help="版本号 X.Y.Z")
     sp_extract.add_argument("-o", "--output", type=Path, default=None)
+
+    sp_manifest = sub.add_parser("generate-manifest", help="生成并签名 schema-2 清单")
+    sp_manifest.add_argument("version")
+    sp_manifest.add_argument("channel", choices=("stable", "preview"))
+    sp_manifest.add_argument("--artifact", action="append", required=True)
+    sp_manifest.add_argument("--base-url", required=True)
+    sp_manifest.add_argument("--output-dir", type=Path, required=True)
+    sp_manifest.add_argument("--gpg-sign-linux", action="store_true")
 
     sp_build = sub.add_parser("build", help="跑完整构建（Updater + 主程序 + zip）")
     build_target_group = sp_build.add_mutually_exclusive_group()
@@ -1186,6 +1212,15 @@ def main(argv: Optional[list] = None) -> int:
         return cmd_prepare(args.version)
     if args.cmd == "extract-notes":
         return cmd_extract_notes(args.version, args.output)
+    if args.cmd == "generate-manifest":
+        return cmd_generate_manifest(
+            args.version,
+            args.channel,
+            args.artifact,
+            args.base_url,
+            args.output_dir,
+            args.gpg_sign_linux,
+        )
     if args.cmd == "build":
         return cmd_build(
             rebuild_updater=args.rebuild_updater,
