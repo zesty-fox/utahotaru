@@ -36,7 +36,6 @@ from PyQt6.QtWidgets import (
     QDialog,
     QFrame,
     QHBoxLayout,
-    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -48,6 +47,7 @@ from qfluentwidgets import (
     LineEdit,
     PrimaryPushButton,
     PushButton,
+    ScrollArea,
     SubtitleLabel,
 )
 
@@ -301,7 +301,7 @@ class EmojiTagDialog(QDialog):
         self._row_layout.setContentsMargins(0, 0, 0, 0)
         self._row_layout.setSpacing(8)
 
-        scroll = QScrollArea()
+        scroll = ScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setWidget(self._row_widget)

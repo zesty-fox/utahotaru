@@ -8,10 +8,9 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QVBoxLayout,
 )
-from qfluentwidgets import PushButton
+from qfluentwidgets import LineEdit, PushButton
 
 
 # 默认值（与 AppSettings.DEFAULT_SETTINGS 保持一致）
@@ -45,7 +44,7 @@ class CheckpointMarkerDialog(QDialog):
         if current:
             markers.update(current)
 
-        self._edits: dict[str, QLineEdit] = {}
+        self._edits: dict[str, LineEdit] = {}
 
         root = QVBoxLayout(self)
 
@@ -63,7 +62,8 @@ class CheckpointMarkerDialog(QDialog):
         for row, (_, label, timed_key, empty_key) in enumerate(_LAYOUT):
             grid.addWidget(QLabel(self.tr(label)), row, 0)
             for col, key in enumerate((timed_key, empty_key), start=1):
-                edit = QLineEdit(markers.get(key, DEFAULT_MARKERS[key]))
+                edit = LineEdit(self)
+                edit.setText(markers.get(key, DEFAULT_MARKERS[key]))
                 edit.setMaxLength(4)
                 edit.setMinimumWidth(48)
                 edit.setAlignment(Qt.AlignmentFlag.AlignCenter)

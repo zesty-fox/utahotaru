@@ -13,28 +13,31 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QPushButton,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
     QColorDialog,
+    QCompleter,
     QMessageBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
     QAbstractItemView,
-    QComboBox,
-    QRadioButton,
     QButtonGroup,
     QSizePolicy,
 )
 from PyQt6.QtCore import QEvent, Qt, QRect, QSize, pyqtSignal
 from PyQt6.QtGui import QColor, QPixmap, QPainter
 from qfluentwidgets import (
+    ComboBox,
+    EditableComboBox,
     PushButton,
     PrimaryPushButton,
+    RadioButton,
     LineEdit,
     ListWidget,
+    ScrollArea,
+    TogglePushButton,
     InfoBar,
     InfoBarPosition,
     FluentIcon as FIF,
@@ -154,15 +157,18 @@ class SingerEditDialog(QDialog):
             self.line_name.setPlaceholderText(self.tr("输入演唱者名称（留空自动编号）..."))
         form.addRow(self.tr("显示名称:"), self.line_name)
 
-        # 分组：可编辑下拉，选项来自项目已有分组
-        self.combo_group = QComboBox()
-        self.combo_group.setEditable(True)
-        self.combo_group.addItem("")          # 空 = 无分组
+        # 分组：可编辑下拉 + 自动补全，选项来自项目已有分组
+        self.combo_group = EditableComboBox(self)
+        self.combo_group.setPlaceholderText(self.tr("留空为默认分组"))
+        self.combo_group.setClearButtonEnabled(True)
         for g in self._existing_groups:
             self.combo_group.addItem(g)
+        if self._existing_groups:
+            _grp_completer = QCompleter(self._existing_groups, self.combo_group)
+            _grp_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+            self.combo_group.setCompleter(_grp_completer)
         current_group = self._singer.group if self._singer else ""
-        self.combo_group.setCurrentText(current_group)
-        self.combo_group.lineEdit().setPlaceholderText(self.tr("留空为默认分组"))
+        self.combo_group.setText(current_group)
         form.addRow(self.tr("分组:"), self.combo_group)
 
         # 从已有演唱者加载颜色（仅在有其他演唱者时显示）
@@ -175,8 +181,8 @@ class SingerEditDialog(QDialog):
         mode_widget = QWidget()
         mode_layout = QHBoxLayout(mode_widget)
         mode_layout.setContentsMargins(0, 0, 0, 0)
-        self._rb_solid = QRadioButton(self.tr("单色"))
-        self._rb_split = QRadioButton(self.tr("分色（最多5色）"))
+        self._rb_solid = RadioButton(self.tr("单色"))
+        self._rb_split = RadioButton(self.tr("分色（最多5色）"))
         mode_grp = QButtonGroup(self)
         mode_grp.addButton(self._rb_solid, 0)
         mode_grp.addButton(self._rb_split, 1)
@@ -232,8 +238,7 @@ class SingerEditDialog(QDialog):
         self._rebuild_split_rows()
 
         # 默认演唱者
-        self.chk_default = QPushButton(self.tr("设为默认演唱者"))
-        self.chk_default.setCheckable(True)
+        self.chk_default = TogglePushButton(self.tr("设为默认演唱者"))
         if self._singer and self._singer.is_default:
             self.chk_default.setChecked(True)
         outer.addWidget(self.chk_default)
@@ -336,7 +341,7 @@ class SingerEditDialog(QDialog):
         row_layout.addWidget(btn_pick)
 
         if total > 2:
-            btn_del = QPushButton("✕")
+            btn_del = PushButton("✕")
             btn_del.setFixedSize(24, 24)
             btn_del.clicked.connect(lambda _checked, i=idx: self._on_remove_split_color(i))
             row_layout.addWidget(btn_del)
@@ -443,7 +448,7 @@ class SingerEditDialog(QDialog):
 
     def _build_used_colors_panel(self) -> QWidget:
         """构建右侧「项目已用颜色」面板（固定宽度，溢出时滚动）"""
-        from PyQt6.QtWidgets import QScrollArea, QGridLayout
+        from PyQt6.QtWidgets import QGridLayout
 
         panel = QWidget()
         # 面板自身的宽度上下限——给"项目已用颜色"标题（本地化后可能是 "Project palette"
@@ -457,7 +462,7 @@ class SingerEditDialog(QDialog):
         title = CaptionLabel(self.tr("项目已用颜色"))
         layout.addWidget(title)
 
-        scroll = QScrollArea()
+        scroll = ScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
@@ -483,9 +488,8 @@ class SingerEditDialog(QDialog):
         grid.setRowStretch(grid.rowCount(), 1)
 
         if not colors:
-            empty_label = QLabel(self.tr("暂无已用颜色"))
+            empty_label = CaptionLabel(self.tr("暂无已用颜色"))
             empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            empty_label.setStyleSheet("color: #888;")
             grid.addWidget(empty_label, 0, 0, 1, cols)
 
         scroll.setWidget(grid_widget)
@@ -516,7 +520,7 @@ class SingerEditDialog(QDialog):
             "color_mode": self._color_mode,
             "split_colors": list(self._split_colors),
             "is_default": self.chk_default.isChecked(),
-            "group": self.combo_group.currentText().strip(),
+            "group": self.combo_group.text().strip(),
         }
 
 
@@ -531,12 +535,15 @@ class BatchGroupDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(self.tr("选择或输入分组名称（留空则清除分组）：")))
 
-        self.combo = QComboBox(self)
-        self.combo.setEditable(True)
-        self.combo.addItem("", "")
+        self.combo = EditableComboBox(self)
+        self.combo.setPlaceholderText(self.tr("留空则清除分组"))
+        self.combo.setClearButtonEnabled(True)
         for g in existing_groups:
-            self.combo.addItem(g, g)
-        self.combo.setCurrentIndex(0)
+            self.combo.addItem(g)
+        if existing_groups:
+            _completer = QCompleter(existing_groups, self.combo)
+            _completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+            self.combo.setCompleter(_completer)
         layout.addWidget(self.combo)
 
         button_box = QDialogButtonBox(
@@ -549,7 +556,7 @@ class BatchGroupDialog(QDialog):
         layout.addWidget(button_box)
 
     def get_group(self) -> str:
-        return self.combo.currentText().strip()
+        return self.combo.text().strip()
 
 
 class TransferTargetDialog(QDialog):
@@ -572,10 +579,10 @@ class TransferTargetDialog(QDialog):
             QLabel(self.tr("被删除演唱者的歌词将转移到以下演唱者："))
         )
 
-        self.combo = QComboBox(self)
+        self.combo = ComboBox(self)
         for s in candidates:
             label = s.name + (self.tr("（默认）") if s.is_default else "")
-            self.combo.addItem(label, s.id)
+            self.combo.addItem(label, userData=s.id)
         if default_id:
             idx = self.combo.findData(default_id)
             if idx >= 0:
@@ -625,14 +632,14 @@ class SingerPresetLoadDialog(QDialog):
         filter_layout.addWidget(self.line_filter)
 
         filter_layout.addWidget(QLabel(self.tr("分组:")))
-        self.combo_group = QComboBox(self)
-        self.combo_group.addItem(self.tr("全部分组"), "")
+        self.combo_group = ComboBox(self)
+        self.combo_group.addItem(self.tr("全部分组"), userData="")
         # 从预设中收集所有分组
         groups = sorted(set(p.get("group", "") for p in self._presets if p.get("group", "")))
         if any(not p.get("group", "") for p in self._presets):
-            self.combo_group.addItem(self.tr("（无分组）"), _FILTER_NO_GROUP)
+            self.combo_group.addItem(self.tr("（无分组）"), userData=_FILTER_NO_GROUP)
         for g in groups:
-            self.combo_group.addItem(g, g)
+            self.combo_group.addItem(g, userData=g)
         self.combo_group.currentIndexChanged.connect(self._apply_filter)
         filter_layout.addWidget(self.combo_group)
 
@@ -693,13 +700,13 @@ class SingerPresetLoadDialog(QDialog):
         self.combo_group.blockSignals(True)
         saved_group = self.combo_group.currentData()
         self.combo_group.clear()
-        self.combo_group.addItem(self.tr("全部分组"), "")
+        self.combo_group.addItem(self.tr("全部分组"), userData="")
         groups = sorted(set(p.get("group", "") for p in self._presets if p.get("group", "")))
         has_no_group = any(not p.get("group", "") for p in self._presets)
         if has_no_group:
-            self.combo_group.addItem(self.tr("（无分组）"), _FILTER_NO_GROUP)
+            self.combo_group.addItem(self.tr("（无分组）"), userData=_FILTER_NO_GROUP)
         for g in groups:
-            self.combo_group.addItem(g, g)
+            self.combo_group.addItem(g, userData=g)
         idx = self.combo_group.findData(saved_group)
         self.combo_group.setCurrentIndex(idx if idx >= 0 else 0)
         self.combo_group.blockSignals(False)
@@ -906,8 +913,7 @@ class SingerColorPreviewPanel(QWidget):
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)
 
-        title = QLabel(self.tr("颜色预览"))
-        title.setStyleSheet("font-size: 13px; font-weight: bold; color: #888;")
+        title = CaptionLabel(self.tr("颜色预览"))
         layout.addWidget(title)
 
         self._swatch = QLabel()
@@ -915,10 +921,9 @@ class SingerColorPreviewPanel(QWidget):
         self._swatch.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._swatch)
 
-        self._name_label = QLabel(self.tr("未选中"))
+        self._name_label = CaptionLabel(self.tr("未选中"))
         self._name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._name_label.setWordWrap(True)
-        self._name_label.setStyleSheet("color: #888; font-size: 12px;")
         layout.addWidget(self._name_label)
 
         layout.addStretch()
@@ -926,7 +931,6 @@ class SingerColorPreviewPanel(QWidget):
 
     def set_preview(self, name: str, colors: list):
         self._name_label.setText(name)
-        self._name_label.setStyleSheet("color: #CCC; font-size: 12px;")
 
         w = max(self._swatch.width(), 152)
         h = max(self._swatch.height(), 96)
@@ -947,12 +951,10 @@ class SingerColorPreviewPanel(QWidget):
 
     def set_multiple(self, count: int):
         self._name_label.setText(self.tr("已选中 {n} 位").format(n=count))
-        self._name_label.setStyleSheet("color: #888; font-size: 12px;")
         self._clear_swatch()
 
     def _clear(self):
         self._name_label.setText(self.tr("未选中"))
-        self._name_label.setStyleSheet("color: #888; font-size: 12px;")
         self._clear_swatch()
 
     def _clear_swatch(self):
@@ -1026,8 +1028,8 @@ class SingerManagerInterface(QWidget):
         search_row.addWidget(self.line_search)
 
         search_row.addWidget(QLabel(self.tr("分组:")))
-        self.combo_group_filter = QComboBox(self)
-        self.combo_group_filter.addItem(self.tr("全部"), "")
+        self.combo_group_filter = ComboBox(self)
+        self.combo_group_filter.addItem(self.tr("全部"), userData="")
         self.combo_group_filter.setMinimumWidth(90)
         self.combo_group_filter.currentIndexChanged.connect(self._on_group_filter_changed)
         search_row.addWidget(self.combo_group_filter)
@@ -1197,11 +1199,11 @@ class SingerManagerInterface(QWidget):
                 has_no_group = any(not s.group for s in self._project.singers)
                 current_group = self._group_filter
                 self.combo_group_filter.clear()
-                self.combo_group_filter.addItem(self.tr("全部"), "")
+                self.combo_group_filter.addItem(self.tr("全部"), userData="")
                 if has_no_group:
-                    self.combo_group_filter.addItem(self.tr("（无分组）"), _FILTER_NO_GROUP)
+                    self.combo_group_filter.addItem(self.tr("（无分组）"), userData=_FILTER_NO_GROUP)
                 for g in all_groups:
-                    self.combo_group_filter.addItem(g, g)
+                    self.combo_group_filter.addItem(g, userData=g)
                 idx = self.combo_group_filter.findData(current_group)
                 self.combo_group_filter.setCurrentIndex(idx if idx >= 0 else 0)
                 if idx < 0:

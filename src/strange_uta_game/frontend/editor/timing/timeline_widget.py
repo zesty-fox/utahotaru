@@ -24,12 +24,11 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QScrollBar,
-    QSlider,
     QVBoxLayout,
     QWidget,
 )
 
-from qfluentwidgets import CaptionLabel, SwitchButton
+from qfluentwidgets import CaptionLabel, Slider, SwitchButton
 
 from strange_uta_game.frontend.perf_log import log_slow_method
 from strange_uta_game.frontend.theme import theme
@@ -521,7 +520,7 @@ class TimelineWidget(QWidget):
         bottom_layout.setSpacing(8)
 
         # 缩放控制（对数刻度：滑条 0-10000 线性对应 zoom 1x-100x 对数）
-        self.zoom_slider = QSlider(Qt.Orientation.Horizontal, self)
+        self.zoom_slider = Slider(Qt.Orientation.Horizontal, self)
         self.zoom_slider.setRange(0, 10000)
         self.zoom_slider.setValue(self._zoom_to_slider(50.0))  # 默认50x
         # slider 用 minimum 而非 fixed：横幅有富余时让它跟着加宽，便于精确缩放

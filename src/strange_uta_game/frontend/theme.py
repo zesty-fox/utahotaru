@@ -647,5 +647,79 @@ class Theme(QObject):
         return getattr(self.colors, name)
 
 
+def _patch_round_menu() -> None:
+    """统一修正所有 RoundMenu（含 ComboBoxMenu 子类）的阴影与动画行为。
+
+    qfluentwidgets 默认：
+    - blurRadius=30、offset=(0,8)、layout margins=(12,8,12,20)
+      → 菜单周围形成明显的 12-20px 透明光晕
+    - exec() 默认 aniType=DROP_DOWN，菜单弹出时带滑入动画
+
+    修正为：
+    - blurRadius=2、offset=(0,1)、margins=(4,4,4,5)  → 紧凑阴影
+    - exec() 统一改用 aniType=NONE                   → 无动画即时弹出
+    """
+    try:
+        from qfluentwidgets import RoundMenu, MenuAnimationType
+        _orig_init = RoundMenu.__init__
+        _orig_exec = RoundMenu.exec
+
+        def _slim_init(self, *args, **kwargs):
+            _orig_init(self, *args, **kwargs)
+            self.setShadowEffect(blurRadius=2, offset=(0, 1))
+            self.hBoxLayout.setContentsMargins(1, 1, 1, 2)
+
+        def _no_ani_exec(self, pos, ani=True, aniType=MenuAnimationType.DROP_DOWN):
+            _orig_exec(self, pos, ani=False, aniType=MenuAnimationType.FADE_IN_DROP_DOWN)
+
+        RoundMenu.__init__ = _slim_init
+        RoundMenu.exec = _no_ani_exec
+    except Exception:
+        pass
+
+
+def _patch_editable_combobox_disconnect() -> None:
+    """修复 EditableComboBox 的通配符 disconnect 警告。
+
+    原始 __init__ 末尾调用 self.clearButton.disconnect()（无参数 = 通配符），
+    会把 StyleSheetManager 在 clearButton.destroyed 上注册的清理 lambda 也断开，
+    触发 Qt 的「wildcard call disconnects from destroyed signal」警告。
+    改为只断开 clicked→self.clear 这条具体连接即可。
+    """
+    try:
+        from qfluentwidgets import EditableComboBox
+        from qfluentwidgets.components.widgets.line_edit import LineEdit, LineEditButton
+        from qfluentwidgets import FluentIcon as FIF
+        from PyQt6.QtCore import Qt
+
+        def _fixed_init(self, parent=None):
+            # 等价于原始 super().__init__(parent=parent)：
+            # 经 MRO 链依次触发 LineEdit / QLineEdit / QWidget / ComboBoxBase 的初始化
+            LineEdit.__init__(self, parent=parent)
+
+            self.dropButton = LineEditButton(FIF.ARROW_DOWN, self)
+            self.setTextMargins(0, 0, 29, 0)
+            self.dropButton.setFixedSize(30, 25)
+            self.hBoxLayout.addWidget(self.dropButton, 0, Qt.AlignmentFlag.AlignRight)
+
+            self.dropButton.clicked.connect(self._toggleComboMenu)
+            self.textChanged.connect(self._onComboTextChanged)
+            self.returnPressed.connect(self._onReturnPressed)
+
+            # FIX：只断开 clicked→clear 这条连接，避免通配符误伤 destroyed 信号
+            try:
+                self.clearButton.clicked.disconnect(self.clear)
+            except TypeError:
+                pass
+            self.clearButton.clicked.connect(self._onClearButtonClicked)
+
+        EditableComboBox.__init__ = _fixed_init
+    except Exception:
+        pass
+
+
+_patch_round_menu()
+_patch_editable_combobox_disconnect()
+
 # 全局单例
 theme = Theme()

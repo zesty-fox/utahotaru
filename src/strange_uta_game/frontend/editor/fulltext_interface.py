@@ -13,7 +13,6 @@ from PyQt6.QtWidgets import (
     QPlainTextEdit,
     QTextEdit,
     QDialog,
-    QCheckBox,
     QMessageBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QRect, QSize, QEvent
@@ -27,6 +26,7 @@ from PyQt6.QtGui import (
     QTextFormat,
 )
 from qfluentwidgets import (
+    CheckBox,
     PushButton,
     PrimaryPushButton,
     SpinBox,
@@ -420,7 +420,7 @@ class DeleteRubyByTypeDialog(QDialog):
 
         self._checkboxes: list[tuple] = []
         for char_type, label in self._TYPE_LABELS:
-            cb = QCheckBox(self.tr(label), self)
+            cb = CheckBox(self.tr(label), self)
             cb.setChecked(char_type in default_set)
             layout.addWidget(cb)
             self._checkboxes.append((char_type, cb))

@@ -9,11 +9,10 @@ from PyQt6.QtWidgets import (
     QDialog,
     QHBoxLayout,
     QLabel,
-    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
-from qfluentwidgets import LineEdit, PrimaryPushButton, PushButton, SpinBox
+from qfluentwidgets import LineEdit, PrimaryPushButton, PushButton, ScrollArea, SpinBox
 
 
 class NicokaraTagsDialog(QDialog):
@@ -39,10 +38,10 @@ class NicokaraTagsDialog(QDialog):
         title.setFont(QFont("Microsoft YaHei", 14))
         layout.addWidget(title)
 
-        scroll = QScrollArea()
+        scroll = ScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setFrameShape(ScrollArea.Shape.NoFrame)
 
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)

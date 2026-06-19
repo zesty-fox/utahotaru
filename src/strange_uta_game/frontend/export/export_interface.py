@@ -14,7 +14,6 @@ from PyQt6.QtWidgets import (
     QListWidgetItem,
     QCheckBox,
     QGroupBox,
-    QScrollArea,
     QMessageBox,
     QDialog,
     QTextEdit,
@@ -27,6 +26,7 @@ from qfluentwidgets import (
     InfoBar,
     InfoBarPosition,
     FluentIcon as FIF,
+    ScrollArea,
     SimpleCardWidget,
     CheckBox,
     TitleLabel,
@@ -243,7 +243,7 @@ class ExportInterface(QWidget):
         self._singer_checkbox_container.setContentsMargins(0, 0, 0, 0)
         self._singer_checkbox_container.setSpacing(6)
 
-        self._singer_scroll_area = QScrollArea()
+        self._singer_scroll_area = ScrollArea()
         self._singer_scroll_area.setWidgetResizable(True)
         self._singer_scroll_area.setMaximumHeight(120)
         self._singer_scroll_area.setHorizontalScrollBarPolicy(

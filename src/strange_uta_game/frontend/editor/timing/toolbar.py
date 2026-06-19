@@ -6,12 +6,13 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QEvent, Qt, pyqtSignal
-from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit
+from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel
 from qfluentwidgets import (
     Action,
     CaptionLabel,
     DropDownPushButton,
     FluentIcon as FIF,
+    LineEdit,
     PushButton,
     RoundMenu,
 )
@@ -152,13 +153,12 @@ class EditorToolBar(QFrame):
         # 整体时间戳偏移调整
         lbl_offset = CaptionLabel(tr("全局偏移:"))
         layout.addWidget(lbl_offset)
-        self.edit_offset = QLineEdit(self)
+        self.edit_offset = LineEdit(self)
         self.edit_offset.setText("-100")
         self.edit_offset.setMinimumWidth(80)
         self.edit_offset.setMaximumWidth(140)  # 限制上限以防输入框喧宾夺主
         self.edit_offset.setFixedHeight(32)
         self.edit_offset.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.edit_offset.setStyleSheet("font-size: 12px;")
         self.edit_offset.editingFinished.connect(self._on_offset_editing_finished)
         layout.addWidget(self.edit_offset)
 

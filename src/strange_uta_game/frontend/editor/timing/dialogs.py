@@ -14,7 +14,6 @@ from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
     QCheckBox,
-    QComboBox,
     QDialog,
     QFormLayout,
     QGroupBox,
@@ -24,7 +23,6 @@ from PyQt6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QRadioButton,
-    QScrollArea,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -49,6 +47,8 @@ def _make_singer_color_pixmap(colors: list, w: int = 32, h: int = 18) -> QPixmap
     p.end()
     return pixmap
 from qfluentwidgets import (
+    CheckBox,
+    ComboBox,
     InfoBar,
     InfoBarPosition,
     PrimaryPushButton,
@@ -57,7 +57,7 @@ from qfluentwidgets import (
     BodyLabel,
     StrongBodyLabel,
     LineEdit,
-    CheckBox,
+    RadioButton,
     ScrollArea,
     SpinBox,
     setCustomStyleSheet,
@@ -112,13 +112,13 @@ def _create_ruby_split_group(parent: QWidget) -> tuple[QRadioButton, QRadioButto
     )
     group_layout = QVBoxLayout(group_box)
 
-    radio_direct = QRadioButton(QCoreApplication.translate(
+    radio_direct = RadioButton(QCoreApplication.translate(
         "RubySplit", "直接应用（用逗号手动分段，无逗号则不分段）"
     ))
-    radio_by_char = QRadioButton(QCoreApplication.translate(
+    radio_by_char = RadioButton(QCoreApplication.translate(
         "RubySplit", "按字符均分"
     ))
-    radio_by_mora = QRadioButton(QCoreApplication.translate(
+    radio_by_mora = RadioButton(QCoreApplication.translate(
         "RubySplit", "按 mora 均分（推荐）"
     ))
 
@@ -644,30 +644,33 @@ class InsertGuideSymbolDialog(QDialog):
         form.addRow(self.tr("当前选中字符:"), lbl_current)
 
         # Field 2: Guide symbol text
-        self.edit_symbol = QLineEdit(saved_symbol)
+        self.edit_symbol = LineEdit(self)
+        self.edit_symbol.setText(saved_symbol)
         self.edit_symbol.setPlaceholderText(self.tr("请填写要插入的导唱符"))
         form.addRow(self.tr("导唱符:"), self.edit_symbol)
 
         # Field 3: Count
-        self.edit_count = QLineEdit(str(saved_count))
+        self.edit_count = LineEdit(self)
+        self.edit_count.setText(str(saved_count))
         self.edit_count.setPlaceholderText(self.tr("个数"))
         form.addRow(self.tr("个数:"), self.edit_count)
 
         # Field 4: Duration per symbol
-        self.edit_duration = QLineEdit(str(saved_duration))
+        self.edit_duration = LineEdit(self)
+        self.edit_duration.setText(str(saved_duration))
         self.edit_duration.setPlaceholderText(self.tr("每个导唱符持续时间（毫秒）"))
         form.addRow(self.tr("持续时间 (ms):"), self.edit_duration)
 
         # Field 5: Fill gap — 补足间隔时间
         # 勾选后忽略手动持续时间，自动在「前一个时间戳」与「本字符首个时间戳」
         # 之间平均分配，前一个时间戳搜索不到时以 0ms（歌曲开始）为起点。
-        self.chk_fill_gap = QCheckBox(self.tr("补足间隔时间"))
+        self.chk_fill_gap = CheckBox(self.tr("补足间隔时间"))
         self.chk_fill_gap.setChecked(bool(saved_fill_gap))
         self.chk_fill_gap.toggled.connect(self._on_fill_gap_toggled)
         form.addRow("", self.chk_fill_gap)
 
         # Field 6: Reverse timestamp order
-        self.chk_reverse = QCheckBox(self.tr("时间戳反向"))
+        self.chk_reverse = CheckBox(self.tr("时间戳反向"))
         self.chk_reverse.setChecked(bool(saved_reverse))
         form.addRow("", self.chk_reverse)
 
@@ -1235,7 +1238,7 @@ class SetSingerByLineDialog(QDialog):
 
         for idx, sentence in enumerate(sentences):
             # 复选框
-            chk = QCheckBox()
+            chk = CheckBox()
             chk_widget = QWidget()
             chk_layout = QHBoxLayout(chk_widget)
             chk_layout.addWidget(chk)
@@ -1283,19 +1286,19 @@ class SetSingerByLineDialog(QDialog):
         # 过滤行
         sg_filter_row = QHBoxLayout()
         sg_filter_row.addWidget(QLabel(self.tr("名称:")))
-        self.singer_name_filter = QLineEdit(self)
+        self.singer_name_filter = LineEdit(self)
         self.singer_name_filter.setPlaceholderText(self.tr("过滤名称..."))
         self.singer_name_filter.textChanged.connect(self._apply_singer_filter)
         sg_filter_row.addWidget(self.singer_name_filter, stretch=1)
 
         sg_filter_row.addWidget(QLabel(self.tr("分组:")))
-        self.singer_group_filter = QComboBox(self)
-        self.singer_group_filter.addItem(self.tr("全部"), "")
+        self.singer_group_filter = ComboBox(self)
+        self.singer_group_filter.addItem(self.tr("全部"), userData="")
         _groups = sorted({s.group for s in singers if s.group})
         if any(not s.group for s in singers):
-            self.singer_group_filter.addItem(self.tr("（无分组）"), "\x00nogroup")
+            self.singer_group_filter.addItem(self.tr("（无分组）"), userData="\x00nogroup")
         for _g in _groups:
-            self.singer_group_filter.addItem(_g, _g)
+            self.singer_group_filter.addItem(_g, userData=_g)
         self.singer_group_filter.currentIndexChanged.connect(self._apply_singer_filter)
         sg_filter_row.addWidget(self.singer_group_filter)
         sg_layout.addLayout(sg_filter_row)
@@ -1527,7 +1530,7 @@ class ApplySingerDialog(QDialog):
         # 第三行：过滤器
         filter_layout = QHBoxLayout()
         filter_layout.addWidget(QLabel(self.tr("过滤:")))
-        self.edit_filter = QLineEdit()
+        self.edit_filter = LineEdit(self)
         self.edit_filter.setPlaceholderText(self.tr("输入演唱者名称进行过滤"))
         self.edit_filter.textChanged.connect(self._on_filter_changed)
         filter_layout.addWidget(self.edit_filter, stretch=1)
@@ -1647,14 +1650,14 @@ class CompleteTimestampDialog(QDialog):
         layout = QVBoxLayout(self)
 
         # 第一行：功能说明
-        desc_label = QLabel(self.tr(
+        desc_label = CaptionLabel(self.tr(
             "本功能用于所有打轴过程完成后，自动查找需要补轴点的字符（仅无普通时间戳字符），"
             "查找前后时间戳取平均值均分给待补偿时间戳。\n\n"
             "边界处理：行首无前方时间戳时，向后找到第一个时间戳并减去「行首扣除」值；"
             "行尾无后方时间戳时，向前找到第一个时间戳并加上「行尾增加」值。"
         ))
         desc_label.setWordWrap(True)
-        desc_label.setStyleSheet("font-size: 12px; color: #555; padding: 8px;")
+        desc_label.setContentsMargins(8, 8, 8, 8)
         layout.addWidget(desc_label)
 
         # 第二行：适用范围（多选）
@@ -1678,7 +1681,7 @@ class CompleteTimestampDialog(QDialog):
         ]
 
         for key, label in scope_items:
-            chk = QCheckBox(label)
+            chk = CheckBox(label)
             chk.setChecked(key in self._saved_scope_types)
             self._scope_checkboxes[key] = chk
             scope_layout.addWidget(chk)
@@ -1689,13 +1692,13 @@ class CompleteTimestampDialog(QDialog):
         exclude_group = QGroupBox(self.tr("排除规则"))
         exclude_layout = QVBoxLayout(exclude_group)
 
-        self._exclude_checkboxes: dict[str, QCheckBox] = {}
+        self._exclude_checkboxes: dict[str, CheckBox] = {}
         exclude_items: list[tuple[str, str]] = [
             ("linked", self.tr("排除被连词字符")),
         ]
 
         for key, label in exclude_items:
-            chk = QCheckBox(label)
+            chk = CheckBox(label)
             chk.setChecked(key in self._saved_exclude_rules)
             self._exclude_checkboxes[key] = chk
             exclude_layout.addWidget(chk)
@@ -1706,14 +1709,16 @@ class CompleteTimestampDialog(QDialog):
         offset_group = QGroupBox(self.tr("边界时间戳偏移"))
         offset_layout = QFormLayout(offset_group)
 
-        self._edit_head_offset = QLineEdit(str(self._saved_head_offset_ms))
+        self._edit_head_offset = LineEdit(self)
+        self._edit_head_offset.setText(str(self._saved_head_offset_ms))
         self._edit_head_offset.setPlaceholderText("150")
         self._edit_head_offset.setToolTip(self.tr(
             "行首字符无前方时间戳时，向后找到第一个时间戳后减去此值"
         ))
         offset_layout.addRow(self.tr("行首扣除时间戳 (ms):"), self._edit_head_offset)
 
-        self._edit_tail_offset = QLineEdit(str(self._saved_tail_offset_ms))
+        self._edit_tail_offset = LineEdit(self)
+        self._edit_tail_offset.setText(str(self._saved_tail_offset_ms))
         self._edit_tail_offset.setPlaceholderText("150")
         self._edit_tail_offset.setToolTip(self.tr(
             "行尾字符无后方时间戳时，向前找到第一个时间戳后加上此值"
@@ -1948,9 +1953,9 @@ class SeparateSymbolTimestampDialog(QDialog):
         left_col = QVBoxLayout()
         right_col = QVBoxLayout()
 
-        self._group_checkboxes: dict[str, QCheckBox] = {}
+        self._group_checkboxes: dict[str, CheckBox] = {}
         for i, (key, label, examples, _) in enumerate(_SEPARATE_SYM_GROUPS):
-            chk = QCheckBox(f"{label}   {examples}")
+            chk = CheckBox(f"{label}   {examples}")
             chk.setChecked(key in self._saved_groups)
             self._group_checkboxes[key] = chk
             if i < mid:

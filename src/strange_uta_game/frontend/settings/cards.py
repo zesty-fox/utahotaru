@@ -10,7 +10,9 @@ from typing import Optional
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QKeyEvent, QWheelEvent
 from PyQt6.QtWidgets import QCheckBox, QDialog, QDialogButtonBox, QFileDialog, QLabel, QVBoxLayout, QWidget
+from strange_uta_game.frontend.theme import theme
 from qfluentwidgets import (
+    CheckBox,
     ComboBox,
     DoubleSpinBox,
     LineEdit,
@@ -367,7 +369,7 @@ class _KeyCaptureButton(PushButton):
         self._original_trigger = self._trigger_type
         self._pending_key = None
         self.setText(self.tr("按下按键..."))
-        self.setStyleSheet("border: 2px solid #0078D4; border-radius: 4px;")
+        self.setStyleSheet(f"border: 2px solid {theme.accent_secondary.name()}; border-radius: 4px;")
         self.setFocus()
 
     def restore_original_key(self):
@@ -739,9 +741,9 @@ class MultiCheckSettingCard(SettingCard):
         layout = QVBoxLayout(dlg)
         layout.setSpacing(8)
 
-        checkboxes: list[tuple[str, QCheckBox]] = []
+        checkboxes: list[tuple[str, CheckBox]] = []
         for value, label in self._options:
-            cb = QCheckBox(label, dlg)
+            cb = CheckBox(label, dlg)
             cb.setChecked(value in self._selected)
             layout.addWidget(cb)
             checkboxes.append((value, cb))
@@ -825,9 +827,9 @@ class MultiBoolSettingCard(SettingCard):
         layout = QVBoxLayout(dlg)
         layout.setSpacing(8)
 
-        checkboxes: list[tuple[str, QCheckBox]] = []
+        checkboxes: list[tuple[str, CheckBox]] = []
         for key, label in self._items:
-            cb = QCheckBox(label, dlg)
+            cb = CheckBox(label, dlg)
             cb.setChecked(self._values.get(key, False))
             layout.addWidget(cb)
             checkboxes.append((key, cb))
