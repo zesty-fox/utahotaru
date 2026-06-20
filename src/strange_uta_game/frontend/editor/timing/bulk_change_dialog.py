@@ -38,6 +38,7 @@ from copy import deepcopy
 from strange_uta_game.backend.domain import Project
 from strange_uta_game.backend.domain.models import Character, Ruby, RubyPart
 from strange_uta_game.frontend.fluent_widgets import message_info, message_question
+from strange_uta_game.frontend.window_sizing import fit_to_screen
 
 
 class BulkChangeDialog(QDialog):
@@ -78,7 +79,7 @@ class BulkChangeDialog(QDialog):
         )
 
         self.setWindowTitle(self.tr("批量变更"))
-        self.resize(*CHAR_DIALOG_SIZE)
+        fit_to_screen(self, *CHAR_DIALOG_SIZE)
         self.setFont(char_dialog_font(FONT_DIALOG_BASE))
 
         layout = QVBoxLayout(self)

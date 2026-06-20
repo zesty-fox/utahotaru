@@ -55,6 +55,7 @@ from strange_uta_game.backend.infrastructure.parsers.text_splitter import (
     get_char_type,
 )
 from strange_uta_game.frontend.fluent_widgets import message_choice
+from strange_uta_game.frontend.window_sizing import fit_to_screen
 
 
 def _ruby_is_all_hiragana(ruby_text: str) -> bool:
@@ -387,7 +388,7 @@ class DeleteRubyByTypeDialog(QDialog):
         """
         super().__init__(parent)
         self.setWindowTitle(self.tr("按类型删除注音"))
-        self.resize(320, 400)
+        fit_to_screen(self, 320, 400)
         self.setFont(QFont("Microsoft YaHei", 10))
 
         layout = QVBoxLayout(self)
@@ -1312,7 +1313,7 @@ class FullTextEditDialog(QDialog):
             | Qt.WindowType.WindowMaximizeButtonHint
             | Qt.WindowType.WindowMinimizeButtonHint
         )
-        self.resize(1400, 900)
+        fit_to_screen(self, 1400, 900)
         main_win = parent.window() if parent is not None else None
         if main_win is not None and main_win.isMaximized():
             self.setWindowState(Qt.WindowState.WindowMaximized)

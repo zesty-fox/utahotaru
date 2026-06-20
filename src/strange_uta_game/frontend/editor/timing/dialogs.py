@@ -64,6 +64,7 @@ from qfluentwidgets import (
 
 from strange_uta_game.frontend.theme import theme, ThemeColors
 from strange_uta_game.frontend.fluent_widgets import FluentGroupBox
+from strange_uta_game.frontend.window_sizing import fit_to_screen
 
 from strange_uta_game.backend.infrastructure.exporters.nicokara_exporter import (
     strip_variation_selectors,
@@ -262,7 +263,7 @@ class ModifyCharacterDialog(QDialog):
         self._char_rows: list[tuple[QLabel, QLineEdit, QLineEdit, QCheckBox]] = []
 
         self.setWindowTitle(self.tr("修改所选字符"))
-        self.resize(*CHAR_DIALOG_SIZE)
+        fit_to_screen(self, *CHAR_DIALOG_SIZE)
         self.setFont(char_dialog_font(FONT_DIALOG_BASE))
 
         layout = QVBoxLayout(self)
@@ -630,7 +631,7 @@ class InsertGuideSymbolDialog(QDialog):
         saved_fill_gap = settings.get("timing.guide_fill_gap", False)
 
         self.setWindowTitle(self.tr("插入导唱符"))
-        self.resize(400, 320)
+        fit_to_screen(self, 400, 320)
         self.setFont(QFont("Microsoft YaHei", 10))
 
         layout = QVBoxLayout(self)
@@ -868,7 +869,7 @@ class CharEditDialog(QDialog):
         self._char_rows: list[tuple[QLabel, QLineEdit, QLineEdit, QCheckBox]] = []
 
         self.setWindowTitle(self.tr("编辑字符"))
-        self.resize(*CHAR_DIALOG_SIZE)
+        fit_to_screen(self, *CHAR_DIALOG_SIZE)
         self.setFont(char_dialog_font(FONT_DIALOG_BASE))
 
         layout = QVBoxLayout(self)
@@ -1211,7 +1212,7 @@ class SetSingerByLineDialog(QDialog):
         self._singer_map = {s.id: s for s in singers}
 
         self.setWindowTitle(self.tr("按行设置演唱者"))
-        self.resize(1200, 900)
+        fit_to_screen(self, 1200, 900)
         self.setFont(QFont("Microsoft YaHei", 10))
 
         layout = QVBoxLayout(self)
@@ -1506,7 +1507,7 @@ class ApplySingerDialog(QDialog):
         self._selected_singer_id = None
 
         self.setWindowTitle(self.tr("应用演唱者"))
-        self.resize(400, 500)
+        fit_to_screen(self, 400, 500)
         self.setFont(QFont("Microsoft YaHei", 10))
 
         layout = QVBoxLayout(self)
@@ -1627,7 +1628,7 @@ class CompleteTimestampDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("补全时间戳"))
-        self.resize(480, 400)
+        fit_to_screen(self, 480, 400)
         self.setFont(QFont("Microsoft YaHei", 10))
         self._apply_clicked = False
 
@@ -1815,7 +1816,7 @@ class AdjustRawTimestampDialog(QDialog):
             tip = self.tr("正数：所有原始时间戳向后移；负数：向前移。")
 
         self.setWindowModality(Qt.WindowModality.NonModal)
-        self.resize(360, 220)
+        fit_to_screen(self, 360, 220)
         self.setFont(QFont("Microsoft YaHei", 10))
 
         layout = QVBoxLayout(self)
@@ -1916,7 +1917,7 @@ class SeparateSymbolTimestampDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("分离符号时间戳"))
-        self.resize(600, 640)
+        fit_to_screen(self, 600, 640)
         self.setFont(QFont("Microsoft YaHei", 10))
         self._apply_clicked = False
 

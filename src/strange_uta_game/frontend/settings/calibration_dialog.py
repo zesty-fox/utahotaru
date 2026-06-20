@@ -23,6 +23,7 @@ from qfluentwidgets import (
 )
 
 from strange_uta_game.frontend.theme import theme
+from strange_uta_game.frontend.window_sizing import fit_to_screen
 
 if TYPE_CHECKING:
     from .settings_interface import SettingsInterface
@@ -99,7 +100,7 @@ class CalibrationDialog(QDialog):
 
         self.setWindowTitle(self.tr("Offset 校准"))
         self.setModal(True)
-        self.resize(880, 420)
+        fit_to_screen(self, 880, 420)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         root = QVBoxLayout(self)

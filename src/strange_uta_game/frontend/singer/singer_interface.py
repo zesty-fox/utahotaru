@@ -52,6 +52,7 @@ from strange_uta_game.backend.application import SingerService
 from strange_uta_game.backend.domain.entities import _compute_complement_color
 from strange_uta_game.frontend.theme import theme
 from strange_uta_game.frontend.fluent_widgets import dialog_button_row, message_question
+from strange_uta_game.frontend.window_sizing import fit_to_screen
 
 
 def _make_singer_icon(colors: List[str], w: int = 32, h: int = 18):
@@ -129,7 +130,7 @@ class SingerEditDialog(QDialog):
         self._active_split_idx = 0
 
         self.setWindowTitle(self.tr("编辑演唱者") if singer else self.tr("添加演唱者"))
-        self.resize(520, 350)
+        fit_to_screen(self, 520, 350)
         self._init_ui()
 
     # ── 初始化 ────────────────────────────────────────────────────────────
@@ -525,7 +526,7 @@ class BatchGroupDialog(QDialog):
     def __init__(self, existing_groups: List[str], parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("批量设置分组"))
-        self.resize(320, 130)
+        fit_to_screen(self, 320, 130)
 
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(self.tr("选择或输入分组名称（留空则清除分组）：")))
@@ -561,7 +562,7 @@ class TransferTargetDialog(QDialog):
     ):
         super().__init__(parent)
         self.setWindowTitle(self.tr("选择转移目标"))
-        self.resize(360, 160)
+        fit_to_screen(self, 360, 160)
 
         self._candidates = candidates
 
@@ -595,7 +596,7 @@ class SingerPresetLoadDialog(QDialog):
     def __init__(self, presets: list, existing_names: set, app_settings=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("从软件预设加载演唱者"))
-        self.resize(400, 450)
+        fit_to_screen(self, 400, 450)
 
         self._presets = presets
         self._existing_names = existing_names

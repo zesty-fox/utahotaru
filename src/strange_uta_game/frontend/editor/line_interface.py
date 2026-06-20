@@ -32,6 +32,7 @@ from strange_uta_game.backend.infrastructure.parsers.annotated_text import (
 )
 from strange_uta_game.frontend.theme import theme
 from strange_uta_game.frontend.fluent_widgets import message_question
+from strange_uta_game.frontend.window_sizing import fit_to_screen
 import re
 
 
@@ -315,7 +316,7 @@ class LineDetailDialog(QDialog):
             "..." if len(self.sentence.text) > 30 else ""
         )
         self.setWindowTitle(self.tr("行详情 - {title}").format(title=title_text))
-        self.resize(900, 500)
+        fit_to_screen(self, 900, 500)
         self.setFont(QFont("Microsoft YaHei", 10))
 
         self.vbox = QVBoxLayout(self)
