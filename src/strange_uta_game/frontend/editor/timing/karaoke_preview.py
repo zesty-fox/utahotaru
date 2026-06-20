@@ -1014,18 +1014,35 @@ class KaraokePreview(QWidget):
         self.update()
 
     def _update_scrollbar_range(self):
-        """根据当前句子总数刷新滚动条的 range 和 pageStep"""
+        """根据当前句子总数刷新滚动条的 range / pageStep。
+
+        滑块长度遵循"可见行数 / 总行数"的比例（与一般网页滚动条一致）：
+        - 全部可见、不可滚动时 range 收为 0，滑块填满整条；
+        - 可滚动时令 pageStep/(range跨度+pageStep)=visible/total，内容越长滑块越短，
+          下限由全局 QSS 的 min-height 兜底。
+        """
         self._scrollbar.blockSignals(True)
         if not self._project or not self._project.sentences:
             self._scrollbar.setVisible(False)
             self._scrollbar.blockSignals(False)
             return
         total = len(self._project.sentences)
+        visible = max(1, self._visible_lines)
         self._scrollbar.setVisible(True)
-        # range: [0, (total-1) * SCALE]，视口占 visible_lines 行
-        max_val = max(0, (total - 1) * self._SCROLL_SCALE)
-        self._scrollbar.setRange(0, max_val)
-        self._scrollbar.setPageStep(self._SCROLL_SCALE * self._visible_lines)
+        if total <= visible:
+            # 全部可见、不可滚动：滑块填满整条
+            self._scrollbar.setRange(0, 0)
+            self._scrollbar.setPageStep(self._SCROLL_SCALE)
+            self._scrollbar.setValue(0)
+        else:
+            # value 仍以"中心行"为单位映射到 [0, (total-1)*SCALE]，与
+            # _sync_scrollbar_to_scroll_center / _on_scrollbar_changed 保持一致；
+            # pageStep 取使滑块占比恰为 visible/total 的值。
+            max_val = (total - 1) * self._SCROLL_SCALE
+            page = int(round(visible * max_val / (total - visible)))
+            self._scrollbar.setRange(0, max_val)
+            self._scrollbar.setPageStep(page)
+            self._scrollbar.setSingleStep(self._SCROLL_SCALE)  # 点击箭头 = 1 行
         self._scrollbar.blockSignals(False)
 
     def _sync_scrollbar_to_scroll_center(self):
