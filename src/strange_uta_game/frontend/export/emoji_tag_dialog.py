@@ -20,6 +20,7 @@ AppSettings["nicokara_tags"]["custom"]，并记忆首行参数供下次预填。
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 # AppSettings 延迟导入（避免循环 / Qt 未初始化时失败），
@@ -34,6 +35,7 @@ from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
+    QFileDialog,
     QFrame,
     QHBoxLayout,
     QVBoxLayout,
@@ -44,12 +46,17 @@ from qfluentwidgets import (
     CaptionLabel,
     CheckBox,
     ComboBox,
+    FluentIcon as FIF,
     LineEdit,
     PrimaryPushButton,
     PushButton,
     ScrollArea,
     SubtitleLabel,
+    ToolButton,
+    TransparentToolButton,
 )
+
+from strange_uta_game.frontend.window_sizing import fit_min_size
 
 # 匹配 @Emoji 或 @EmojiN= 开头的行（大小写不敏感）
 _EMOJI_TAG_RE = re.compile(r"^@Emoji\d*=", re.IGNORECASE)
@@ -266,8 +273,8 @@ class EmojiTagDialog(QDialog):
     ):
         super().__init__(parent)
         self.setWindowTitle(self.tr("分色标签设置助手"))
-        self.setMinimumWidth(820)
-        self.setMinimumHeight(300)
+        # 加宽以容纳浏览/删除按钮；不超过屏幕可用区域
+        fit_min_size(self, 1040, 320)
 
         self._singers = singers
         self._rows: List[Dict[str, Any]] = []
@@ -295,19 +302,28 @@ class EmojiTagDialog(QDialog):
         desc.setWordWrap(True)
         layout.addWidget(desc)
 
+        # 添加行按钮（手动新增演唱者行）
+        add_row = QHBoxLayout()
+        btn_add = PushButton(self.tr("添加行"), self)
+        btn_add.setIcon(FIF.ADD)
+        btn_add.clicked.connect(self._on_add_row)
+        add_row.addWidget(btn_add)
+        add_row.addStretch()
+        layout.addLayout(add_row)
+
         # 滚动区容纳演唱者卡片列表
         self._row_widget = QWidget()
         self._row_layout = QVBoxLayout(self._row_widget)
         self._row_layout.setContentsMargins(0, 0, 0, 0)
         self._row_layout.setSpacing(8)
+        # 末尾留一个伸缩项，卡片始终插入其前
+        self._row_layout.addStretch()
 
         scroll = ScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setWidget(self._row_widget)
         layout.addWidget(scroll, stretch=1)
-
-        layout.addStretch()
 
         # 确定/取消
         btn_row = QHBoxLayout()
@@ -422,6 +438,152 @@ class EmojiTagDialog(QDialog):
 
         card_layout.addLayout(row)
 
+    def _make_browse_button(self, edit: "LineEdit") -> ToolButton:
+        """创建一个浏览按钮，点击后选取图片并把文件名填入 ``edit``。"""
+        btn = ToolButton(FIF.FOLDER)
+        btn.setToolTip(self.tr("浏览图片文件（仅取文件名）"))
+        btn.clicked.connect(lambda: self._browse_image(edit))
+        return btn
+
+    def _browse_image(self, edit: "LineEdit"):
+        """弹出文件选择框，从上次加载目录开始，选中后把文件名写入 ``edit``。"""
+        init_dir = self._last_image_dir()
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            self.tr("选择图片文件"),
+            init_dir,
+            self.tr("图片文件 (*.png *.jpg *.jpeg *.bmp *.gif *.webp);;所有文件 (*.*)"),
+        )
+        if path:
+            edit.setText(Path(path).name)
+            self._save_image_dir(path)
+
+    def _last_image_dir(self) -> str:
+        """读取上次浏览图片的目录。"""
+        if AppSettings is None:
+            return ""  # pragma: no cover
+        try:
+            return AppSettings().get("nicokara_emoji_last_image_dir", "") or ""
+        except Exception:
+            return ""
+
+    def _save_image_dir(self, path: str):
+        """记忆本次浏览图片所在目录，供下次预填。"""
+        if AppSettings is None:
+            return  # pragma: no cover
+        try:
+            settings = AppSettings()
+            settings.set("nicokara_emoji_last_image_dir", str(Path(path).parent))
+            settings.save()
+        except Exception:
+            pass
+
+    def _add_card(
+        self,
+        singer_name: str,
+        default_front: str,
+        default_back: str,
+        default_opts: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """新增一张演唱者配置卡片，插入到列表末尾的伸缩项之前。"""
+        card = QFrame()
+        card.setFrameShape(QFrame.Shape.StyledPanel)
+        card.setFrameShadow(QFrame.Shadow.Raised)
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(10, 8, 10, 8)
+        card_layout.setSpacing(4)
+
+        # --- 第一行：演唱者名 · 触发字符 · 前画像 · 後画像 · 删除 ---
+        row1 = QHBoxLayout()
+        row1.setSpacing(6)
+
+        name_edit = LineEdit()
+        name_edit.setFont(QFont("Microsoft YaHei", 10))
+        name_edit.setText(singer_name)
+        name_edit.setPlaceholderText(self.tr("演唱者名"))
+        name_edit.setFixedWidth(96)
+        row1.addWidget(name_edit)
+
+        trigger_lbl = BodyLabel(self.tr("触发"))
+        row1.addWidget(trigger_lbl)
+
+        trigger_edit = LineEdit()
+        trigger_edit.setFont(QFont("Microsoft YaHei", 10))
+        trigger_edit.setText(f"【{singer_name}】" if singer_name else "")
+        trigger_edit.setPlaceholderText(self.tr("必填"))
+        trigger_edit.setMinimumWidth(110)
+        row1.addWidget(trigger_edit)
+
+        front_lbl = BodyLabel(self.tr("前画像"))
+        front_lbl.setToolTip(self.tr("擦除前图片文件名（可留空）"))
+        row1.addWidget(front_lbl)
+
+        front_edit = LineEdit()
+        front_edit.setFont(QFont("Microsoft YaHei", 10))
+        front_edit.setText(default_front)
+        front_edit.setPlaceholderText(self.tr("可留空"))
+        row1.addWidget(front_edit, stretch=2)
+        row1.addWidget(self._make_browse_button(front_edit))
+
+        back_lbl = BodyLabel(self.tr("後画像"))
+        back_lbl.setToolTip(self.tr("擦除后图片文件名（可省略；留空=与前画像相同）"))
+        row1.addWidget(back_lbl)
+
+        back_edit = LineEdit()
+        back_edit.setFont(QFont("Microsoft YaHei", 10))
+        back_edit.setText(default_back)
+        back_edit.setPlaceholderText(self.tr("留空=同前画像"))
+        row1.addWidget(back_edit, stretch=2)
+        row1.addWidget(self._make_browse_button(back_edit))
+
+        del_btn = TransparentToolButton(FIF.DELETE)
+        del_btn.setToolTip(self.tr("删除此行"))
+        row1.addWidget(del_btn)
+
+        card_layout.addLayout(row1)
+
+        # --- 第二行：缩放 · 飾り · 余白 ---
+        opt_ctrls = self._make_option_controls(default_opts)
+        self._add_option_row(card_layout, opt_ctrls)
+
+        # 插入到末尾伸缩项之前
+        self._row_layout.insertWidget(self._row_layout.count() - 1, card)
+
+        row = {
+            "card": card,
+            "name": name_edit,
+            "trigger": trigger_edit,
+            "front": front_edit,
+            "back": back_edit,
+            "zoom_mode": opt_ctrls["zoom_mode"],
+            "zoom_value": opt_ctrls["zoom_value"],
+            "nodecor": opt_ctrls["nodecor"],
+            "forcewipedecor": opt_ctrls["forcewipedecor"],
+            "margin_left": opt_ctrls["margin_left"],
+            "margin_right": opt_ctrls["margin_right"],
+            "margin_bottom": opt_ctrls["margin_bottom"],
+        }
+        del_btn.clicked.connect(lambda: self._remove_card(row))
+        self._rows.append(row)
+        return row
+
+    def _remove_card(self, row: Dict[str, Any]):
+        """删除指定行的卡片。"""
+        if row not in self._rows:
+            return
+        self._rows.remove(row)
+        card = row["card"]
+        self._row_layout.removeWidget(card)
+        card.setParent(None)
+        card.deleteLater()
+
+    def _on_add_row(self):
+        """手动新增一空白演唱者行，画像/选项沿用记忆的默认参数。"""
+        default_str = self._get_default_params()
+        default_front, default_back, default_opts_str = split_params(default_str)
+        default_opts = parse_option_str(default_opts_str)
+        self._add_card("", default_front, default_back, default_opts)
+
     def _populate_rows(self):
         """根据 self._singers 填充每位演唱者的配置卡片。"""
         default_str = self._get_default_params()
@@ -429,73 +591,7 @@ class EmojiTagDialog(QDialog):
         default_opts = parse_option_str(default_opts_str)
 
         for _singer_id, singer_name in self._singers:
-            card = QFrame()
-            card.setFrameShape(QFrame.Shape.StyledPanel)
-            card.setFrameShadow(QFrame.Shadow.Raised)
-            card_layout = QVBoxLayout(card)
-            card_layout.setContentsMargins(10, 8, 10, 8)
-            card_layout.setSpacing(4)
-
-            # --- 第一行：演唱者名 · 触发字符 · 前画像 · 後画像 ---
-            row1 = QHBoxLayout()
-            row1.setSpacing(6)
-
-            name_lbl = BodyLabel(singer_name)
-            name_lbl.setMinimumWidth(80)
-            row1.addWidget(name_lbl)
-
-            trigger_lbl = BodyLabel(self.tr("触发"))
-            row1.addWidget(trigger_lbl)
-
-            trigger_edit = LineEdit()
-            trigger_edit.setFont(QFont("Microsoft YaHei", 10))
-            trigger_edit.setText(f"【{singer_name}】")
-            trigger_edit.setPlaceholderText(self.tr("必填"))
-            trigger_edit.setMinimumWidth(110)
-            row1.addWidget(trigger_edit)
-
-            front_lbl = BodyLabel(self.tr("前画像"))
-            front_lbl.setToolTip(self.tr("擦除前图片文件名（可留空）"))
-            row1.addWidget(front_lbl)
-
-            front_edit = LineEdit()
-            front_edit.setFont(QFont("Microsoft YaHei", 10))
-            front_edit.setText(default_front)
-            front_edit.setPlaceholderText(self.tr("可留空"))
-            row1.addWidget(front_edit, stretch=2)
-
-            back_lbl = BodyLabel(self.tr("後画像"))
-            back_lbl.setToolTip(self.tr("擦除后图片文件名（可省略；留空=与前画像相同）"))
-            row1.addWidget(back_lbl)
-
-            back_edit = LineEdit()
-            back_edit.setFont(QFont("Microsoft YaHei", 10))
-            back_edit.setText(default_back)
-            back_edit.setPlaceholderText(self.tr("留空=同前画像"))
-            row1.addWidget(back_edit, stretch=2)
-
-            card_layout.addLayout(row1)
-
-            # --- 第二行：缩放 · 飾り · 余白 ---
-            opt_ctrls = self._make_option_controls(default_opts)
-            self._add_option_row(card_layout, opt_ctrls)
-
-            self._row_layout.addWidget(card)
-            self._rows.append({
-                "singer_name": singer_name,
-                "trigger": trigger_edit,
-                "front": front_edit,
-                "back": back_edit,
-                "zoom_mode": opt_ctrls["zoom_mode"],
-                "zoom_value": opt_ctrls["zoom_value"],
-                "nodecor": opt_ctrls["nodecor"],
-                "forcewipedecor": opt_ctrls["forcewipedecor"],
-                "margin_left": opt_ctrls["margin_left"],
-                "margin_right": opt_ctrls["margin_right"],
-                "margin_bottom": opt_ctrls["margin_bottom"],
-            })
-
-        self._row_layout.addStretch()
+            self._add_card(singer_name, default_front, default_back, default_opts)
 
     def get_singer_params(self) -> List[Tuple[str, str, str]]:
         """返回 [(singer_name, trigger, params), ...] 列表。"""
@@ -523,7 +619,7 @@ class EmojiTagDialog(QDialog):
             }
             options_str = build_option_str(opts)
             params = join_params(front, back, options_str)
-            result.append((row["singer_name"], trigger, params))
+            result.append((row["name"].text().strip(), trigger, params))
         return result
 
     def _copy_first_row_params(self):
