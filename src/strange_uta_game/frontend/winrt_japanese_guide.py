@@ -15,13 +15,9 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PyQt6.QtCore import QCoreApplication, QThread, pyqtSignal
-from PyQt6.QtWidgets import (
-    QApplication,
-    QMessageBox,
-    QPushButton,
-    QWidget,
-)
+from PyQt6.QtCore import QCoreApplication, Qt, QThread, pyqtSignal
+from PyQt6.QtWidgets import QApplication, QWidget
+from qfluentwidgets import MessageBox, PushButton
 
 
 def _tr(s: str) -> str:
@@ -33,6 +29,14 @@ from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import (
     install_winrt_japanese,
     winrt_install_guidance,
     winrt_japanese_status,
+)
+from strange_uta_game.frontend.fluent_widgets import (
+    _resolve_window,
+    message_busy,
+    message_choice,
+    message_error,
+    message_info,
+    message_question,
 )
 
 _INSTALL_CMD = f"Add-WindowsCapability -Online -Name {WINRT_JA_CAPABILITY}"
@@ -49,29 +53,33 @@ class _InstallWorker(QThread):
 
 
 def _show_guidance(parent: Optional[QWidget], extra: str = "") -> None:
-    """展示手动安装引导，附「复制命令」按钮。"""
-    box = QMessageBox(parent)
-    box.setIcon(QMessageBox.Icon.Information)
-    box.setWindowTitle(_tr("手动安装日语注音组件"))
-    box.setText((extra + "\n\n" if extra else "") + winrt_install_guidance())
-    copy_btn = box.addButton(_tr("复制命令"), QMessageBox.ButtonRole.ActionRole)
-    box.addButton(_tr("我知道了"), QMessageBox.ButtonRole.AcceptRole)
-    # 阻止「复制命令」关闭对话框：点后复制到剪贴板并保持打开
-    copy_btn.clicked.disconnect()
+    """展示手动安装引导，附「复制命令」按钮（点击不关闭对话框）。"""
+    box = MessageBox(
+        _tr("手动安装日语注音组件"),
+        (extra + "\n\n" if extra else "") + winrt_install_guidance(),
+        _resolve_window(parent),
+    )
+    box.setContentCopyable(True)
+    box.yesButton.setText(_tr("我知道了"))
+    box.hideCancelButton()
+    # 额外加一个「复制命令」按钮：点击仅复制到剪贴板，不关闭对话框
+    copy_btn = PushButton(_tr("复制命令"), box.buttonGroup)
+    copy_btn.setAttribute(Qt.WidgetAttribute.WA_LayoutUsesWidgetRect)
     copy_btn.clicked.connect(
         lambda: QApplication.clipboard().setText(_INSTALL_CMD)
     )
+    box.buttonLayout.insertWidget(0, copy_btn, 1, Qt.AlignmentFlag.AlignVCenter)
     box.exec()
 
 
 def _run_install_blocking(parent: Optional[QWidget]) -> bool:
     """后台线程跑安装 + 模态忙碌提示，返回是否安装成功。"""
-    busy = QMessageBox(parent)
-    busy.setIcon(QMessageBox.Icon.Information)
-    busy.setWindowTitle(_tr("正在安装"))
-    busy.setText(_tr("正在从 Windows Update 下载并安装日语注音组件，请稍候…\n"
-                     "（请在弹出的 UAC 窗口点击「是」以授权安装）"))
-    busy.setStandardButtons(QMessageBox.StandardButton.NoButton)
+    busy = message_busy(
+        parent,
+        _tr("正在安装"),
+        _tr("正在从 Windows Update 下载并安装日语注音组件，请稍候…\n"
+            "（请在弹出的 UAC 窗口点击「是」以授权安装）"),
+    )
 
     result: dict = {}
     worker = _InstallWorker()
@@ -103,7 +111,7 @@ def ensure_winrt_japanese(parent: Optional[QWidget] = None) -> bool:
         return True
 
     if reason == "no_winrt_package":
-        QMessageBox.critical(
+        message_error(
             parent,
             _tr("缺少注音组件"),
             _tr("未找到 winrt 运行库（winrt-Windows.Globalization）。\n"
@@ -111,42 +119,39 @@ def ensure_winrt_japanese(parent: Optional[QWidget] = None) -> bool:
         )
         return False
 
-    # engine_unavailable / error：缺日语 IME 功能，引导安装
-    box = QMessageBox(parent)
-    box.setIcon(QMessageBox.Icon.Question)
-    box.setWindowTitle(_tr("需要安装日语注音组件"))
-    box.setText(_tr(
-        "日语注音需要 Windows 的日语功能（含日语 IME），当前系统未安装。\n"
-        "约几十 MB，从 Windows Update 联网下载，不会更改系统显示语言。\n\n"
-        "是否现在安装？"
-    ))
-    btn_install = box.addButton(_tr("现在安装"), QMessageBox.ButtonRole.AcceptRole)
-    btn_manual = box.addButton(_tr("手动安装"), QMessageBox.ButtonRole.ActionRole)
-    box.addButton(_tr("暂不"), QMessageBox.ButtonRole.RejectRole)
-    box.exec()
-    clicked = box.clickedButton()
-
-    if clicked is btn_manual:
+    # engine_unavailable / error：缺日语 IME 功能，引导安装（三选项）
+    choice = message_choice(
+        parent,
+        _tr("需要安装日语注音组件"),
+        _tr(
+            "日语注音需要 Windows 的日语功能（含日语 IME），当前系统未安装。\n"
+            "约几十 MB，从 Windows Update 联网下载，不会更改系统显示语言。\n\n"
+            "是否现在安装？"
+        ),
+        [_tr("现在安装"), _tr("手动安装"), _tr("暂不")],
+        default=0,
+    )
+    if choice == 1:  # 手动安装
         _show_guidance(parent)
         return False
-    if clicked is not btn_install:
-        return False  # 暂不
+    if choice != 0:  # 暂不 / 关闭
+        return False
 
     # 现在安装：先说明将弹出 UAC，征得同意
-    confirm = QMessageBox.question(
+    if not message_question(
         parent,
         _tr("授权安装"),
         _tr("接下来会弹出 Windows 的「用户账户控制 (UAC)」窗口，\n"
             "请点击「是」以授权安装日语组件。\n\n是否继续？"),
-        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-    )
-    if confirm != QMessageBox.StandardButton.Yes:
+        yes_text=_tr("是"),
+        no_text=_tr("否"),
+    ):
         return False
 
     ok = _run_install_blocking(parent)
     if ok:
-        QMessageBox.information(parent, _tr("安装完成"),
-                                _tr("日语注音组件已安装，可以开始注音了。"))
+        message_info(parent, _tr("安装完成"),
+                     _tr("日语注音组件已安装，可以开始注音了。"))
         return True
 
     # UAC 被拒或安装失败 → 转手动引导
