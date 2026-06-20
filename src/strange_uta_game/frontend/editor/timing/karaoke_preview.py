@@ -881,6 +881,10 @@ class KaraokePreview(QWidget):
 
     def _update_display(self):
         self._global_version += 1
+        # 内容（句子数）可能在结构性编辑后变化（如首次粘贴/导入歌词使项目从空
+        # 变为有句子），需同步刷新滚动条的可见性与 range；否则滚动条会一直停留在
+        # 初始的隐藏状态，直到某次 resize/主题切换才被动显示。
+        self._update_scrollbar_range()
         self.update()
 
     def _invalidate_line(self, line_idx: int):
