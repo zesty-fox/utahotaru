@@ -44,17 +44,25 @@ def available_rect(widget: QWidget | None = None) -> QRect:
     return current_screen(widget).availableGeometry()
 
 
+# 给窗口边框/标题栏 + 少量视觉留白预留的逻辑像素余量。
+# 裁剪时用「可用区域 − 该余量」作为上限，而不是乘一个比例(如 0.9)：
+# 这样只在窗口确实放不下时才收缩，否则保持设计尺寸——避免在「设计尺寸恰好
+# 接近可用高度」的开发环境(如 2K@150%，可用高 ~928，主窗口高 900)上把窗口
+# 平白缩小。
+_FRAME_MARGIN = 24
+
+
 def clamp_size(
-    widget: QWidget, width: int, height: int, max_frac: float = 0.9
+    widget: QWidget, width: int, height: int, margin: int = _FRAME_MARGIN
 ) -> tuple[int, int]:
-    """把期望尺寸裁剪到当前屏幕可用区域的 ``max_frac`` 比例以内。
+    """把期望尺寸裁剪到 ``可用区域 − margin`` 以内。
 
     返回裁剪后的 ``(width, height)``。窗口本就放得下时原样返回(裁剪是无操作)，
-    因此对大屏用户无任何副作用。
+    因此对设计尺寸与大屏用户都无副作用；只有真正会溢出屏幕时才收缩。
     """
     avail = available_rect(widget)
-    cw = min(width, int(avail.width() * max_frac))
-    ch = min(height, int(avail.height() * max_frac))
+    cw = min(width, max(320, avail.width() - margin))
+    ch = min(height, max(240, avail.height() - margin))
     return cw, ch
 
 
@@ -63,27 +71,27 @@ def fit_to_screen(
     width: int,
     height: int,
     *,
-    max_frac: float = 0.9,
+    margin: int = _FRAME_MARGIN,
     center: bool = False,
 ) -> None:
     """裁剪到屏幕可用区域后 ``resize``，可选居中到所在屏。
 
-    替代裸 ``widget.resize(w, h)``：在小屏 / 高缩放下不会溢出。
+    替代裸 ``widget.resize(w, h)``：在小屏 / 高缩放下不会溢出，放得下时保持原尺寸。
     """
-    cw, ch = clamp_size(widget, width, height, max_frac)
+    cw, ch = clamp_size(widget, width, height, margin)
     widget.resize(cw, ch)
     if center:
         center_on_screen(widget)
 
 
 def fit_min_size(
-    widget: QWidget, width: int, height: int, *, max_frac: float = 0.95
+    widget: QWidget, width: int, height: int, *, margin: int = _FRAME_MARGIN
 ) -> None:
     """设置最小尺寸，但绝不超过当前屏幕可用区域。
 
     替代裸 ``setMinimumSize(w, h)``：避免最小尺寸大于屏幕导致窗口无法缩进可视范围。
     """
-    cw, ch = clamp_size(widget, width, height, max_frac)
+    cw, ch = clamp_size(widget, width, height, margin)
     widget.setMinimumSize(cw, ch)
 
 
