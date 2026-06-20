@@ -33,6 +33,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from PyQt6.QtGui import QIntValidator
+from strange_uta_game.frontend.window_sizing import fit_min_size
 from qfluentwidgets import (
     ComboBox,
     FluentIcon as FIF,
@@ -73,7 +74,7 @@ class PriorityOrderDialog(QDialog):
     ):
         super().__init__(parent)
         self.setWindowTitle(self.tr("字典源优先级"))
-        self.setMinimumSize(420, 360)
+        fit_min_size(self, 420, 360)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)

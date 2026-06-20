@@ -45,6 +45,7 @@ from strange_uta_game.frontend.settings.settings_interface import (
 )
 from strange_uta_game.frontend.theme import theme as _theme
 from strange_uta_game.frontend.fluent_widgets import FluentGroupBox, message_question
+from strange_uta_game.frontend.window_sizing import fit_to_screen
 
 
 class RubyMismatchDialog(QDialog):
@@ -53,7 +54,7 @@ class RubyMismatchDialog(QDialog):
     def __init__(self, detail: dict, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("注音分段不匹配"))
-        self.resize(640, 500)
+        fit_to_screen(self, 640, 500)
         self._action: str = "cancel"
 
         layout = QVBoxLayout(self)
