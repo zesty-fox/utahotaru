@@ -344,6 +344,10 @@ class Theme(QObject):
         # 在此显式同步一次。
         self._sync_app_palette()
 
+        # 启动时一并写入全局样式表，使无法被 Fluent 接管的原生滚动条
+        # 在深色模式下也跟随主题。
+        self._apply_global_qss()
+
         # 监听系统主题变化
         self._setup_system_theme_listener()
 
@@ -499,10 +503,54 @@ class Theme(QObject):
             palette.setColor(QPalette.ColorRole.Dark,            QColor(160, 160, 160))
         app.setPalette(palette)
 
+    def _build_global_qss(self) -> str:
+        """构建应用级全局样式表，仅针对 qfluentwidgets 无法接管的原生 Qt 控件。
+
+        qfluentwidgets 通过 **逐控件** setStyleSheet 应用样式，其优先级高于
+        application 级样式表；因此这里用 ``app.setStyleSheet`` 设置的全局规则
+        只会命中没有自管理 QSS 的原生控件，不会污染任何 Fluent 控件。
+
+        当前仅保留 QScrollBar：timeline / karaoke 预览把它当作独立数值滑条使用
+        （自定义 range/value），而 Fluent ScrollBar 必须依附 QAbstractScrollArea，
+        无法直接替换；故只能用全局 QSS 让其在深色模式下不再呈现白色原生外观。
+        其余原生控件（QGroupBox / QMessageBox / QDialogButtonBox 按钮等）已统一
+        改用 Fluent 控件接管，不在此处理。
+        """
+        dark = self.colors.is_dark
+        # 滚动条滑块：深色用半透明白、浅色用半透明黑，hover 加深
+        handle = "rgba(255, 255, 255, 0.28)" if dark else "rgba(0, 0, 0, 0.28)"
+        handle_hover = "rgba(255, 255, 255, 0.45)" if dark else "rgba(0, 0, 0, 0.45)"
+        return f"""
+        /* ── 原生滚动条（波形 timeline / karaoke 预览的独立滑条）── */
+        QScrollBar:vertical, QScrollBar:horizontal {{
+            background: transparent;
+            border: none;
+        }}
+        QScrollBar::handle:vertical, QScrollBar::handle:horizontal {{
+            background: {handle};
+            border-radius: 4px;
+        }}
+        QScrollBar::handle:vertical {{ min-height: 24px; }}
+        QScrollBar::handle:horizontal {{ min-width: 24px; }}
+        QScrollBar::handle:hover {{ background: {handle_hover}; }}
+        QScrollBar::add-line, QScrollBar::sub-line {{
+            width: 0px; height: 0px; background: none; border: none;
+        }}
+        QScrollBar::add-page, QScrollBar::sub-page {{ background: none; }}
+        """
+
+    def _apply_global_qss(self) -> None:
+        """把全局样式表写入 QApplication（覆盖原生控件，不影响 Fluent 控件）。"""
+        app = QApplication.instance()
+        if not app:
+            return
+        app.setStyleSheet(self._build_global_qss())
+
     def _apply_theme_change(self) -> None:
         """应用主题变更（统一入口）"""
         self._invalidate()
         self._sync_app_palette()
+        self._apply_global_qss()
         self._apply_qfluentwidgets_theme(lazy=True)
         self._refresh_all_widgets()
         self.changed.emit()
@@ -526,6 +574,7 @@ class Theme(QObject):
         - 不重复调用 _invalidate()，因 _mode 未变，颜色缓存无需重建。
         """
         self._sync_app_palette()
+        self._apply_global_qss()
         self._apply_qfluentwidgets_theme(lazy=False)
         self._refresh_all_widgets()
         self.changed.emit()
