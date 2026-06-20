@@ -30,7 +30,7 @@ try:
 except Exception:  # pragma: no cover
     AppSettings = None  # type: ignore[assignment,misc]
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QApplication,
@@ -56,7 +56,7 @@ from qfluentwidgets import (
     TransparentToolButton,
 )
 
-from strange_uta_game.frontend.window_sizing import fit_min_size
+from strange_uta_game.frontend.window_sizing import fit_min_size, fit_to_screen
 
 # 匹配 @Emoji 或 @EmojiN= 开头的行（大小写不敏感）
 _EMOJI_TAG_RE = re.compile(r"^@Emoji\d*=", re.IGNORECASE)
@@ -324,6 +324,7 @@ class EmojiTagDialog(QDialog):
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setWidget(self._row_widget)
         layout.addWidget(scroll, stretch=1)
+        self._scroll = scroll
 
         # 确定/取消
         btn_row = QHBoxLayout()
@@ -578,11 +579,29 @@ class EmojiTagDialog(QDialog):
         card.deleteLater()
 
     def _on_add_row(self):
-        """手动新增一空白演唱者行，画像/选项沿用记忆的默认参数。"""
+        """手动新增一空白演唱者行，画像/选项沿用记忆的默认参数。
+
+        新增后自动放大窗口（不超过屏幕），并把视觉焦点滚动到新行。
+        """
         default_str = self._get_default_params()
         default_front, default_back, default_opts_str = split_params(default_str)
         default_opts = parse_option_str(default_opts_str)
-        self._add_card("", default_front, default_back, default_opts)
+        row = self._add_card("", default_front, default_back, default_opts)
+
+        # 让窗口尽量长高以容纳新行（受屏幕与 maximumHeight 限制）
+        card = row["card"]
+        card.adjustSize()
+        delta = card.sizeHint().height() + self._row_layout.spacing()
+        fit_to_screen(self, self.width(), self.height() + delta)
+
+        # 布局更新后再滚动到新行并聚焦其演唱者名输入框
+        def _reveal():
+            self._scroll.ensureWidgetVisible(card)
+            bar = self._scroll.verticalScrollBar()
+            bar.setValue(bar.maximum())
+            row["name"].setFocus()
+
+        QTimer.singleShot(0, _reveal)
 
     def _populate_rows(self):
         """根据 self._singers 填充每位演唱者的配置卡片。"""
