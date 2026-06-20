@@ -31,7 +31,6 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QMessageBox,
     QVBoxLayout,
     QWidget,
 )
@@ -70,6 +69,11 @@ from strange_uta_game.frontend.perf_log import (
     start_ui_watchdog,
 )
 from strange_uta_game.frontend.theme import theme, ThemeColors
+from strange_uta_game.frontend.fluent_widgets import (
+    message_choice,
+    message_info,
+    message_question,
+)
 
 from .line_interface import LineDetailDialog
 from .timing import (
@@ -1600,19 +1604,18 @@ class EditorInterface(QWidget):
             store = getattr(self, "_store", None)
             # 检查是否有未保存的更改
             if store and store.dirty:
-                msg = QMessageBox(self)
-                msg.setWindowTitle(self.tr("保存当前项目"))
-                msg.setText(self.tr("当前项目有未保存的更改，是否保存？"))
-                btn_save = msg.addButton(self.tr("保存"), QMessageBox.ButtonRole.AcceptRole)
-                msg.addButton(self.tr("放弃"), QMessageBox.ButtonRole.DestructiveRole)
-                btn_cancel = msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
-                msg.setDefaultButton(btn_save)
-                msg.exec()
-                clicked = msg.clickedButton()
-                if clicked is btn_save:
+                choice = message_choice(
+                    self,
+                    self.tr("保存当前项目"),
+                    self.tr("当前项目有未保存的更改，是否保存？"),
+                    [self.tr("保存"), self.tr("放弃"), self.tr("取消")],
+                    default=0,
+                )
+                if choice == 0:  # 保存
                     self._on_save()
-                elif clicked is btn_cancel:
+                elif choice == 2 or choice == -1:  # 取消 / 关闭
                     return
+                # choice == 1（放弃）：什么都不做，继续新建
 
         # 创建新项目
         from strange_uta_game.backend.application import ProjectService
@@ -1858,7 +1861,7 @@ class EditorInterface(QWidget):
                 more = ""
                 if len(failures) > 20:
                     more = f"\n...（还有 {len(failures) - 20} 项未显示）"
-                QMessageBox.information(
+                message_info(
                     self,
                     self.tr("部分连词设置未应用"),
                     self.tr("以下位置为末字/句尾/行尾，不能设置连词，已自动跳过：\n\n")
@@ -2846,14 +2849,14 @@ class EditorInterface(QWidget):
             )
             return
 
-        msg = QMessageBox(self)
-        msg.setIcon(QMessageBox.Icon.Warning)
-        msg.setText(self.tr("确定要删除所有时间戳吗？此操作可撤销。"))
-        msg.addButton(self.tr("删除"), QMessageBox.ButtonRole.AcceptRole)
-        btn_cancel = msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
-        msg.setDefaultButton(btn_cancel)
-        msg.exec()
-        if msg.clickedButton() == btn_cancel:
+        if not message_question(
+            self,
+            self.tr("删除所有时间戳"),
+            self.tr("确定要删除所有时间戳吗？此操作可撤销。"),
+            yes_text=self.tr("删除"),
+            no_text=self.tr("取消"),
+            default_cancel=True,
+        ):
             return
 
         project = self._project
@@ -2905,14 +2908,14 @@ class EditorInterface(QWidget):
             )
             return
 
-        msg = QMessageBox(self)
-        msg.setIcon(QMessageBox.Icon.Warning)
-        msg.setText(self.tr("确定要删除所有时间戳（保留行首）吗？此操作可撤销。"))
-        msg.addButton(self.tr("删除"), QMessageBox.ButtonRole.AcceptRole)
-        btn_cancel = msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
-        msg.setDefaultButton(btn_cancel)
-        msg.exec()
-        if msg.clickedButton() == btn_cancel:
+        if not message_question(
+            self,
+            self.tr("删除所有时间戳（保留行首）"),
+            self.tr("确定要删除所有时间戳（保留行首）吗？此操作可撤销。"),
+            yes_text=self.tr("删除"),
+            no_text=self.tr("取消"),
+            default_cancel=True,
+        ):
             return
 
         project = self._project
@@ -5298,15 +5301,16 @@ class EditorInterface(QWidget):
             for l, c in marks[:10]
         ]
         extra = self.tr("\n...另 {n} 处").format(n=len(marks) - 10) if len(marks) > 10 else ""
-        msg = QMessageBox(self)
-        msg.setIcon(QMessageBox.Icon.Warning)
-        msg.setWindowTitle(self.tr("仍有导唱待办未处理"))
-        msg.setText(self.tr("还剩 {n} 个标记点未添加导唱符。").format(n=len(marks)))
-        msg.setInformativeText("\n".join(preview) + extra)
-        btn_continue = msg.addButton(self.tr("继续导出"), QMessageBox.ButtonRole.AcceptRole)
-        msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
-        msg.exec()
-        return msg.clickedButton() is btn_continue
+        return message_question(
+            self,
+            self.tr("仍有导唱待办未处理"),
+            self.tr("还剩 {n} 个标记点未添加导唱符。").format(n=len(marks))
+            + "\n\n"
+            + "\n".join(preview)
+            + extra,
+            yes_text=self.tr("继续导出"),
+            no_text=self.tr("取消"),
+        )
 
     def _on_quick_export(self):
         """快捷导出：使用默认导出格式弹出保存对话框并导出。"""
@@ -6398,25 +6402,21 @@ class EditorInterface(QWidget):
         if not self._project:
             return
 
-        msg = QMessageBox(self)
-        msg.setWindowTitle(self.tr("自动分析全部注音"))
-        msg.setText(self.tr("请选择分析范围："))
-        msg.setInformativeText(self.tr(
-            "「全部重新分析」会覆盖现有注音。\n"
-            "「仅分析未注音字符」会保留已有的人工/字典注音。"
-        ))
-        btn_all = msg.addButton(self.tr("全部重新分析"), QMessageBox.ButtonRole.DestructiveRole)
-        btn_only_noruby = msg.addButton(
-            self.tr("仅分析未注音字符"), QMessageBox.ButtonRole.AcceptRole
+        choice = message_choice(
+            self,
+            self.tr("自动分析全部注音"),
+            self.tr("请选择分析范围：")
+            + "\n\n"
+            + self.tr(
+                "「全部重新分析」会覆盖现有注音。\n"
+                "「仅分析未注音字符」会保留已有的人工/字典注音。"
+            ),
+            [self.tr("全部重新分析"), self.tr("仅分析未注音字符"), self.tr("取消")],
+            default=1,
         )
-        btn_cancel = msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
-        msg.setDefaultButton(btn_only_noruby)
-        msg.exec()
-
-        clicked = msg.clickedButton()
-        if clicked is btn_cancel or clicked is None:
+        if choice in (-1, 2):
             return
-        only_noruby = clicked is btn_only_noruby
+        only_noruby = choice == 1
         self._auto_analyze_rubies(only_noruby=only_noruby)
 
     def _auto_analyze_all_rubies(self):

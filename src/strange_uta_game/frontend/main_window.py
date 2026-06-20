@@ -6,7 +6,7 @@
 
 from PyQt6.QtCore import Qt, QTimer, QEvent
 from PyQt6.QtGui import QKeySequence, QShortcut
-from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox
+from PyQt6.QtWidgets import QApplication, QFileDialog
 
 from qfluentwidgets import (
     NavigationItemPosition,
@@ -26,6 +26,7 @@ from strange_uta_game.backend.domain import Project
 from strange_uta_game.backend.infrastructure.audio import BassEngine, BassTsmEngine
 from strange_uta_game.frontend.project_store import ProjectStore
 from strange_uta_game.frontend.theme import theme
+from strange_uta_game.frontend.fluent_widgets import message_choice, message_question
 
 
 class MainWindow(MSFluentWindow):
@@ -739,15 +740,13 @@ class MainWindow(MSFluentWindow):
             return False
 
         parent = dialog_parent if dialog_parent is not None else self
-        msg = QMessageBox(parent)
-        msg.setWindowTitle(self.tr("恢复未保存的项目"))
-        msg.setText(self.tr("检测到上次异常退出时的未保存项目数据。\n是否加载恢复？"))
-        btn_yes = msg.addButton(self.tr("是"), QMessageBox.ButtonRole.AcceptRole)
-        msg.addButton(self.tr("否"), QMessageBox.ButtonRole.RejectRole)
-        msg.setDefaultButton(btn_yes)
-        msg.exec()
-        clicked = msg.clickedButton()
-        if clicked is btn_yes:
+        if message_question(
+            parent,
+            self.tr("恢复未保存的项目"),
+            self.tr("检测到上次异常退出时的未保存项目数据。\n是否加载恢复？"),
+            yes_text=self.tr("是"),
+            no_text=self.tr("否"),
+        ):
             recovered = ProjectStore.load_crash_recovery()
             if recovered:
                 project, temp_path = recovered
@@ -1184,21 +1183,18 @@ class MainWindow(MSFluentWindow):
             return
 
         if self._store.dirty:
-            msg = QMessageBox(self)
-            msg.setIcon(QMessageBox.Icon.Question)
-            msg.setWindowTitle(self.tr("未保存的更改"))
-            msg.setText(self.tr("项目有未保存的更改，是否在退出前保存？"))
-            save_btn = msg.addButton(self.tr("保存"), QMessageBox.ButtonRole.AcceptRole)
-            discard_btn = msg.addButton(self.tr("放弃"), QMessageBox.ButtonRole.DestructiveRole)
-            cancel_btn = msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
-            msg.setDefaultButton(save_btn)
-            msg.exec()
-            clicked = msg.clickedButton()
-            if clicked is save_btn:
+            choice = message_choice(
+                self,
+                self.tr("未保存的更改"),
+                self.tr("项目有未保存的更改，是否在退出前保存？"),
+                [self.tr("保存"), self.tr("放弃"), self.tr("取消")],
+                default=0,
+            )
+            if choice == 0:  # 保存
                 self._on_save_project()
                 # 保存后清理临时文件
                 self._store.cleanup_temp_files()
-            elif clicked is discard_btn:
+            elif choice == 1:  # 放弃
                 # 用户主动放弃保存 → 删除临时文件
                 self._store.cleanup_temp_files()
             else:

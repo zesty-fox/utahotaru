@@ -18,9 +18,7 @@ from PyQt6.QtWidgets import (
     QListWidgetItem,
     QColorDialog,
     QCompleter,
-    QMessageBox,
     QDialog,
-    QDialogButtonBox,
     QFormLayout,
     QAbstractItemView,
     QButtonGroup,
@@ -53,6 +51,7 @@ from strange_uta_game.backend.domain import Project, Singer
 from strange_uta_game.backend.application import SingerService
 from strange_uta_game.backend.domain.entities import _compute_complement_color
 from strange_uta_game.frontend.theme import theme
+from strange_uta_game.frontend.fluent_widgets import dialog_button_row, message_question
 
 
 def _make_singer_icon(colors: List[str], w: int = 32, h: int = 18):
@@ -244,14 +243,10 @@ class SingerEditDialog(QDialog):
         outer.addWidget(self.chk_default)
 
         # 确定 / 取消
-        button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        button_row, _, _ = dialog_button_row(
+            self, ok_text=self.tr("确定"), cancel_text=self.tr("取消")
         )
-        button_box.button(QDialogButtonBox.StandardButton.Ok).setText(self.tr("确定"))
-        button_box.button(QDialogButtonBox.StandardButton.Cancel).setText(self.tr("取消"))
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
-        outer.addWidget(button_box)
+        outer.addLayout(button_row)
 
         main_layout.addWidget(left_widget, stretch=1)
 
@@ -546,14 +541,10 @@ class BatchGroupDialog(QDialog):
             self.combo.setCompleter(_completer)
         layout.addWidget(self.combo)
 
-        button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        button_row, _, _ = dialog_button_row(
+            self, ok_text=self.tr("确定"), cancel_text=self.tr("取消")
         )
-        button_box.button(QDialogButtonBox.StandardButton.Ok).setText(self.tr("确定"))
-        button_box.button(QDialogButtonBox.StandardButton.Cancel).setText(self.tr("取消"))
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
-        layout.addWidget(button_box)
+        layout.addLayout(button_row)
 
     def get_group(self) -> str:
         return self.combo.text().strip()
@@ -589,14 +580,10 @@ class TransferTargetDialog(QDialog):
                 self.combo.setCurrentIndex(idx)
         layout.addWidget(self.combo)
 
-        button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        button_row, _, _ = dialog_button_row(
+            self, ok_text=self.tr("确定"), cancel_text=self.tr("取消")
         )
-        button_box.button(QDialogButtonBox.StandardButton.Ok).setText(self.tr("确定"))
-        button_box.button(QDialogButtonBox.StandardButton.Cancel).setText(self.tr("取消"))
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
-        layout.addWidget(button_box)
+        layout.addLayout(button_row)
 
     def get_target_id(self) -> Optional[str]:
         return self.combo.currentData()
@@ -829,15 +816,14 @@ class SingerPresetLoadDialog(QDialog):
         if len(selected_presets) > 5:
             names += self.tr(" 等 {n} 位").format(n=len(selected_presets))
 
-        msg = QMessageBox(self)
-        msg.setWindowTitle(self.tr("确认删除"))
-        msg.setText(self.tr("确定要从预设中删除以下演唱者吗？\n\n{names}\n\n删除后将无法恢复。").format(names=names))
-        btn_yes = msg.addButton(self.tr("删除"), QMessageBox.ButtonRole.AcceptRole)
-        msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
-        msg.setDefaultButton(btn_yes)
-        msg.exec()
-
-        if msg.clickedButton() is not btn_yes:
+        if not message_question(
+            self,
+            self.tr("确认删除"),
+            self.tr("确定要从预设中删除以下演唱者吗？\n\n{names}\n\n删除后将无法恢复。").format(names=names),
+            yes_text=self.tr("删除"),
+            no_text=self.tr("取消"),
+            default_cancel=True,
+        ):
             return
 
         # 从预设中删除选中的演唱者
@@ -1577,17 +1563,16 @@ class SingerManagerInterface(QWidget):
         names = "、".join(s.name for s in selected_singers[:5])
         if len(selected_singers) > 5:
             names += self.tr(" 等 {n} 位").format(n=len(selected_singers))
-        msg = QMessageBox(self)
-        msg.setWindowTitle(self.tr("确认批量删除"))
-        msg.setText(self.tr(
-            "确定要删除 {n} 位演唱者吗？\n\n{names}\n\n"
-            "这些演唱者的歌词将转移到你下一步选择的演唱者."
-        ).format(n=len(selected_singers), names=names))
-        btn_yes = msg.addButton(self.tr("继续"), QMessageBox.ButtonRole.AcceptRole)
-        msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
-        msg.setDefaultButton(btn_yes)
-        msg.exec()
-        if msg.clickedButton() is not btn_yes:
+        if not message_question(
+            self,
+            self.tr("确认批量删除"),
+            self.tr(
+                "确定要删除 {n} 位演唱者吗？\n\n{names}\n\n"
+                "这些演唱者的歌词将转移到你下一步选择的演唱者."
+            ).format(n=len(selected_singers), names=names),
+            yes_text=self.tr("继续"),
+            no_text=self.tr("取消"),
+        ):
             return
 
         if dlg.exec() != QDialog.DialogCode.Accepted:

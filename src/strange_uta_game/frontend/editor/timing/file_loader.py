@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, QThread
-from PyQt6.QtWidgets import QFileDialog, QMessageBox
+from PyQt6.QtWidgets import QFileDialog
+from strange_uta_game.frontend.fluent_widgets import message_choice
 from qfluentwidgets import InfoBar, InfoBarPosition, StateToolTip
 
 from strange_uta_game.backend.infrastructure.audio.video_converter import (
@@ -317,21 +318,23 @@ class FileLoader:
         store = self._store
         # 检查是否有未保存的更改
         if store and store.dirty:
-            msg = QMessageBox(self._editor)
-            msg.setWindowTitle(self._editor.tr("保存当前项目"))
-            msg.setText(self._editor.tr("当前项目有未保存的更改，是否保存？"))
-            btn_save = msg.addButton(self._editor.tr("保存"), QMessageBox.ButtonRole.AcceptRole)
-            btn_discard = msg.addButton(self._editor.tr("放弃"), QMessageBox.ButtonRole.DestructiveRole)
-            msg.addButton(self._editor.tr("取消"), QMessageBox.ButtonRole.RejectRole)
-            msg.setDefaultButton(btn_save)
-            msg.exec()
-            clicked = msg.clickedButton()
-            if clicked is btn_save:
+            choice = message_choice(
+                self._editor,
+                self._editor.tr("保存当前项目"),
+                self._editor.tr("当前项目有未保存的更改，是否保存？"),
+                [
+                    self._editor.tr("保存"),
+                    self._editor.tr("放弃"),
+                    self._editor.tr("取消"),
+                ],
+                default=0,
+            )
+            if choice == 0:  # 保存
                 self._editor._on_save()
                 return True
-            elif clicked is btn_discard:
+            elif choice == 1:  # 放弃
                 return True
-            else:  # Cancel
+            else:  # 取消 / 关闭
                 return False
 
         return True
@@ -930,26 +933,28 @@ class FileLoader:
 
     def _prompt_nicokara_ruby_choice(self):
         """Nicokara 格式注音处理弹窗（三选一）"""
-        msg = QMessageBox(self._editor)
-        msg.setWindowTitle(self._editor.tr("Nicokara 格式检测"))
-        msg.setText(self._editor.tr("检测到 Nicokara 格式歌词（已包含注音）。"))
-        msg.setInformativeText(self._editor.tr(
-            "「保留原有注音」使用文件中的 @Ruby 注音。\n"
-            "「全部重新分析」清除原有注音，使用自动分析。\n"
-            "「仅分析未注音字符」保留已有注音，补充缺失的。"
-        ))
-        btn_keep = msg.addButton(self._editor.tr("保留原有注音"), QMessageBox.ButtonRole.AcceptRole)
-        btn_all = msg.addButton(self._editor.tr("全部重新分析"), QMessageBox.ButtonRole.DestructiveRole)
-        btn_only_noruby = msg.addButton(self._editor.tr("仅分析未注音字符"), QMessageBox.ButtonRole.ActionRole)
-        msg.setDefaultButton(btn_keep)
-        msg.exec()
-
-        clicked = msg.clickedButton()
-        if clicked is btn_all:
+        choice = message_choice(
+            self._editor,
+            self._editor.tr("Nicokara 格式检测"),
+            self._editor.tr("检测到 Nicokara 格式歌词（已包含注音）。")
+            + "\n\n"
+            + self._editor.tr(
+                "「保留原有注音」使用文件中的 @Ruby 注音。\n"
+                "「全部重新分析」清除原有注音，使用自动分析。\n"
+                "「仅分析未注音字符」保留已有注音，补充缺失的。"
+            ),
+            [
+                self._editor.tr("保留原有注音"),
+                self._editor.tr("全部重新分析"),
+                self._editor.tr("仅分析未注音字符"),
+            ],
+            default=0,
+        )
+        if choice == 1:  # 全部重新分析
             self._editor._auto_analyze_rubies(only_noruby=False, auto_detect_chinese=True)
-        elif clicked is btn_only_noruby:
+        elif choice == 2:  # 仅分析未注音字符
             self._editor._auto_analyze_rubies(only_noruby=True, auto_detect_chinese=True)
-        elif clicked is btn_keep:
+        elif choice == 0:  # 保留原有注音
             self._keep_nicokara_as_imported()
 
     def _keep_nicokara_as_imported(self):

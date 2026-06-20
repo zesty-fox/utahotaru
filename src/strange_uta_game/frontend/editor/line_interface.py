@@ -7,7 +7,6 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QTableWidgetItem,
     QAbstractItemView,
-    QMessageBox,
 )
 from PyQt6.QtCore import Qt, QEvent
 from PyQt6.QtGui import QFont, QColor, QKeyEvent, QKeySequence
@@ -32,6 +31,7 @@ from strange_uta_game.backend.infrastructure.parsers.annotated_text import (
     parse_timed_line,
 )
 from strange_uta_game.frontend.theme import theme
+from strange_uta_game.frontend.fluent_widgets import message_question
 import re
 
 
@@ -993,15 +993,13 @@ class EditInterface(QWidget):
             return
 
         if len(selected_sentences) > 1:
-            msg = QMessageBox(self)
-            msg.setWindowTitle(self.tr("确认删除"))
-            msg.setText(self.tr("确定要删除选中的 {n} 行吗？").format(n=len(selected_sentences)))
-            btn_yes = msg.addButton(self.tr("是"), QMessageBox.ButtonRole.AcceptRole)
-            msg.addButton(self.tr("否"), QMessageBox.ButtonRole.RejectRole)
-            msg.setDefaultButton(btn_yes)
-            msg.exec()
-            clicked = msg.clickedButton()
-            if clicked is not btn_yes:
+            if not message_question(
+                self,
+                self.tr("确认删除"),
+                self.tr("确定要删除选中的 {n} 行吗？").format(n=len(selected_sentences)),
+                yes_text=self.tr("是"),
+                no_text=self.tr("否"),
+            ):
                 return
 
         for sentence in selected_sentences:

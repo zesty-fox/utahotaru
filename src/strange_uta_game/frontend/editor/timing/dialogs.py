@@ -16,7 +16,6 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
     QFormLayout,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -64,6 +63,7 @@ from qfluentwidgets import (
 )
 
 from strange_uta_game.frontend.theme import theme, ThemeColors
+from strange_uta_game.frontend.fluent_widgets import FluentGroupBox
 
 from strange_uta_game.backend.infrastructure.exporters.nicokara_exporter import (
     strip_variation_selectors,
@@ -98,7 +98,7 @@ def _set_ruby_split_mode(mode: str) -> None:
         pass
 
 
-def _create_ruby_split_group(parent: QWidget) -> tuple[QRadioButton, QRadioButton, QRadioButton, QGroupBox]:
+def _create_ruby_split_group(parent: QWidget) -> tuple[QRadioButton, QRadioButton, QRadioButton, FluentGroupBox]:
     """创建注音分段方式选择组
 
     Returns:
@@ -107,10 +107,10 @@ def _create_ruby_split_group(parent: QWidget) -> tuple[QRadioButton, QRadioButto
     from PyQt6.QtCore import QCoreApplication
     # 显式 QCoreApplication.translate 让 .ts 抽取器以 "RubySplit" 为上下文
     # 收录源串（lambda 包装时抽取器无法跟踪到内嵌上下文名）。
-    group_box = QGroupBox(
+    group_box = FluentGroupBox(
         QCoreApplication.translate("RubySplit", "注音分段方式")
     )
-    group_layout = QVBoxLayout(group_box)
+    group_layout = group_box.contentLayout
 
     radio_direct = RadioButton(QCoreApplication.translate(
         "RubySplit", "直接应用（用逗号手动分段，无逗号则不分段）"
@@ -1279,8 +1279,8 @@ class SetSingerByLineDialog(QDialog):
         layout.addLayout(select_layout)
 
         # 演唱者选择区（名称过滤 + 分组过滤 + 列表预览）
-        singer_group = QGroupBox(self.tr("设置演唱者为"), self)
-        sg_layout = QVBoxLayout(singer_group)
+        singer_group = FluentGroupBox(self.tr("设置演唱者为"), self)
+        sg_layout = singer_group.contentLayout
         sg_layout.setSpacing(4)
 
         # 过滤行
@@ -1661,8 +1661,8 @@ class CompleteTimestampDialog(QDialog):
         layout.addWidget(desc_label)
 
         # 第二行：适用范围（多选）
-        scope_group = QGroupBox(self.tr("适用范围"))
-        scope_layout = QVBoxLayout(scope_group)
+        scope_group = FluentGroupBox(self.tr("适用范围"))
+        scope_layout = scope_group.contentLayout
 
         self._scope_checkboxes: dict[str, QCheckBox] = {}
         # 显示侧逐项显式 self.tr 以便 .ts 抽取器把源串归入本类上下文
@@ -1689,8 +1689,8 @@ class CompleteTimestampDialog(QDialog):
         layout.addWidget(scope_group)
 
         # 第三行：排除规则（多选）
-        exclude_group = QGroupBox(self.tr("排除规则"))
-        exclude_layout = QVBoxLayout(exclude_group)
+        exclude_group = FluentGroupBox(self.tr("排除规则"))
+        exclude_layout = exclude_group.contentLayout
 
         self._exclude_checkboxes: dict[str, CheckBox] = {}
         exclude_items: list[tuple[str, str]] = [
@@ -1706,8 +1706,9 @@ class CompleteTimestampDialog(QDialog):
         layout.addWidget(exclude_group)
 
         # 第四行：边界时间戳偏移设置
-        offset_group = QGroupBox(self.tr("边界时间戳偏移"))
-        offset_layout = QFormLayout(offset_group)
+        offset_group = FluentGroupBox(self.tr("边界时间戳偏移"))
+        offset_layout = QFormLayout()
+        offset_group.contentLayout.addLayout(offset_layout)
 
         self._edit_head_offset = LineEdit(self)
         self._edit_head_offset.setText(str(self._saved_head_offset_ms))
@@ -1947,8 +1948,9 @@ class SeparateSymbolTimestampDialog(QDialog):
         layout.addWidget(desc)
 
         # 符号分组选择（两列布局）
-        group_box = QGroupBox(self.tr("适用符号分组"))
-        group_hlayout = QHBoxLayout(group_box)
+        group_box = FluentGroupBox(self.tr("适用符号分组"))
+        group_hlayout = QHBoxLayout()
+        group_box.contentLayout.addLayout(group_hlayout)
         mid = (len(_SEPARATE_SYM_GROUPS) + 1) // 2
         left_col = QVBoxLayout()
         right_col = QVBoxLayout()
@@ -1980,8 +1982,9 @@ class SeparateSymbolTimestampDialog(QDialog):
         layout.addLayout(sel_row)
 
         # 补偿设置
-        comp_box = QGroupBox(self.tr("补偿时间戳"))
-        comp_form = QFormLayout(comp_box)
+        comp_box = FluentGroupBox(self.tr("补偿时间戳"))
+        comp_form = QFormLayout()
+        comp_box.contentLayout.addLayout(comp_form)
 
         self.spin_pre_comp = SpinBox(self)
         self.spin_pre_comp.setRange(0, 9999)

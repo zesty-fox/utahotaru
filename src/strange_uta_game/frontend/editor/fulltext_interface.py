@@ -13,7 +13,6 @@ from PyQt6.QtWidgets import (
     QPlainTextEdit,
     QTextEdit,
     QDialog,
-    QMessageBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QRect, QSize, QEvent
 from PyQt6.QtGui import (
@@ -55,6 +54,7 @@ from strange_uta_game.backend.infrastructure.parsers.text_splitter import (
     CharType,
     get_char_type,
 )
+from strange_uta_game.frontend.fluent_widgets import message_choice
 
 
 def _ruby_is_all_hiragana(ruby_text: str) -> bool:
@@ -940,25 +940,21 @@ class RubyInterface(QWidget):
                 return
 
         # 三选项对话框
-        msg = QMessageBox(self)
-        msg.setWindowTitle(self.tr("自动分析全部注音"))
-        msg.setText(self.tr("请选择分析范围："))
-        msg.setInformativeText(self.tr(
-            "「全部重新分析」会覆盖现有注音。\n"
-            "「仅分析未注音字符」会保留已有的人工/字典注音。"
-        ))
-        btn_all = msg.addButton(self.tr("全部重新分析"), QMessageBox.ButtonRole.DestructiveRole)
-        btn_only_noruby = msg.addButton(
-            self.tr("仅分析未注音字符"), QMessageBox.ButtonRole.AcceptRole
+        choice = message_choice(
+            self,
+            self.tr("自动分析全部注音"),
+            self.tr("请选择分析范围：")
+            + "\n\n"
+            + self.tr(
+                "「全部重新分析」会覆盖现有注音。\n"
+                "「仅分析未注音字符」会保留已有的人工/字典注音。"
+            ),
+            [self.tr("全部重新分析"), self.tr("仅分析未注音字符"), self.tr("取消")],
+            default=1,
         )
-        btn_cancel = msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
-        msg.setDefaultButton(btn_only_noruby)
-        msg.exec()
-
-        clicked = msg.clickedButton()
-        if clicked is btn_cancel or clicked is None:
+        if choice in (-1, 2):
             return
-        only_noruby = clicked is btn_only_noruby
+        only_noruby = choice == 1
 
         auto_check = self._create_auto_check_service()
         # LLM 注音时是否仍应用用户词典（非 LLM 模式恒为 True）。

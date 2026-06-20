@@ -12,9 +12,6 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QListWidget,
     QListWidgetItem,
-    QCheckBox,
-    QGroupBox,
-    QMessageBox,
     QDialog,
     QTextEdit,
 )
@@ -29,6 +26,7 @@ from qfluentwidgets import (
     ScrollArea,
     SimpleCardWidget,
     CheckBox,
+    setCustomStyleSheet,
     TitleLabel,
     SubtitleLabel,
     BodyLabel,
@@ -46,6 +44,7 @@ from strange_uta_game.frontend.settings.settings_interface import (
     NicokaraTagsDialog,
 )
 from strange_uta_game.frontend.theme import theme as _theme
+from strange_uta_game.frontend.fluent_widgets import FluentGroupBox, message_question
 
 
 class RubyMismatchDialog(QDialog):
@@ -230,8 +229,8 @@ class ExportInterface(QWidget):
         right_layout.addWidget(self.btn_tags)
 
         # 演唱者选择区域（仅 Nicokara 格式显示）
-        self._singer_group = QGroupBox(self.tr("演唱者过滤"))
-        singer_group_layout = QVBoxLayout(self._singer_group)
+        self._singer_group = FluentGroupBox(self.tr("演唱者过滤"))
+        singer_group_layout = self._singer_group.contentLayout
         singer_group_layout.setSpacing(6)
 
         singer_hint = CaptionLabel(self.tr("勾选要导出的演唱者（不勾选则导出全部）"))
@@ -541,9 +540,11 @@ class ExportInterface(QWidget):
                 continue
             chk = CheckBox(f"{singer.name}")
             chk.setProperty("singer_id", singer.id)
-            chk.setStyleSheet(
-                f"QCheckBox {{ color: {singer.color}; font-weight: bold; }}"
-            )
+            # 用 setCustomStyleSheet 追加（而非 setStyleSheet 替换）演唱者专属
+            # 文字色，保留 qfluentwidgets CheckBox 自管理的勾选框 QSS，使其在
+            # 主题切换时仍被正常接管、不退化。
+            _singer_qss = f"CheckBox {{ color: {singer.color}; font-weight: bold; }}"
+            setCustomStyleSheet(chk, _singer_qss, _singer_qss)
             self._singer_checkbox_container.addWidget(chk)
             self._singer_checkboxes.append(chk)
 
@@ -690,15 +691,16 @@ class ExportInterface(QWidget):
                 if len(needs_guide_marks) > 10
                 else ""
             )
-            msg = QMessageBox(self)
-            msg.setIcon(QMessageBox.Icon.Warning)
-            msg.setWindowTitle(self.tr("仍有导唱待办未处理"))
-            msg.setText(self.tr("还剩 {n} 个标记点未添加导唱符。").format(n=len(needs_guide_marks)))
-            msg.setInformativeText("\n".join(preview_lines) + extra)
-            btn_continue = msg.addButton(self.tr("继续导出"), QMessageBox.ButtonRole.AcceptRole)
-            msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
-            msg.exec()
-            if msg.clickedButton() is not btn_continue:
+            if not message_question(
+                self,
+                self.tr("仍有导唱待办未处理"),
+                self.tr("还剩 {n} 个标记点未添加导唱符。").format(n=len(needs_guide_marks))
+                + "\n\n"
+                + "\n".join(preview_lines)
+                + extra,
+                yes_text=self.tr("继续导出"),
+                no_text=self.tr("取消"),
+            ):
                 return
 
         # 导出前验证
@@ -756,14 +758,15 @@ class ExportInterface(QWidget):
 
         # 检查文件是否已存在
         if Path(filepath).exists():
-            msg = QMessageBox(self)
-            msg.setWindowTitle(self.tr("文件已存在"))
-            msg.setText(self.tr("文件已存在：\n{filename}").format(filename=filename))
-            msg.setInformativeText(self.tr("是否覆盖该文件？"))
-            btn_overwrite = msg.addButton(self.tr("覆盖"), QMessageBox.ButtonRole.AcceptRole)
-            msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
-            msg.exec()
-            if msg.clickedButton() != btn_overwrite:
+            if not message_question(
+                self,
+                self.tr("文件已存在"),
+                self.tr("文件已存在：\n{filename}").format(filename=filename)
+                + "\n\n"
+                + self.tr("是否覆盖该文件？"),
+                yes_text=self.tr("覆盖"),
+                no_text=self.tr("取消"),
+            ):
                 return
 
         result = self._export_service.export(

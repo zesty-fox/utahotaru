@@ -33,7 +33,6 @@ from PyQt6.QtWidgets import (
     QLabel,
     QListWidget,
     QListWidgetItem,
-    QMessageBox,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -49,6 +48,7 @@ from strange_uta_game.backend.infrastructure.network_dictionary import (
     fetch_source_entries,
     import_file_to_entries,
 )
+from strange_uta_game.frontend.fluent_widgets import message_question
 
 
 _LOCAL_LABEL = "📒 本地词典"
@@ -513,10 +513,10 @@ class NetworkDictionaryDialog(QDialog):
         if src.get("builtin"):
             self._warn(self.tr("内置预设不可删除（可在表格里关闭其启用开关）"))
             return
-        if (
-            QMessageBox.question(self, self.tr("确认"),
-                                 self.tr("删除源 {name}？").format(name=src.get('name', '')))
-            != QMessageBox.StandardButton.Yes
+        if not message_question(
+            self,
+            self.tr("确认"),
+            self.tr("删除源 {name}？").format(name=src.get('name', '')),
         ):
             return
         sid = src.get("id")

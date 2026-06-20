@@ -7,7 +7,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QEvent, Qt, QProcess, QUrl
 from PyQt6.QtGui import QDesktopServices, QFont
-from PyQt6.QtWidgets import QApplication, QFileDialog, QHBoxLayout, QMessageBox, QWidget
+from PyQt6.QtWidgets import QApplication, QFileDialog, QHBoxLayout, QWidget
 from qfluentwidgets import (
     FluentIcon as FIF,
     InfoBar, InfoBarPosition,
