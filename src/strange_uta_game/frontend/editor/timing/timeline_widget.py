@@ -656,6 +656,9 @@ class TimelineWidget(QWidget):
         zoom = self._slider_to_zoom(value)
         self.waveform_display.set_zoom(zoom)
         self.zoom_label.setText(f"{zoom:.1f}x")
+        # set_zoom 不发 zoom_changed 信号（仅 Alt+滚轮缩放才发），故缩放滑条
+        # 改变后需在此显式刷新滚动条 pageStep/range，使滑块长度跟随缩放比例。
+        self._update_scroll_bar_metrics()
 
     def _on_scroll_bar_changed(self, value: int):
         self.waveform_display._suspend_auto_scroll()
