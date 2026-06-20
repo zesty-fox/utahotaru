@@ -1142,6 +1142,7 @@
   "选择导出目录": "Choose export directory",
   "选择导出目录...": "Choose export directory...",
   "选择或输入分组名称（留空则清除分组）：": "Pick or type a group name (empty = clear group):",
+  "留空则清除分组": "Empty = clear group",
   "选择按键音音效风格": "Choose key-sound style",
   "选择服务商的接口形态：Chat Completions 覆盖大多数（含本地 Ollama/LM Studio）；Anthropic 用 /v1/messages；Responses 用 /v1/responses（OpenAI 新接口）": "Choose provider API format: Chat Completions covers most cases (incl. local Ollama/LM Studio). Anthropic uses /v1/messages. Responses uses /v1/responses (OpenAI new API).",
   "选择歌词文件": "Choose lyrics file",

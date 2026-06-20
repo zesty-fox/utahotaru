@@ -1112,6 +1112,7 @@
   "选择导出目录": "書き出しディレクトリを選択",
   "选择导出目录...": "書き出しディレクトリを選択...",
   "选择或输入分组名称（留空则清除分组）：": "グループ名を選択または入力（空欄でグループ解除）：",
+  "留空则清除分组": "空欄でグループ解除",
   "选择按键音音效风格": "キー音効果スタイルを選択",
   "选择服务商的接口形态：Chat Completions 覆盖大多数（含本地 Ollama/LM Studio）；Anthropic 用 /v1/messages；Responses 用 /v1/responses（OpenAI 新接口）": "プロバイダの API 形式を選択：Chat Completions は大多数に対応（ローカル Ollama/LM Studio 含む）。Anthropic は /v1/messages、Responses は /v1/responses（OpenAI の新 API）。",
   "选择歌词文件": "歌詞ファイルを選択",
