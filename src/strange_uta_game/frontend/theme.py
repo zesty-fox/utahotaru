@@ -331,6 +331,19 @@ class Theme(QObject):
         # 检测初始系统主题
         self._detect_system_theme()
 
+        # 启动时强制同步一次 QApplication palette，使其与解析出的主题一致。
+        #
+        # 必要性：qfluentwidgets 的 setTheme 只改自有控件的 QSS，不改 QPalette；
+        # 而 Win10 上 Qt 平台层不会跟随系统深色模式自动写入暗色 palette（Win11
+        # 才会，且通过 colorSchemeChanged → _reapply_win11_appearance 矫正）。
+        # 若此处不主动同步，Win10 深色模式下 QDialog / QWidget 等依赖 palette
+        # 渲染背景的容器仍保持浅色（Window=#f3f3f3、Base=#fff），而 qfluentwidgets
+        # 深色 LineEdit/TextEdit 的背景是 6% 半透明白 + 白色文字，叠在浅色容器上
+        # 就呈现「白底白字」无法使用。AUTO 模式下 mode setter 会因 mode 未变而
+        # 提前 return，_apply_theme_change（含 _sync_app_palette）不会触发，故必须
+        # 在此显式同步一次。
+        self._sync_app_palette()
+
         # 监听系统主题变化
         self._setup_system_theme_listener()
 
