@@ -541,8 +541,23 @@ def parse_timed_line(
                 name = line_text[i + 1 : close]
                 if name == DEFAULT_SINGER_LABEL:
                     current = default_singer_id
-                else:
-                    current = name_map.get(name, current)
+                    i = close + 1
+                    continue
+                if name in name_map:
+                    current = name_map[name]
+                    i = close + 1
+                    continue
+                # 未知演唱者名（不在项目设置中）→ 整个 【名】 当普通字符，
+                # 不静默丢弃（与不合规 [xxx] 的容错处理一致）。
+                for literal_ch in line_text[i : close + 1]:
+                    ch = Character(char=literal_ch, singer_id=current or "")
+                    if pending_starts:
+                        ch.check_count = len(pending_starts)
+                        ch.timestamps = _build_timestamps(pending_starts)
+                        pending_starts = []
+                    else:
+                        ch.check_count = 0
+                    chars.append(ch)
                 i = close + 1
                 continue
 
