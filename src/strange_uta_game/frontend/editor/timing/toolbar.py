@@ -48,6 +48,10 @@ class EditorToolBar(QFrame):
     adjust_raw_timestamp_clicked = pyqtSignal()          # 整体调整原始时间戳
     adjust_raw_timestamp_line_clicked = pyqtSignal()     # 按行调整原始时间戳
     adjust_raw_timestamp_selected_clicked = pyqtSignal() # 调整所选字符原始时间戳
+    delete_all_timestamps_clicked = pyqtSignal()           # 删除所有时间戳
+    delete_all_timestamps_keep_head_clicked = pyqtSignal() # 删除所有时间戳（保留行首）
+
+    delete_timestamps_selected_clicked = pyqtSignal()      # 删除所选范围时间戳
     offset_changed = pyqtSignal(int)  # 偏移量变化（毫秒）
 
     def __init__(self, parent=None):
@@ -145,6 +149,11 @@ class EditorToolBar(QFrame):
         ts_menu.addAction(Action(FIF.DATE_TIME, tr("调整原始时间戳"), self, triggered=self.adjust_raw_timestamp_clicked.emit))
         ts_menu.addAction(Action(FIF.DATE_TIME, tr("按行调整原始时间戳"), self, triggered=self.adjust_raw_timestamp_line_clicked.emit))
         ts_menu.addAction(Action(FIF.DATE_TIME, tr("调整所选字符原始时间戳"), self, triggered=self.adjust_raw_timestamp_selected_clicked.emit))
+        ts_menu.addSeparator()
+        ts_menu.addAction(Action(FIF.DELETE, tr("删除所有时间戳"), self, triggered=self.delete_all_timestamps_clicked.emit))
+        ts_menu.addAction(Action(FIF.DELETE, tr("删除所有时间戳（保留行首）"), self, triggered=self.delete_all_timestamps_keep_head_clicked.emit))
+
+        ts_menu.addAction(Action(FIF.DELETE, tr("删除所选范围时间戳"), self, triggered=self.delete_timestamps_selected_clicked.emit))
         self.btn_timestamp.setMenu(ts_menu)
         layout.addWidget(self.btn_timestamp)
 

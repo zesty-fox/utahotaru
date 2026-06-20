@@ -7961,7 +7961,7 @@ This usually means an incomplete install; please reinstall or contact the develo
     </message>
     <message>
         <source>更新完成</source>
-        <translation>Update complete</translation>
+        <translation>Update done</translation>
     </message>
     <message>
         <source>更新完成，即将关闭…</source>

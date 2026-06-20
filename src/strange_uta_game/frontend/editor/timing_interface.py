@@ -361,6 +361,10 @@ class EditorInterface(QWidget):
         self.toolbar.adjust_raw_timestamp_clicked.connect(self._on_adjust_raw_timestamp)
         self.toolbar.adjust_raw_timestamp_line_clicked.connect(self._on_adjust_raw_timestamp_line)
         self.toolbar.adjust_raw_timestamp_selected_clicked.connect(self._on_adjust_raw_timestamp_selected)
+        self.toolbar.delete_all_timestamps_clicked.connect(self._on_delete_all_timestamps)
+        self.toolbar.delete_all_timestamps_keep_head_clicked.connect(self._on_delete_all_timestamps_keep_head)
+
+        self.toolbar.delete_timestamps_selected_clicked.connect(self._on_delete_timestamps_selected)
         self.toolbar.offset_changed.connect(self._on_offset_changed)
         layout.addWidget(self.toolbar)
 
@@ -2825,6 +2829,202 @@ class EditorInterface(QWidget):
         else:
             if hasattr(self, "_adjust_ts_sel_dlg") and self._adjust_ts_sel_dlg is not None:
                 self._adjust_ts_sel_dlg.set_status(self.tr("无可调整的时间戳"), success=False)
+
+    # ── 删除时间戳 ──
+
+    def _on_delete_all_timestamps(self):
+        """删除所有时间戳"""
+        if not self._project:
+            InfoBar.warning(
+                title=self.tr("无项目"),
+                content=self.tr("请先创建或打开项目"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+            return
+
+        msg = QMessageBox(self)
+        msg.setIcon(QMessageBox.Icon.Warning)
+        msg.setText(self.tr("确定要删除所有时间戳吗？此操作可撤销。"))
+        msg.addButton(self.tr("删除"), QMessageBox.ButtonRole.AcceptRole)
+        btn_cancel = msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
+        msg.setDefaultButton(btn_cancel)
+        msg.exec()
+        if msg.clickedButton() == btn_cancel:
+            return
+
+        project = self._project
+
+        def _mutate():
+            cleared = 0
+            for sentence in project.sentences:
+                for ch in sentence.characters:
+                    if ch.timestamps or ch.sentence_end_ts is not None:
+                        ch.clear_timestamps()
+                        cleared += 1
+            if cleared == 0:
+                return None
+            return (self._current_line_idx, self.preview._current_char_idx, None, "timetags")
+
+        ok = self._execute_structural_edit("删除所有时间戳", _mutate)
+        if ok:
+            InfoBar.success(
+                title=self.tr("删除完成"),
+                content=self.tr("已删除所有时间戳"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+        else:
+            InfoBar.info(
+                title=self.tr("无时间戳"),
+                content=self.tr("当前项目没有需要删除的时间戳"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+
+    def _on_delete_all_timestamps_keep_head(self):
+        """删除所有时间戳（保留行首）"""
+        if not self._project:
+            InfoBar.warning(
+                title=self.tr("无项目"),
+                content=self.tr("请先创建或打开项目"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+            return
+
+        msg = QMessageBox(self)
+        msg.setIcon(QMessageBox.Icon.Warning)
+        msg.setText(self.tr("确定要删除所有时间戳（保留行首）吗？此操作可撤销。"))
+        msg.addButton(self.tr("删除"), QMessageBox.ButtonRole.AcceptRole)
+        btn_cancel = msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
+        msg.setDefaultButton(btn_cancel)
+        msg.exec()
+        if msg.clickedButton() == btn_cancel:
+            return
+
+        project = self._project
+
+        def _mutate():
+            cleared = 0
+            for sentence in project.sentences:
+                for idx, ch in enumerate(sentence.characters):
+                    if idx == 0:
+                        if ch.sentence_end_ts is not None:
+                            ch.sentence_end_ts = None
+                            ch._update_offset_timestamps()
+                            ch.push_to_ruby()
+                            cleared += 1
+                        continue
+                    if ch.timestamps or ch.sentence_end_ts is not None:
+                        ch.clear_timestamps()
+                        cleared += 1
+            if cleared == 0:
+                return None
+            return (self._current_line_idx, self.preview._current_char_idx, None, "timetags")
+
+        ok = self._execute_structural_edit("删除所有时间戳（保留行首）", _mutate)
+        if ok:
+            InfoBar.success(
+                title=self.tr("删除完成"),
+                content=self.tr("已删除所有时间戳（保留行首）"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+        else:
+            InfoBar.info(
+                title=self.tr("无时间戳"),
+                content=self.tr("当前项目没有需要删除的时间戳"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+
+    def _on_delete_timestamps_selected(self):
+        """删除所选范围时间戳"""
+        if not self._project:
+            InfoBar.warning(
+                title=self.tr("无项目"),
+                content=self.tr("请先创建或打开项目"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+            return
+
+        ranges = self._collect_selected_char_ranges()
+        if not ranges:
+            InfoBar.warning(
+                title=self.tr("未选中字符"),
+                content=self.tr("请先选择要删除时间戳的字符"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+            return
+
+        project = self._project
+
+        def _mutate():
+            cleared = 0
+            for li, s, e in ranges:
+                if li < 0 or li >= len(project.sentences):
+                    continue
+                sentence = project.sentences[li]
+                for ci in range(s, e + 1):
+                    if ci < 0 or ci >= len(sentence.characters):
+                        continue
+                    ch = sentence.characters[ci]
+                    if ch.timestamps or ch.sentence_end_ts is not None:
+                        ch.clear_timestamps()
+                        cleared += 1
+            if cleared == 0:
+                return None
+            return (self._current_line_idx, self.preview._current_char_idx, None, "timetags")
+
+        scope_label = self._format_selected_scope_label(ranges)
+        ok = self._execute_structural_edit("删除所选范围时间戳", _mutate)
+        if ok:
+            InfoBar.success(
+                title=self.tr("删除完成"),
+                content=self.tr("{scope} 的时间戳已删除").format(scope=scope_label),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+        else:
+            InfoBar.info(
+                title=self.tr("无时间戳"),
+                content=self.tr("{scope} 没有需要删除的时间戳").format(scope=scope_label),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
 
     def _execute_complete_timestamp(self, scope_types: set[str], exclude_rules: list[str], head_offset_ms: int = 150, tail_offset_ms: int = 150) -> int:
         """执行补全时间戳的核心逻辑

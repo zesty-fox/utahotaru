@@ -258,7 +258,7 @@ class ExportInterface(QWidget):
         self._singer_checkbox_widget.setAutoFillBackground(False)
         singer_group_layout.addWidget(self._singer_scroll_area)
 
-        self._chk_insert_singer_tags = CheckBox(self.tr("在演唱者切换处插入【演唱者名】标签"))
+        self._chk_insert_singer_tags = CheckBox(self.tr("插入【演唱者名】标签"))
         self._chk_insert_singer_tags.setToolTip(
             self.tr("导出时，当演唱者发生变化，在字符前自动插入演唱者名称标签")
         )
@@ -266,7 +266,7 @@ class ExportInterface(QWidget):
 
         self._chk_insert_singer_each_line = CheckBox(self.tr("->每行行首都插入演唱者"))
         self._chk_insert_singer_each_line.setToolTip(
-            self.tr("每一行开头都插入演唱者名称标签（需先启用「在演唱者切换处插入标签」）")
+            self.tr("每一行开头都插入演唱者名称标签（需先启用「插入【演唱者名】标签」）")
         )
         self._chk_insert_singer_each_line.setEnabled(False)
         self._chk_insert_singer_each_line.hide()
