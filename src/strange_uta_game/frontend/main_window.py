@@ -27,6 +27,12 @@ from strange_uta_game.backend.infrastructure.audio import BassEngine, BassTsmEng
 from strange_uta_game.frontend.project_store import ProjectStore
 from strange_uta_game.frontend.theme import theme
 from strange_uta_game.frontend.fluent_widgets import message_choice, message_question
+from strange_uta_game.frontend.window_sizing import (
+    center_on_screen,
+    clamp_size,
+    fit_min_size,
+    fit_to_screen,
+)
 
 
 class MainWindow(MSFluentWindow):
@@ -223,8 +229,10 @@ class MainWindow(MSFluentWindow):
         self._apply_win10_fallback_bg()
 
         self.setWindowTitle(self.tr("StrangeUtaGame - 歌词打轴工具 Bilibili@不会说话的呆轩cc"))
-        self.setMinimumSize(1200, 800)
-        self.resize(1400, 900)
+        # 最小尺寸与默认尺寸都按当前屏幕可用区域裁剪：在 1080p/高缩放屏上不会
+        # 溢出，也不会出现「最小尺寸大于屏幕、窗口缩不进可视区」的情况。
+        fit_min_size(self, 1200, 800)
+        fit_to_screen(self, 1400, 900)
 
         # 设置窗口图标（左上角 + 任务栏）
         from PyQt6.QtGui import QIcon
@@ -233,14 +241,8 @@ class MainWindow(MSFluentWindow):
         if icon_path:
             self.setWindowIcon(QIcon(icon_path))
 
-        # 居中
-        screen = QApplication.primaryScreen()
-        if screen is not None:
-            geometry = screen.availableGeometry()
-            self.move(
-                (geometry.width() - self.width()) // 2,
-                (geometry.height() - self.height()) // 2,
-            )
+        # 居中到光标所在屏（多显示器下不会强制跳回主屏）
+        center_on_screen(self)
 
         # 应用用户上次的窗口大小/最大化习惯（覆盖上面的默认尺寸）
         self._restore_window_geometry()
@@ -293,15 +295,12 @@ class MainWindow(MSFluentWindow):
         try:
             size = self._win_settings.get("ui.window_size", None)
             if isinstance(size, (list, tuple)) and len(size) == 2:
-                self.resize(int(size[0]), int(size[1]))
-                # 改变尺寸后重新居中
-                screen = QApplication.primaryScreen()
-                if screen is not None:
-                    geo = screen.availableGeometry()
-                    self.move(
-                        (geo.width() - self.width()) // 2,
-                        (geo.height() - self.height()) // 2,
-                    )
+                # 上次保存的尺寸可能是在更大的屏幕上记录的，恢复时同样裁剪到
+                # 当前屏幕，避免换到小屏后窗口超出可视范围。
+                w, h = clamp_size(self, int(size[0]), int(size[1]))
+                self.resize(w, h)
+                # 改变尺寸后重新居中到所在屏
+                center_on_screen(self)
             if self._win_settings.get("ui.window_maximized", False):
                 self.showMaximized()
         except Exception:
