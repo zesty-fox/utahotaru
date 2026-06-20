@@ -168,7 +168,7 @@ class RubyAnalyzeWorker(QObject):
     worker 只负责在自己线程调用 init_apartment 后执行分析计算，避免阻塞 UI。
     """
 
-    progress = pyqtSignal(int, int)    # (current_line, total_lines)
+    progress = pyqtSignal(str, int, int)  # (phase, current_line, total_lines)
     llm_waiting = pyqtSignal()         # LLM 整首批量请求发出、等待返回中
     finished = pyqtSignal(object, int) # (analyzed_project_copy, deleted_count)
     error = pyqtSignal(str)
@@ -199,8 +199,8 @@ class RubyAnalyzeWorker(QObject):
             except Exception:
                 pass
 
-            def _progress_cb(current: int, total: int) -> None:
-                self.progress.emit(current, total)
+            def _progress_cb(phase: str, current: int, total: int) -> None:
+                self.progress.emit(phase, current, total)
 
             # LLM 注音：显式预热整首批量请求，期间发「等待 LLM」信号给 UI。
             _analyzer = getattr(self._auto_check, "_analyzer", None)

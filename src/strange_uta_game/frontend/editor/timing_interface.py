@@ -6295,8 +6295,8 @@ class EditorInterface(QWidget):
         self._ruby_analyze_worker = worker
         self._ruby_analyze_thread = thread
 
-        def _on_progress(current: int, total: int) -> None:
-            state_tooltip.setContent(self.tr("已处理 {current}/{total} 行").format(current=current, total=total))
+        def _on_progress(phase: str, current: int, total: int) -> None:
+            state_tooltip.setContent(f"{phase} {current}/{total}")
 
         def _cleanup() -> None:
             self._ruby_analyze_worker = None
