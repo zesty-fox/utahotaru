@@ -854,3 +854,51 @@ class TestEnglishWordEndSpaceConflict:
             f"'o' (idx=7) 不应 is_sentence_end, 实际 {chars[7].is_sentence_end}"
         )
 
+
+
+class TestAnalyzeUpdateCheckpointsToggle:
+    """`update_checkpoints` 开关：注音管线可选是否重算节奏点。
+
+    用于「不更新节奏点的自动注音分析」入口——只刷注音、保留现有节奏点。
+    """
+
+    def test_sentence_pipeline_skips_checkpoint_update(self, monkeypatch):
+        """update_checkpoints=False 时不应调用 update_checkpoints_from_rubies。"""
+        service = AutoCheckService(DummyAnalyzer())
+        sentence = Sentence.from_text("赤い花", "s1")
+
+        calls = []
+        monkeypatch.setattr(
+            service, "update_checkpoints_from_rubies",
+            lambda *a, **k: calls.append(1),
+        )
+
+        service.analyze_and_apply_sentence_pipeline(
+            sentence, update_checkpoints=False
+        )
+        assert calls == [], "关闭节奏点更新时不应重算节奏点"
+
+        service.analyze_and_apply_sentence_pipeline(
+            sentence, update_checkpoints=True
+        )
+        assert calls == [1], "默认仍应重算节奏点"
+
+    def test_project_pipeline_skips_checkpoint_update(self, monkeypatch):
+        """update_checkpoints=False 时不应调用 update_checkpoints_for_project。"""
+        from strange_uta_game.backend.domain import Project
+
+        service = AutoCheckService(DummyAnalyzer())
+        project = Project()
+        project.sentences.append(Sentence.from_text("赤い花", "s1"))
+
+        calls = []
+        monkeypatch.setattr(
+            service, "update_checkpoints_for_project",
+            lambda *a, **k: calls.append(1),
+        )
+
+        service.analyze_and_apply_pipeline(project, update_checkpoints=False)
+        assert calls == [], "关闭节奏点更新时不应重算节奏点"
+
+        service.analyze_and_apply_pipeline(project, update_checkpoints=True)
+        assert calls == [1], "默认仍应重算节奏点"

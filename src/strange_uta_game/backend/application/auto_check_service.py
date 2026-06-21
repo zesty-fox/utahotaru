@@ -2581,9 +2581,10 @@ class AutoCheckService:
         only_noruby: bool = False,
         apply_user_dict: bool = True,
         delete_types: Optional[List[str]] = None,
+        update_checkpoints: bool = True,
         progress_callback=None,
     ) -> int:
-        """注音分析 → 节奏点更新 → 按类型删除 → 用户词典补回 → 罗马音转换。
+        """注音分析 →（可选）节奏点更新 → 按类型删除 → 用户词典补回 → 罗马音转换。
 
         统一全项目注音分析的完整管线，保证所有入口（新建项目加载、手动重新
         分析、全文本编辑界面分析）走同一路径，避免遗漏或顺序不一致。
@@ -2594,6 +2595,8 @@ class AutoCheckService:
             apply_user_dict: 是否应用用户词典（LLM 模式可关闭）。
             delete_types: 按类型删除注音的类型名列表（如 ``["hiragana"]``）。
                 为空或 None 时跳过删除步骤。
+            update_checkpoints: True=分析后根据注音重算节奏点（默认）；
+                False=只更新注音、保留现有节奏点不动。
             progress_callback: ``(phase, current, total)`` 进度回调。
 
         Returns:
@@ -2609,9 +2612,10 @@ class AutoCheckService:
         )
 
         # Step 2: 根据已有注音更新节奏点（统一 check 规则应用）
-        self.update_checkpoints_for_project(
-            project, progress_callback=progress_callback
-        )
+        if update_checkpoints:
+            self.update_checkpoints_for_project(
+                project, progress_callback=progress_callback
+            )
 
         # Step 3: 按类型删除注音
         deleted_count = 0
@@ -2636,17 +2640,20 @@ class AutoCheckService:
         only_noruby: bool = False,
         restrict_indices: Optional[set] = None,
         apply_user_dict: bool = True,
+        update_checkpoints: bool = True,
     ) -> None:
-        """单句注音分析 → 节奏点更新。
+        """单句注音分析 →（可选）节奏点更新。
 
         统一单句/子集注音分析管线，保证 apply_to_sentence 后一定跟
-        update_checkpoints_from_rubies。
+        update_checkpoints_from_rubies（除非显式关闭）。
 
         Args:
             sentence: 目标句子。
             only_noruby: 仅对未注音字符应用。
             restrict_indices: 仅对这些字符索引应用分析。
             apply_user_dict: 是否应用用户词典。
+            update_checkpoints: True=分析后重算节奏点（默认）；
+                False=只更新注音、保留现有节奏点不动。
         """
         self.apply_to_sentence(
             sentence,
@@ -2654,7 +2661,8 @@ class AutoCheckService:
             restrict_indices=restrict_indices,
             apply_user_dict=apply_user_dict,
         )
-        self.update_checkpoints_from_rubies(sentence)
+        if update_checkpoints:
+            self.update_checkpoints_from_rubies(sentence)
 
     def estimate_check_count(self, text: str) -> int:
         """估算文本的节奏点数量
