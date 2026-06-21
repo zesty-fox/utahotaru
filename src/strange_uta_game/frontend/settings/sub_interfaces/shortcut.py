@@ -25,49 +25,91 @@ class ShortcutSubInterface(SubSettingInterface):
     _SHORTCUT_ACTIONS: list = [
         # (key, icon, title, content, default_timing, default_edit, scope,
         #  timing_content, edit_content, readonly)
+        #
+        # 顺序按功能分组（同类相邻）；不可修改的固定功能集中在列表最底部。
+        # 工具栏（EditorToolBar）里的每个功能都在此登记，可在快捷键设置中自定义；
+        # 工具栏功能默认不绑定按键（留空），由用户按需设置。
+
+        # ── 播放控制 ──
         ("play_pause", FIF.PLAY, "播放/暂停", "切换播放和暂停", "D:short", "D:short", "both", None, None, False),
         ("stop", FIF.PAUSE, "停止", "停止播放", "S:short", "S:short", "both", None, None, False),
         ("speed_down", FIF.SPEED_OFF, "减速", "降低播放速度", "Q:short", "Q:short", "both", None, None, False),
         ("speed_up", FIF.SPEED_HIGH, "加速", "提高播放速度", "W:short", "W:short", "both", None, None, False),
         ("volume_up", FIF.VOLUME, "音量增大", "增大播放音量", "", "", "both", None, None, False),
         ("volume_down", FIF.MUTE, "音量减小", "减小播放音量", "", "", "both", None, None, False),
+
+        # ── 导航与跳转 ──
         ("nav_prev_line", FIF.UP, "上一行", "移动到上一歌词行", "UP:short", "UP:short", "both", None, None, False),
         ("nav_next_line", FIF.DOWN, "下一行", "移动到下一歌词行", "DOWN:short", "DOWN:short", "both", None, None, False),
         ("nav_prev_char", FIF.LEFT_ARROW, "上一字符", "在当前行内移动到上一个字符；若已在首字符则跳到上一行末字符", "LEFT:short", "LEFT:short", "both", None, None, False),
         ("nav_next_char", FIF.RIGHT_ARROW, "下一字符", "在当前行内移动到下一个字符；若已在末字符则跳到下一行首字符", "RIGHT:short", "RIGHT:short", "both", None, None, False),
-        ("cycle_checkpoint_prev", FIF.SYNC, "切换字内节奏点（反向）", "在当前字符的多个节奏点之间反向循环切换（Alt+←）", "ALT+LEFT:short", "ALT+LEFT:short", "both", None, None, False),
-        ("timestamp_up", FIF.UP, "时间戳+步长", "增加选中节奏点时间戳", "ALT+UP:short", "ALT+UP:short", "both", None, None, False),
-        ("timestamp_down", FIF.DOWN, "时间戳-步长", "减少选中节奏点时间戳", "ALT+DOWN:short", "ALT+DOWN:short", "both", None, None, False),
-        ("cycle_checkpoint", FIF.SYNC, "切换字内节奏点", "在当前字符的多个节奏点之间循环切换（Alt+→）", "ALT+RIGHT:short", "ALT+RIGHT:short", "both", None, None, False),
-        ("edit_ruby", FIF.EDIT, "注音编辑", "编辑当前字符注音", "F2:short", "F2:short", "both", None, None, False),
-        ("toggle_word_join", FIF.LINK, "连词", "连词/取消连词；划选多个字符时：全未连词则整段连为一个词，否则整段取消连词", "F3:short", "F3:short", "both", None, None, False),
+        ("seek_back", FIF.LEFT_ARROW, "后退", "后退跳转【仅打轴模式】", "Z:short", "", "timing_only", None, None, False),
+        ("seek_forward", FIF.CHEVRON_RIGHT, "前进", "前进跳转【仅打轴模式】", "X:short", "", "timing_only", None, None, False),
+
+        # ── 打轴与时间戳微调 ──
         ("tag_now", FIF.PLAY, "打轴键", "打轴操作的按键【仅打轴模式】", "Space:short", "", "timing_only", None, None, False),
         ("tag_now_extra", FIF.PLAY, "打轴键 Extra", "打轴操作的备用按键【仅打轴模式】", "", "", "timing_only", None, None, False),
         ("tag_and_delete_next", FIF.PLAY, "打轴并删除下一节奏点", "记录当前节奏点时间戳，同时删除下一个节奏点本身（减少 check_count），光标跳至原第三个节奏点【仅打轴模式】", "", "", "timing_only", None, None, False),
         ("tag_now_editor", FIF.PLAY, "打轴键（编辑模式）", "编辑模式下打轴：记录当前进度条时间戳至当前节奏点【仅编辑模式】", "", "", "edit_only", None, None, False),
         ("tag_now_extra_editor", FIF.PLAY, "打轴键 Extra（编辑模式）", "编辑模式下打轴（备用键）：记录当前进度条时间戳至当前节奏点【仅编辑模式】", "", "", "edit_only", None, None, False),
-        ("seek_back", FIF.LEFT_ARROW, "后退", "后退跳转【仅打轴模式】", "Z:short", "", "timing_only", None, None, False),
-        ("seek_forward", FIF.CHEVRON_RIGHT, "前进", "前进跳转【仅打轴模式】", "X:short", "", "timing_only", None, None, False),
         ("delete_timestamp", FIF.DELETE, "删除当前时间戳并回滚", "删除跳转【仅打轴模式】", "Backspace:short", "", "timing_only", None, None, False),
+        ("timestamp_up", FIF.UP, "时间戳+步长", "增加选中节奏点时间戳", "ALT+UP:short", "ALT+UP:short", "both", None, None, False),
+        ("timestamp_down", FIF.DOWN, "时间戳-步长", "减少选中节奏点时间戳", "ALT+DOWN:short", "ALT+DOWN:short", "both", None, None, False),
+
+        # ── 节奏点与句尾 ──
         ("add_checkpoint", FIF.PIN, "增加节奏点", "增加当前字符的节奏点数量", "F5:short", "Space:short", "split", "增加当前字符的节奏点数量（默认 [）", "增加当前字符的节奏点数量（默认 Space）", False),
         ("remove_checkpoint", FIF.REMOVE, "删除节奏点", "减少当前字符的节奏点数量", "F6:short", "Backspace:short", "split", "减少当前字符的节奏点数量（默认 ]", "减少当前字符的节奏点数量（默认 Backspace）", False),
+        ("cycle_checkpoint", FIF.SYNC, "切换字内节奏点", "在当前字符的多个节奏点之间循环切换（Alt+→）", "ALT+RIGHT:short", "ALT+RIGHT:short", "both", None, None, False),
+        ("cycle_checkpoint_prev", FIF.SYNC, "切换字内节奏点（反向）", "在当前字符的多个节奏点之间反向循环切换（Alt+←）", "ALT+LEFT:short", "ALT+LEFT:short", "both", None, None, False),
+        ("clear_all_checkpoints", FIF.DELETE, "清除所有节奏点", "删除当前字符全部节奏点并取消句尾标记（cc=0，is_sentence_end=False）", "", "", "both", None, None, False),
         ("toggle_line_end", FIF.TAG, "切换句尾", "切换当前字符的句尾标记", "F4:short", ".:short", "split", "切换当前字符的句尾标记（默认 句号）", "切换当前字符的句尾标记（默认 句号）", False),
-        ("bulk_change", FIF.EDIT, "批量变更", "打开批量变更对话框", "CTRL+H:short", "CTRL+H:short", "both", None, None, False),
+        ("timestamps_to_sentence_end", FIF.TAG, "时间戳转句尾", "取消所有节奏点、清除时间戳并标记为句尾", "", "", "both", None, None, False),
+
+        # ── 字符与行编辑 ──
+        ("edit_ruby", FIF.EDIT, "注音编辑", "编辑当前字符注音", "F2:short", "F2:short", "both", None, None, False),
+        ("toggle_word_join", FIF.LINK, "连词", "连词/取消连词；划选多个字符时：全未连词则整段连为一个词，否则整段取消连词", "F3:short", "F3:short", "both", None, None, False),
+        ("insert_space", FIF.ADD, "插入空格", "在当前字符后插入空格", "M:short", "M:short", "both", None, None, False),
         ("modify_char", FIF.EDIT, "修改所选字符", "打开修改所选字符对话框", "", "", "both", None, None, False),
+        ("modify_line", FIF.EDIT, "修改选中行", "打开修改选中行对话框", "", "", "both", None, None, False),
+        ("bulk_change", FIF.EDIT, "批量变更", "打开批量变更对话框", "CTRL+H:short", "CTRL+H:short", "both", None, None, False),
         ("insert_guide", FIF.ADD, "插入导唱符", "打开插入导唱符对话框", "", "", "both", None, None, False),
         ("toggle_needs_guide", FIF.PIN, "切换导唱待办", "切换当前字符的导唱待办标记（在字符左上角显示半透明 ✚，提示稍后需要插入导唱符）", "", "", "both", None, None, False),
-        ("modify_line", FIF.EDIT, "修改选中行", "打开修改选中行对话框", "", "", "both", None, None, False),
+
+        # ── 自动注音 ──
         ("analyze_rubies", FIF.SYNC, "注音分析", "自动分析全部注音", "", "", "both", None, None, False),
         ("analyze_rubies_by_line", FIF.SYNC, "按行注音分析", "仅分析当前行的注音", "", "", "both", None, None, False),
         ("analyze_rubies_selected", FIF.SYNC, "注音分析所选字符", "仅分析当前行选中字符的注音", "", "", "both", None, None, False),
-        ("open_fulltext", FIF.EDIT, "全文本编辑", "打开全文本编辑界面", "CTRL+T:short", "CTRL+T:short", "both", None, None, False),
+        ("analyze_rubies_no_cp", FIF.SYNC, "注音分析（仅注音）", "分析全部注音，但不更新节奏点", "", "", "both", None, None, False),
+        ("analyze_rubies_by_line_no_cp", FIF.SYNC, "按行注音分析（仅注音）", "仅分析当前行注音，但不更新节奏点", "", "", "both", None, None, False),
+        ("analyze_rubies_selected_no_cp", FIF.SYNC, "注音分析所选字符（仅注音）", "仅分析选中字符注音，但不更新节奏点", "", "", "both", None, None, False),
+        ("romanize_all", FIF.FONT, "全部转为罗马字", "将现有注音整体转为罗马字（不更新节奏点、不删除注音）", "", "", "both", None, None, False),
         ("delete_rubies_by_type", FIF.DELETE, "按类型删除注音", "按类型删除注音对话框", "", "", "both", None, None, False),
-        ("set_singer_by_line", FIF.PEOPLE, "按行设置演唱者", "按行批量设置演唱者", "", "", "both", None, None, False),
+
+        # ── 演唱者 ──
+        ("singer_manager", FIF.PEOPLE, "演唱者管理", "打开演唱者管理窗口", "", "", "both", None, None, False),
         ("apply_singer", FIF.PEOPLE, "应用演唱者", "为选中字符设置演唱者", "", "", "both", None, None, False),
-        ("timestamps_to_sentence_end", FIF.TAG, "时间戳转句尾", "取消所有节奏点、清除时间戳并标记为句尾", "", "", "both", None, None, False),
-        ("clear_all_checkpoints", FIF.DELETE, "清除所有节奏点", "删除当前字符全部节奏点并取消句尾标记（cc=0，is_sentence_end=False）", "", "", "both", None, None, False),
+        ("set_singer_by_line", FIF.PEOPLE, "按行设置演唱者", "按行批量设置演唱者", "", "", "both", None, None, False),
+
+        # ── 时间戳工具 ──
+        ("complete_timestamp", FIF.DATE_TIME, "补全时间戳", "为缺失时间戳的字符补全时间戳", "", "", "both", None, None, False),
+        ("separate_symbol_timestamp", FIF.DATE_TIME, "分离符号时间戳", "将符号与相邻字符的时间戳分离", "", "", "both", None, None, False),
+        ("adjust_raw_timestamp", FIF.DATE_TIME, "调整原始时间戳", "整体调整全部原始时间戳", "", "", "both", None, None, False),
+        ("adjust_raw_timestamp_line", FIF.DATE_TIME, "按行调整原始时间戳", "调整当前行的原始时间戳", "", "", "both", None, None, False),
+        ("adjust_raw_timestamp_selected", FIF.DATE_TIME, "调整所选字符原始时间戳", "调整所选字符的原始时间戳", "", "", "both", None, None, False),
+        ("delete_all_timestamps", FIF.DELETE, "删除所有时间戳", "删除项目中全部时间戳", "", "", "both", None, None, False),
+        ("delete_all_timestamps_keep_head", FIF.DELETE, "删除所有时间戳（保留行首）", "删除全部时间戳，但保留每行行首时间戳", "", "", "both", None, None, False),
+        ("delete_timestamps_selected", FIF.DELETE, "删除所选范围时间戳", "删除所选范围内的时间戳", "", "", "both", None, None, False),
+
+        # ── 文件与导出 ──
+        ("new_project", FIF.ADD, "新建项目", "新建空白项目", "", "", "both", None, None, False),
+        ("load_project", FIF.FOLDER, "加载项目", "打开已有项目文件", "", "", "both", None, None, False),
+        ("save_as", FIF.SAVE_AS, "项目另存为", "将当前项目另存为新文件", "", "", "both", None, None, False),
+        ("load_audio", FIF.MUSIC, "加载音频", "加载音频文件", "", "", "both", None, None, False),
+        ("load_lyrics", FIF.DOCUMENT, "加载歌词", "加载歌词文本文件", "", "", "both", None, None, False),
+        ("open_fulltext", FIF.EDIT, "全文本编辑", "打开全文本编辑界面", "CTRL+T:short", "CTRL+T:short", "both", None, None, False),
         ("quick_export", FIF.SHARE, "快捷导出", "使用默认导出格式快速导出到文件", "", "", "both", None, None, False),
-        ("insert_space", FIF.ADD, "插入空格", "在当前字符后插入空格", "M:short", "M:short", "both", None, None, False),
+
+        # ══════════ 以下为固定功能（不可修改快捷键），始终置于列表最底部 ══════════
         ("undo", FIF.CANCEL, "撤销", "撤销操作", "CTRL+Z:short", "CTRL+Z:short", "both", None, None, True),
         ("redo", FIF.SYNC, "重做", "重做操作", "CTRL+Y:short", "CTRL+Y:short", "both", None, None, True),
         ("save", FIF.SAVE, "保存", "保存项目", "CTRL+S:short", "CTRL+S:short", "both", None, None, True),
@@ -179,6 +221,14 @@ class ShortcutSubInterface(SubSettingInterface):
         tr("按行设置演唱者"); tr("应用演唱者")
         tr("时间戳转句尾"); tr("清除所有节奏点")
         tr("快捷导出"); tr("插入空格")
+        # 新增：工具栏功能对应的可设置快捷键 title（默认留空）
+        tr("注音分析（仅注音）"); tr("按行注音分析（仅注音）")
+        tr("注音分析所选字符（仅注音）"); tr("全部转为罗马字")
+        tr("演唱者管理")
+        tr("补全时间戳"); tr("分离符号时间戳")
+        tr("调整原始时间戳"); tr("按行调整原始时间戳"); tr("调整所选字符原始时间戳")
+        tr("删除所有时间戳"); tr("删除所有时间戳（保留行首）"); tr("删除所选范围时间戳")
+        tr("新建项目"); tr("加载项目"); tr("项目另存为"); tr("加载音频"); tr("加载歌词")
         tr("撤销"); tr("重做"); tr("保存"); tr("复制字符")
         tr("粘贴"); tr("插入换行"); tr("合并上一行"); tr("删除字符")
         # content
@@ -220,6 +270,22 @@ class ShortcutSubInterface(SubSettingInterface):
         tr("删除当前字符全部节奏点并取消句尾标记（cc=0，is_sentence_end=False）")
         tr("使用默认导出格式快速导出到文件")
         tr("在当前字符后插入空格")
+        # 新增：工具栏功能对应的 content
+        tr("分析全部注音，但不更新节奏点")
+        tr("仅分析当前行注音，但不更新节奏点")
+        tr("仅分析选中字符注音，但不更新节奏点")
+        tr("将现有注音整体转为罗马字（不更新节奏点、不删除注音）")
+        tr("打开演唱者管理窗口")
+        tr("为缺失时间戳的字符补全时间戳")
+        tr("将符号与相邻字符的时间戳分离")
+        tr("整体调整全部原始时间戳")
+        tr("调整当前行的原始时间戳")
+        tr("调整所选字符的原始时间戳")
+        tr("删除项目中全部时间戳")
+        tr("删除全部时间戳，但保留每行行首时间戳")
+        tr("删除所选范围内的时间戳")
+        tr("新建空白项目"); tr("打开已有项目文件"); tr("将当前项目另存为新文件")
+        tr("加载音频文件"); tr("加载歌词文本文件")
         tr("撤销操作"); tr("重做操作"); tr("保存项目")
         tr("复制选中字符的完整信息")
         tr("无歌词时粘贴整批歌词文本；已有歌词时在光标处插入（复制的字符或纯文本）")
