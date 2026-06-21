@@ -492,11 +492,17 @@ class RubyInterface(QWidget):
         # 批量操作按钮
         batch_layout = QHBoxLayout()
 
-        self.btn_auto_all = PushButton(self.tr("自动分析全部注音"), self)
+        self.btn_auto_all = PushButton(self.tr("自动分析全部注音（更新节奏点）"), self)
         self.btn_auto_all.setIcon(FIF.SYNC)
         self.btn_auto_all.clicked.connect(self._on_auto_analyze_all)
         self.btn_auto_all.setEnabled(False)
         batch_layout.addWidget(self.btn_auto_all)
+
+        self.btn_auto_all_no_cp = PushButton(self.tr("自动分析全部注音（不更新节奏点）"), self)
+        self.btn_auto_all_no_cp.setIcon(FIF.SYNC)
+        self.btn_auto_all_no_cp.clicked.connect(self._on_auto_analyze_all_no_cp)
+        self.btn_auto_all_no_cp.setEnabled(False)
+        batch_layout.addWidget(self.btn_auto_all_no_cp)
 
         self.btn_delete_by_type = PushButton(self.tr("按类型删除注音"), self)
         self.btn_delete_by_type.setIcon(FIF.DELETE)
@@ -795,6 +801,7 @@ class RubyInterface(QWidget):
 
         for btn in (
             self.btn_auto_all,
+            self.btn_auto_all_no_cp,
             self.btn_delete_by_type,
             self.btn_update_cp,
             self.btn_apply,
@@ -913,13 +920,19 @@ class RubyInterface(QWidget):
 
     # ==================== 批量操作 ====================
 
-    def _on_auto_analyze_all(self):
+    def _on_auto_analyze_all_no_cp(self):
+        """自动分析全部注音（不更新节奏点）— 只刷注音、保留现有节奏点。"""
+        self._on_auto_analyze_all(update_checkpoints=False)
+
+    def _on_auto_analyze_all(self, update_checkpoints: bool = True):
         """自动分析全部注音：拆成注音与节奏点两步；节奏点失败不影响注音更新。
 
         弹三选项对话框：
         - 全部重新分析（覆盖已有注音）
         - 仅分析未注音字符（保留已有注音）
         - 取消
+
+        update_checkpoints=False 时只刷注音、保留现有节奏点不动。
         """
         if not self._project:
             return
@@ -940,11 +953,17 @@ class RubyInterface(QWidget):
             if not ensure_winrt_japanese(self):
                 return
 
+        cp_note = (
+            self.tr("（分析后会重算节奏点）")
+            if update_checkpoints
+            else self.tr("（保留现有节奏点不动）")
+        )
         # 三选项对话框
         choice = message_choice(
             self,
             self.tr("自动分析全部注音"),
             self.tr("请选择分析范围：")
+            + cp_note
             + "\n\n"
             + self.tr(
                 "「全部重新分析」会覆盖现有注音。\n"
@@ -967,11 +986,13 @@ class RubyInterface(QWidget):
             auto_check.analyze_and_apply_pipeline(
                 self._project, only_noruby=only_noruby,
                 apply_user_dict=_apply_user_dict,
+                update_checkpoints=update_checkpoints,
             )
             self._refresh_display()
             if hasattr(self, "_store"):
                 self._store.notify("rubies")
-                self._store.notify("checkpoints")
+                if update_checkpoints:
+                    self._store.notify("checkpoints")
             # LLM 注音失败时已回退本地引擎，提示用户。
             _analyzer = getattr(auto_check, "_analyzer", None)
             if getattr(_analyzer, "llm_failed", False):
@@ -984,11 +1005,14 @@ class RubyInterface(QWidget):
                     duration=5000,
                     parent=self,
                 )
+            success_content = (
+                self.tr("已为 {lines} 行自动分析注音并更新节奏点")
+                if update_checkpoints
+                else self.tr("已为 {lines} 行自动分析注音（保留现有节奏点）")
+            ).format(lines=len(self._project.sentences))
             InfoBar.success(
                 title=self.tr("分析完成"),
-                content=self.tr("已为 {lines} 行自动分析注音并更新节奏点").format(
-                    lines=len(self._project.sentences)
-                ),
+                content=success_content,
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -1251,7 +1275,9 @@ class RubyInterface(QWidget):
             self.switch_ch_width.setOffText(self.tr("关"))
         # 按钮
         if hasattr(self, "btn_auto_all"):
-            self.btn_auto_all.setText(self.tr("自动分析全部注音"))
+            self.btn_auto_all.setText(self.tr("自动分析全部注音（更新节奏点）"))
+        if hasattr(self, "btn_auto_all_no_cp"):
+            self.btn_auto_all_no_cp.setText(self.tr("自动分析全部注音（不更新节奏点）"))
         if hasattr(self, "btn_delete_by_type"):
             self.btn_delete_by_type.setText(self.tr("按类型删除注音"))
         if hasattr(self, "btn_update_cp"):
