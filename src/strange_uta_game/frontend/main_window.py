@@ -1346,4 +1346,5 @@ class MainWindow(MSFluentWindow):
         instance._apply_embedded_ui_policy()
         if parent is not None:
             instance.setParent(parent)  # type: ignore[arg-type]
+        instance.winId()
         return instance
