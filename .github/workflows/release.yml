@@ -39,11 +39,11 @@ jobs:
         include:
           - { variant: main,     os: windows-latest, cache: '.runtime-hash-cache.json' }
           - { variant: noWinIME, os: windows-latest, cache: '.runtime-hash-cache-noWinIME.json' }
-          # mac 变体暂不构建：无 BASS 音频引擎 / 无更新器 / 多项功能缺失。待补齐后取消注释。
-          # - { variant: mac,      os: macos-latest,   cache: '.runtime-hash-cache-mac.json' }
+          # mac 变体：已补齐（BASS→SoundDeviceEngine 回落、sudachi 注音、更新器降级为手动下载）。
+          # 首次启用设为 best-effort，待 CI 实跑绿后把本行的 continue-on-error 去掉（恢复硬性 gate）。
+          - { variant: mac,      os: macos-latest,   cache: '.runtime-hash-cache-mac.json', continue-on-error: true }
     runs-on: ${{ matrix.os }}
-    # 未启用 mac 变体，所有变体均不可失败。
-    continue-on-error: false
+    continue-on-error: ${{ matrix.continue-on-error || false }}
     defaults:
       run:
         shell: bash
