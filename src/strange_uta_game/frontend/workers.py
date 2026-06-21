@@ -180,6 +180,7 @@ class RubyAnalyzeWorker(QObject):
         only_noruby: bool,
         delete_types: list,
         llm_apply_user_dict: bool = True,
+        update_checkpoints: bool = True,
     ):
         super().__init__()
         self._project = project_copy
@@ -188,6 +189,8 @@ class RubyAnalyzeWorker(QObject):
         self._delete_types = delete_types
         # LLM 注音时是否仍应用用户词典（非 LLM 模式恒为 True，无副作用）
         self._llm_apply_user_dict = llm_apply_user_dict
+        # False=只刷注音、保留现有节奏点不动
+        self._update_checkpoints = update_checkpoints
 
     def run(self) -> None:
         try:
@@ -213,6 +216,7 @@ class RubyAnalyzeWorker(QObject):
                 only_noruby=self._only_noruby,
                 apply_user_dict=self._llm_apply_user_dict,
                 delete_types=self._delete_types or None,
+                update_checkpoints=self._update_checkpoints,
                 progress_callback=_progress_cb,
             )
 
@@ -243,12 +247,15 @@ class RubySubsetAnalyzeWorker(QObject):
         auto_check,
         specs: list,
         apply_user_dict: bool = True,
+        update_checkpoints: bool = True,
     ):
         super().__init__()
         self._project = project_copy
         self._auto_check = auto_check
         self._specs = specs
         self._apply_user_dict = apply_user_dict
+        # False=只刷注音、保留现有节奏点不动
+        self._update_checkpoints = update_checkpoints
 
     def run(self) -> None:
         try:
@@ -271,6 +278,7 @@ class RubySubsetAnalyzeWorker(QObject):
                     only_noruby=False,
                     restrict_indices=restrict_indices,
                     apply_user_dict=self._apply_user_dict,
+                    update_checkpoints=self._update_checkpoints,
                 )
 
             self.finished.emit(self._project)

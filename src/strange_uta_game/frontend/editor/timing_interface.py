@@ -355,6 +355,9 @@ class EditorInterface(QWidget):
         self.toolbar.analyze_rubies_clicked.connect(self._on_analyze_rubies)
         self.toolbar.analyze_rubies_by_line_clicked.connect(self._on_analyze_rubies_by_line)
         self.toolbar.analyze_rubies_selected_clicked.connect(self._on_analyze_rubies_selected)
+        self.toolbar.analyze_rubies_no_cp_clicked.connect(self._on_analyze_rubies_no_cp)
+        self.toolbar.analyze_rubies_by_line_no_cp_clicked.connect(self._on_analyze_rubies_by_line_no_cp)
+        self.toolbar.analyze_rubies_selected_no_cp_clicked.connect(self._on_analyze_rubies_selected_no_cp)
         self.toolbar.open_fulltext_clicked.connect(self._on_open_fulltext)
         self.toolbar.delete_rubies_by_type_clicked.connect(self._on_delete_rubies_by_type)
         self.toolbar.set_singer_by_line_clicked.connect(self._on_set_singer_by_line)
@@ -6194,7 +6197,8 @@ class EditorInterface(QWidget):
     def refresh_lyric_display(self):
         self.preview._update_display()
 
-    def _auto_analyze_rubies(self, only_noruby: bool = False, auto_detect_chinese: bool = False):
+    def _auto_analyze_rubies(self, only_noruby: bool = False, auto_detect_chinese: bool = False,
+                             update_checkpoints: bool = True):
         """执行注音分析（核心逻辑，供多处复用）。
 
         分析在后台 QThread 中进行，不阻塞 UI。分析结果通过信号回调到主线程，
@@ -6205,6 +6209,8 @@ class EditorInterface(QWidget):
             auto_detect_chinese: True=自动检测纯中文歌词并走中文模式（跳过注音）。
                 仅导入歌词后的自动触发应传 True；用户手动按"注音分析"按钮明确表达了
                 注音意图，应传 False，避免纯汉字日文行被误判为中文。
+            update_checkpoints: True=分析后重算节奏点（默认）；
+                False=只刷注音、保留现有节奏点不动。
         """
         if not self._project:
             return
@@ -6291,6 +6297,7 @@ class EditorInterface(QWidget):
         worker = RubyAnalyzeWorker(
             project_copy, auto_check, only_noruby, delete_types,
             llm_apply_user_dict=llm_apply_user_dict,
+            update_checkpoints=update_checkpoints,
         )
         thread = QThread(self)
         worker.moveToThread(thread)
@@ -6397,15 +6404,24 @@ class EditorInterface(QWidget):
 
         thread.start()
 
-    def _on_analyze_rubies(self):
-        """工具栏「注音分析」— 弹三选项对话框"""
+    def _on_analyze_rubies(self, update_checkpoints: bool = True):
+        """工具栏「注音分析」— 弹三选项对话框
+
+        update_checkpoints=False 时只刷注音、保留现有节奏点不动。
+        """
         if not self._project:
             return
 
+        cp_note = (
+            self.tr("（分析后会重算节奏点）")
+            if update_checkpoints
+            else self.tr("（保留现有节奏点不动）")
+        )
         choice = message_choice(
             self,
             self.tr("自动分析全部注音"),
             self.tr("请选择分析范围：")
+            + cp_note
             + "\n\n"
             + self.tr(
                 "「全部重新分析」会覆盖现有注音。\n"
@@ -6417,7 +6433,13 @@ class EditorInterface(QWidget):
         if choice in (-1, 2):
             return
         only_noruby = choice == 1
-        self._auto_analyze_rubies(only_noruby=only_noruby)
+        self._auto_analyze_rubies(
+            only_noruby=only_noruby, update_checkpoints=update_checkpoints
+        )
+
+    def _on_analyze_rubies_no_cp(self):
+        """工具栏「注音分析（不更新节奏点）」— 只刷注音、保留节奏点。"""
+        self._on_analyze_rubies(update_checkpoints=False)
 
     def _auto_analyze_all_rubies(self):
         """自动分析全部注音（用于歌词导入后重新注音，覆盖已有）"""
@@ -6430,11 +6452,13 @@ class EditorInterface(QWidget):
         label: str,
         *,
         show_winrt_dialog: bool = True,
+        update_checkpoints: bool = True,
     ) -> None:
         """对单行（restrict_indices=None）或行内选定字符执行注音分析（异步）。"""
         self._analyze_rubies_specs_async(
             [(line_idx, restrict_indices)], label,
             show_winrt_dialog=show_winrt_dialog,
+            update_checkpoints=update_checkpoints,
         )
 
     def _analyze_rubies_specs_async(
@@ -6443,6 +6467,7 @@ class EditorInterface(QWidget):
         label: str,
         *,
         show_winrt_dialog: bool = True,
+        update_checkpoints: bool = True,
     ) -> None:
         """对多个指定行/范围批量执行注音分析（后台 QThread，不阻塞 UI）。
 
@@ -6450,13 +6475,17 @@ class EditorInterface(QWidget):
             specs: list of (line_idx, restrict_indices | None)
             label: 用于 InfoBar 标题和 undo 描述
             show_winrt_dialog: False 时 WinRT 不可用则静默跳过（粘贴触发时用）
+            update_checkpoints: True=分析后重算节奏点（默认）；
+                False=只刷注音、保留现有节奏点不动。
         """
         if not self._project or not specs:
             return
         if getattr(self, "_ruby_subset_analyzing", False):
             if not hasattr(self, "_ruby_analysis_queue"):
                 self._ruby_analysis_queue = []
-            self._ruby_analysis_queue.append((list(specs), label, show_winrt_dialog))
+            self._ruby_analysis_queue.append(
+                (list(specs), label, show_winrt_dialog, update_checkpoints)
+            )
             return
 
         from strange_uta_game.backend.application import AutoCheckService
@@ -6530,7 +6559,8 @@ class EditorInterface(QWidget):
             subset_tooltip.show()
 
         worker = RubySubsetAnalyzeWorker(
-            project_copy, auto_check, specs, apply_user_dict=llm_apply_user_dict
+            project_copy, auto_check, specs, apply_user_dict=llm_apply_user_dict,
+            update_checkpoints=update_checkpoints,
         )
         thread = QThread(self)
         worker.moveToThread(thread)
@@ -6543,8 +6573,10 @@ class EditorInterface(QWidget):
             self._ruby_subset_analyze_thread = None
             self._ruby_subset_analyzing = False
             if hasattr(self, "_ruby_analysis_queue") and self._ruby_analysis_queue:
-                ns, nl, nswd = self._ruby_analysis_queue.pop(0)
-                self._analyze_rubies_specs_async(ns, nl, show_winrt_dialog=nswd)
+                ns, nl, nswd, nuc = self._ruby_analysis_queue.pop(0)
+                self._analyze_rubies_specs_async(
+                    ns, nl, show_winrt_dialog=nswd, update_checkpoints=nuc
+                )
 
         def _close_tooltip() -> None:
             if subset_tooltip is not None:
@@ -6621,8 +6653,11 @@ class EditorInterface(QWidget):
         thread.finished.connect(thread.deleteLater)
         thread.start()
 
-    def _on_analyze_rubies_by_line(self):
-        """工具栏「按行注音分析」— 仅分析当前行。"""
+    def _on_analyze_rubies_by_line(self, update_checkpoints: bool = True):
+        """工具栏「按行注音分析」— 仅分析当前行。
+
+        update_checkpoints=False 时只刷注音、保留现有节奏点不动。
+        """
         if not self._project:
             return
         line_idx = self._current_line_idx
@@ -6637,12 +6672,24 @@ class EditorInterface(QWidget):
                 parent=self,
             )
             return
-        self._analyze_rubies_subset(line_idx, None, "按行注音分析")
+        label = "按行注音分析" if update_checkpoints else "按行注音分析（不更新节奏点）"
+        self._analyze_rubies_subset(
+            line_idx, None, label, update_checkpoints=update_checkpoints
+        )
 
-    def _on_analyze_rubies_selected(self):
-        """工具栏「注音分析所选字符」— 分析选中字符范围（支持跨行逐行排队）。"""
+    def _on_analyze_rubies_by_line_no_cp(self):
+        """工具栏「按行注音分析（不更新节奏点）」— 只刷注音、保留节奏点。"""
+        self._on_analyze_rubies_by_line(update_checkpoints=False)
+
+    def _on_analyze_rubies_selected(self, update_checkpoints: bool = True):
+        """工具栏「注音分析所选字符」— 分析选中字符范围（支持跨行逐行排队）。
+
+        update_checkpoints=False 时只刷注音、保留现有节奏点不动。
+        """
         if not self._project:
             return
+
+        label = "注音分析所选字符" if update_checkpoints else "注音分析所选字符（不更新节奏点）"
 
         # 跨行选中：逐行提交，由 _analyze_rubies_specs_async 队列顺序执行
         if self.preview.is_multi_line_selection():
@@ -6666,13 +6713,16 @@ class EditorInterface(QWidget):
             if specs:
                 # 第一行立即执行，后续行加入队列
                 first_li, first_ri = specs[0]
-                self._analyze_rubies_subset(first_li, first_ri, "注音分析所选字符")
+                self._analyze_rubies_subset(
+                    first_li, first_ri, label,
+                    update_checkpoints=update_checkpoints,
+                )
                 if len(specs) > 1:
                     if not hasattr(self, "_ruby_analysis_queue"):
                         self._ruby_analysis_queue = []
                     for li, ri in specs[1:]:
                         self._ruby_analysis_queue.append(
-                            ([(li, ri)], "注音分析所选字符", False)
+                            ([(li, ri)], label, False, update_checkpoints)
                         )
             return
 
@@ -6707,8 +6757,13 @@ class EditorInterface(QWidget):
                 self.preview._focus_char_idx, self.preview._focus_char_range_end
             )
         self._analyze_rubies_subset(
-            line_idx, set(range(start_idx, end_idx + 1)), "注音分析所选字符"
+            line_idx, set(range(start_idx, end_idx + 1)), label,
+            update_checkpoints=update_checkpoints,
         )
+
+    def _on_analyze_rubies_selected_no_cp(self):
+        """工具栏「注音分析所选字符（不更新节奏点）」— 只刷注音、保留节奏点。"""
+        self._on_analyze_rubies_selected(update_checkpoints=False)
 
     def _on_open_fulltext(self):
         """工具栏「全文本编辑」— 以对话框打开全文本注音编辑界面。"""

@@ -36,6 +36,9 @@ class EditorToolBar(QFrame):
     analyze_rubies_clicked = pyqtSignal()
     analyze_rubies_by_line_clicked = pyqtSignal()
     analyze_rubies_selected_clicked = pyqtSignal()
+    analyze_rubies_no_cp_clicked = pyqtSignal()           # 注音分析（不更新节奏点）
+    analyze_rubies_by_line_no_cp_clicked = pyqtSignal()   # 按行注音分析（不更新节奏点）
+    analyze_rubies_selected_no_cp_clicked = pyqtSignal()  # 注音分析所选字符（不更新节奏点）
     open_fulltext_clicked = pyqtSignal()
     modify_char_clicked = pyqtSignal()
     insert_guide_clicked = pyqtSignal()
@@ -110,9 +113,16 @@ class EditorToolBar(QFrame):
         self.btn_ruby.setFixedHeight(32)
         self.btn_ruby.setMinimumWidth(110)
         ruby_menu = RoundMenu(parent=self.btn_ruby)
-        ruby_menu.addAction(Action(FIF.SYNC, tr("注音分析"), self, triggered=self.analyze_rubies_clicked.emit))
-        ruby_menu.addAction(Action(FIF.SYNC, tr("按行注音分析"), self, triggered=self.analyze_rubies_by_line_clicked.emit))
-        ruby_menu.addAction(Action(FIF.SYNC, tr("注音分析所选字符"), self, triggered=self.analyze_rubies_selected_clicked.emit))
+        # 第一组：注音分析并自动更新节奏点
+        ruby_menu.addAction(Action(FIF.SYNC, tr("注音分析（更新节奏点）"), self, triggered=self.analyze_rubies_clicked.emit))
+        ruby_menu.addAction(Action(FIF.SYNC, tr("按行注音分析（更新节奏点）"), self, triggered=self.analyze_rubies_by_line_clicked.emit))
+        ruby_menu.addAction(Action(FIF.SYNC, tr("注音分析所选字符（更新节奏点）"), self, triggered=self.analyze_rubies_selected_clicked.emit))
+        ruby_menu.addSeparator()
+        # 第二组：仅注音分析，保留现有节奏点不动
+        ruby_menu.addAction(Action(FIF.SYNC, tr("注音分析（不更新节奏点）"), self, triggered=self.analyze_rubies_no_cp_clicked.emit))
+        ruby_menu.addAction(Action(FIF.SYNC, tr("按行注音分析（不更新节奏点）"), self, triggered=self.analyze_rubies_by_line_no_cp_clicked.emit))
+        ruby_menu.addAction(Action(FIF.SYNC, tr("注音分析所选字符（不更新节奏点）"), self, triggered=self.analyze_rubies_selected_no_cp_clicked.emit))
+        ruby_menu.addSeparator()
         ruby_menu.addAction(Action(FIF.DELETE, tr("按类型删除注音"), self, triggered=self.delete_rubies_by_type_clicked.emit))
         self.btn_ruby.setMenu(ruby_menu)
         layout.addWidget(self.btn_ruby)
