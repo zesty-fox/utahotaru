@@ -550,6 +550,7 @@ class EditorInterface(QWidget):
     def set_store(self, store):
         """接入 ProjectStore 统一数据中心。"""
         self._store = store
+        self._save_tooltip = None
         store.data_changed.connect(self._on_data_changed)
 
     def _get_setting_interface(self):
@@ -651,6 +652,25 @@ class EditorInterface(QWidget):
             "tag_now_extra_editor",
             "clear_all_checkpoints",
             "tag_and_delete_next",
+            # 工具栏功能对应的可设置快捷键（默认留空）
+            "analyze_rubies_no_cp",
+            "analyze_rubies_by_line_no_cp",
+            "analyze_rubies_selected_no_cp",
+            "romanize_all",
+            "singer_manager",
+            "complete_timestamp",
+            "separate_symbol_timestamp",
+            "adjust_raw_timestamp",
+            "adjust_raw_timestamp_line",
+            "adjust_raw_timestamp_selected",
+            "delete_all_timestamps",
+            "delete_all_timestamps_keep_head",
+            "delete_timestamps_selected",
+            "new_project",
+            "load_project",
+            "save_as",
+            "load_audio",
+            "load_lyrics",
         ]
         # 默认值兜底（当设置未写入新 schema 时使用）
         defaults = {
@@ -698,6 +718,25 @@ class EditorInterface(QWidget):
             "tag_now_extra_editor": "",
             "clear_all_checkpoints": "",
             "tag_and_delete_next": "",
+            # 工具栏功能默认不绑定按键（留空），由用户在快捷键设置中按需配置
+            "analyze_rubies_no_cp": "",
+            "analyze_rubies_by_line_no_cp": "",
+            "analyze_rubies_selected_no_cp": "",
+            "romanize_all": "",
+            "singer_manager": "",
+            "complete_timestamp": "",
+            "separate_symbol_timestamp": "",
+            "adjust_raw_timestamp": "",
+            "adjust_raw_timestamp_line": "",
+            "adjust_raw_timestamp_selected": "",
+            "delete_all_timestamps": "",
+            "delete_all_timestamps_keep_head": "",
+            "delete_timestamps_selected": "",
+            "new_project": "",
+            "load_project": "",
+            "save_as": "",
+            "load_audio": "",
+            "load_lyrics": "",
         }
 
         def _normalize_trigger(raw: str) -> str:
@@ -1523,29 +1562,70 @@ class EditorInterface(QWidget):
             self._fallback_sync_save(path)
 
     def _connect_save_signals(self, store) -> None:
-        """一次性连接 store 保存结果信号。"""
-        try:
-            store.save_finished.disconnect(self._on_store_save_finished)
-        except TypeError:
-            pass
-        try:
-            store.save_error.disconnect(self._on_store_save_error)
-        except TypeError:
-            pass
-        store.save_finished.connect(self._on_store_save_finished)
-        store.save_error.connect(self._on_store_save_error)
+        """一次性连接 store 保存生命周期信号（含进度提示）。"""
+        for sig, slot in [
+            (store.save_started,  self._on_store_save_started),
+            (store.save_progress, self._on_store_save_progress),
+            (store.save_finished, self._on_store_save_finished),
+            (store.save_error,    self._on_store_save_error),
+        ]:
+            try:
+                sig.disconnect(slot)
+            except TypeError:
+                pass
+            sig.connect(slot)
+
+    def _disconnect_save_signals(self, store) -> None:
+        """断开本次保存的所有信号连接。"""
+        for sig, slot in [
+            (store.save_started,  self._on_store_save_started),
+            (store.save_progress, self._on_store_save_progress),
+            (store.save_finished, self._on_store_save_finished),
+            (store.save_error,    self._on_store_save_error),
+        ]:
+            try:
+                sig.disconnect(slot)
+            except TypeError:
+                pass
+
+    def _on_store_save_started(self, save_path: str) -> None:
+        from pathlib import Path as _Path
+        from qfluentwidgets import StateToolTip
+        from strange_uta_game.frontend.theme import theme
+        if self._save_tooltip:
+            self._save_tooltip.close()
+        self._save_tooltip = StateToolTip(
+            self.tr("正在保存"),
+            _Path(save_path).name,
+            self,
+        )
+        green = theme.status_complete.name()
+        self._save_tooltip.setStyleSheet(f"""
+            StateToolTip {{
+                background-color: {green};
+                border: 1px solid {green};
+                border-radius: 8px;
+            }}
+            StateToolTip QLabel {{
+                color: white;
+            }}
+        """)
+        self._save_tooltip.move(self._save_tooltip.getSuitablePos())
+        self._save_tooltip.show()
+
+    def _on_store_save_progress(self, stage: str) -> None:
+        if self._save_tooltip:
+            self._save_tooltip.setContent(stage)
 
     def _on_store_save_finished(self, saved_path: str) -> None:
         store = getattr(self, "_store", None)
         if store:
-            try:
-                store.save_finished.disconnect(self._on_store_save_finished)
-            except TypeError:
-                pass
-            try:
-                store.save_error.disconnect(self._on_store_save_error)
-            except TypeError:
-                pass
+            self._disconnect_save_signals(store)
+        if self._save_tooltip:
+            self._save_tooltip.setState(True)
+            self._save_tooltip.setContent(self.tr("保存完成"))
+            self._save_tooltip.close()
+            self._save_tooltip = None
         InfoBar.success(
             title=self.tr("保存成功"),
             content=saved_path,
@@ -1560,14 +1640,10 @@ class EditorInterface(QWidget):
     def _on_store_save_error(self, error_msg: str) -> None:
         store = getattr(self, "_store", None)
         if store:
-            try:
-                store.save_finished.disconnect(self._on_store_save_finished)
-            except TypeError:
-                pass
-            try:
-                store.save_error.disconnect(self._on_store_save_error)
-            except TypeError:
-                pass
+            self._disconnect_save_signals(store)
+        if self._save_tooltip:
+            self._save_tooltip.close()
+            self._save_tooltip = None
         InfoBar.error(
             title=self.tr("保存失败"),
             content=error_msg,
@@ -5299,6 +5375,43 @@ class EditorInterface(QWidget):
             self._insert_space_at_current()
         elif action == "merge_line_up":
             self._merge_line_up_at_current()
+        # ── 工具栏功能（默认无快捷键，可在设置中绑定）──
+        elif action == "analyze_rubies_no_cp":
+            self._on_analyze_rubies_no_cp()
+        elif action == "analyze_rubies_by_line_no_cp":
+            self._on_analyze_rubies_by_line_no_cp()
+        elif action == "analyze_rubies_selected_no_cp":
+            self._on_analyze_rubies_selected_no_cp()
+        elif action == "romanize_all":
+            self._on_romanize_all_rubies()
+        elif action == "singer_manager":
+            self._on_singer_manager_clicked()
+        elif action == "complete_timestamp":
+            self._on_complete_timestamp()
+        elif action == "separate_symbol_timestamp":
+            self._on_separate_symbol_timestamp()
+        elif action == "adjust_raw_timestamp":
+            self._on_adjust_raw_timestamp()
+        elif action == "adjust_raw_timestamp_line":
+            self._on_adjust_raw_timestamp_line()
+        elif action == "adjust_raw_timestamp_selected":
+            self._on_adjust_raw_timestamp_selected()
+        elif action == "delete_all_timestamps":
+            self._on_delete_all_timestamps()
+        elif action == "delete_all_timestamps_keep_head":
+            self._on_delete_all_timestamps_keep_head()
+        elif action == "delete_timestamps_selected":
+            self._on_delete_timestamps_selected()
+        elif action == "new_project":
+            self._on_new_project()
+        elif action == "load_project":
+            self._on_load_project()
+        elif action == "save_as":
+            self._on_save_as()
+        elif action == "load_audio":
+            self._on_load_audio()
+        elif action == "load_lyrics":
+            self._on_load_lyrics()
 
     def _prompt_if_needs_guide_pending(self) -> bool:
         """若项目中仍有 needs_guide 标记，弹窗让用户决定是否继续导出。

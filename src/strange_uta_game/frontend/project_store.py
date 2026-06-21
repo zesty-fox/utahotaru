@@ -85,7 +85,9 @@ class ProjectStore(QObject):
     # 单一变更通知信号
     data_changed = pyqtSignal(str)  # change_type
 
-    # 手动保存结果信号
+    # 手动保存生命周期信号
+    save_started = pyqtSignal(str)    # save_path（线程启动前同步触发）
+    save_progress = pyqtSignal(str)   # stage description（来自 worker 线程）
     save_finished = pyqtSignal(str)   # saved_path
     save_error = pyqtSignal(str)      # error_msg
 
@@ -103,6 +105,8 @@ class ProjectStore(QObject):
         # 优先级介于 audio 与 last_export_dir 之间）
         self._last_lyric_dir: Optional[str] = None
         self._dirty = False
+        # 每次 load_project 递增，用于防止异步保存回调在项目被替换后覆盖 _save_path。
+        self._load_count: int = 0
 
         # 防抖 auto-save（2 秒无操作后写临时文件）
         self._auto_save_timer = QTimer(self)
@@ -326,7 +330,8 @@ class ProjectStore(QObject):
         # 清理旧项目的临时文件
         if self._project:
             self.cleanup_temp_files()
-        
+
+        self._load_count += 1
         self._project = project
         self._save_path = save_path
         self._audio_path = audio_path
@@ -402,9 +407,16 @@ class ProjectStore(QObject):
         if not target:
             return False
 
+        # 捕获当前版本号：若保存期间 load_project 被调用（项目被替换），
+        # 回调中版本号不匹配时不覆盖新项目的 _save_path。
+        load_count_at_save = self._load_count
+
+        def _on_finished(saved_path: str) -> None:
+            self._on_manual_save_finished(saved_path, load_count_at_save)
+
         self._launch_save(
             target,
-            on_finished=self._on_manual_save_finished,
+            on_finished=_on_finished,
             on_error=self._on_manual_save_error,
             is_background=False,
         )
@@ -447,6 +459,10 @@ class ProjectStore(QObject):
         worker.finished.connect(on_finished)
         worker.error.connect(on_error)
 
+        # 手动保存：转发进度信号供 UI 显示进度提示
+        if not is_background:
+            worker.progress.connect(self.save_progress.emit)
+
         def cleanup():
             thread.quit()
             thread.wait()
@@ -467,9 +483,18 @@ class ProjectStore(QObject):
             self._save_thread = thread
             self._save_worker = worker
 
+        # 手动保存：线程启动前同步广播"已开始"，UI 可在此时显示进度提示
+        if not is_background:
+            self.save_started.emit(file_path)
+
         thread.start()
 
-    def _on_manual_save_finished(self, saved_path: str) -> None:
+    def _on_manual_save_finished(self, saved_path: str, load_count_at_save: int = -1) -> None:
+        if load_count_at_save >= 0 and self._load_count != load_count_at_save:
+            # 保存期间 load_project 被调用（项目已被替换），跳过 _save_path 更新，
+            # 避免新项目误继承旧项目的保存路径。仍然广播保存成功信号供 UI 展示提示。
+            self.save_finished.emit(saved_path)
+            return
         old_path = self._save_path
         self._save_path = saved_path
         self._dirty = False

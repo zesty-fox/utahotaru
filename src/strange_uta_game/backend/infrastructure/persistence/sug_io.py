@@ -266,6 +266,7 @@ class SugProjectParser:
         *,
         nicokara_tags: Optional[Dict[str, Any]] = None,
         media_path: Optional[str] = None,
+        progress_cb=None,
     ) -> None:
         """保存项目到 SUG 文件
 
@@ -274,11 +275,14 @@ class SugProjectParser:
             file_path: 保存路径
             nicokara_tags: Nicokara 标签数据（可选）
             media_path: 实际媒体文件路径（可选，不含 .cache 临时路径）
+            progress_cb: 可选进度回调 ``(stage: str) -> None``，在序列化和写盘两个阶段调用
 
         Raises:
             SugParseError: 保存失败
         """
         try:
+            if progress_cb:
+                progress_cb("正在序列化项目数据...")
             data = SugProjectParser._project_to_dict(
                 project, nicokara_tags=nicokara_tags, media_path=media_path
             )
@@ -286,6 +290,8 @@ class SugProjectParser:
             path = Path(file_path)
             path.parent.mkdir(parents=True, exist_ok=True)
 
+            if progress_cb:
+                progress_cb("正在写入文件...")
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
 

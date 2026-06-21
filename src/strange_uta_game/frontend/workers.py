@@ -129,6 +129,7 @@ class ProjectSaveWorker(QObject):
     nicokara_tags 和 media_path 在创建 worker 时从主线程读取并传入，保证线程安全。
     """
 
+    progress = pyqtSignal(str)  # stage description
     finished = pyqtSignal(str)  # saved path
     error = pyqtSignal(str)
 
@@ -150,6 +151,7 @@ class ProjectSaveWorker(QObject):
                 self._file_path,
                 nicokara_tags=self._nicokara_tags,
                 media_path=self._media_path,
+                progress_cb=self.progress.emit,
             )
             self.finished.emit(self._file_path)
         except Exception as e:

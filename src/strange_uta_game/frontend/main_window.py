@@ -1075,26 +1075,68 @@ class MainWindow(MSFluentWindow):
             self._store.save(path)
 
     def _connect_store_save_signals(self) -> None:
-        try:
-            self._store.save_finished.disconnect(self._on_save_success)
-        except TypeError:
-            pass
-        try:
-            self._store.save_error.disconnect(self._on_save_error)
-        except TypeError:
-            pass
-        self._store.save_finished.connect(self._on_save_success)
-        self._store.save_error.connect(self._on_save_error)
+        for sig, slot in [
+            (self._store.save_started,  self._on_save_started),
+            (self._store.save_progress, self._on_save_progress),
+            (self._store.save_finished, self._on_save_success),
+            (self._store.save_error,    self._on_save_error),
+        ]:
+            try:
+                sig.disconnect(slot)
+            except TypeError:
+                pass
+            sig.connect(slot)
+
+    def _disconnect_store_save_signals(self) -> None:
+        for sig, slot in [
+            (self._store.save_started,  self._on_save_started),
+            (self._store.save_progress, self._on_save_progress),
+            (self._store.save_finished, self._on_save_success),
+            (self._store.save_error,    self._on_save_error),
+        ]:
+            try:
+                sig.disconnect(slot)
+            except TypeError:
+                pass
+
+    def _on_save_started(self, save_path: str) -> None:
+        from pathlib import Path as _Path
+        from qfluentwidgets import StateToolTip
+        from strange_uta_game.frontend.theme import theme
+        if getattr(self, "_save_tooltip", None):
+            self._save_tooltip.close()
+        self._save_tooltip = StateToolTip(
+            self.tr("正在保存"),
+            _Path(save_path).name,
+            self,
+        )
+        green = theme.status_complete.name()
+        self._save_tooltip.setStyleSheet(f"""
+            StateToolTip {{
+                background-color: {green};
+                border: 1px solid {green};
+                border-radius: 8px;
+            }}
+            StateToolTip QLabel {{
+                color: white;
+            }}
+        """)
+        self._save_tooltip.move(self._save_tooltip.getSuitablePos())
+        self._save_tooltip.show()
+
+    def _on_save_progress(self, stage: str) -> None:
+        tooltip = getattr(self, "_save_tooltip", None)
+        if tooltip:
+            tooltip.setContent(stage)
 
     def _on_save_success(self, file_path: str) -> None:
-        try:
-            self._store.save_finished.disconnect(self._on_save_success)
-        except TypeError:
-            pass
-        try:
-            self._store.save_error.disconnect(self._on_save_error)
-        except TypeError:
-            pass
+        self._disconnect_store_save_signals()
+        tooltip = getattr(self, "_save_tooltip", None)
+        if tooltip:
+            tooltip.setState(True)
+            tooltip.setContent(self.tr("保存完成"))
+            tooltip.close()
+            self._save_tooltip = None
         self._store.cleanup_temp_files()
         InfoBar.success(
             title=self.tr("保存成功"),
@@ -1108,14 +1150,11 @@ class MainWindow(MSFluentWindow):
         self._update_title()
 
     def _on_save_error(self, error_msg: str) -> None:
-        try:
-            self._store.save_finished.disconnect(self._on_save_success)
-        except TypeError:
-            pass
-        try:
-            self._store.save_error.disconnect(self._on_save_error)
-        except TypeError:
-            pass
+        self._disconnect_store_save_signals()
+        tooltip = getattr(self, "_save_tooltip", None)
+        if tooltip:
+            tooltip.close()
+            self._save_tooltip = None
         InfoBar.error(
             title=self.tr("保存失败"),
             content=error_msg,
