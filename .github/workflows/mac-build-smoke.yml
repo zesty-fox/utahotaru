@@ -1,0 +1,50 @@
+name: mac-build-smoke
+
+# macOS 打包冒烟测试：在 macos-latest 上原样复刻 release.yml 的 mac build job
+# （同样的依赖安装 + `release.py build --variant mac`），但不触发 tag/发版/缓存回写。
+# 用途：验证 mac 变体能在 CI 上成功打包；确认绿后可删除本文件，或保留为 mac 构建 CI。
+# 触发：push 到 feat/macos-port、PR、或 Actions 页面手动 workflow_dispatch。
+
+on:
+  push:
+    branches: [feat/macos-port]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mac-build:
+    name: build (mac, smoke)
+    runs-on: macos-latest
+    continue-on-error: true   # 冒烟测试：失败不阻断（mac 变体当前为 best-effort）
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-variants.txt
+
+      - name: Build mac variant
+        run: python scripts/release.py build --variant mac
+
+      - name: List dist
+        run: ls -la dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-build-smoke
+          path: |
+            dist/*.zip
+            dist/manifest-*.json
+          if-no-files-found: error
+          retention-days: 7
