@@ -4918,6 +4918,7 @@ class EditorInterface(QWidget):
                 self._timing_service.move_to_checkpoint(line_idx, char_idx, 0, prefer_backward=True)
                 self._update_time_tags_display()
                 self._update_status()
+                self.preview.scroll_current_line_to_center()
             self._on_seek(seek_ms)
         else:
             # 当前字符没有时间戳：找前一个有节奏点的字符
@@ -4933,6 +4934,7 @@ class EditorInterface(QWidget):
                 self._timing_service.move_to_checkpoint(prev_line, prev_char_idx, prev_cp_idx)
                 self._update_time_tags_display()
                 self._update_status()
+                self.preview.scroll_current_line_to_center()
             self.preview.set_focus_position(prev_line, prev_char_idx)
             if seek_ms is not None:
                 self._on_seek(seek_ms)
