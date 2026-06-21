@@ -49,6 +49,20 @@ from strange_uta_game.backend.infrastructure.parsers.inline_format import (
 )
 
 
+def _reset_nicokara_tags() -> None:
+    """新建项目前重置全局 nicokara_tags 为默认值，避免上一项目残留。"""
+    try:
+        from strange_uta_game.frontend.settings.app_settings import AppSettings
+        settings = AppSettings()
+        settings.set(
+            "nicokara_tags",
+            dict(AppSettings.DEFAULT_SETTINGS.get("nicokara_tags", {})),
+        )
+        settings.save()
+    except Exception:
+        pass
+
+
 class HomeInterface(QWidget):
     """主页界面
 
@@ -405,6 +419,10 @@ class HomeInterface(QWidget):
             return
 
         try:
+            # 新建项目：重置全局 nicokara_tags 为默认值，避免上一项目残留。
+            # _parse_text_content 中若检测到 nicokara 格式会重新写入正确的标签。
+            _reset_nicokara_tags()
+
             # 解析文本框中的原始内容
             self._parse_text_content(text)
 

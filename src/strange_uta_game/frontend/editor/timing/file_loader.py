@@ -470,6 +470,21 @@ class FileLoader:
         except Exception:
             pass
 
+    def _reset_nicokara_tags_to_defaults(self) -> None:
+        """新建项目时重置全局 nicokara_tags 为默认值，避免上一项目残留。"""
+        try:
+            setting_iface = self._editor._get_setting_interface()
+            if setting_iface is not None:
+                from strange_uta_game.frontend.settings.app_settings import AppSettings
+                settings = setting_iface.get_settings()
+                settings.set(
+                    "nicokara_tags",
+                    dict(AppSettings.DEFAULT_SETTINGS.get("nicokara_tags", {})),
+                )
+                settings.save()
+        except Exception:
+            pass
+
     def _on_project_load_error(self, error_msg: str) -> None:
         """项目加载失败的回调"""
         if self._state_tooltip:
@@ -647,6 +662,7 @@ class FileLoader:
                 project = ProjectService().create_project()
                 self._store._project = project
                 self._store.notify("project")
+                self._reset_nicokara_tags_to_defaults()
             else:
                 InfoBar.warning(
                     title=self._editor.tr("无法加载"), content=self._editor.tr("请先创建或打开一个项目"),
@@ -688,6 +704,7 @@ class FileLoader:
                 project = ProjectService().create_project()
                 self._store._project = project
                 self._store.notify("project")
+                self._reset_nicokara_tags_to_defaults()
             else:
                 InfoBar.warning(
                     title=self._editor.tr("无法加载"), content=self._editor.tr("请先创建或打开一个项目"),
@@ -780,6 +797,7 @@ class FileLoader:
                     project = project_service.create_project()
                     self._store._project = project
                     self._store.notify("project")
+                    self._reset_nicokara_tags_to_defaults()
                 else:
                     InfoBar.warning(
                         title=self._editor.tr("无法加载"), content=self._editor.tr("请先创建或打开一个项目"),
