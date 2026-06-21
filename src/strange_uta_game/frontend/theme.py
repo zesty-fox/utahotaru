@@ -720,6 +720,16 @@ def _patch_round_menu() -> None:
     修正为：
     - blurRadius=2、offset=(0,1)、margins=(4,4,4,5)  → 紧凑阴影
     - exec() 统一改用 aniType=NONE                   → 无动画即时弹出
+
+    同时修复 MSFluentWindow 页面切换后点击下拉菜单时 Qt 报警
+    "QWidgetWindow(StackedWidgetClassWindow) must be a top level window"。
+    根因：PopUpAniStackedWidget 在页面切换动画期间可能获得杂散原生窗口句柄，
+    导致 RoundMenu 弹窗解析 transient parent 时走到错误的 QWidgetWindow。
+    修复：在 exec 前对按钮所在顶层窗口调用 winId()，强制 Qt 理顺窗口父子链。
+
+    详见 qfluentwidgets PopUpAniStackedWidget.setCurrentIndex 中对子 widget
+    pos 属性的 QPropertyAnimation，该动画可能在页面显隐切换后使中间层
+    QStackedWidget 持有不应存在的原生窗口句柄。
     """
     try:
         from qfluentwidgets import RoundMenu, MenuAnimationType
@@ -732,6 +742,17 @@ def _patch_round_menu() -> None:
             self.hBoxLayout.setContentsMargins(1, 1, 1, 2)
 
         def _no_ani_exec(self, pos, ani=True, aniType=MenuAnimationType.DROP_DOWN):
+            # 页面切换后 QStackedWidget 可能持有杂散原生窗口句柄，
+            # 导致弹窗 transient parent 检查时 Qt 报警。
+            # 提前 pin 顶层窗口的原生句柄，强制理顺窗口父子链。
+            try:
+                parent = self.parent()
+                if parent is not None:
+                    top = parent.window()
+                    if top is not None:
+                        top.winId()
+            except Exception:
+                pass
             _orig_exec(self, pos, ani=False, aniType=MenuAnimationType.FADE_IN_DROP_DOWN)
 
         RoundMenu.__init__ = _slim_init
