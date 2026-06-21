@@ -1836,7 +1836,7 @@ class AdjustRawTimestampDialog(QDialog):
 
         form = QFormLayout()
         self.spin_delta = SpinBox(self)
-        self.spin_delta.setRange(-9999, 9999)
+        self.spin_delta.setRange(-99999, 99999)
         self.spin_delta.setValue(0)
         self.spin_delta.setSuffix(" ms")
         form.addRow(self.tr("偏移量:"), self.spin_delta)
@@ -1988,7 +1988,7 @@ class SeparateSymbolTimestampDialog(QDialog):
         comp_box.contentLayout.addLayout(comp_form)
 
         self.spin_pre_comp = SpinBox(self)
-        self.spin_pre_comp.setRange(0, 9999)
+        self.spin_pre_comp.setRange(0, 99999)
         self.spin_pre_comp.setValue(self._saved_pre_comp)
         self.spin_pre_comp.setSuffix(" ms")
         self.spin_pre_comp.setToolTip(self.tr(
@@ -1998,7 +1998,7 @@ class SeparateSymbolTimestampDialog(QDialog):
         comp_form.addRow(self.tr("前补偿（前移符号时间戳）:"), self.spin_pre_comp)
 
         self.spin_post_comp = SpinBox(self)
-        self.spin_post_comp.setRange(0, 9999)
+        self.spin_post_comp.setRange(0, 99999)
         self.spin_post_comp.setValue(self._saved_post_comp)
         self.spin_post_comp.setSuffix(" ms")
         self.spin_post_comp.setToolTip(self.tr(
