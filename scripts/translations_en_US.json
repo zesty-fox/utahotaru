@@ -1253,5 +1253,8 @@
   "请等待当前注音分析完成后再试": "Please wait for the current ruby analysis to finish",
   "已转为罗马字注音": "Converted to romaji ruby",
   "共处理 {n} 行": "Processed {n} lines",
-  "没有可转为罗马字的注音或单假名": "No ruby or standalone kana to romanize"
+  "没有可转为罗马字的注音或单假名": "No ruby or standalone kana to romanize",
+  "连通成功（API 限流中）": "Connected (API rate-limited)",
+  "GitHub 可达": "GitHub reachable",
+  "代理可正常访问 GitHub，但官方 API 对你的出口 IP 限流（403）。检查更新会自动改用网页端探测，通常不受影响。": "The proxy can reach GitHub fine, but the official API is rate-limiting your egress IP (403). Update checks fall back to web-page detection automatically, so this usually has no impact."
 }
