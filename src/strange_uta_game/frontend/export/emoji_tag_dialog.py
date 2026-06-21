@@ -270,13 +270,23 @@ class EmojiTagDialog(QDialog):
         self,
         singers: List[Tuple[str, str]],  # [(singer_id, singer_name), ...]
         parent: Optional[QWidget] = None,
+        existing_tags: Optional[Dict[str, Tuple[str, str, str]]] = None,
     ):
+        """分色标签设置助手。
+
+        Args:
+            singers: 演唱者列表 [(singer_id, singer_name), ...]
+            parent: 父窗口
+            existing_tags: 已有的 @Emoji 标签映射 {trigger: (front, back, options)}
+                           打开对话框时优先读取，无匹配项则回退到默认参数。
+        """
         super().__init__(parent)
         self.setWindowTitle(self.tr("分色标签设置助手"))
         # 加宽以容纳浏览/删除按钮；不超过屏幕可用区域
         fit_min_size(self, 1040, 320)
 
         self._singers = singers
+        self._existing_tags: Dict[str, Tuple[str, str, str]] = existing_tags or {}
         self._rows: List[Dict[str, Any]] = []
 
         self._init_ui()
@@ -485,8 +495,17 @@ class EmojiTagDialog(QDialog):
         default_front: str,
         default_back: str,
         default_opts: Dict[str, Any],
+        trigger_text: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """新增一张演唱者配置卡片，插入到列表末尾的伸缩项之前。"""
+        """新增一张演唱者配置卡片，插入到列表末尾的伸缩项之前。
+
+        Args:
+            singer_name: 演唱者显示名
+            default_front: 前画像默认值
+            default_back: 後画像默认值
+            default_opts: 选项默认值
+            trigger_text: 触发字符。为 None 时自动由 singer_name 生成。
+        """
         card = QFrame()
         card.setFrameShape(QFrame.Shape.StyledPanel)
         card.setFrameShadow(QFrame.Shadow.Raised)
@@ -510,7 +529,10 @@ class EmojiTagDialog(QDialog):
 
         trigger_edit = LineEdit()
         trigger_edit.setFont(QFont("Microsoft YaHei", 10))
-        trigger_edit.setText(f"【{singer_name}】" if singer_name else "")
+        if trigger_text is not None:
+            trigger_edit.setText(trigger_text)
+        else:
+            trigger_edit.setText(f"【{singer_name}】" if singer_name else "")
         trigger_edit.setPlaceholderText(self.tr("必填"))
         trigger_edit.setMinimumWidth(110)
         row1.addWidget(trigger_edit)
@@ -604,13 +626,39 @@ class EmojiTagDialog(QDialog):
         QTimer.singleShot(0, _reveal)
 
     def _populate_rows(self):
-        """根据 self._singers 填充每位演唱者的配置卡片。"""
+        """根据 self._singers 填充每位演唱者的配置卡片。
+
+        优先级：已存在的 @Emoji 标签 > nicokara_emoji_default > 内置默认值。
+        未匹配歌手的已有 @Emoji 标签也作为额外行保留。
+        """
         default_str = self._get_default_params()
         default_front, default_back, default_opts_str = split_params(default_str)
         default_opts = parse_option_str(default_opts_str)
 
+        matched_triggers: set[str] = set()
+
         for _singer_id, singer_name in self._singers:
-            self._add_card(singer_name, default_front, default_back, default_opts)
+            trigger = f"【{singer_name}】"
+            tag_params = self._existing_tags.get(trigger)
+            if tag_params:
+                front, back, opts_str = tag_params
+                opts = parse_option_str(opts_str)
+                matched_triggers.add(trigger)
+            else:
+                front, back, opts_str = default_front, default_back, default_opts_str
+                opts = default_opts
+            self._add_card(singer_name, front, back, opts)
+
+        # 添加未匹配歌手的已有 @Emoji 标签（如自定义触发字符等非歌手标签）
+        for trigger, (front, back, opts_str) in self._existing_tags.items():
+            if trigger not in matched_triggers:
+                opts = parse_option_str(opts_str)
+                display_name = (
+                    trigger.strip("【】")
+                    if trigger.startswith("【") and trigger.endswith("】")
+                    else trigger
+                )
+                self._add_card(display_name, front, back, opts, trigger_text=trigger)
 
     def get_singer_params(self) -> List[Tuple[str, str, str]]:
         """返回 [(singer_name, trigger, params), ...] 列表。"""

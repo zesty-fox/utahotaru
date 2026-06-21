@@ -593,9 +593,13 @@ class ExportInterface(QWidget):
         """打开分色标签设置助手对话框。
 
         演唱者列表以当前过滤器勾选结果为准（无勾选则使用全部演唱者）。
+        已有 @Emoji 标签优先读取，无匹配项回退到默认参数。
         配置确认后自动写入 nicokara_tags.custom 并记忆首行参数。
         """
-        from strange_uta_game.frontend.export.emoji_tag_dialog import EmojiTagDialog
+        from strange_uta_game.frontend.export.emoji_tag_dialog import (
+            EmojiTagDialog,
+            split_params,
+        )
 
         if not self._project:
             InfoBar.warning(
@@ -630,7 +634,23 @@ class ExportInterface(QWidget):
             )
             return
 
-        dialog = EmojiTagDialog(singer_list, self)
+        # 解析已有的 @Emoji 标签，按触发字符建立映射。
+        # 只匹配 @Emoji= (主标签)，排除 @EmojiN= (叠加层变体)。
+        settings = AppSettings()
+        tag_data = settings.get("nicokara_tags") or {}
+        custom = tag_data.get("custom", [])
+        existing_tags: dict[str, tuple[str, str, str]] = {}
+        for line in custom:
+            line = line.strip()
+            if line.lower().startswith("@emoji="):
+                rest = line[len("@Emoji="):]
+                comma_idx = rest.find(",")
+                if comma_idx > 0:
+                    trigger = rest[:comma_idx]
+                    params = rest[comma_idx + 1:]
+                    existing_tags[trigger] = split_params(params)
+
+        dialog = EmojiTagDialog(singer_list, self, existing_tags=existing_tags)
         if dialog.exec() == EmojiTagDialog.DialogCode.Accepted:  # apply_emoji_tags_to_settings 在 _on_accept 内部调用
             if self._store:
                 self._store.mark_dirty()
