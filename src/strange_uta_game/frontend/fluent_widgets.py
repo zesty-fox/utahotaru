@@ -15,7 +15,7 @@ from typing import Optional
 
 from typing import Sequence
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
@@ -31,6 +31,46 @@ from qfluentwidgets import (
     SimpleCardWidget,
     StrongBodyLabel,
 )
+
+
+class FluentMessageBox(MessageBox):
+    """qfluentwidgets ``MessageBox`` 的定位修正版。
+
+    qfluentwidgets 的 ``MaskDialogBase`` 在 ``__init__`` 里把遮罩固定为
+    ``setGeometry(0, 0, parent.width(), parent.height())`` —— 即钉在**主屏原点**、
+    大小取父窗口大小。仅当父窗口恰好最大化在主屏 (0,0) 时才正好覆盖；只要父窗口
+    不在原点（**嵌入式下 SUG 是宿主里的子面板、宿主窗口通常不在原点**，或
+    standalone 下窗口非最大化），遮罩就会跑到主屏左上角与可见区域错位：用户看不到
+    对话框，点击落到被模态屏蔽的窗口上只听到系统禁止音。
+
+    本类在显示时把遮罩重新定位/缩放到锚点窗口的**实际全局矩形**，使遮罩与对话框
+    始终覆盖正确的窗口，standalone 与 embedded 两种模式下行为一致。
+    """
+
+    def __init__(self, title: str, content: str, parent: Optional[QWidget] = None):
+        super().__init__(title, content, parent)
+        # 锚点：父级所在的顶层窗口（_resolve_window 已把 parent 解析为窗口，
+        # 这里 .window() 多为其自身；对子控件也能正确上溯）。
+        self._anchorWindow = parent.window() if parent is not None else None
+
+    def _reposition_over_anchor(self) -> None:
+        win = self._anchorWindow
+        if win is None or not win.isVisible():
+            return
+        top_left = win.mapToGlobal(QPoint(0, 0))
+        self.setGeometry(top_left.x(), top_left.y(), win.width(), win.height())
+        self.windowMask.resize(self.size())
+
+    def showEvent(self, e):
+        self._reposition_over_anchor()
+        super().showEvent(e)
+
+
+def make_message_box(
+    parent: Optional[QWidget], title: str, content: str
+) -> FluentMessageBox:
+    """构建定位修正后的 Fluent 消息对话框（供各 message_* 封装与 winrt 引导复用）。"""
+    return FluentMessageBox(title, content, _resolve_window(parent))
 
 
 class FluentGroupBox(SimpleCardWidget):
@@ -138,7 +178,7 @@ def message_info(
     copyable: bool = False,
 ) -> None:
     """信息提示（单个"确定"按钮）。替代 ``QMessageBox.information``。"""
-    w = MessageBox(title, content, _resolve_window(parent))
+    w = make_message_box(parent, title, content)
     w.yesButton.setText(ok_text)
     w.hideCancelButton()
     if copyable:
@@ -171,7 +211,7 @@ def message_question(
     Returns:
         True 表示用户点击了"是/确定"，False 表示取消或关闭。
     """
-    w = MessageBox(title, content, _resolve_window(parent))
+    w = make_message_box(parent, title, content)
     w.yesButton.setText(yes_text)
     w.cancelButton.setText(no_text)
     if copyable:
@@ -201,7 +241,7 @@ def message_choice(
     Returns:
         被点击按钮的索引；若通过遮罩/Esc 关闭而未点击任何按钮，返回 -1。
     """
-    w = MessageBox(title, content, _resolve_window(parent))
+    w = make_message_box(parent, title, content)
     state = {"index": -1}
 
     def _pick(idx: int) -> None:
@@ -238,13 +278,13 @@ def message_busy(
     parent: Optional[QWidget],
     title: str,
     content: str,
-) -> MessageBox:
+) -> FluentMessageBox:
     """构建一个无按钮的"忙碌/请稍候"遮罩对话框（不在此处 exec）。
 
     替代 ``QMessageBox`` + ``setStandardButtons(NoButton)`` 的用法：调用方拿到
     返回的对话框后自行 ``exec()`` 阻塞，并在后台完成时调用其 ``accept()`` 关闭。
     """
-    w = MessageBox(title, content, _resolve_window(parent))
+    w = make_message_box(parent, title, content)
     w.hideYesButton()
     w.hideCancelButton()
     return w

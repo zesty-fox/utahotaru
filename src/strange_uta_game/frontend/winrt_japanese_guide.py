@@ -17,7 +17,7 @@ from typing import Optional
 
 from PyQt6.QtCore import QCoreApplication, Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import QApplication, QWidget
-from qfluentwidgets import MessageBox, PushButton
+from qfluentwidgets import PushButton
 
 
 def _tr(s: str) -> str:
@@ -31,7 +31,7 @@ from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import (
     winrt_japanese_status,
 )
 from strange_uta_game.frontend.fluent_widgets import (
-    _resolve_window,
+    make_message_box,
     message_busy,
     message_choice,
     message_error,
@@ -54,10 +54,10 @@ class _InstallWorker(QThread):
 
 def _show_guidance(parent: Optional[QWidget], extra: str = "") -> None:
     """展示手动安装引导，附「复制命令」按钮（点击不关闭对话框）。"""
-    box = MessageBox(
+    box = make_message_box(
+        parent,
         _tr("手动安装日语注音组件"),
         (extra + "\n\n" if extra else "") + winrt_install_guidance(),
-        _resolve_window(parent),
     )
     box.setContentCopyable(True)
     box.yesButton.setText(_tr("我知道了"))
