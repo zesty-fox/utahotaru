@@ -2600,6 +2600,16 @@ Never — disable auto-scroll</translation>
         <translation>Full text</translation>
     </message>
     <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="122" />
+        <source>全部 · 仅注音</source>
+        <translation>All · ruby only</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="117" />
+        <source>全部 · 含节奏点</source>
+        <translation>All · with checkpoints</translation>
+    </message>
+    <message>
         <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="157" />
         <source>分离符号时间戳</source>
         <translation>Separate symbol timestamps</translation>
@@ -2640,6 +2650,16 @@ Never — disable auto-scroll</translation>
         <translation>Apply singer</translation>
     </message>
     <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="124" />
+        <source>所选 · 仅注音</source>
+        <translation>Selection · ruby only</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="119" />
+        <source>所选 · 含节奏点</source>
+        <translation>Selection · with checkpoints</translation>
+    </message>
+    <message>
         <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="96" />
         <source>批量变更</source>
         <translation>Bulk change</translation>
@@ -2651,13 +2671,13 @@ Never — disable auto-scroll</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="123" />
-        <source>按行注音分析（不更新节奏点）</source>
-        <translation>Analyze ruby per line (keep checkpoints)</translation>
+        <source>按行 · 仅注音</source>
+        <translation>Per line · ruby only</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="118" />
-        <source>按行注音分析（更新节奏点）</source>
-        <translation>Analyze ruby per line (update checkpoints)</translation>
+        <source>按行 · 含节奏点</source>
+        <translation>Per line · with checkpoints</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="138" />
@@ -2688,26 +2708,6 @@ Never — disable auto-scroll</translation>
         <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="151" />
         <source>时间戳工具</source>
         <translation>Timestamp</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="124" />
-        <source>注音分析所选字符（不更新节奏点）</source>
-        <translation>Analyze ruby of selected chars (keep checkpoints)</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="119" />
-        <source>注音分析所选字符（更新节奏点）</source>
-        <translation>Analyze ruby of selected chars (update checkpoints)</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="122" />
-        <source>注音分析（不更新节奏点）</source>
-        <translation>Analyze ruby (keep checkpoints)</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="117" />
-        <source>注音分析（更新节奏点）</source>
-        <translation>Analyze ruby (update checkpoints)</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="131" />
@@ -5140,6 +5140,18 @@ Next group (low opacity preview).</translation>
         <translation>Full text</translation>
     </message>
     <message>
+        <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="501" />
+        <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="1280" />
+        <source>全部注音 · 仅注音</source>
+        <translation>All ruby · ruby only</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="495" />
+        <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="1278" />
+        <source>全部注音 · 含节奏点</source>
+        <translation>All ruby · with checkpoints</translation>
+    </message>
+    <message>
         <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="972" />
         <source>全部重新分析</source>
         <translation>Re-analyze all</translation>
@@ -5307,18 +5319,6 @@ Example: {大冒険||[00:01.00]だ|[00:01.20]い,...}</translation>
         <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="964" />
         <source>自动分析全部注音</source>
         <translation>Auto-analyze all ruby</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="501" />
-        <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="1280" />
-        <source>自动分析全部注音（不更新节奏点）</source>
-        <translation>Auto-analyze all ruby (keep checkpoints)</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="495" />
-        <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="1278" />
-        <source>自动分析全部注音（更新节奏点）</source>
-        <translation>Auto-analyze all ruby (update checkpoints)</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="965" />

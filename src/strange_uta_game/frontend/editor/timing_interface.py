@@ -6672,7 +6672,7 @@ class EditorInterface(QWidget):
                 parent=self,
             )
             return
-        label = "按行注音分析" if update_checkpoints else "按行注音分析（不更新节奏点）"
+        label = "按行注音分析" if update_checkpoints else "按行注音分析（仅注音）"
         self._analyze_rubies_subset(
             line_idx, None, label, update_checkpoints=update_checkpoints
         )
@@ -6689,7 +6689,7 @@ class EditorInterface(QWidget):
         if not self._project:
             return
 
-        label = "注音分析所选字符" if update_checkpoints else "注音分析所选字符（不更新节奏点）"
+        label = "注音分析所选字符" if update_checkpoints else "注音分析所选字符（仅注音）"
 
         # 跨行选中：逐行提交，由 _analyze_rubies_specs_async 队列顺序执行
         if self.preview.is_multi_line_selection():

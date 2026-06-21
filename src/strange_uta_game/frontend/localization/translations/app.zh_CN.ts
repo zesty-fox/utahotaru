@@ -2600,6 +2600,16 @@
         <translation>全文本编辑</translation>
     </message>
     <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="122" />
+        <source>全部 · 仅注音</source>
+        <translation>全部 · 仅注音</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="117" />
+        <source>全部 · 含节奏点</source>
+        <translation>全部 · 含节奏点</translation>
+    </message>
+    <message>
         <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="157" />
         <source>分离符号时间戳</source>
         <translation>分离符号时间戳</translation>
@@ -2640,6 +2650,16 @@
         <translation>应用演唱者</translation>
     </message>
     <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="124" />
+        <source>所选 · 仅注音</source>
+        <translation>所选 · 仅注音</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="119" />
+        <source>所选 · 含节奏点</source>
+        <translation>所选 · 含节奏点</translation>
+    </message>
+    <message>
         <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="96" />
         <source>批量变更</source>
         <translation>批量变更</translation>
@@ -2651,13 +2671,13 @@
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="123" />
-        <source>按行注音分析（不更新节奏点）</source>
-        <translation>按行注音分析（不更新节奏点）</translation>
+        <source>按行 · 仅注音</source>
+        <translation>按行 · 仅注音</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="118" />
-        <source>按行注音分析（更新节奏点）</source>
-        <translation>按行注音分析（更新节奏点）</translation>
+        <source>按行 · 含节奏点</source>
+        <translation>按行 · 含节奏点</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="138" />
@@ -2688,26 +2708,6 @@
         <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="151" />
         <source>时间戳工具</source>
         <translation>时间戳工具</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="124" />
-        <source>注音分析所选字符（不更新节奏点）</source>
-        <translation>注音分析所选字符（不更新节奏点）</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="119" />
-        <source>注音分析所选字符（更新节奏点）</source>
-        <translation>注音分析所选字符（更新节奏点）</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="122" />
-        <source>注音分析（不更新节奏点）</source>
-        <translation>注音分析（不更新节奏点）</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="117" />
-        <source>注音分析（更新节奏点）</source>
-        <translation>注音分析（更新节奏点）</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/editor/timing/toolbar.py" line="131" />
@@ -5140,6 +5140,18 @@ Checkpoint数：每字符一项（如 2,2,1），累加为本行节奏点总数 
         <translation>全文本编辑</translation>
     </message>
     <message>
+        <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="501" />
+        <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="1280" />
+        <source>全部注音 · 仅注音</source>
+        <translation>全部注音 · 仅注音</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="495" />
+        <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="1278" />
+        <source>全部注音 · 含节奏点</source>
+        <translation>全部注音 · 含节奏点</translation>
+    </message>
+    <message>
         <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="972" />
         <source>全部重新分析</source>
         <translation>全部重新分析</translation>
@@ -5307,18 +5319,6 @@ Checkpoint数：每字符一项（如 2,2,1），累加为本行节奏点总数 
         <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="964" />
         <source>自动分析全部注音</source>
         <translation>自动分析全部注音</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="501" />
-        <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="1280" />
-        <source>自动分析全部注音（不更新节奏点）</source>
-        <translation>自动分析全部注音（不更新节奏点）</translation>
-    </message>
-    <message>
-        <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="495" />
-        <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="1278" />
-        <source>自动分析全部注音（更新节奏点）</source>
-        <translation>自动分析全部注音（更新节奏点）</translation>
     </message>
     <message>
         <location filename="src/strange_uta_game/frontend/editor/fulltext_interface.py" line="965" />

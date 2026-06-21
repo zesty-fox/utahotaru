@@ -492,13 +492,13 @@ class RubyInterface(QWidget):
         # 批量操作按钮
         batch_layout = QHBoxLayout()
 
-        self.btn_auto_all = PushButton(self.tr("自动分析全部注音（更新节奏点）"), self)
+        self.btn_auto_all = PushButton(self.tr("全部注音 · 含节奏点"), self)
         self.btn_auto_all.setIcon(FIF.SYNC)
         self.btn_auto_all.clicked.connect(self._on_auto_analyze_all)
         self.btn_auto_all.setEnabled(False)
         batch_layout.addWidget(self.btn_auto_all)
 
-        self.btn_auto_all_no_cp = PushButton(self.tr("自动分析全部注音（不更新节奏点）"), self)
+        self.btn_auto_all_no_cp = PushButton(self.tr("全部注音 · 仅注音"), self)
         self.btn_auto_all_no_cp.setIcon(FIF.SYNC)
         self.btn_auto_all_no_cp.clicked.connect(self._on_auto_analyze_all_no_cp)
         self.btn_auto_all_no_cp.setEnabled(False)
@@ -1275,9 +1275,9 @@ class RubyInterface(QWidget):
             self.switch_ch_width.setOffText(self.tr("关"))
         # 按钮
         if hasattr(self, "btn_auto_all"):
-            self.btn_auto_all.setText(self.tr("自动分析全部注音（更新节奏点）"))
+            self.btn_auto_all.setText(self.tr("全部注音 · 含节奏点"))
         if hasattr(self, "btn_auto_all_no_cp"):
-            self.btn_auto_all_no_cp.setText(self.tr("自动分析全部注音（不更新节奏点）"))
+            self.btn_auto_all_no_cp.setText(self.tr("全部注音 · 仅注音"))
         if hasattr(self, "btn_delete_by_type"):
             self.btn_delete_by_type.setText(self.tr("按类型删除注音"))
         if hasattr(self, "btn_update_cp"):
