@@ -953,6 +953,7 @@ class EditorInterface(QWidget):
             self._store.notify("settings")
 
     def set_project(self, project: Project):
+        previous_project = self._project
         self._project = project
         # 获取AppSettings实例（与_apply_settings使用同一个）
         app_settings = None
@@ -1006,8 +1007,11 @@ class EditorInterface(QWidget):
         self._update_status()
         # 重新应用设置（字体大小、行间距、对齐方式等）
         self._apply_settings()
-        # 加载新项目时清除旧音频缓存，避免旧波形/时长/缓存残留
-        self._clear_audio_state()
+        # 仅在替换已有项目时清除旧音频缓存，避免旧波形/时长/缓存残留。
+        # 首次设置项目（self._project 原为 None）时保留已加载的音频，
+        # 支持"先导入音频再导入歌词"的工作流。
+        if previous_project is not None:
+            self._clear_audio_state()
 
     def release_resources(self):
         """释放音频资源"""
