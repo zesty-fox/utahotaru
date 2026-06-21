@@ -23,7 +23,6 @@ from typing import Optional
 
 from strange_uta_game.backend.application import CommandManager, TimingService
 from strange_uta_game.backend.domain import Project
-from strange_uta_game.backend.infrastructure.audio import BassEngine, BassTsmEngine
 from strange_uta_game.frontend.project_store import ProjectStore
 from strange_uta_game.frontend.theme import theme
 from strange_uta_game.frontend.fluent_widgets import message_choice, message_question
@@ -669,8 +668,14 @@ class MainWindow(MSFluentWindow):
             return True
 
     def _make_audio_engine(self):
-        """按设置创建音频引擎。"""
-        return BassTsmEngine() if self._hq_speed_enabled() else BassEngine()
+        """按设置与平台能力创建音频引擎。
+
+        mac（BASS 不可用）始终返回 SoundDeviceEngine；Windows 按 HQ 开关在
+        BassTsmEngine / BassEngine 间选择。
+        """
+        from strange_uta_game.backend.infrastructure.audio import select_audio_engine
+
+        return select_audio_engine(self._hq_speed_enabled())
 
     def _apply_audio_engine_setting(self):
         """设置变更时按"高质量音频变速"开关切换引擎。
@@ -678,6 +683,15 @@ class MainWindow(MSFluentWindow):
         仅在引擎类型实际改变时重建：释放旧引擎、接入新引擎，并重载当前曲目
         （位置重置为 0）。切换是用户在设置里的低频操作，可接受短暂中断。
         """
+        from strange_uta_game.backend.infrastructure.audio import bass_available
+
+        # mac（BASS 不可用）：SoundDeviceEngine 始终走离线 TSM，HQ 开关无效，直接返回，
+        # 否则下方 isinstance(x, None) 会抛 TypeError。
+        if not bass_available:
+            return
+
+        from strange_uta_game.backend.infrastructure.audio import BassEngine, BassTsmEngine
+
         desired = BassTsmEngine if self._hq_speed_enabled() else BassEngine
         if isinstance(self._audio_engine, desired):
             return
