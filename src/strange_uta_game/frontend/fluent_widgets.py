@@ -16,6 +16,7 @@ from typing import Optional
 from typing import Sequence
 
 from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QColor, QPainter
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
@@ -33,6 +34,27 @@ from qfluentwidgets import (
 )
 
 
+class _DimOverlay(QWidget):
+    """盖在父窗口上的半透明暗化层（纯视觉，置于对话框之下）。
+
+    作为锚点窗口的子控件覆盖其客户区，使对话框弹出时背景变暗，复刻
+    ``MaskDialogBase`` 的遮罩观感；而对话框本身仍是独立可点击的顶层窗口，
+    不重蹈遮罩式"点不动"的覆辙。
+    """
+
+    def __init__(self, anchor_window: QWidget):
+        super().__init__(anchor_window)
+        self._anchor = anchor_window
+        # 不抢焦点、不参与 Tab；仅作背景遮罩
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setGeometry(0, 0, anchor_window.width(), anchor_window.height())
+
+    def paintEvent(self, e):
+        painter = QPainter(self)
+        # 与 qfluentwidgets MessageBox 的遮罩一致：约 30% 黑
+        painter.fillRect(self.rect(), QColor(0, 0, 0, 96))
+
+
 class FluentMessageBox(Dialog):
     """嵌入式兼容的 Fluent 消息对话框。
 
@@ -42,6 +64,9 @@ class FluentMessageBox(Dialog):
     窗口拿不到前台 / 被宿主盖住，点击落到被模态屏蔽的宿主上；其遮罩定位在非最大化
     窗口下也会错位。``Dialog`` 是普通顶层模态窗口，行为等同于此前在嵌入下能正常
     工作的 ``QMessageBox``，且原生按父窗口居中。
+
+    背景暗化由独立的 :class:`_DimOverlay`（父窗口子控件）提供，弹出时覆盖父窗口、
+    置于对话框之下，关闭时移除；既保留遮罩观感，又不影响对话框点击。
 
     与 ``MessageBox`` 共享同一套 ``Ui_MessageBox`` 接口（yesButton / cancelButton /
     hideYesButton / hideCancelButton / setContentCopyable / buttonGroup /
@@ -55,6 +80,23 @@ class FluentMessageBox(Dialog):
         self.setTitleBarVisible(False)
         # 显式应用级模态：嵌入式下确保屏蔽宿主、把输入交给本对话框。
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
+        # 锚点窗口（_resolve_window 已把 parent 解析为窗口，.window() 多为自身）
+        self._anchor_window = parent.window() if parent is not None else None
+        self._dim: Optional[_DimOverlay] = None
+
+    def _show_dim(self) -> None:
+        win = self._anchor_window
+        if win is None or not win.isVisible():
+            return
+        self._dim = _DimOverlay(win)
+        self._dim.show()
+        self._dim.raise_()  # 置于父窗口所有子控件之上（对话框是独立顶层窗口，仍在其上）
+
+    def _hide_dim(self) -> None:
+        if self._dim is not None:
+            self._dim.hide()
+            self._dim.deleteLater()
+            self._dim = None
 
     def _ensure_active(self) -> None:
         self.raise_()
@@ -66,11 +108,19 @@ class FluentMessageBox(Dialog):
         self._ensure_active()
         QTimer.singleShot(0, self._ensure_active)
 
+    def exec(self):
+        """弹出暗化遮罩 → 模态执行 → 退出时移除遮罩。"""
+        self._show_dim()
+        try:
+            return super().exec()
+        finally:
+            self._hide_dim()
+
 
 def make_message_box(
     parent: Optional[QWidget], title: str, content: str
 ) -> FluentMessageBox:
-    """构建定位修正后的 Fluent 消息对话框（供各 message_* 封装与 winrt 引导复用）。"""
+    """构建 Fluent 消息对话框（供各 message_* 封装与 winrt 引导复用）。"""
     return FluentMessageBox(title, content, _resolve_window(parent))
 
 
