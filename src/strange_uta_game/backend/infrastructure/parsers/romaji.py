@@ -200,3 +200,171 @@ def romanize_ruby_parts(
         index += 1
 
     return result
+
+
+# ──────────────────────────────────────────────
+# 句子/项目级罗马音转换（纯逻辑，独立于注音分析流程）
+#
+# 以下函数被 AutoCheckService（受 romanize_ruby 设置开关）与工具栏的
+# 「全部转为罗马字注音」一次性操作共同复用。本层不调用注音引擎、不更新节奏点、
+# 不删除注音——仅就地把假名 ruby 文本转为罗马音，并给无 ruby 的单假名补自注音。
+# 依赖（domain / text_splitter）按需延迟导入，保持模块加载期零依赖。
+# ──────────────────────────────────────────────
+
+
+def is_self_romanizable_kana(char: str) -> bool:
+    """单字符是否为可自注音的假名（平假名/片假名/促音/长音）。"""
+    if len(char) != 1:
+        return False
+    from strange_uta_game.backend.infrastructure.parsers.text_splitter import (
+        CharType,
+        get_char_type,
+    )
+
+    return get_char_type(char) in (
+        CharType.HIRAGANA,
+        CharType.KATAKANA,
+        CharType.SOKUON,
+        CharType.LONG_VOWEL,
+    )
+
+
+def detect_particle_part_indices(sentence) -> set:
+    """检测句中作为助词的 は/へ/を 所在的 ruby part 全局索引（罗马音读音覆盖用）。
+
+    part 索引在「按字符、按 part」顺序展开的扁平序列中计数，与
+    :func:`romanize_sentence_in_place` 收集 texts 的顺序一致。
+
+    判定规则（保守）：
+      - を：恒为助词。
+      - は/へ：需前一字符为日文字符；前字为汉字/片假名时直接判为助词，
+        前字为假名时仅当后字非假名（或位于句末）才判为助词。
+    """
+    from strange_uta_game.backend.infrastructure.parsers.text_splitter import (
+        CharType,
+        get_char_type,
+    )
+
+    particle_indices: set = set()
+    part_idx = 0
+    for char_idx, ch in enumerate(sentence.characters):
+        if not ch.ruby:
+            continue
+        for part in ch.ruby.parts:
+            text = part.text
+            if len(text) != 1 or text != ch.char:
+                part_idx += 1
+                continue
+            if text == "を":  # を
+                particle_indices.add(part_idx)
+                part_idx += 1
+                continue
+            if text not in ("は", "へ"):  # は / へ
+                part_idx += 1
+                continue
+            if char_idx == 0:
+                part_idx += 1
+                continue
+            prev = sentence.characters[char_idx - 1]
+            prev_ct = get_char_type(prev.char) if len(prev.char) == 1 else CharType.OTHER
+            if prev_ct not in (
+                CharType.KANJI,
+                CharType.HIRAGANA,
+                CharType.KATAKANA,
+                CharType.SOKUON,
+                CharType.LONG_VOWEL,
+            ):
+                part_idx += 1
+                continue
+            # 前一字符是汉字/片假名 → 词边界信号强，直接判定为助词。
+            if prev_ct in (CharType.KANJI, CharType.KATAKANA):
+                particle_indices.add(part_idx)
+                part_idx += 1
+                continue
+            # 前一字符是假名：后字非假名（或句末）才判为助词，否则保守不判。
+            if char_idx + 1 >= len(sentence.characters):
+                particle_indices.add(part_idx)
+                part_idx += 1
+                continue
+            next_ch = sentence.characters[char_idx + 1]
+            next_ct = (
+                get_char_type(next_ch.char) if len(next_ch.char) == 1 else CharType.OTHER
+            )
+            if next_ct not in (
+                CharType.HIRAGANA,
+                CharType.KATAKANA,
+                CharType.SOKUON,
+                CharType.LONG_VOWEL,
+            ):
+                particle_indices.add(part_idx)
+            part_idx += 1
+    return particle_indices
+
+
+def romanize_sentence_in_place(sentence) -> None:
+    """将句中所有假名 ruby part 就地转为赫本式罗马音（含助词/促音上下文）。
+
+    保持每个 ruby 的 part 数量不变，仅改写 part.text；非假名（已是罗马音/英文
+    读音）原样保留。
+    """
+    refs = []
+    texts = []
+    for ch in sentence.characters:
+        if not ch.ruby:
+            continue
+        for part in ch.ruby.parts:
+            refs.append(part)
+            texts.append(part.text)
+    if not refs:
+        return
+    particle_indices = detect_particle_part_indices(sentence)
+    converted = romanize_ruby_parts(texts, particle_indices=particle_indices)
+    for part, text in zip(refs, converted):
+        part.text = text
+
+
+def romanize_project_to_self_ruby(project, progress_callback=None) -> int:
+    """「全部转为罗马字注音」一次性操作。
+
+    两步：
+      1. 给无 ruby 的单假名（平假名/片假名/促音/长音）创建自注音
+         （假名本身作为 ruby 文本，保持 check_count 不变、至少为 1）；
+      2. 整句假名 ruby 就地转罗马音（含助词/促音上下文）。
+
+    不调用注音引擎、不更新节奏点、不删除注音。对已是罗马音的 part 幂等。
+
+    Args:
+        project: 目标项目（就地修改）。
+        progress_callback: ``(phase, current, total)`` 进度回调，可选。
+
+    Returns:
+        发生变化的句数。
+    """
+    from strange_uta_game.backend.domain.models import Ruby, RubyPart
+
+    changed = 0
+    sentences = project.sentences
+    total = len(sentences)
+    for i, sentence in enumerate(sentences):
+        touched = False
+        for ch in sentence.characters:
+            if ch.ruby:
+                continue
+            if is_self_romanizable_kana(ch.char):
+                ch.ruby = Ruby(parts=[RubyPart(text=ch.char)])
+                # 经 setter 收口：check_count >= 2 时补占位符，维持 parts==cc 不变式。
+                ch.set_check_count(max(ch.check_count, 1), force=True)
+                touched = True
+
+        def _join(sent) -> str:
+            return "".join(
+                p.text for c in sent.characters if c.ruby for p in c.ruby.parts
+            )
+
+        before = _join(sentence)
+        romanize_sentence_in_place(sentence)
+        if touched or before != _join(sentence):
+            changed += 1
+        if progress_callback is not None:
+            progress_callback("罗马音转换", i + 1, total)
+    return changed

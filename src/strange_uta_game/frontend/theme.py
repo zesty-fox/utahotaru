@@ -331,6 +331,23 @@ class Theme(QObject):
         # 检测初始系统主题
         self._detect_system_theme()
 
+        # 启动时强制同步一次 QApplication palette，使其与解析出的主题一致。
+        #
+        # 必要性：qfluentwidgets 的 setTheme 只改自有控件的 QSS，不改 QPalette；
+        # 而 Win10 上 Qt 平台层不会跟随系统深色模式自动写入暗色 palette（Win11
+        # 才会，且通过 colorSchemeChanged → _reapply_win11_appearance 矫正）。
+        # 若此处不主动同步，Win10 深色模式下 QDialog / QWidget 等依赖 palette
+        # 渲染背景的容器仍保持浅色（Window=#f3f3f3、Base=#fff），而 qfluentwidgets
+        # 深色 LineEdit/TextEdit 的背景是 6% 半透明白 + 白色文字，叠在浅色容器上
+        # 就呈现「白底白字」无法使用。AUTO 模式下 mode setter 会因 mode 未变而
+        # 提前 return，_apply_theme_change（含 _sync_app_palette）不会触发，故必须
+        # 在此显式同步一次。
+        self._sync_app_palette()
+
+        # 启动时一并写入全局样式表，使无法被 Fluent 接管的原生滚动条
+        # 在深色模式下也跟随主题。
+        self._apply_global_qss()
+
         # 监听系统主题变化
         self._setup_system_theme_listener()
 
@@ -486,10 +503,54 @@ class Theme(QObject):
             palette.setColor(QPalette.ColorRole.Dark,            QColor(160, 160, 160))
         app.setPalette(palette)
 
+    def _build_global_qss(self) -> str:
+        """构建应用级全局样式表，仅针对 qfluentwidgets 无法接管的原生 Qt 控件。
+
+        qfluentwidgets 通过 **逐控件** setStyleSheet 应用样式，其优先级高于
+        application 级样式表；因此这里用 ``app.setStyleSheet`` 设置的全局规则
+        只会命中没有自管理 QSS 的原生控件，不会污染任何 Fluent 控件。
+
+        当前仅保留 QScrollBar：timeline / karaoke 预览把它当作独立数值滑条使用
+        （自定义 range/value），而 Fluent ScrollBar 必须依附 QAbstractScrollArea，
+        无法直接替换；故只能用全局 QSS 让其在深色模式下不再呈现白色原生外观。
+        其余原生控件（QGroupBox / QMessageBox / QDialogButtonBox 按钮等）已统一
+        改用 Fluent 控件接管，不在此处理。
+        """
+        dark = self.colors.is_dark
+        # 滚动条滑块：深色用半透明白、浅色用半透明黑，hover 加深
+        handle = "rgba(255, 255, 255, 0.28)" if dark else "rgba(0, 0, 0, 0.28)"
+        handle_hover = "rgba(255, 255, 255, 0.45)" if dark else "rgba(0, 0, 0, 0.45)"
+        return f"""
+        /* ── 原生滚动条（波形 timeline / karaoke 预览的独立滑条）── */
+        QScrollBar:vertical, QScrollBar:horizontal {{
+            background: transparent;
+            border: none;
+        }}
+        QScrollBar::handle:vertical, QScrollBar::handle:horizontal {{
+            background: {handle};
+            border-radius: 4px;
+        }}
+        QScrollBar::handle:vertical {{ min-height: 24px; }}
+        QScrollBar::handle:horizontal {{ min-width: 24px; }}
+        QScrollBar::handle:hover {{ background: {handle_hover}; }}
+        QScrollBar::add-line, QScrollBar::sub-line {{
+            width: 0px; height: 0px; background: none; border: none;
+        }}
+        QScrollBar::add-page, QScrollBar::sub-page {{ background: none; }}
+        """
+
+    def _apply_global_qss(self) -> None:
+        """把全局样式表写入 QApplication（覆盖原生控件，不影响 Fluent 控件）。"""
+        app = QApplication.instance()
+        if not app:
+            return
+        app.setStyleSheet(self._build_global_qss())
+
     def _apply_theme_change(self) -> None:
         """应用主题变更（统一入口）"""
         self._invalidate()
         self._sync_app_palette()
+        self._apply_global_qss()
         self._apply_qfluentwidgets_theme(lazy=True)
         self._refresh_all_widgets()
         self.changed.emit()
@@ -513,6 +574,7 @@ class Theme(QObject):
         - 不重复调用 _invalidate()，因 _mode 未变，颜色缓存无需重建。
         """
         self._sync_app_palette()
+        self._apply_global_qss()
         self._apply_qfluentwidgets_theme(lazy=False)
         self._refresh_all_widgets()
         self.changed.emit()
@@ -658,6 +720,16 @@ def _patch_round_menu() -> None:
     修正为：
     - blurRadius=2、offset=(0,1)、margins=(4,4,4,5)  → 紧凑阴影
     - exec() 统一改用 aniType=NONE                   → 无动画即时弹出
+
+    同时修复 MSFluentWindow 页面切换后点击下拉菜单时 Qt 报警
+    "QWidgetWindow(StackedWidgetClassWindow) must be a top level window"。
+    根因：PopUpAniStackedWidget 在页面切换动画期间可能获得杂散原生窗口句柄，
+    导致 RoundMenu 弹窗解析 transient parent 时走到错误的 QWidgetWindow。
+    修复：在 exec 前对按钮所在顶层窗口调用 winId()，强制 Qt 理顺窗口父子链。
+
+    详见 qfluentwidgets PopUpAniStackedWidget.setCurrentIndex 中对子 widget
+    pos 属性的 QPropertyAnimation，该动画可能在页面显隐切换后使中间层
+    QStackedWidget 持有不应存在的原生窗口句柄。
     """
     try:
         from qfluentwidgets import RoundMenu, MenuAnimationType
@@ -670,6 +742,17 @@ def _patch_round_menu() -> None:
             self.hBoxLayout.setContentsMargins(1, 1, 1, 2)
 
         def _no_ani_exec(self, pos, ani=True, aniType=MenuAnimationType.DROP_DOWN):
+            # 页面切换后 QStackedWidget 可能持有杂散原生窗口句柄，
+            # 导致弹窗 transient parent 检查时 Qt 报警。
+            # 提前 pin 顶层窗口的原生句柄，强制理顺窗口父子链。
+            try:
+                parent = self.parent()
+                if parent is not None:
+                    top = parent.window()
+                    if top is not None:
+                        top.winId()
+            except Exception:
+                pass
             _orig_exec(self, pos, ani=False, aniType=MenuAnimationType.FADE_IN_DROP_DOWN)
 
         RoundMenu.__init__ = _slim_init

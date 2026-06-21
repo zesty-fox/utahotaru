@@ -244,6 +244,33 @@ def test_default_singer_label_roundtrip():
     assert decoded[1].singer_id == "id-a"
 
 
+def test_decode_unknown_singer_tag_becomes_literal():
+    """项目设置里不存在的演唱者名 【名】 当普通字符解析，不静默丢弃。"""
+    name_map = {"太郎": "id-a"}
+    # 【未知】 不在 name_map 也不是默认标签 → 整段逐字当普通字符
+    chars, last = parse_timed_line(
+        "あ【未知】い", name_to_singer_id=name_map, default_singer_id="id-a"
+    )
+    assert [c.char for c in chars] == list("あ【未知】い")
+    # singer 不被切换，全程沿用 default
+    assert all(c.singer_id == "id-a" for c in chars)
+    assert last == "id-a"
+
+    # pending_starts 由 【 正常消耗，时间戳不丢失
+    chars2, _ = parse_timed_line(
+        "[00:01.00]【未知】う", name_to_singer_id=name_map
+    )
+    assert chars2[0].char == "【" and chars2[0].timestamps == [1000]
+    assert [c.char for c in chars2] == list("【未知】う")
+
+    # 已知演唱者仍正常切换
+    chars3, _ = parse_timed_line(
+        "【太郎】さ", name_to_singer_id=name_map, default_singer_id="id-x"
+    )
+    assert [c.char for c in chars3] == ["さ"]
+    assert chars3[0].singer_id == "id-a"
+
+
 def test_timed_line_columns_point_to_glyphs():
     """timed_line_columns 返回的列号精确指向各字符的可见字形。"""
     chars = [

@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 
 from PyQt6.QtCore import Qt, QRectF, QCoreApplication, pyqtSignal
-from PyQt6.QtGui import QPainter, QColor, QPainterPath
+from PyQt6.QtGui import QPainter, QColor, QPainterPath, QCursor
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -171,12 +171,13 @@ class UpdateProgressWindow(QWidget):
     # ----------------------------------------------------------------
 
     def _center_on_screen(self) -> None:
-        screen = QApplication.primaryScreen()
+        # 居中到光标所在屏（多显示器下不强制跳回主屏）
+        screen = QApplication.screenAt(QCursor.pos()) or QApplication.primaryScreen()
         if screen:
             geo = screen.availableGeometry()
             self.move(
-                (geo.width() - self.width()) // 2,
-                (geo.height() - self.height()) // 2,
+                geo.x() + (geo.width() - self.width()) // 2,
+                geo.y() + (geo.height() - self.height()) // 2,
             )
 
     def update_from_text(self, text: str) -> None:

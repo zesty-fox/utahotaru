@@ -475,6 +475,10 @@ class TimelineWidget(QWidget):
     seek_requested = pyqtSignal(int)
     waveform_visibility_changed = pyqtSignal(bool)
 
+    # 横向滚动条整数分辨率：把"整段时长"映射为 [0, _SCROLL_SCALE] 个单位，
+    # pageStep = 可见时间窗占比（_SCROLL_SCALE / zoom），使滑块长度随缩放自动伸缩。
+    _SCROLL_SCALE = 100000
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._duration_ms = 0
@@ -535,10 +539,10 @@ class TimelineWidget(QWidget):
 
         # 横向滚动条
         self.scroll_bar = QScrollBar(Qt.Orientation.Horizontal, self)
-        self.scroll_bar.setRange(0, 1000)
-        self.scroll_bar.setValue(0)
         self.scroll_bar.valueChanged.connect(self._on_scroll_bar_changed)
         bottom_layout.addWidget(self.scroll_bar, stretch=1)
+        # 初始按当前缩放设置 pageStep/range/value（滑块长度=可见窗占比）
+        self._update_scroll_bar_metrics()
 
         # 音频名称标签（_audio_name_is_placeholder 标志位让 changeEvent
         # 不靠字符串比较即可判断是否需要重译）
@@ -619,10 +623,30 @@ class TimelineWidget(QWidget):
         self.zoom_slider.setValue(self._zoom_to_slider(zoom))
         self.zoom_slider.blockSignals(False)
         self.zoom_label.setText(f"{zoom:.1f}x")
+        # 缩放变化 → 可见窗占比变化 → 刷新滑块长度
+        self._update_scroll_bar_metrics()
 
     def _on_scroll_changed(self, position: float):
         self.scroll_bar.blockSignals(True)
-        self.scroll_bar.setValue(int(position * 1000))
+        self.scroll_bar.setValue(int(round(position * self._SCROLL_SCALE)))
+        self.scroll_bar.blockSignals(False)
+
+    def _update_scroll_bar_metrics(self):
+        """根据当前缩放刷新横向滚动条的 pageStep / range / value。
+
+        滑块长度 = pageStep / (range跨度 + pageStep) = (1/zoom)，即可见时间窗占
+        整段时长的比例：1x 时填满整条，放大越多滑块越短（下限由 QSS min-width 兜底）。
+        """
+        if not hasattr(self, "scroll_bar"):
+            return
+        zoom = max(1.0, getattr(self.waveform_display, "_zoom_factor", 1.0))
+        page = max(1, int(round(self._SCROLL_SCALE / zoom)))
+        position = getattr(self.waveform_display, "_scroll_position", 0.0)
+        self.scroll_bar.blockSignals(True)
+        self.scroll_bar.setPageStep(page)
+        self.scroll_bar.setSingleStep(max(1, page // 10))
+        self.scroll_bar.setRange(0, self._SCROLL_SCALE - page)
+        self.scroll_bar.setValue(int(round(position * self._SCROLL_SCALE)))
         self.scroll_bar.blockSignals(False)
 
     def _on_zoom_slider_changed(self, value: int):
@@ -632,10 +656,13 @@ class TimelineWidget(QWidget):
         zoom = self._slider_to_zoom(value)
         self.waveform_display.set_zoom(zoom)
         self.zoom_label.setText(f"{zoom:.1f}x")
+        # set_zoom 不发 zoom_changed 信号（仅 Alt+滚轮缩放才发），故缩放滑条
+        # 改变后需在此显式刷新滚动条 pageStep/range，使滑块长度跟随缩放比例。
+        self._update_scroll_bar_metrics()
 
     def _on_scroll_bar_changed(self, value: int):
         self.waveform_display._suspend_auto_scroll()
-        position = value / 1000.0
+        position = value / self._SCROLL_SCALE
         self.waveform_display.set_scroll_position(position)
 
     def _on_waveform_visibility_changed(self, checked: bool):

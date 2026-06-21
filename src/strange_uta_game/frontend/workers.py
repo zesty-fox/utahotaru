@@ -168,7 +168,7 @@ class RubyAnalyzeWorker(QObject):
     worker 只负责在自己线程调用 init_apartment 后执行分析计算，避免阻塞 UI。
     """
 
-    progress = pyqtSignal(int, int)    # (current_line, total_lines)
+    progress = pyqtSignal(str, int, int)  # (phase, current_line, total_lines)
     llm_waiting = pyqtSignal()         # LLM 整首批量请求发出、等待返回中
     finished = pyqtSignal(object, int) # (analyzed_project_copy, deleted_count)
     error = pyqtSignal(str)
@@ -180,6 +180,7 @@ class RubyAnalyzeWorker(QObject):
         only_noruby: bool,
         delete_types: list,
         llm_apply_user_dict: bool = True,
+        update_checkpoints: bool = True,
     ):
         super().__init__()
         self._project = project_copy
@@ -188,6 +189,8 @@ class RubyAnalyzeWorker(QObject):
         self._delete_types = delete_types
         # LLM 注音时是否仍应用用户词典（非 LLM 模式恒为 True，无副作用）
         self._llm_apply_user_dict = llm_apply_user_dict
+        # False=只刷注音、保留现有节奏点不动
+        self._update_checkpoints = update_checkpoints
 
     def run(self) -> None:
         try:
@@ -199,8 +202,8 @@ class RubyAnalyzeWorker(QObject):
             except Exception:
                 pass
 
-            def _progress_cb(current: int, total: int) -> None:
-                self.progress.emit(current, total)
+            def _progress_cb(phase: str, current: int, total: int) -> None:
+                self.progress.emit(phase, current, total)
 
             # LLM 注音：显式预热整首批量请求，期间发「等待 LLM」信号给 UI。
             _analyzer = getattr(self._auto_check, "_analyzer", None)
@@ -213,6 +216,7 @@ class RubyAnalyzeWorker(QObject):
                 only_noruby=self._only_noruby,
                 apply_user_dict=self._llm_apply_user_dict,
                 delete_types=self._delete_types or None,
+                update_checkpoints=self._update_checkpoints,
                 progress_callback=_progress_cb,
             )
 
@@ -243,12 +247,15 @@ class RubySubsetAnalyzeWorker(QObject):
         auto_check,
         specs: list,
         apply_user_dict: bool = True,
+        update_checkpoints: bool = True,
     ):
         super().__init__()
         self._project = project_copy
         self._auto_check = auto_check
         self._specs = specs
         self._apply_user_dict = apply_user_dict
+        # False=只刷注音、保留现有节奏点不动
+        self._update_checkpoints = update_checkpoints
 
     def run(self) -> None:
         try:
@@ -271,6 +278,7 @@ class RubySubsetAnalyzeWorker(QObject):
                     only_noruby=False,
                     restrict_indices=restrict_indices,
                     apply_user_dict=self._apply_user_dict,
+                    update_checkpoints=self._update_checkpoints,
                 )
 
             self.finished.emit(self._project)

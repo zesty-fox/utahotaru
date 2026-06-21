@@ -16,7 +16,6 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
     QFormLayout,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -64,6 +63,8 @@ from qfluentwidgets import (
 )
 
 from strange_uta_game.frontend.theme import theme, ThemeColors
+from strange_uta_game.frontend.fluent_widgets import FluentGroupBox
+from strange_uta_game.frontend.window_sizing import fit_to_screen
 
 from strange_uta_game.backend.infrastructure.exporters.nicokara_exporter import (
     strip_variation_selectors,
@@ -98,7 +99,7 @@ def _set_ruby_split_mode(mode: str) -> None:
         pass
 
 
-def _create_ruby_split_group(parent: QWidget) -> tuple[QRadioButton, QRadioButton, QRadioButton, QGroupBox]:
+def _create_ruby_split_group(parent: QWidget) -> tuple[QRadioButton, QRadioButton, QRadioButton, FluentGroupBox]:
     """创建注音分段方式选择组
 
     Returns:
@@ -107,10 +108,10 @@ def _create_ruby_split_group(parent: QWidget) -> tuple[QRadioButton, QRadioButto
     from PyQt6.QtCore import QCoreApplication
     # 显式 QCoreApplication.translate 让 .ts 抽取器以 "RubySplit" 为上下文
     # 收录源串（lambda 包装时抽取器无法跟踪到内嵌上下文名）。
-    group_box = QGroupBox(
+    group_box = FluentGroupBox(
         QCoreApplication.translate("RubySplit", "注音分段方式")
     )
-    group_layout = QVBoxLayout(group_box)
+    group_layout = group_box.contentLayout
 
     radio_direct = RadioButton(QCoreApplication.translate(
         "RubySplit", "直接应用（用逗号手动分段，无逗号则不分段）"
@@ -262,7 +263,7 @@ class ModifyCharacterDialog(QDialog):
         self._char_rows: list[tuple[QLabel, QLineEdit, QLineEdit, QCheckBox]] = []
 
         self.setWindowTitle(self.tr("修改所选字符"))
-        self.resize(*CHAR_DIALOG_SIZE)
+        fit_to_screen(self, *CHAR_DIALOG_SIZE)
         self.setFont(char_dialog_font(FONT_DIALOG_BASE))
 
         layout = QVBoxLayout(self)
@@ -630,7 +631,7 @@ class InsertGuideSymbolDialog(QDialog):
         saved_fill_gap = settings.get("timing.guide_fill_gap", False)
 
         self.setWindowTitle(self.tr("插入导唱符"))
-        self.resize(400, 320)
+        fit_to_screen(self, 400, 320)
         self.setFont(QFont("Microsoft YaHei", 10))
 
         layout = QVBoxLayout(self)
@@ -868,7 +869,7 @@ class CharEditDialog(QDialog):
         self._char_rows: list[tuple[QLabel, QLineEdit, QLineEdit, QCheckBox]] = []
 
         self.setWindowTitle(self.tr("编辑字符"))
-        self.resize(*CHAR_DIALOG_SIZE)
+        fit_to_screen(self, *CHAR_DIALOG_SIZE)
         self.setFont(char_dialog_font(FONT_DIALOG_BASE))
 
         layout = QVBoxLayout(self)
@@ -1211,7 +1212,7 @@ class SetSingerByLineDialog(QDialog):
         self._singer_map = {s.id: s for s in singers}
 
         self.setWindowTitle(self.tr("按行设置演唱者"))
-        self.resize(1200, 900)
+        fit_to_screen(self, 1200, 900)
         self.setFont(QFont("Microsoft YaHei", 10))
 
         layout = QVBoxLayout(self)
@@ -1279,8 +1280,8 @@ class SetSingerByLineDialog(QDialog):
         layout.addLayout(select_layout)
 
         # 演唱者选择区（名称过滤 + 分组过滤 + 列表预览）
-        singer_group = QGroupBox(self.tr("设置演唱者为"), self)
-        sg_layout = QVBoxLayout(singer_group)
+        singer_group = FluentGroupBox(self.tr("设置演唱者为"), self)
+        sg_layout = singer_group.contentLayout
         sg_layout.setSpacing(4)
 
         # 过滤行
@@ -1506,7 +1507,7 @@ class ApplySingerDialog(QDialog):
         self._selected_singer_id = None
 
         self.setWindowTitle(self.tr("应用演唱者"))
-        self.resize(400, 500)
+        fit_to_screen(self, 400, 500)
         self.setFont(QFont("Microsoft YaHei", 10))
 
         layout = QVBoxLayout(self)
@@ -1627,7 +1628,7 @@ class CompleteTimestampDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("补全时间戳"))
-        self.resize(480, 400)
+        fit_to_screen(self, 480, 400)
         self.setFont(QFont("Microsoft YaHei", 10))
         self._apply_clicked = False
 
@@ -1661,8 +1662,8 @@ class CompleteTimestampDialog(QDialog):
         layout.addWidget(desc_label)
 
         # 第二行：适用范围（多选）
-        scope_group = QGroupBox(self.tr("适用范围"))
-        scope_layout = QVBoxLayout(scope_group)
+        scope_group = FluentGroupBox(self.tr("适用范围"))
+        scope_layout = scope_group.contentLayout
 
         self._scope_checkboxes: dict[str, QCheckBox] = {}
         # 显示侧逐项显式 self.tr 以便 .ts 抽取器把源串归入本类上下文
@@ -1689,8 +1690,8 @@ class CompleteTimestampDialog(QDialog):
         layout.addWidget(scope_group)
 
         # 第三行：排除规则（多选）
-        exclude_group = QGroupBox(self.tr("排除规则"))
-        exclude_layout = QVBoxLayout(exclude_group)
+        exclude_group = FluentGroupBox(self.tr("排除规则"))
+        exclude_layout = exclude_group.contentLayout
 
         self._exclude_checkboxes: dict[str, CheckBox] = {}
         exclude_items: list[tuple[str, str]] = [
@@ -1706,8 +1707,9 @@ class CompleteTimestampDialog(QDialog):
         layout.addWidget(exclude_group)
 
         # 第四行：边界时间戳偏移设置
-        offset_group = QGroupBox(self.tr("边界时间戳偏移"))
-        offset_layout = QFormLayout(offset_group)
+        offset_group = FluentGroupBox(self.tr("边界时间戳偏移"))
+        offset_layout = QFormLayout()
+        offset_group.contentLayout.addLayout(offset_layout)
 
         self._edit_head_offset = LineEdit(self)
         self._edit_head_offset.setText(str(self._saved_head_offset_ms))
@@ -1814,7 +1816,7 @@ class AdjustRawTimestampDialog(QDialog):
             tip = self.tr("正数：所有原始时间戳向后移；负数：向前移。")
 
         self.setWindowModality(Qt.WindowModality.NonModal)
-        self.resize(360, 220)
+        fit_to_screen(self, 360, 220)
         self.setFont(QFont("Microsoft YaHei", 10))
 
         layout = QVBoxLayout(self)
@@ -1834,7 +1836,7 @@ class AdjustRawTimestampDialog(QDialog):
 
         form = QFormLayout()
         self.spin_delta = SpinBox(self)
-        self.spin_delta.setRange(-9999, 9999)
+        self.spin_delta.setRange(-99999, 99999)
         self.spin_delta.setValue(0)
         self.spin_delta.setSuffix(" ms")
         form.addRow(self.tr("偏移量:"), self.spin_delta)
@@ -1915,7 +1917,7 @@ class SeparateSymbolTimestampDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("分离符号时间戳"))
-        self.resize(600, 640)
+        fit_to_screen(self, 600, 640)
         self.setFont(QFont("Microsoft YaHei", 10))
         self._apply_clicked = False
 
@@ -1947,8 +1949,9 @@ class SeparateSymbolTimestampDialog(QDialog):
         layout.addWidget(desc)
 
         # 符号分组选择（两列布局）
-        group_box = QGroupBox(self.tr("适用符号分组"))
-        group_hlayout = QHBoxLayout(group_box)
+        group_box = FluentGroupBox(self.tr("适用符号分组"))
+        group_hlayout = QHBoxLayout()
+        group_box.contentLayout.addLayout(group_hlayout)
         mid = (len(_SEPARATE_SYM_GROUPS) + 1) // 2
         left_col = QVBoxLayout()
         right_col = QVBoxLayout()
@@ -1980,11 +1983,12 @@ class SeparateSymbolTimestampDialog(QDialog):
         layout.addLayout(sel_row)
 
         # 补偿设置
-        comp_box = QGroupBox(self.tr("补偿时间戳"))
-        comp_form = QFormLayout(comp_box)
+        comp_box = FluentGroupBox(self.tr("补偿时间戳"))
+        comp_form = QFormLayout()
+        comp_box.contentLayout.addLayout(comp_form)
 
         self.spin_pre_comp = SpinBox(self)
-        self.spin_pre_comp.setRange(0, 9999)
+        self.spin_pre_comp.setRange(0, 99999)
         self.spin_pre_comp.setValue(self._saved_pre_comp)
         self.spin_pre_comp.setSuffix(" ms")
         self.spin_pre_comp.setToolTip(self.tr(
@@ -1994,7 +1998,7 @@ class SeparateSymbolTimestampDialog(QDialog):
         comp_form.addRow(self.tr("前补偿（前移符号时间戳）:"), self.spin_pre_comp)
 
         self.spin_post_comp = SpinBox(self)
-        self.spin_post_comp.setRange(0, 9999)
+        self.spin_post_comp.setRange(0, 99999)
         self.spin_post_comp.setValue(self._saved_post_comp)
         self.spin_post_comp.setSuffix(" ms")
         self.spin_post_comp.setToolTip(self.tr(

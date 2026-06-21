@@ -349,6 +349,9 @@ def _sync_nicokara_metadata_to_settings(metadata: dict, *, setting_iface=None) -
         elif key == "Offset":
             # @Offset 由 Project.offset_ms 单独承载，跳过避免双重写入
             continue
+        elif key.startswith("_Emoji"):
+            # NicokaraParser 用 _EmojiN 键存储完整 @Emoji 行，还原为 @Emoji=
+            custom.append(f"@Emoji={value}")
         else:
             custom.append(f"@{key}={value}")
     if custom:

@@ -36,6 +36,10 @@ class EditorToolBar(QFrame):
     analyze_rubies_clicked = pyqtSignal()
     analyze_rubies_by_line_clicked = pyqtSignal()
     analyze_rubies_selected_clicked = pyqtSignal()
+    analyze_rubies_no_cp_clicked = pyqtSignal()           # 注音分析（不更新节奏点）
+    analyze_rubies_by_line_no_cp_clicked = pyqtSignal()   # 按行注音分析（不更新节奏点）
+    analyze_rubies_selected_no_cp_clicked = pyqtSignal()  # 注音分析所选字符（不更新节奏点）
+    romanize_all_clicked = pyqtSignal()                   # 全部转为罗马字注音（不更新节奏点/不删除注音）
     open_fulltext_clicked = pyqtSignal()
     modify_char_clicked = pyqtSignal()
     insert_guide_clicked = pyqtSignal()
@@ -48,6 +52,10 @@ class EditorToolBar(QFrame):
     adjust_raw_timestamp_clicked = pyqtSignal()          # 整体调整原始时间戳
     adjust_raw_timestamp_line_clicked = pyqtSignal()     # 按行调整原始时间戳
     adjust_raw_timestamp_selected_clicked = pyqtSignal() # 调整所选字符原始时间戳
+    delete_all_timestamps_clicked = pyqtSignal()           # 删除所有时间戳
+    delete_all_timestamps_keep_head_clicked = pyqtSignal() # 删除所有时间戳（保留行首）
+
+    delete_timestamps_selected_clicked = pyqtSignal()      # 删除所选范围时间戳
     offset_changed = pyqtSignal(int)  # 偏移量变化（毫秒）
 
     def __init__(self, parent=None):
@@ -106,9 +114,19 @@ class EditorToolBar(QFrame):
         self.btn_ruby.setFixedHeight(32)
         self.btn_ruby.setMinimumWidth(110)
         ruby_menu = RoundMenu(parent=self.btn_ruby)
-        ruby_menu.addAction(Action(FIF.SYNC, tr("注音分析"), self, triggered=self.analyze_rubies_clicked.emit))
-        ruby_menu.addAction(Action(FIF.SYNC, tr("按行注音分析"), self, triggered=self.analyze_rubies_by_line_clicked.emit))
-        ruby_menu.addAction(Action(FIF.SYNC, tr("注音分析所选字符"), self, triggered=self.analyze_rubies_selected_clicked.emit))
+        # 第一组：注音分析并自动更新节奏点
+        ruby_menu.addAction(Action(FIF.SYNC, tr("全部 · 含节奏点"), self, triggered=self.analyze_rubies_clicked.emit))
+        ruby_menu.addAction(Action(FIF.SYNC, tr("按行 · 含节奏点"), self, triggered=self.analyze_rubies_by_line_clicked.emit))
+        ruby_menu.addAction(Action(FIF.SYNC, tr("所选 · 含节奏点"), self, triggered=self.analyze_rubies_selected_clicked.emit))
+        ruby_menu.addSeparator()
+        # 第二组：仅注音分析，保留现有节奏点不动
+        ruby_menu.addAction(Action(FIF.SYNC, tr("全部 · 仅注音"), self, triggered=self.analyze_rubies_no_cp_clicked.emit))
+        ruby_menu.addAction(Action(FIF.SYNC, tr("按行 · 仅注音"), self, triggered=self.analyze_rubies_by_line_no_cp_clicked.emit))
+        ruby_menu.addAction(Action(FIF.SYNC, tr("所选 · 仅注音"), self, triggered=self.analyze_rubies_selected_no_cp_clicked.emit))
+        ruby_menu.addSeparator()
+        # 第三组：把现有注音/单假名整体转为罗马字（独立操作，不分析/不更新节奏点/不删除注音）
+        ruby_menu.addAction(Action(FIF.FONT, tr("全部转为罗马字"), self, triggered=self.romanize_all_clicked.emit))
+        ruby_menu.addSeparator()
         ruby_menu.addAction(Action(FIF.DELETE, tr("按类型删除注音"), self, triggered=self.delete_rubies_by_type_clicked.emit))
         self.btn_ruby.setMenu(ruby_menu)
         layout.addWidget(self.btn_ruby)
@@ -145,6 +163,11 @@ class EditorToolBar(QFrame):
         ts_menu.addAction(Action(FIF.DATE_TIME, tr("调整原始时间戳"), self, triggered=self.adjust_raw_timestamp_clicked.emit))
         ts_menu.addAction(Action(FIF.DATE_TIME, tr("按行调整原始时间戳"), self, triggered=self.adjust_raw_timestamp_line_clicked.emit))
         ts_menu.addAction(Action(FIF.DATE_TIME, tr("调整所选字符原始时间戳"), self, triggered=self.adjust_raw_timestamp_selected_clicked.emit))
+        ts_menu.addSeparator()
+        ts_menu.addAction(Action(FIF.DELETE, tr("删除所有时间戳"), self, triggered=self.delete_all_timestamps_clicked.emit))
+        ts_menu.addAction(Action(FIF.DELETE, tr("删除所有时间戳（保留行首）"), self, triggered=self.delete_all_timestamps_keep_head_clicked.emit))
+
+        ts_menu.addAction(Action(FIF.DELETE, tr("删除所选范围时间戳"), self, triggered=self.delete_timestamps_selected_clicked.emit))
         self.btn_timestamp.setMenu(ts_menu)
         layout.addWidget(self.btn_timestamp)
 

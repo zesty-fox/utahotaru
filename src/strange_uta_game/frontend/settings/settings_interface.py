@@ -45,6 +45,7 @@ from qfluentwidgets import (
 )
 
 from strange_uta_game.__version__ import __version__ as _app_version
+from strange_uta_game.frontend.fluent_widgets import message_question
 
 from .app_settings import AppSettings, _parse_rl_dictionary
 from .calibration_dialog import CalibrationCanvas, CalibrationDialog
@@ -451,15 +452,13 @@ class SettingsInterface(ScrollArea):
         )
 
     def _reset_settings(self):
-        from PyQt6.QtWidgets import QMessageBox
-        msg = QMessageBox(self)
-        msg.setWindowTitle(self.tr("确认重置"))
-        msg.setText(self.tr("确定要将所有设置重置为默认值吗？\n这将覆盖您当前的设置（用户词典和演唱者预设不受影响）。"))
-        btn_yes = msg.addButton(self.tr("是"), QMessageBox.ButtonRole.AcceptRole)
-        msg.addButton(self.tr("否"), QMessageBox.ButtonRole.RejectRole)
-        msg.setDefaultButton(btn_yes)
-        msg.exec()
-        if msg.clickedButton() is btn_yes:
+        if message_question(
+            self,
+            self.tr("确认重置"),
+            self.tr("确定要将所有设置重置为默认值吗？\n这将覆盖您当前的设置（用户词典和演唱者预设不受影响）。"),
+            yes_text=self.tr("是"),
+            no_text=self.tr("否"),
+        ):
             try:
                 if self._settings_provider is not None:
                     self._settings = AppSettings(provider=self._settings_provider)
@@ -524,8 +523,6 @@ class SettingsInterface(ScrollArea):
         覆盖规则：KS 来源的同名字段优先，字典/演唱者按 word/name 合并（存在则替换，否则追加），
         网络词典缓存整体覆盖。
         """
-        from PyQt6.QtWidgets import QMessageBox
-
         # 仅 standalone 模式支持 KS 导入
         if self._embedded:
             InfoBar.info(
@@ -537,40 +534,39 @@ class SettingsInterface(ScrollArea):
             return
 
         # 确认对话框
-        msg = QMessageBox(self)
-        msg.setWindowTitle(self.tr("确认导入"))
-        msg.setText(self.tr(
-            "确定要从前 Karaoke Studio 的 settings.json 导入配置吗？\n\n"
-            "将从 KS 配置中提取以下内容并合并到当前 SUG 配置：\n"
-            "  - 主设置（播放、打轴、界面、快捷键等）\n"
-            "  - 用户词典\n"
-            "  - 演唱者预设\n"
-            "  - 网络词典缓存\n"
-            "  - 界面主题\n"
-            "  - 更新器设置\n\n"
-            "KS 来源的配置将优先覆盖同名设置。"
-        ))
-        btn_yes = msg.addButton(self.tr("是"), QMessageBox.ButtonRole.AcceptRole)
-        msg.addButton(self.tr("否"), QMessageBox.ButtonRole.RejectRole)
-        msg.setDefaultButton(btn_yes)
-        msg.exec()
-        if msg.clickedButton() is not btn_yes:
+        if not message_question(
+            self,
+            self.tr("确认导入"),
+            self.tr(
+                "确定要从前 Karaoke Studio 的 settings.json 导入配置吗？\n\n"
+                "将从 KS 配置中提取以下内容并合并到当前 SUG 配置：\n"
+                "  - 主设置（播放、打轴、界面、快捷键等）\n"
+                "  - 用户词典\n"
+                "  - 演唱者预设\n"
+                "  - 网络词典缓存\n"
+                "  - 界面主题\n"
+                "  - 更新器设置\n\n"
+                "KS 来源的配置将优先覆盖同名设置。"
+            ),
+            yes_text=self.tr("是"),
+            no_text=self.tr("否"),
+        ):
             return
 
         # 查找 KS settings.json
         ks_path = self._find_ks_settings_path()
         if ks_path is None:
             # 自动查找失败，让用户手动选择
-            choice = QMessageBox(self)
-            choice.setWindowTitle(self.tr("未找到 KS 配置"))
-            choice.setText(self.tr(
-                "未能自动找到 Karaoke Studio 的 settings.json。\n\n"
-                "是否手动选择文件？"
-            ))
-            btn_browse = choice.addButton(self.tr("浏览"), QMessageBox.ButtonRole.AcceptRole)
-            choice.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
-            choice.exec()
-            if choice.clickedButton() is not btn_browse:
+            if not message_question(
+                self,
+                self.tr("未找到 KS 配置"),
+                self.tr(
+                    "未能自动找到 Karaoke Studio 的 settings.json。\n\n"
+                    "是否手动选择文件？"
+                ),
+                yes_text=self.tr("浏览"),
+                no_text=self.tr("取消"),
+            ):
                 return
             from PyQt6.QtWidgets import QFileDialog
             ks_path_str, _ = QFileDialog.getOpenFileName(

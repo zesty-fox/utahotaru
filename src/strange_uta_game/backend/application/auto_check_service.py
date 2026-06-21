@@ -44,7 +44,9 @@ from strange_uta_game.backend.infrastructure.parsers.e2k_engine import (
     EnglishToKanaEngine,
 )
 from strange_uta_game.backend.infrastructure.parsers.romaji import (
-    romanize_ruby_parts,
+    detect_particle_part_indices,
+    is_self_romanizable_kana,
+    romanize_sentence_in_place,
 )
 
 
@@ -340,80 +342,17 @@ class AutoCheckService:
             pass
 
     def _should_make_romaji_self_ruby(self, char: str) -> bool:
-        if not self._romanize_ruby or len(char) != 1:
-            return False
-        return get_char_type(char) in (
-            CharType.HIRAGANA, CharType.KATAKANA, CharType.SOKUON, CharType.LONG_VOWEL)
+        return self._romanize_ruby and is_self_romanizable_kana(char)
 
     def _detect_romaji_particles(self, sentence: Sentence) -> set[int]:
         if not self._romanize_ruby:
             return set()
-        particle_indices: set[int] = set()
-        part_idx = 0
-        for char_idx, ch in enumerate(sentence.characters):
-            if not ch.ruby:
-                continue
-            for part in ch.ruby.parts:
-                text = part.text
-                if len(text) != 1 or text != ch.char:
-                    part_idx += 1
-                    continue
-                if text == "\u3092":
-                    particle_indices.add(part_idx)
-                    part_idx += 1
-                    continue
-                if text not in ("\u306f", "\u3078"):
-                    part_idx += 1
-                    continue
-                if char_idx == 0:
-                    part_idx += 1
-                    continue
-                prev = sentence.characters[char_idx - 1]
-                prev_ct = get_char_type(prev.char) if len(prev.char) == 1 else CharType.OTHER
-                if prev_ct not in (CharType.KANJI, CharType.HIRAGANA, CharType.KATAKANA,
-                                   CharType.SOKUON, CharType.LONG_VOWEL):
-                    part_idx += 1
-                    continue
-                # 前一字符是汉字/片假名 → 词边界信号强，直接判定为助词（无需看后字）。
-                # 例：「私は」「学校へ」「ロボットは」
-                if prev_ct in (CharType.KANJI, CharType.KATAKANA):
-                    particle_indices.add(part_idx)
-                    part_idx += 1
-                    continue
-                # 前一字符是假名（平假名/促音/长音）：使用后一字符辅助双向判断。
-                # 「假名+は/へ+假名」三方全假名时无法可靠区分词内は与助词は
-                # （例：「おはなし」的は vs「わたしはやさしい」的は），
-                # 保守处理：只有后一字符非假名（汉字、标点、英文、句末等）时才判定为助词。
-                if char_idx + 1 >= len(sentence.characters):
-                    # 句末の は/へ，前有日文字符 → 判定为助词
-                    particle_indices.add(part_idx)
-                    part_idx += 1
-                    continue
-                next_ch = sentence.characters[char_idx + 1]
-                next_ct = get_char_type(next_ch.char) if len(next_ch.char) == 1 else CharType.OTHER
-                if next_ct not in (CharType.HIRAGANA, CharType.KATAKANA,
-                                   CharType.SOKUON, CharType.LONG_VOWEL):
-                    particle_indices.add(part_idx)
-                part_idx += 1
-        return particle_indices
+        return detect_particle_part_indices(sentence)
 
     def _romanize_sentence_ruby(self, sentence: Sentence) -> None:
         if not self._romanize_ruby:
             return
-        refs: List[RubyPart] = []
-        texts: List[str] = []
-        for ch in sentence.characters:
-            if not ch.ruby:
-                continue
-            for part in ch.ruby.parts:
-                refs.append(part)
-                texts.append(part.text)
-        if not refs:
-            return
-        particle_indices = self._detect_romaji_particles(sentence)
-        converted = romanize_ruby_parts(texts, particle_indices=particle_indices)
-        for part, text in zip(refs, converted):
-            part.text = text
+        romanize_sentence_in_place(sentence)
 
     def _apply_english_dictionary(
         self, text: str, ruby_results: List[RubyResult], dict_covered: set
@@ -2163,19 +2102,27 @@ class AutoCheckService:
         if not skip_romanize:
             self._romanize_sentence_ruby(sentence)
 
-    def romanize_project_rubies(self, project: Project) -> int:
-        """对项目所有句子执行罗马音转换（供外部在 delete 之后调用）。"""
+    def romanize_project_rubies(self, project: Project, progress_callback=None) -> int:
+        """对项目所有句子执行罗马音转换（供外部在 delete 之后调用）。
+
+        Args:
+            progress_callback: ``(phase, current, total)`` 进度回调。
+        """
         if self._chinese_mode:
             return 0
         if not self._romanize_ruby:
             return 0
         changed = 0
-        for sentence in project.sentences:
+        sentences = project.sentences
+        total = len(sentences)
+        for i, sentence in enumerate(sentences):
             before = sum(len(part.text) for ch in sentence.characters if ch.ruby for part in ch.ruby.parts)
             self._romanize_sentence_ruby(sentence)
             after = sum(len(part.text) for ch in sentence.characters if ch.ruby for part in ch.ruby.parts)
             if before != after:
                 changed += 1
+            if progress_callback is not None:
+                progress_callback("罗马音转换", i + 1, total)
         return changed
 
     def _apply_user_dictionary_to_sentence(
@@ -2387,7 +2334,7 @@ class AutoCheckService:
             for i, sentence in enumerate(sentences):
                 self._apply_chinese_to_sentence(sentence, keep_existing_timetags)
                 if progress_callback is not None:
-                    progress_callback(i + 1, total)
+                    progress_callback("注音分析", i + 1, total)
             project.shift_selected_checkpoint_if_lost()
             return
         for i, sentence in enumerate(sentences):
@@ -2396,25 +2343,34 @@ class AutoCheckService:
                 apply_user_dict=apply_user_dict, skip_romanize=skip_romanize,
             )
             if progress_callback is not None:
-                progress_callback(i + 1, total)
+                progress_callback("注音分析", i + 1, total)
         project.shift_selected_checkpoint_if_lost()
 
-    def apply_user_dict_to_project(self, project: Project, skip_romanize: bool = False) -> None:
+    def apply_user_dict_to_project(
+        self, project: Project, skip_romanize: bool = False, progress_callback=None
+    ) -> None:
         """对整个项目执行 Phase 5 用户词典覆盖。
 
         每句重新调用 analyze_sentence 拿到最新的复合词归组信息（compound_group_id），
         构建 morpheme_ranges 后传给 Phase 5，确保保护与 apply_to_sentence 路径一致。
+
+        Args:
+            progress_callback: ``(phase, current, total)`` 进度回调。
         """
         if self._chinese_mode:
             return
         if not self._dict:
             return
-        for sentence in project.sentences:
+        sentences = project.sentences
+        total = len(sentences)
+        for i, sentence in enumerate(sentences):
             results = self.analyze_sentence(sentence)
             morpheme_ranges = _build_compound_ranges(results) or None
             self._apply_user_dictionary_to_sentence(sentence, morpheme_ranges=morpheme_ranges)
             if not skip_romanize:
                 self._romanize_sentence_ruby(sentence)
+            if progress_callback is not None:
+                progress_callback("应用用户词典", i + 1, total)
 
     def update_checkpoints_from_rubies(
         self,
@@ -2536,6 +2492,7 @@ class AutoCheckService:
         split_config: Optional[SplitConfig] = None,
         *,
         preserve_ruby_segments: bool = False,
+        progress_callback=None,
     ) -> None:
         """根据现有注音更新整个项目的节奏点配置（不重新分析注音）
 
@@ -2543,13 +2500,18 @@ class AutoCheckService:
             project: 项目
             split_config: 拆分配置
             preserve_ruby_segments: 透传到 update_checkpoints_from_rubies。
+            progress_callback: ``(phase, current, total)`` 进度回调。
         """
         if self._chinese_mode:
             return
-        for sentence in project.sentences:
+        sentences = project.sentences
+        total = len(sentences)
+        for i, sentence in enumerate(sentences):
             self.update_checkpoints_from_rubies(
                 sentence, split_config, preserve_ruby_segments=preserve_ruby_segments
             )
+            if progress_callback is not None:
+                progress_callback("更新节奏点", i + 1, total)
 
     def analyze_and_apply_pipeline(
         self,
@@ -2558,9 +2520,10 @@ class AutoCheckService:
         only_noruby: bool = False,
         apply_user_dict: bool = True,
         delete_types: Optional[List[str]] = None,
+        update_checkpoints: bool = True,
         progress_callback=None,
     ) -> int:
-        """注音分析 → 节奏点更新 → 按类型删除 → 用户词典补回 → 罗马音转换。
+        """注音分析 →（可选）节奏点更新 → 按类型删除 → 用户词典补回 → 罗马音转换。
 
         统一全项目注音分析的完整管线，保证所有入口（新建项目加载、手动重新
         分析、全文本编辑界面分析）走同一路径，避免遗漏或顺序不一致。
@@ -2571,11 +2534,21 @@ class AutoCheckService:
             apply_user_dict: 是否应用用户词典（LLM 模式可关闭）。
             delete_types: 按类型删除注音的类型名列表（如 ``["hiragana"]``）。
                 为空或 None 时跳过删除步骤。
-            progress_callback: ``(current, total)`` 进度回调。
+            update_checkpoints: True=分析后根据注音重算节奏点（默认）；
+                False=只更新注音、保留现有节奏点不动。
+            progress_callback: ``(phase, current, total)`` 进度回调。
 
         Returns:
             按类型删除的注音数量（无删除步骤时返回 0）。
         """
+        # 不更新节奏点：注音分析本身（apply_to_project/delete/romanize）会改写
+        # check_count，故先快照全项目节奏点数，管线末尾再还原。
+        saved_cc = None
+        if not update_checkpoints:
+            saved_cc = [
+                [c.check_count for c in s.characters] for s in project.sentences
+            ]
+
         # Step 1: 注音分析（延迟 romaji，delete 之后再转）
         self.apply_to_project(
             project,
@@ -2586,17 +2559,30 @@ class AutoCheckService:
         )
 
         # Step 2: 根据已有注音更新节奏点（统一 check 规则应用）
-        self.update_checkpoints_for_project(project)
+        if update_checkpoints:
+            self.update_checkpoints_for_project(
+                project, progress_callback=progress_callback
+            )
 
         # Step 3: 按类型删除注音
         deleted_count = 0
         if delete_types:
-            deleted_count = delete_rubies_by_type_names(project, delete_types)
+            deleted_count = delete_rubies_by_type_names(
+                project, delete_types, progress_callback=progress_callback
+            )
             if apply_user_dict:
-                self.apply_user_dict_to_project(project, skip_romanize=True)
+                self.apply_user_dict_to_project(
+                    project, skip_romanize=True, progress_callback=progress_callback
+                )
 
         # Step 4: 罗马音转换（在 delete 之后，只转换剩余的假名注音）
-        self.romanize_project_rubies(project)
+        self.romanize_project_rubies(project, progress_callback=progress_callback)
+
+        # Step 5: 还原节奏点（不更新节奏点模式）。在所有改动之后兜底还原，
+        # 权威 setter 会把新注音的 ruby.parts 重新对齐回原节奏点数。
+        if saved_cc is not None:
+            for s, ccs in zip(project.sentences, saved_cc):
+                self._restore_sentence_check_counts(s, ccs)
 
         return deleted_count
 
@@ -2607,25 +2593,49 @@ class AutoCheckService:
         only_noruby: bool = False,
         restrict_indices: Optional[set] = None,
         apply_user_dict: bool = True,
+        update_checkpoints: bool = True,
     ) -> None:
-        """单句注音分析 → 节奏点更新。
+        """单句注音分析 →（可选）节奏点更新。
 
         统一单句/子集注音分析管线，保证 apply_to_sentence 后一定跟
-        update_checkpoints_from_rubies。
+        update_checkpoints_from_rubies（除非显式关闭）。
 
         Args:
             sentence: 目标句子。
             only_noruby: 仅对未注音字符应用。
             restrict_indices: 仅对这些字符索引应用分析。
             apply_user_dict: 是否应用用户词典。
+            update_checkpoints: True=分析后重算节奏点（默认）；
+                False=只更新注音、保留现有节奏点不动。
         """
+        # 不更新节奏点：apply_to_sentence 内部会按新注音重写 check_count，
+        # 故先快照整句节奏点数，分析后还原（覆盖全句，确保节奏点完全不动）。
+        saved_cc = None
+        if not update_checkpoints:
+            saved_cc = [c.check_count for c in sentence.characters]
+
         self.apply_to_sentence(
             sentence,
             only_noruby=only_noruby,
             restrict_indices=restrict_indices,
             apply_user_dict=apply_user_dict,
         )
-        self.update_checkpoints_from_rubies(sentence)
+        if update_checkpoints:
+            self.update_checkpoints_from_rubies(sentence)
+        elif saved_cc is not None:
+            self._restore_sentence_check_counts(sentence, saved_cc)
+
+    @staticmethod
+    def _restore_sentence_check_counts(sentence: Sentence, saved: List[int]) -> None:
+        """把句中字符的 check_count 还原到 saved（供「不更新节奏点」复用）。
+
+        仅对实际发生变化的字符调用权威 setter——setter 会按旧节奏点数重新对齐
+        新注音的 ruby.parts（缩小合并尾段 / 放大补占位），从而做到「注音更新、
+        节奏点不动」。未变化的字符跳过，避免无谓重切 parts。
+        """
+        for i, ch in enumerate(sentence.characters):
+            if i < len(saved) and ch.check_count != saved[i]:
+                ch.set_check_count(saved[i], force=True)
 
     def estimate_check_count(self, text: str) -> int:
         """估算文本的节奏点数量
@@ -2733,7 +2743,7 @@ def _ruby_is_all_hiragana(ruby_text: str) -> bool:
 
 
 def delete_rubies_by_type_names(
-    project: "Project", type_names: List[str]
+    project: "Project", type_names: List[str], progress_callback=None
 ) -> int:
     """按字符类型名称列表删除注音。
 
@@ -2746,6 +2756,7 @@ def delete_rubies_by_type_names(
     Args:
         project: 项目
         type_names: 类型名称列表，如 ["hiragana", "katakana_hiragana_ruby"]
+        progress_callback: ``(phase, current, total)`` 进度回调。
 
     Returns:
         删除的注音数量
@@ -2762,7 +2773,9 @@ def delete_rubies_by_type_names(
         extended.add(CharType.SOKUON)
 
     removed = 0
-    for sentence in project.sentences:
+    sentences = project.sentences
+    total = len(sentences)
+    for si, sentence in enumerate(sentences):
         kanji_linked = get_kanji_linked_indices(sentence.characters)
         for idx, ch in enumerate(sentence.characters):
             if not ch.ruby:
@@ -2799,5 +2812,7 @@ def delete_rubies_by_type_names(
                 if idx > 0:
                     sentence.characters[idx - 1].linked_to_next = False
                 removed += 1
+        if progress_callback is not None:
+            progress_callback("删除注音", si + 1, total)
 
     return removed

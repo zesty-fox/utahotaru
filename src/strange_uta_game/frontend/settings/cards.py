@@ -9,8 +9,9 @@ from typing import Optional
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QKeyEvent, QWheelEvent
-from PyQt6.QtWidgets import QCheckBox, QDialog, QDialogButtonBox, QFileDialog, QLabel, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QDialog, QFileDialog, QLabel, QVBoxLayout, QWidget
 from strange_uta_game.frontend.theme import theme
+from strange_uta_game.frontend.fluent_widgets import dialog_button_row
 from qfluentwidgets import (
     CheckBox,
     ComboBox,
@@ -748,12 +749,10 @@ class MultiCheckSettingCard(SettingCard):
             layout.addWidget(cb)
             checkboxes.append((value, cb))
 
-        btn_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        btn_row, _, _ = dialog_button_row(
+            dlg, ok_text=self.tr("确定"), cancel_text=self.tr("取消")
         )
-        btn_box.accepted.connect(dlg.accept)
-        btn_box.rejected.connect(dlg.reject)
-        layout.addWidget(btn_box)
+        layout.addLayout(btn_row)
 
         if dlg.exec():
             new_selected = [value for value, cb in checkboxes if cb.isChecked()]
@@ -834,14 +833,10 @@ class MultiBoolSettingCard(SettingCard):
             layout.addWidget(cb)
             checkboxes.append((key, cb))
 
-        from PyQt6.QtWidgets import QDialogButtonBox
-
-        btn_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        btn_row, _, _ = dialog_button_row(
+            dlg, ok_text=self.tr("确定"), cancel_text=self.tr("取消")
         )
-        btn_box.accepted.connect(dlg.accept)
-        btn_box.rejected.connect(dlg.reject)
-        layout.addWidget(btn_box)
+        layout.addLayout(btn_row)
 
         if dlg.exec():
             new_values = {key: cb.isChecked() for key, cb in checkboxes}

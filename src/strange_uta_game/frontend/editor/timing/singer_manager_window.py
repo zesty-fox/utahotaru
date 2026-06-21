@@ -11,6 +11,7 @@ from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import QWidget, QVBoxLayout
 
 from strange_uta_game.frontend.singer.singer_interface import SingerManagerInterface
+from strange_uta_game.frontend.window_sizing import fit_to_screen
 
 
 class MiniSingerManager(QWidget):
@@ -28,7 +29,7 @@ class MiniSingerManager(QWidget):
             | Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.WindowCloseButtonHint
         )
-        self.resize(420, 560)
+        fit_to_screen(self, 420, 560)
         self._init_ui()
         self._drag_pos = None
 

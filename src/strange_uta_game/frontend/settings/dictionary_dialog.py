@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
+from strange_uta_game.frontend.window_sizing import fit_min_size
 from PyQt6.QtWidgets import (
     QDialog,
     QFileDialog,
@@ -40,7 +41,7 @@ class DictionaryEditDialog(QDialog):
     def __init__(self, entries: list, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("读音词典"))
-        self.setMinimumSize(560, 480)
+        fit_min_size(self, 560, 480)
         self._entries = [dict(e) for e in entries]  # 深拷贝
 
         layout = QVBoxLayout(self)

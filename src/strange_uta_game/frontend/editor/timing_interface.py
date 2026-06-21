@@ -31,7 +31,6 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QMessageBox,
     QVBoxLayout,
     QWidget,
 )
@@ -70,6 +69,11 @@ from strange_uta_game.frontend.perf_log import (
     start_ui_watchdog,
 )
 from strange_uta_game.frontend.theme import theme, ThemeColors
+from strange_uta_game.frontend.fluent_widgets import (
+    message_choice,
+    message_info,
+    message_question,
+)
 
 from .line_interface import LineDetailDialog
 from .timing import (
@@ -351,6 +355,10 @@ class EditorInterface(QWidget):
         self.toolbar.analyze_rubies_clicked.connect(self._on_analyze_rubies)
         self.toolbar.analyze_rubies_by_line_clicked.connect(self._on_analyze_rubies_by_line)
         self.toolbar.analyze_rubies_selected_clicked.connect(self._on_analyze_rubies_selected)
+        self.toolbar.analyze_rubies_no_cp_clicked.connect(self._on_analyze_rubies_no_cp)
+        self.toolbar.analyze_rubies_by_line_no_cp_clicked.connect(self._on_analyze_rubies_by_line_no_cp)
+        self.toolbar.analyze_rubies_selected_no_cp_clicked.connect(self._on_analyze_rubies_selected_no_cp)
+        self.toolbar.romanize_all_clicked.connect(self._on_romanize_all_rubies)
         self.toolbar.open_fulltext_clicked.connect(self._on_open_fulltext)
         self.toolbar.delete_rubies_by_type_clicked.connect(self._on_delete_rubies_by_type)
         self.toolbar.set_singer_by_line_clicked.connect(self._on_set_singer_by_line)
@@ -361,6 +369,10 @@ class EditorInterface(QWidget):
         self.toolbar.adjust_raw_timestamp_clicked.connect(self._on_adjust_raw_timestamp)
         self.toolbar.adjust_raw_timestamp_line_clicked.connect(self._on_adjust_raw_timestamp_line)
         self.toolbar.adjust_raw_timestamp_selected_clicked.connect(self._on_adjust_raw_timestamp_selected)
+        self.toolbar.delete_all_timestamps_clicked.connect(self._on_delete_all_timestamps)
+        self.toolbar.delete_all_timestamps_keep_head_clicked.connect(self._on_delete_all_timestamps_keep_head)
+
+        self.toolbar.delete_timestamps_selected_clicked.connect(self._on_delete_timestamps_selected)
         self.toolbar.offset_changed.connect(self._on_offset_changed)
         layout.addWidget(self.toolbar)
 
@@ -941,6 +953,7 @@ class EditorInterface(QWidget):
             self._store.notify("settings")
 
     def set_project(self, project: Project):
+        previous_project = self._project
         self._project = project
         # 获取AppSettings实例（与_apply_settings使用同一个）
         app_settings = None
@@ -994,8 +1007,11 @@ class EditorInterface(QWidget):
         self._update_status()
         # 重新应用设置（字体大小、行间距、对齐方式等）
         self._apply_settings()
-        # 加载新项目时清除旧音频缓存，避免旧波形/时长/缓存残留
-        self._clear_audio_state()
+        # 仅在替换已有项目时清除旧音频缓存，避免旧波形/时长/缓存残留。
+        # 首次设置项目（self._project 原为 None）时保留已加载的音频，
+        # 支持"先导入音频再导入歌词"的工作流。
+        if previous_project is not None:
+            self._clear_audio_state()
 
     def release_resources(self):
         """释放音频资源"""
@@ -1596,25 +1612,33 @@ class EditorInterface(QWidget):
             store = getattr(self, "_store", None)
             # 检查是否有未保存的更改
             if store and store.dirty:
-                msg = QMessageBox(self)
-                msg.setWindowTitle(self.tr("保存当前项目"))
-                msg.setText(self.tr("当前项目有未保存的更改，是否保存？"))
-                btn_save = msg.addButton(self.tr("保存"), QMessageBox.ButtonRole.AcceptRole)
-                msg.addButton(self.tr("放弃"), QMessageBox.ButtonRole.DestructiveRole)
-                btn_cancel = msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
-                msg.setDefaultButton(btn_save)
-                msg.exec()
-                clicked = msg.clickedButton()
-                if clicked is btn_save:
+                choice = message_choice(
+                    self,
+                    self.tr("保存当前项目"),
+                    self.tr("当前项目有未保存的更改，是否保存？"),
+                    [self.tr("保存"), self.tr("放弃"), self.tr("取消")],
+                    default=0,
+                )
+                if choice == 0:  # 保存
                     self._on_save()
-                elif clicked is btn_cancel:
+                elif choice == 2 or choice == -1:  # 取消 / 关闭
                     return
+                # choice == 1（放弃）：什么都不做，继续新建
 
         # 创建新项目
         from strange_uta_game.backend.application import ProjectService
 
         project_service = ProjectService()
         project = project_service.create_project()
+
+        # 重置 AppSettings 中的 nicokara_tags 为默认值，避免上一个项目残留
+        setting_iface = self._get_setting_interface()
+        if setting_iface is not None:
+            from strange_uta_game.frontend.settings.app_settings import AppSettings
+            settings = setting_iface.get_settings()
+            settings.set("nicokara_tags", dict(AppSettings.DEFAULT_SETTINGS.get("nicokara_tags", {})))
+            settings.save()
+
         if self._store:
             self._store.load_project(project)
         else:
@@ -1854,7 +1878,7 @@ class EditorInterface(QWidget):
                 more = ""
                 if len(failures) > 20:
                     more = f"\n...（还有 {len(failures) - 20} 项未显示）"
-                QMessageBox.information(
+                message_info(
                     self,
                     self.tr("部分连词设置未应用"),
                     self.tr("以下位置为末字/句尾/行尾，不能设置连词，已自动跳过：\n\n")
@@ -2825,6 +2849,202 @@ class EditorInterface(QWidget):
         else:
             if hasattr(self, "_adjust_ts_sel_dlg") and self._adjust_ts_sel_dlg is not None:
                 self._adjust_ts_sel_dlg.set_status(self.tr("无可调整的时间戳"), success=False)
+
+    # ── 删除时间戳 ──
+
+    def _on_delete_all_timestamps(self):
+        """删除所有时间戳"""
+        if not self._project:
+            InfoBar.warning(
+                title=self.tr("无项目"),
+                content=self.tr("请先创建或打开项目"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+            return
+
+        if not message_question(
+            self,
+            self.tr("删除所有时间戳"),
+            self.tr("确定要删除所有时间戳吗？此操作可撤销。"),
+            yes_text=self.tr("删除"),
+            no_text=self.tr("取消"),
+            default_cancel=True,
+        ):
+            return
+
+        project = self._project
+
+        def _mutate():
+            cleared = 0
+            for sentence in project.sentences:
+                for ch in sentence.characters:
+                    if ch.timestamps or ch.sentence_end_ts is not None:
+                        ch.clear_timestamps()
+                        cleared += 1
+            if cleared == 0:
+                return None
+            return (self._current_line_idx, self.preview._current_char_idx, None, "timetags")
+
+        ok = self._execute_structural_edit("删除所有时间戳", _mutate)
+        if ok:
+            InfoBar.success(
+                title=self.tr("删除完成"),
+                content=self.tr("已删除所有时间戳"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+        else:
+            InfoBar.info(
+                title=self.tr("无时间戳"),
+                content=self.tr("当前项目没有需要删除的时间戳"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+
+    def _on_delete_all_timestamps_keep_head(self):
+        """删除所有时间戳（保留行首）"""
+        if not self._project:
+            InfoBar.warning(
+                title=self.tr("无项目"),
+                content=self.tr("请先创建或打开项目"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+            return
+
+        if not message_question(
+            self,
+            self.tr("删除所有时间戳（保留行首）"),
+            self.tr("确定要删除所有时间戳（保留行首）吗？此操作可撤销。"),
+            yes_text=self.tr("删除"),
+            no_text=self.tr("取消"),
+            default_cancel=True,
+        ):
+            return
+
+        project = self._project
+
+        def _mutate():
+            cleared = 0
+            for sentence in project.sentences:
+                for idx, ch in enumerate(sentence.characters):
+                    if idx == 0:
+                        if ch.sentence_end_ts is not None:
+                            ch.sentence_end_ts = None
+                            ch._update_offset_timestamps()
+                            ch.push_to_ruby()
+                            cleared += 1
+                        continue
+                    if ch.timestamps or ch.sentence_end_ts is not None:
+                        ch.clear_timestamps()
+                        cleared += 1
+            if cleared == 0:
+                return None
+            return (self._current_line_idx, self.preview._current_char_idx, None, "timetags")
+
+        ok = self._execute_structural_edit("删除所有时间戳（保留行首）", _mutate)
+        if ok:
+            InfoBar.success(
+                title=self.tr("删除完成"),
+                content=self.tr("已删除所有时间戳（保留行首）"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+        else:
+            InfoBar.info(
+                title=self.tr("无时间戳"),
+                content=self.tr("当前项目没有需要删除的时间戳"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+
+    def _on_delete_timestamps_selected(self):
+        """删除所选范围时间戳"""
+        if not self._project:
+            InfoBar.warning(
+                title=self.tr("无项目"),
+                content=self.tr("请先创建或打开项目"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+            return
+
+        ranges = self._collect_selected_char_ranges()
+        if not ranges:
+            InfoBar.warning(
+                title=self.tr("未选中字符"),
+                content=self.tr("请先选择要删除时间戳的字符"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+            return
+
+        project = self._project
+
+        def _mutate():
+            cleared = 0
+            for li, s, e in ranges:
+                if li < 0 or li >= len(project.sentences):
+                    continue
+                sentence = project.sentences[li]
+                for ci in range(s, e + 1):
+                    if ci < 0 or ci >= len(sentence.characters):
+                        continue
+                    ch = sentence.characters[ci]
+                    if ch.timestamps or ch.sentence_end_ts is not None:
+                        ch.clear_timestamps()
+                        cleared += 1
+            if cleared == 0:
+                return None
+            return (self._current_line_idx, self.preview._current_char_idx, None, "timetags")
+
+        scope_label = self._format_selected_scope_label(ranges)
+        ok = self._execute_structural_edit("删除所选范围时间戳", _mutate)
+        if ok:
+            InfoBar.success(
+                title=self.tr("删除完成"),
+                content=self.tr("{scope} 的时间戳已删除").format(scope=scope_label),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+        else:
+            InfoBar.info(
+                title=self.tr("无时间戳"),
+                content=self.tr("{scope} 没有需要删除的时间戳").format(scope=scope_label),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
 
     def _execute_complete_timestamp(self, scope_types: set[str], exclude_rules: list[str], head_offset_ms: int = 150, tail_offset_ms: int = 150) -> int:
         """执行补全时间戳的核心逻辑
@@ -4711,6 +4931,8 @@ class EditorInterface(QWidget):
                 self._timing_service.move_to_checkpoint(line_idx, char_idx, 0, prefer_backward=True)
                 self._update_time_tags_display()
                 self._update_status()
+                if self._scroll_mode != "always":
+                    self.preview.scroll_current_line_to_center()
             self._on_seek(seek_ms)
         else:
             # 当前字符没有时间戳：找前一个有节奏点的字符
@@ -4726,6 +4948,8 @@ class EditorInterface(QWidget):
                 self._timing_service.move_to_checkpoint(prev_line, prev_char_idx, prev_cp_idx)
                 self._update_time_tags_display()
                 self._update_status()
+                if self._scroll_mode != "always":
+                    self.preview.scroll_current_line_to_center()
             self.preview.set_focus_position(prev_line, prev_char_idx)
             if seek_ms is not None:
                 self._on_seek(seek_ms)
@@ -5098,15 +5322,16 @@ class EditorInterface(QWidget):
             for l, c in marks[:10]
         ]
         extra = self.tr("\n...另 {n} 处").format(n=len(marks) - 10) if len(marks) > 10 else ""
-        msg = QMessageBox(self)
-        msg.setIcon(QMessageBox.Icon.Warning)
-        msg.setWindowTitle(self.tr("仍有导唱待办未处理"))
-        msg.setText(self.tr("还剩 {n} 个标记点未添加导唱符。").format(n=len(marks)))
-        msg.setInformativeText("\n".join(preview) + extra)
-        btn_continue = msg.addButton(self.tr("继续导出"), QMessageBox.ButtonRole.AcceptRole)
-        msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
-        msg.exec()
-        return msg.clickedButton() is btn_continue
+        return message_question(
+            self,
+            self.tr("仍有导唱待办未处理"),
+            self.tr("还剩 {n} 个标记点未添加导唱符。").format(n=len(marks))
+            + "\n\n"
+            + "\n".join(preview)
+            + extra,
+            yes_text=self.tr("继续导出"),
+            no_text=self.tr("取消"),
+        )
 
     def _on_quick_export(self):
         """快捷导出：使用默认导出格式弹出保存对话框并导出。"""
@@ -5990,7 +6215,8 @@ class EditorInterface(QWidget):
     def refresh_lyric_display(self):
         self.preview._update_display()
 
-    def _auto_analyze_rubies(self, only_noruby: bool = False, auto_detect_chinese: bool = False):
+    def _auto_analyze_rubies(self, only_noruby: bool = False, auto_detect_chinese: bool = False,
+                             update_checkpoints: bool = True):
         """执行注音分析（核心逻辑，供多处复用）。
 
         分析在后台 QThread 中进行，不阻塞 UI。分析结果通过信号回调到主线程，
@@ -6001,6 +6227,8 @@ class EditorInterface(QWidget):
             auto_detect_chinese: True=自动检测纯中文歌词并走中文模式（跳过注音）。
                 仅导入歌词后的自动触发应传 True；用户手动按"注音分析"按钮明确表达了
                 注音意图，应传 False，避免纯汉字日文行被误判为中文。
+            update_checkpoints: True=分析后重算节奏点（默认）；
+                False=只刷注音、保留现有节奏点不动。
         """
         if not self._project:
             return
@@ -6087,6 +6315,7 @@ class EditorInterface(QWidget):
         worker = RubyAnalyzeWorker(
             project_copy, auto_check, only_noruby, delete_types,
             llm_apply_user_dict=llm_apply_user_dict,
+            update_checkpoints=update_checkpoints,
         )
         thread = QThread(self)
         worker.moveToThread(thread)
@@ -6095,8 +6324,8 @@ class EditorInterface(QWidget):
         self._ruby_analyze_worker = worker
         self._ruby_analyze_thread = thread
 
-        def _on_progress(current: int, total: int) -> None:
-            state_tooltip.setContent(self.tr("已处理 {current}/{total} 行").format(current=current, total=total))
+        def _on_progress(phase: str, current: int, total: int) -> None:
+            state_tooltip.setContent(f"{phase} {current}/{total}")
 
         def _cleanup() -> None:
             self._ruby_analyze_worker = None
@@ -6193,31 +6422,42 @@ class EditorInterface(QWidget):
 
         thread.start()
 
-    def _on_analyze_rubies(self):
-        """工具栏「注音分析」— 弹三选项对话框"""
+    def _on_analyze_rubies(self, update_checkpoints: bool = True):
+        """工具栏「注音分析」— 弹三选项对话框
+
+        update_checkpoints=False 时只刷注音、保留现有节奏点不动。
+        """
         if not self._project:
             return
 
-        msg = QMessageBox(self)
-        msg.setWindowTitle(self.tr("自动分析全部注音"))
-        msg.setText(self.tr("请选择分析范围："))
-        msg.setInformativeText(self.tr(
-            "「全部重新分析」会覆盖现有注音。\n"
-            "「仅分析未注音字符」会保留已有的人工/字典注音。"
-        ))
-        btn_all = msg.addButton(self.tr("全部重新分析"), QMessageBox.ButtonRole.DestructiveRole)
-        btn_only_noruby = msg.addButton(
-            self.tr("仅分析未注音字符"), QMessageBox.ButtonRole.AcceptRole
+        cp_note = (
+            self.tr("（分析后会重算节奏点）")
+            if update_checkpoints
+            else self.tr("（保留现有节奏点不动）")
         )
-        btn_cancel = msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
-        msg.setDefaultButton(btn_only_noruby)
-        msg.exec()
-
-        clicked = msg.clickedButton()
-        if clicked is btn_cancel or clicked is None:
+        choice = message_choice(
+            self,
+            self.tr("自动分析全部注音"),
+            self.tr("请选择分析范围：")
+            + cp_note
+            + "\n\n"
+            + self.tr(
+                "「全部重新分析」会覆盖现有注音。\n"
+                "「仅分析未注音字符」会保留已有的人工/字典注音。"
+            ),
+            [self.tr("全部重新分析"), self.tr("仅分析未注音字符"), self.tr("取消")],
+            default=1,
+        )
+        if choice in (-1, 2):
             return
-        only_noruby = clicked is btn_only_noruby
-        self._auto_analyze_rubies(only_noruby=only_noruby)
+        only_noruby = choice == 1
+        self._auto_analyze_rubies(
+            only_noruby=only_noruby, update_checkpoints=update_checkpoints
+        )
+
+    def _on_analyze_rubies_no_cp(self):
+        """工具栏「注音分析（不更新节奏点）」— 只刷注音、保留节奏点。"""
+        self._on_analyze_rubies(update_checkpoints=False)
 
     def _auto_analyze_all_rubies(self):
         """自动分析全部注音（用于歌词导入后重新注音，覆盖已有）"""
@@ -6230,11 +6470,13 @@ class EditorInterface(QWidget):
         label: str,
         *,
         show_winrt_dialog: bool = True,
+        update_checkpoints: bool = True,
     ) -> None:
         """对单行（restrict_indices=None）或行内选定字符执行注音分析（异步）。"""
         self._analyze_rubies_specs_async(
             [(line_idx, restrict_indices)], label,
             show_winrt_dialog=show_winrt_dialog,
+            update_checkpoints=update_checkpoints,
         )
 
     def _analyze_rubies_specs_async(
@@ -6243,6 +6485,7 @@ class EditorInterface(QWidget):
         label: str,
         *,
         show_winrt_dialog: bool = True,
+        update_checkpoints: bool = True,
     ) -> None:
         """对多个指定行/范围批量执行注音分析（后台 QThread，不阻塞 UI）。
 
@@ -6250,13 +6493,17 @@ class EditorInterface(QWidget):
             specs: list of (line_idx, restrict_indices | None)
             label: 用于 InfoBar 标题和 undo 描述
             show_winrt_dialog: False 时 WinRT 不可用则静默跳过（粘贴触发时用）
+            update_checkpoints: True=分析后重算节奏点（默认）；
+                False=只刷注音、保留现有节奏点不动。
         """
         if not self._project or not specs:
             return
         if getattr(self, "_ruby_subset_analyzing", False):
             if not hasattr(self, "_ruby_analysis_queue"):
                 self._ruby_analysis_queue = []
-            self._ruby_analysis_queue.append((list(specs), label, show_winrt_dialog))
+            self._ruby_analysis_queue.append(
+                (list(specs), label, show_winrt_dialog, update_checkpoints)
+            )
             return
 
         from strange_uta_game.backend.application import AutoCheckService
@@ -6330,7 +6577,8 @@ class EditorInterface(QWidget):
             subset_tooltip.show()
 
         worker = RubySubsetAnalyzeWorker(
-            project_copy, auto_check, specs, apply_user_dict=llm_apply_user_dict
+            project_copy, auto_check, specs, apply_user_dict=llm_apply_user_dict,
+            update_checkpoints=update_checkpoints,
         )
         thread = QThread(self)
         worker.moveToThread(thread)
@@ -6343,8 +6591,10 @@ class EditorInterface(QWidget):
             self._ruby_subset_analyze_thread = None
             self._ruby_subset_analyzing = False
             if hasattr(self, "_ruby_analysis_queue") and self._ruby_analysis_queue:
-                ns, nl, nswd = self._ruby_analysis_queue.pop(0)
-                self._analyze_rubies_specs_async(ns, nl, show_winrt_dialog=nswd)
+                ns, nl, nswd, nuc = self._ruby_analysis_queue.pop(0)
+                self._analyze_rubies_specs_async(
+                    ns, nl, show_winrt_dialog=nswd, update_checkpoints=nuc
+                )
 
         def _close_tooltip() -> None:
             if subset_tooltip is not None:
@@ -6421,8 +6671,11 @@ class EditorInterface(QWidget):
         thread.finished.connect(thread.deleteLater)
         thread.start()
 
-    def _on_analyze_rubies_by_line(self):
-        """工具栏「按行注音分析」— 仅分析当前行。"""
+    def _on_analyze_rubies_by_line(self, update_checkpoints: bool = True):
+        """工具栏「按行注音分析」— 仅分析当前行。
+
+        update_checkpoints=False 时只刷注音、保留现有节奏点不动。
+        """
         if not self._project:
             return
         line_idx = self._current_line_idx
@@ -6437,12 +6690,24 @@ class EditorInterface(QWidget):
                 parent=self,
             )
             return
-        self._analyze_rubies_subset(line_idx, None, "按行注音分析")
+        label = "按行注音分析" if update_checkpoints else "按行注音分析（仅注音）"
+        self._analyze_rubies_subset(
+            line_idx, None, label, update_checkpoints=update_checkpoints
+        )
 
-    def _on_analyze_rubies_selected(self):
-        """工具栏「注音分析所选字符」— 分析选中字符范围（支持跨行逐行排队）。"""
+    def _on_analyze_rubies_by_line_no_cp(self):
+        """工具栏「按行注音分析（不更新节奏点）」— 只刷注音、保留节奏点。"""
+        self._on_analyze_rubies_by_line(update_checkpoints=False)
+
+    def _on_analyze_rubies_selected(self, update_checkpoints: bool = True):
+        """工具栏「注音分析所选字符」— 分析选中字符范围（支持跨行逐行排队）。
+
+        update_checkpoints=False 时只刷注音、保留现有节奏点不动。
+        """
         if not self._project:
             return
+
+        label = "注音分析所选字符" if update_checkpoints else "注音分析所选字符（仅注音）"
 
         # 跨行选中：逐行提交，由 _analyze_rubies_specs_async 队列顺序执行
         if self.preview.is_multi_line_selection():
@@ -6466,13 +6731,16 @@ class EditorInterface(QWidget):
             if specs:
                 # 第一行立即执行，后续行加入队列
                 first_li, first_ri = specs[0]
-                self._analyze_rubies_subset(first_li, first_ri, "注音分析所选字符")
+                self._analyze_rubies_subset(
+                    first_li, first_ri, label,
+                    update_checkpoints=update_checkpoints,
+                )
                 if len(specs) > 1:
                     if not hasattr(self, "_ruby_analysis_queue"):
                         self._ruby_analysis_queue = []
                     for li, ri in specs[1:]:
                         self._ruby_analysis_queue.append(
-                            ([(li, ri)], "注音分析所选字符", False)
+                            ([(li, ri)], label, False, update_checkpoints)
                         )
             return
 
@@ -6507,8 +6775,85 @@ class EditorInterface(QWidget):
                 self.preview._focus_char_idx, self.preview._focus_char_range_end
             )
         self._analyze_rubies_subset(
-            line_idx, set(range(start_idx, end_idx + 1)), "注音分析所选字符"
+            line_idx, set(range(start_idx, end_idx + 1)), label,
+            update_checkpoints=update_checkpoints,
         )
+
+    def _on_analyze_rubies_selected_no_cp(self):
+        """工具栏「注音分析所选字符（不更新节奏点）」— 只刷注音、保留节奏点。"""
+        self._on_analyze_rubies_selected(update_checkpoints=False)
+
+    def _on_romanize_all_rubies(self):
+        """工具栏「全部转为罗马字注音」。
+
+        读取现有全部注音结构、保留结构把假名 ruby 转为赫本式罗马音；无 ruby 的
+        单假名（平假名/片假名/促音/长音）补自注音再转罗马音。罗马音读音随上下文
+        变化（促音双写、は/へ/を 助词读音）。
+
+        单例同步操作：不调用注音引擎、不更新节奏点、不删除注音；与正在进行的异步
+        注音分析互斥。变更经 :py:meth:`_execute_structural_edit` 纳入撤销/重做栈，
+        ruby 通道刷新（move_cp=False，不触碰节奏点）。
+        """
+        if not self._project:
+            return
+        # 与异步注音分析互斥，避免并发改写句子结构
+        if getattr(self, "_ruby_analyzing", False) or getattr(
+            self, "_ruby_subset_analyzing", False
+        ):
+            InfoBar.warning(
+                title=self.tr("注音分析进行中"),
+                content=self.tr("请等待当前注音分析完成后再试"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2500,
+                parent=self,
+            )
+            return
+        # 单例：防止重入（同步操作下事件循环阻塞，理论上不会重入，仍显式守卫）
+        if getattr(self, "_romanizing_all", False):
+            return
+
+        from strange_uta_game.backend.infrastructure.parsers.romaji import (
+            romanize_project_to_self_ruby,
+        )
+
+        changed_box = [0]
+
+        def _mutate() -> Optional[tuple[int, int, Optional[int], str]]:
+            assert self._project is not None
+            self._romanizing_all = True
+            try:
+                changed_box[0] = romanize_project_to_self_ruby(self._project)
+            finally:
+                self._romanizing_all = False
+            if changed_box[0] == 0:
+                return None
+            return (self._current_line_idx, self.preview._current_char_idx, None, "rubies")
+
+        ok = self._execute_structural_edit(
+            "全部转为罗马字注音", _mutate, move_cp=False
+        )
+        if ok:
+            InfoBar.success(
+                title=self.tr("已转为罗马字注音"),
+                content=self.tr("共处理 {n} 行").format(n=changed_box[0]),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2500,
+                parent=self,
+            )
+        else:
+            InfoBar.info(
+                title=self.tr("无变化"),
+                content=self.tr("没有可转为罗马字的注音或单假名"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2500,
+                parent=self,
+            )
 
     def _on_open_fulltext(self):
         """工具栏「全文本编辑」— 以对话框打开全文本注音编辑界面。"""

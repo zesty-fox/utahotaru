@@ -28,6 +28,8 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem,
     QVBoxLayout,
 )
+
+from strange_uta_game.frontend.window_sizing import fit_min_size
 from qfluentwidgets import PrimaryPushButton, PushButton
 
 
@@ -128,7 +130,7 @@ class DictCandidateDialog(QDialog):
     def __init__(self, word: str, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("查询候补字典"))
-        self.setMinimumSize(480, 360)
+        fit_min_size(self, 480, 360)
         self._word = (word or "").strip()
         self._candidates = query_dict_candidates(self._word)
         self._selected_entry: Optional[Dict[str, Any]] = None

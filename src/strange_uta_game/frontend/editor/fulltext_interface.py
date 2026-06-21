@@ -13,7 +13,6 @@ from PyQt6.QtWidgets import (
     QPlainTextEdit,
     QTextEdit,
     QDialog,
-    QMessageBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QRect, QSize, QEvent
 from PyQt6.QtGui import (
@@ -55,6 +54,8 @@ from strange_uta_game.backend.infrastructure.parsers.text_splitter import (
     CharType,
     get_char_type,
 )
+from strange_uta_game.frontend.fluent_widgets import message_choice
+from strange_uta_game.frontend.window_sizing import fit_to_screen
 
 
 def _ruby_is_all_hiragana(ruby_text: str) -> bool:
@@ -387,7 +388,7 @@ class DeleteRubyByTypeDialog(QDialog):
         """
         super().__init__(parent)
         self.setWindowTitle(self.tr("按类型删除注音"))
-        self.resize(320, 400)
+        fit_to_screen(self, 320, 400)
         self.setFont(QFont("Microsoft YaHei", 10))
 
         layout = QVBoxLayout(self)
@@ -491,11 +492,17 @@ class RubyInterface(QWidget):
         # 批量操作按钮
         batch_layout = QHBoxLayout()
 
-        self.btn_auto_all = PushButton(self.tr("自动分析全部注音"), self)
+        self.btn_auto_all = PushButton(self.tr("全部注音 · 含节奏点"), self)
         self.btn_auto_all.setIcon(FIF.SYNC)
         self.btn_auto_all.clicked.connect(self._on_auto_analyze_all)
         self.btn_auto_all.setEnabled(False)
         batch_layout.addWidget(self.btn_auto_all)
+
+        self.btn_auto_all_no_cp = PushButton(self.tr("全部注音 · 仅注音"), self)
+        self.btn_auto_all_no_cp.setIcon(FIF.SYNC)
+        self.btn_auto_all_no_cp.clicked.connect(self._on_auto_analyze_all_no_cp)
+        self.btn_auto_all_no_cp.setEnabled(False)
+        batch_layout.addWidget(self.btn_auto_all_no_cp)
 
         self.btn_delete_by_type = PushButton(self.tr("按类型删除注音"), self)
         self.btn_delete_by_type.setIcon(FIF.DELETE)
@@ -794,6 +801,7 @@ class RubyInterface(QWidget):
 
         for btn in (
             self.btn_auto_all,
+            self.btn_auto_all_no_cp,
             self.btn_delete_by_type,
             self.btn_update_cp,
             self.btn_apply,
@@ -912,13 +920,19 @@ class RubyInterface(QWidget):
 
     # ==================== 批量操作 ====================
 
-    def _on_auto_analyze_all(self):
+    def _on_auto_analyze_all_no_cp(self):
+        """自动分析全部注音（不更新节奏点）— 只刷注音、保留现有节奏点。"""
+        self._on_auto_analyze_all(update_checkpoints=False)
+
+    def _on_auto_analyze_all(self, update_checkpoints: bool = True):
         """自动分析全部注音：拆成注音与节奏点两步；节奏点失败不影响注音更新。
 
         弹三选项对话框：
         - 全部重新分析（覆盖已有注音）
         - 仅分析未注音字符（保留已有注音）
         - 取消
+
+        update_checkpoints=False 时只刷注音、保留现有节奏点不动。
         """
         if not self._project:
             return
@@ -939,26 +953,28 @@ class RubyInterface(QWidget):
             if not ensure_winrt_japanese(self):
                 return
 
-        # 三选项对话框
-        msg = QMessageBox(self)
-        msg.setWindowTitle(self.tr("自动分析全部注音"))
-        msg.setText(self.tr("请选择分析范围："))
-        msg.setInformativeText(self.tr(
-            "「全部重新分析」会覆盖现有注音。\n"
-            "「仅分析未注音字符」会保留已有的人工/字典注音。"
-        ))
-        btn_all = msg.addButton(self.tr("全部重新分析"), QMessageBox.ButtonRole.DestructiveRole)
-        btn_only_noruby = msg.addButton(
-            self.tr("仅分析未注音字符"), QMessageBox.ButtonRole.AcceptRole
+        cp_note = (
+            self.tr("（分析后会重算节奏点）")
+            if update_checkpoints
+            else self.tr("（保留现有节奏点不动）")
         )
-        btn_cancel = msg.addButton(self.tr("取消"), QMessageBox.ButtonRole.RejectRole)
-        msg.setDefaultButton(btn_only_noruby)
-        msg.exec()
-
-        clicked = msg.clickedButton()
-        if clicked is btn_cancel or clicked is None:
+        # 三选项对话框
+        choice = message_choice(
+            self,
+            self.tr("自动分析全部注音"),
+            self.tr("请选择分析范围：")
+            + cp_note
+            + "\n\n"
+            + self.tr(
+                "「全部重新分析」会覆盖现有注音。\n"
+                "「仅分析未注音字符」会保留已有的人工/字典注音。"
+            ),
+            [self.tr("全部重新分析"), self.tr("仅分析未注音字符"), self.tr("取消")],
+            default=1,
+        )
+        if choice in (-1, 2):
             return
-        only_noruby = clicked is btn_only_noruby
+        only_noruby = choice == 1
 
         auto_check = self._create_auto_check_service()
         # LLM 注音时是否仍应用用户词典（非 LLM 模式恒为 True）。
@@ -970,11 +986,13 @@ class RubyInterface(QWidget):
             auto_check.analyze_and_apply_pipeline(
                 self._project, only_noruby=only_noruby,
                 apply_user_dict=_apply_user_dict,
+                update_checkpoints=update_checkpoints,
             )
             self._refresh_display()
             if hasattr(self, "_store"):
                 self._store.notify("rubies")
-                self._store.notify("checkpoints")
+                if update_checkpoints:
+                    self._store.notify("checkpoints")
             # LLM 注音失败时已回退本地引擎，提示用户。
             _analyzer = getattr(auto_check, "_analyzer", None)
             if getattr(_analyzer, "llm_failed", False):
@@ -987,11 +1005,14 @@ class RubyInterface(QWidget):
                     duration=5000,
                     parent=self,
                 )
+            success_content = (
+                self.tr("已为 {lines} 行自动分析注音并更新节奏点")
+                if update_checkpoints
+                else self.tr("已为 {lines} 行自动分析注音（保留现有节奏点）")
+            ).format(lines=len(self._project.sentences))
             InfoBar.success(
                 title=self.tr("分析完成"),
-                content=self.tr("已为 {lines} 行自动分析注音并更新节奏点").format(
-                    lines=len(self._project.sentences)
-                ),
+                content=success_content,
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 position=InfoBarPosition.TOP,
@@ -1254,7 +1275,9 @@ class RubyInterface(QWidget):
             self.switch_ch_width.setOffText(self.tr("关"))
         # 按钮
         if hasattr(self, "btn_auto_all"):
-            self.btn_auto_all.setText(self.tr("自动分析全部注音"))
+            self.btn_auto_all.setText(self.tr("全部注音 · 含节奏点"))
+        if hasattr(self, "btn_auto_all_no_cp"):
+            self.btn_auto_all_no_cp.setText(self.tr("全部注音 · 仅注音"))
         if hasattr(self, "btn_delete_by_type"):
             self.btn_delete_by_type.setText(self.tr("按类型删除注音"))
         if hasattr(self, "btn_update_cp"):
@@ -1316,7 +1339,7 @@ class FullTextEditDialog(QDialog):
             | Qt.WindowType.WindowMaximizeButtonHint
             | Qt.WindowType.WindowMinimizeButtonHint
         )
-        self.resize(1400, 900)
+        fit_to_screen(self, 1400, 900)
         main_win = parent.window() if parent is not None else None
         if main_win is not None and main_win.isMaximized():
             self.setWindowState(Qt.WindowState.WindowMaximized)

@@ -12,6 +12,8 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication
 
 from qfluentwidgets import ProgressRing
 
+from strange_uta_game.frontend.window_sizing import center_on_screen, current_screen
+
 
 class SplashWindow(QWidget):
     """启动闪屏 — mascot 背景 + 半透明信息浮层。"""
@@ -33,7 +35,8 @@ class SplashWindow(QWidget):
         if icon_path:
             px = QPixmap(icon_path)
             if not px.isNull():
-                screen = QApplication.primaryScreen()
+                # 闪屏在 show 前构建，用光标所在屏的 dpr（多显示器下更准确）
+                screen = current_screen(self)
                 dpr = screen.devicePixelRatio() if screen else 2.0
                 target = int(self._SIDE * dpr)
                 self._bg = px.scaled(
@@ -97,13 +100,7 @@ class SplashWindow(QWidget):
     # ------------------------------------------------------------------
 
     def _center_on_screen(self) -> None:
-        screen = QApplication.primaryScreen()
-        if screen:
-            geo = screen.availableGeometry()
-            self.move(
-                (geo.width() - self.width()) // 2,
-                (geo.height() - self.height()) // 2,
-            )
+        center_on_screen(self)
 
     def set_progress(self, value: int, text: str = "") -> None:
         """更新进度值和状态文本，并立即重绘。"""

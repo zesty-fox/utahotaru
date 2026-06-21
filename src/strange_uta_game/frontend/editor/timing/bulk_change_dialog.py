@@ -20,7 +20,6 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QScrollArea,
     QWidget,
-    QMessageBox,
 )
 from PyQt6.QtGui import QFont
 from qfluentwidgets import (
@@ -38,6 +37,8 @@ from copy import deepcopy
 
 from strange_uta_game.backend.domain import Project
 from strange_uta_game.backend.domain.models import Character, Ruby, RubyPart
+from strange_uta_game.frontend.fluent_widgets import message_info, message_question
+from strange_uta_game.frontend.window_sizing import fit_to_screen
 
 
 class BulkChangeDialog(QDialog):
@@ -78,7 +79,7 @@ class BulkChangeDialog(QDialog):
         )
 
         self.setWindowTitle(self.tr("批量变更"))
-        self.resize(*CHAR_DIALOG_SIZE)
+        fit_to_screen(self, *CHAR_DIALOG_SIZE)
         self.setFont(char_dialog_font(FONT_DIALOG_BASE))
 
         layout = QVBoxLayout(self)
@@ -477,18 +478,16 @@ class BulkChangeDialog(QDialog):
         same_len = len(new_text) == len(word)
         if not same_len:
             # 丢时间戳确认
-            msg = QMessageBox(self)
-            msg.setWindowTitle(self.tr("确认批量替换"))
-            msg.setText(self.tr(
-                "替换后字符数 ({new}) 与搜索词 ({word}) 不同，\n"
-                "将丢失全部 {n} 处匹配的时间戳。是否继续？"
-            ).format(new=len(new_text), word=len(word), n=total_matches))
-            btn_yes = msg.addButton(self.tr("是"), QMessageBox.ButtonRole.AcceptRole)
-            msg.addButton(self.tr("否"), QMessageBox.ButtonRole.RejectRole)
-            msg.setDefaultButton(btn_yes)
-            msg.exec()
-            clicked = msg.clickedButton()
-            if clicked is not btn_yes:
+            if not message_question(
+                self,
+                self.tr("确认批量替换"),
+                self.tr(
+                    "替换后字符数 ({new}) 与搜索词 ({word}) 不同，\n"
+                    "将丢失全部 {n} 处匹配的时间戳。是否继续？"
+                ).format(new=len(new_text), word=len(word), n=total_matches),
+                yes_text=self.tr("是"),
+                no_text=self.tr("否"),
+            ):
                 return
 
         # 执行前快照（用于 CommandManager 的 undo/redo）
@@ -678,7 +677,7 @@ class BulkChangeDialog(QDialog):
         if len(self._linked_failures) > 20:
             more = self.tr("\n...（还有 {n} 项未显示）").format(
                 n=len(self._linked_failures) - 20)
-        QMessageBox.information(
+        message_info(
             self,
             self.tr("部分连词设置未应用"),
             self.tr("以下位置为末字/行尾，不能设置连词，已自动跳过：\n\n")

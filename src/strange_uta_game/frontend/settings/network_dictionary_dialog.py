@@ -33,7 +33,6 @@ from PyQt6.QtWidgets import (
     QLabel,
     QListWidget,
     QListWidgetItem,
-    QMessageBox,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -49,6 +48,8 @@ from strange_uta_game.backend.infrastructure.network_dictionary import (
     fetch_source_entries,
     import_file_to_entries,
 )
+from strange_uta_game.frontend.fluent_widgets import message_question
+from strange_uta_game.frontend.window_sizing import fit_min_size
 
 
 _LOCAL_LABEL = "📒 本地词典"
@@ -96,7 +97,7 @@ class NetworkSourceEntriesDialog(QDialog):
     def __init__(self, source_name: str, entries: List[Dict[str, Any]], parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("网络词典条目 - {name}").format(name=source_name))
-        self.setMinimumSize(640, 480)
+        fit_min_size(self, 640, 480)
         self._entries: List[Dict[str, Any]] = [dict(e) for e in (entries or [])]
 
         layout = QVBoxLayout(self)
@@ -225,7 +226,7 @@ class NetworkDictionaryDialog(QDialog):
     def __init__(self, doc: Dict[str, Any], cache_path: str = "", parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("网络读音词典"))
-        self.setMinimumSize(760, 600)
+        fit_min_size(self, 760, 600)
         self._doc: Dict[str, Any] = json.loads(json.dumps(doc))
         self._cache_path = cache_path
         # 后台拉取所需句柄
@@ -513,10 +514,10 @@ class NetworkDictionaryDialog(QDialog):
         if src.get("builtin"):
             self._warn(self.tr("内置预设不可删除（可在表格里关闭其启用开关）"))
             return
-        if (
-            QMessageBox.question(self, self.tr("确认"),
-                                 self.tr("删除源 {name}？").format(name=src.get('name', '')))
-            != QMessageBox.StandardButton.Yes
+        if not message_question(
+            self,
+            self.tr("确认"),
+            self.tr("删除源 {name}？").format(name=src.get('name', '')),
         ):
             return
         sid = src.get("id")
