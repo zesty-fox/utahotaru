@@ -1626,6 +1626,15 @@ class EditorInterface(QWidget):
 
         project_service = ProjectService()
         project = project_service.create_project()
+
+        # 重置 AppSettings 中的 nicokara_tags 为默认值，避免上一个项目残留
+        setting_iface = self._get_setting_interface()
+        if setting_iface is not None:
+            from strange_uta_game.frontend.settings.app_settings import AppSettings
+            settings = setting_iface.get_settings()
+            settings.set("nicokara_tags", dict(AppSettings.DEFAULT_SETTINGS.get("nicokara_tags", {})))
+            settings.save()
+
         if self._store:
             self._store.load_project(project)
         else:
