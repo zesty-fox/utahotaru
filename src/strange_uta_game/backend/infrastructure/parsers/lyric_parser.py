@@ -661,8 +661,13 @@ class NicokaraParser:
             # 解析 @Emoji 元数据（演唱者定义）
             emoji_match = self.EMOJI_PATTERN.match(stripped) if stripped else None
             if emoji_match:
-                defs = self._parse_emoji_line(emoji_match.group(1))
+                emoji_value = emoji_match.group(1)
+                defs = self._parse_emoji_line(emoji_value)
                 singer_definitions.update(defs)
+                # 保留完整 @Emoji 行以支持 round-trip（图片/Zoom/NoDecor/Margin 等）。
+                # 用 _EmojiN 唯一键存储，_sync_nicokara_metadata_to_settings 中还原为 @Emoji=。
+                idx = len([k for k in metadata if k.startswith("_Emoji")])
+                metadata[f"_Emoji{idx}"] = emoji_value
                 continue
 
             # 解析其他 @ 元数据
