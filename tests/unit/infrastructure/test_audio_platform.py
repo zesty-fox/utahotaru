@@ -39,3 +39,16 @@ def test_select_audio_engine_uses_bass_when_available(monkeypatch):
     monkeypatch.setattr(audio, "bass_available", True)
     assert isinstance(select_audio_engine(hq_enabled=True), BassTsmEngine)
     assert isinstance(select_audio_engine(hq_enabled=False), BassEngine)
+
+
+def test_create_keysound_player_falls_back_when_bass_unavailable(monkeypatch):
+    """BASS 不可用时工厂返回 SoundDeviceKeySoundPlayer。"""
+    from strange_uta_game.backend.infrastructure.audio import keysound_player
+    from strange_uta_game.backend.infrastructure.audio.keysound_player import (
+        SoundDeviceKeySoundPlayer,
+        create_keysound_player,
+    )
+
+    monkeypatch.setattr(keysound_player, "bass_available", False)
+    player = create_keysound_player()
+    assert isinstance(player, SoundDeviceKeySoundPlayer)
