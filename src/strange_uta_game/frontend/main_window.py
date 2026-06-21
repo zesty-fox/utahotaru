@@ -876,15 +876,40 @@ class MainWindow(MSFluentWindow):
 
             # 用户确认更新 → 启动 Updater.exe 并退出
             if not upd_installer.is_updater_available():
-                InfoBar.warning(
-                    title=self.tr("更新器未就绪"),
-                    content=self.tr("未找到 Updater.exe。请到 GitHub 手动下载完整安装包。"),
-                    orient=Qt.Orientation.Horizontal,
-                    isClosable=True,
-                    position=InfoBarPosition.TOP,
-                    duration=6000,
-                    parent=self,
-                )
+                import sys
+
+                if sys.platform == "darwin":
+                    # mac 无自动安装 handoff：直接打开 release 页面供手动下载。
+                    from PyQt6.QtCore import QUrl
+                    from PyQt6.QtGui import QDesktopServices
+                    from strange_uta_game.__version__ import REPO_OWNER, REPO_NAME
+
+                    QDesktopServices.openUrl(
+                        QUrl(
+                            f"https://github.com/{REPO_OWNER}/{REPO_NAME}/releases/latest"
+                        )
+                    )
+                    InfoBar.success(
+                        title=self.tr("已打开下载页面"),
+                        content=self.tr(
+                            "macOS 暂不支持自动更新，已在浏览器打开最新版本下载页。"
+                        ),
+                        orient=Qt.Orientation.Horizontal,
+                        isClosable=True,
+                        position=InfoBarPosition.TOP,
+                        duration=6000,
+                        parent=self,
+                    )
+                else:
+                    InfoBar.warning(
+                        title=self.tr("更新器未就绪"),
+                        content=self.tr("未找到 Updater.exe。请到 GitHub 手动下载完整安装包。"),
+                        orient=Qt.Orientation.Horizontal,
+                        isClosable=True,
+                        position=InfoBarPosition.TOP,
+                        duration=6000,
+                        parent=self,
+                    )
                 return
 
             from strange_uta_game.updater.proxy import resolve_proxy
