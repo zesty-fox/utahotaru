@@ -15,7 +15,7 @@ from typing import Optional
 
 from typing import Sequence
 
-from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtCore import QPoint, Qt, QTimer
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
@@ -34,17 +34,21 @@ from qfluentwidgets import (
 
 
 class FluentMessageBox(MessageBox):
-    """qfluentwidgets ``MessageBox`` 的定位修正版。
+    """qfluentwidgets ``MessageBox`` 的嵌入式兼容版。
 
-    qfluentwidgets 的 ``MaskDialogBase`` 在 ``__init__`` 里把遮罩固定为
-    ``setGeometry(0, 0, parent.width(), parent.height())`` —— 即钉在**主屏原点**、
-    大小取父窗口大小。仅当父窗口恰好最大化在主屏 (0,0) 时才正好覆盖；只要父窗口
-    不在原点（**嵌入式下 SUG 是宿主里的子面板、宿主窗口通常不在原点**，或
-    standalone 下窗口非最大化），遮罩就会跑到主屏左上角与可见区域错位：用户看不到
-    对话框，点击落到被模态屏蔽的窗口上只听到系统禁止音。
+    针对嵌入式（SUG 作为子 widget 挂在宿主里）下两个问题做修正：
 
-    本类在显示时把遮罩重新定位/缩放到锚点窗口的**实际全局矩形**，使遮罩与对话框
-    始终覆盖正确的窗口，standalone 与 embedded 两种模式下行为一致。
+    1. **可点击性 / 模态激活**：``MaskDialogBase`` 是无边框 + 半透明的顶层窗口，
+       嵌入式下 ``exec()`` 后首帧拿不到前台激活，表现为"对话框可见但点不动、
+       点击只发系统禁止音"（点击落到被模态屏蔽的窗口上）。这里显式设为
+       ApplicationModal，并在显示后 ``raise_()`` + ``activateWindow()``（事件循环
+       跑起来后再补一次），与 SUG 其它嵌入式对话框的既有套路一致。
+    2. **定位**：``MaskDialogBase.__init__`` 把遮罩固定为
+       ``setGeometry(0, 0, parent.width(), parent.height())``，钉在主屏原点；父窗口
+       非最大化 / 不在原点时遮罩会与可见区域错位。这里在显示时把遮罩重定位到锚点
+       窗口的实际全局矩形。
+
+    standalone 与 embedded 两种模式下行为一致，仍是同一套 Fluent 组件。
     """
 
     def __init__(self, title: str, content: str, parent: Optional[QWidget] = None):
@@ -52,6 +56,8 @@ class FluentMessageBox(MessageBox):
         # 锚点：父级所在的顶层窗口（_resolve_window 已把 parent 解析为窗口，
         # 这里 .window() 多为其自身；对子控件也能正确上溯）。
         self._anchorWindow = parent.window() if parent is not None else None
+        # 显式应用级模态：嵌入式下确保屏蔽宿主、把输入交给本对话框。
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
 
     def _reposition_over_anchor(self) -> None:
         win = self._anchorWindow
@@ -61,9 +67,17 @@ class FluentMessageBox(MessageBox):
         self.setGeometry(top_left.x(), top_left.y(), win.width(), win.height())
         self.windowMask.resize(self.size())
 
+    def _ensure_active(self) -> None:
+        self.raise_()
+        self.activateWindow()
+
     def showEvent(self, e):
         self._reposition_over_anchor()
         super().showEvent(e)
+        # 立即激活一次；事件循环 settle 后再补一次，确保嵌入式下取得前台焦点，
+        # 避免"可见但点击发禁止音"。
+        self._ensure_active()
+        QTimer.singleShot(0, self._ensure_active)
 
 
 def make_message_box(
