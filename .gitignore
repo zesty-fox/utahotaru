@@ -228,3 +228,5 @@ scripts/_sources.txt
 
 # Local Superpowers brainstorming companion
 .superpowers/
+# Superpowers brainstorming/planning 草稿（spec/plan 产物，不入库）
+docs/superpowers/
