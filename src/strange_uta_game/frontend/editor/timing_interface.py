@@ -358,6 +358,7 @@ class EditorInterface(QWidget):
         self.toolbar.analyze_rubies_no_cp_clicked.connect(self._on_analyze_rubies_no_cp)
         self.toolbar.analyze_rubies_by_line_no_cp_clicked.connect(self._on_analyze_rubies_by_line_no_cp)
         self.toolbar.analyze_rubies_selected_no_cp_clicked.connect(self._on_analyze_rubies_selected_no_cp)
+        self.toolbar.romanize_all_clicked.connect(self._on_romanize_all_rubies)
         self.toolbar.open_fulltext_clicked.connect(self._on_open_fulltext)
         self.toolbar.delete_rubies_by_type_clicked.connect(self._on_delete_rubies_by_type)
         self.toolbar.set_singer_by_line_clicked.connect(self._on_set_singer_by_line)
@@ -6764,6 +6765,78 @@ class EditorInterface(QWidget):
     def _on_analyze_rubies_selected_no_cp(self):
         """工具栏「注音分析所选字符（不更新节奏点）」— 只刷注音、保留节奏点。"""
         self._on_analyze_rubies_selected(update_checkpoints=False)
+
+    def _on_romanize_all_rubies(self):
+        """工具栏「全部转为罗马字注音」。
+
+        读取现有全部注音结构、保留结构把假名 ruby 转为赫本式罗马音；无 ruby 的
+        单假名（平假名/片假名/促音/长音）补自注音再转罗马音。罗马音读音随上下文
+        变化（促音双写、は/へ/を 助词读音）。
+
+        单例同步操作：不调用注音引擎、不更新节奏点、不删除注音；与正在进行的异步
+        注音分析互斥。变更经 :py:meth:`_execute_structural_edit` 纳入撤销/重做栈，
+        ruby 通道刷新（move_cp=False，不触碰节奏点）。
+        """
+        if not self._project:
+            return
+        # 与异步注音分析互斥，避免并发改写句子结构
+        if getattr(self, "_ruby_analyzing", False) or getattr(
+            self, "_ruby_subset_analyzing", False
+        ):
+            InfoBar.warning(
+                title=self.tr("注音分析进行中"),
+                content=self.tr("请等待当前注音分析完成后再试"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2500,
+                parent=self,
+            )
+            return
+        # 单例：防止重入（同步操作下事件循环阻塞，理论上不会重入，仍显式守卫）
+        if getattr(self, "_romanizing_all", False):
+            return
+
+        from strange_uta_game.backend.infrastructure.parsers.romaji import (
+            romanize_project_to_self_ruby,
+        )
+
+        changed_box = [0]
+
+        def _mutate() -> Optional[tuple[int, int, Optional[int], str]]:
+            assert self._project is not None
+            self._romanizing_all = True
+            try:
+                changed_box[0] = romanize_project_to_self_ruby(self._project)
+            finally:
+                self._romanizing_all = False
+            if changed_box[0] == 0:
+                return None
+            return (self._current_line_idx, self.preview._current_char_idx, None, "rubies")
+
+        ok = self._execute_structural_edit(
+            "全部转为罗马字注音", _mutate, move_cp=False
+        )
+        if ok:
+            InfoBar.success(
+                title=self.tr("已转为罗马字注音"),
+                content=self.tr("共处理 {n} 行").format(n=changed_box[0]),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2500,
+                parent=self,
+            )
+        else:
+            InfoBar.info(
+                title=self.tr("无变化"),
+                content=self.tr("没有可转为罗马字的注音或单假名"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2500,
+                parent=self,
+            )
 
     def _on_open_fulltext(self):
         """工具栏「全文本编辑」— 以对话框打开全文本注音编辑界面。"""

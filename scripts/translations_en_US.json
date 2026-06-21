@@ -1247,5 +1247,11 @@
   "按行 · 仅注音": "Per line · ruby only",
   "所选 · 仅注音": "Selection · ruby only",
   "全部注音 · 含节奏点": "All ruby · with checkpoints",
-  "全部注音 · 仅注音": "All ruby · ruby only"
+  "全部注音 · 仅注音": "All ruby · ruby only",
+  "全部转为罗马字": "Convert all to romaji",
+  "注音分析进行中": "Ruby analysis in progress",
+  "请等待当前注音分析完成后再试": "Please wait for the current ruby analysis to finish",
+  "已转为罗马字注音": "Converted to romaji ruby",
+  "共处理 {n} 行": "Processed {n} lines",
+  "没有可转为罗马字的注音或单假名": "No ruby or standalone kana to romanize"
 }

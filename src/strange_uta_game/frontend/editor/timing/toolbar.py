@@ -39,6 +39,7 @@ class EditorToolBar(QFrame):
     analyze_rubies_no_cp_clicked = pyqtSignal()           # 注音分析（不更新节奏点）
     analyze_rubies_by_line_no_cp_clicked = pyqtSignal()   # 按行注音分析（不更新节奏点）
     analyze_rubies_selected_no_cp_clicked = pyqtSignal()  # 注音分析所选字符（不更新节奏点）
+    romanize_all_clicked = pyqtSignal()                   # 全部转为罗马字注音（不更新节奏点/不删除注音）
     open_fulltext_clicked = pyqtSignal()
     modify_char_clicked = pyqtSignal()
     insert_guide_clicked = pyqtSignal()
@@ -122,6 +123,9 @@ class EditorToolBar(QFrame):
         ruby_menu.addAction(Action(FIF.SYNC, tr("全部 · 仅注音"), self, triggered=self.analyze_rubies_no_cp_clicked.emit))
         ruby_menu.addAction(Action(FIF.SYNC, tr("按行 · 仅注音"), self, triggered=self.analyze_rubies_by_line_no_cp_clicked.emit))
         ruby_menu.addAction(Action(FIF.SYNC, tr("所选 · 仅注音"), self, triggered=self.analyze_rubies_selected_no_cp_clicked.emit))
+        ruby_menu.addSeparator()
+        # 第三组：把现有注音/单假名整体转为罗马字（独立操作，不分析/不更新节奏点/不删除注音）
+        ruby_menu.addAction(Action(FIF.FONT, tr("全部转为罗马字"), self, triggered=self.romanize_all_clicked.emit))
         ruby_menu.addSeparator()
         ruby_menu.addAction(Action(FIF.DELETE, tr("按类型删除注音"), self, triggered=self.delete_rubies_by_type_clicked.emit))
         self.btn_ruby.setMenu(ruby_menu)

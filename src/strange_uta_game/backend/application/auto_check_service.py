@@ -44,7 +44,9 @@ from strange_uta_game.backend.infrastructure.parsers.e2k_engine import (
     EnglishToKanaEngine,
 )
 from strange_uta_game.backend.infrastructure.parsers.romaji import (
-    romanize_ruby_parts,
+    detect_particle_part_indices,
+    is_self_romanizable_kana,
+    romanize_sentence_in_place,
 )
 
 
@@ -340,80 +342,17 @@ class AutoCheckService:
             pass
 
     def _should_make_romaji_self_ruby(self, char: str) -> bool:
-        if not self._romanize_ruby or len(char) != 1:
-            return False
-        return get_char_type(char) in (
-            CharType.HIRAGANA, CharType.KATAKANA, CharType.SOKUON, CharType.LONG_VOWEL)
+        return self._romanize_ruby and is_self_romanizable_kana(char)
 
     def _detect_romaji_particles(self, sentence: Sentence) -> set[int]:
         if not self._romanize_ruby:
             return set()
-        particle_indices: set[int] = set()
-        part_idx = 0
-        for char_idx, ch in enumerate(sentence.characters):
-            if not ch.ruby:
-                continue
-            for part in ch.ruby.parts:
-                text = part.text
-                if len(text) != 1 or text != ch.char:
-                    part_idx += 1
-                    continue
-                if text == "\u3092":
-                    particle_indices.add(part_idx)
-                    part_idx += 1
-                    continue
-                if text not in ("\u306f", "\u3078"):
-                    part_idx += 1
-                    continue
-                if char_idx == 0:
-                    part_idx += 1
-                    continue
-                prev = sentence.characters[char_idx - 1]
-                prev_ct = get_char_type(prev.char) if len(prev.char) == 1 else CharType.OTHER
-                if prev_ct not in (CharType.KANJI, CharType.HIRAGANA, CharType.KATAKANA,
-                                   CharType.SOKUON, CharType.LONG_VOWEL):
-                    part_idx += 1
-                    continue
-                # 前一字符是汉字/片假名 → 词边界信号强，直接判定为助词（无需看后字）。
-                # 例：「私は」「学校へ」「ロボットは」
-                if prev_ct in (CharType.KANJI, CharType.KATAKANA):
-                    particle_indices.add(part_idx)
-                    part_idx += 1
-                    continue
-                # 前一字符是假名（平假名/促音/长音）：使用后一字符辅助双向判断。
-                # 「假名+は/へ+假名」三方全假名时无法可靠区分词内は与助词は
-                # （例：「おはなし」的は vs「わたしはやさしい」的は），
-                # 保守处理：只有后一字符非假名（汉字、标点、英文、句末等）时才判定为助词。
-                if char_idx + 1 >= len(sentence.characters):
-                    # 句末の は/へ，前有日文字符 → 判定为助词
-                    particle_indices.add(part_idx)
-                    part_idx += 1
-                    continue
-                next_ch = sentence.characters[char_idx + 1]
-                next_ct = get_char_type(next_ch.char) if len(next_ch.char) == 1 else CharType.OTHER
-                if next_ct not in (CharType.HIRAGANA, CharType.KATAKANA,
-                                   CharType.SOKUON, CharType.LONG_VOWEL):
-                    particle_indices.add(part_idx)
-                part_idx += 1
-        return particle_indices
+        return detect_particle_part_indices(sentence)
 
     def _romanize_sentence_ruby(self, sentence: Sentence) -> None:
         if not self._romanize_ruby:
             return
-        refs: List[RubyPart] = []
-        texts: List[str] = []
-        for ch in sentence.characters:
-            if not ch.ruby:
-                continue
-            for part in ch.ruby.parts:
-                refs.append(part)
-                texts.append(part.text)
-        if not refs:
-            return
-        particle_indices = self._detect_romaji_particles(sentence)
-        converted = romanize_ruby_parts(texts, particle_indices=particle_indices)
-        for part, text in zip(refs, converted):
-            part.text = text
+        romanize_sentence_in_place(sentence)
 
     def _apply_english_dictionary(
         self, text: str, ruby_results: List[RubyResult], dict_covered: set
