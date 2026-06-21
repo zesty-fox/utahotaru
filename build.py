@@ -200,7 +200,7 @@ if _failed:
     print("请先安装缺少的依赖后重试。")
     sys.exit(1)
 
-import PyQt6
+import PyQt6.QtCore
 import sounddevice
 import soundfile
 import pedalboard
