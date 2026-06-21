@@ -902,3 +902,53 @@ class TestAnalyzeUpdateCheckpointsToggle:
 
         service.analyze_and_apply_pipeline(project, update_checkpoints=True)
         assert calls == [1], "默认仍应重算节奏点"
+
+    def test_sentence_pipeline_preserves_check_count_values(self):
+        """不更新节奏点：注音照常更新，但 check_count 还原到分析前。"""
+        analyzer = _FixedReadingAnalyzer({"桜": "さくら"})  # 3 mora
+        service = AutoCheckService(analyzer)
+        sentence = Sentence.from_text("桜", "s1")
+        # 人为设定与注音 mora 数不同的节奏点数
+        sentence.characters[0].set_check_count(1, force=True)
+
+        service.analyze_and_apply_sentence_pipeline(
+            sentence, update_checkpoints=False
+        )
+
+        ch = sentence.characters[0]
+        # 注音文本已更新为 さくら
+        assert ch.ruby is not None
+        assert "".join(p.text for p in ch.ruby.parts) == "さくら"
+        # 节奏点数保持 1（未被 3 mora 覆盖），parts 也对齐回 1 段
+        assert ch.check_count == 1
+        assert len(ch.ruby.parts) == 1
+
+    def test_sentence_pipeline_updates_check_count_when_enabled(self):
+        """对照：默认模式下 check_count 会被注音 mora 数刷新。"""
+        analyzer = _FixedReadingAnalyzer({"桜": "さくら"})
+        service = AutoCheckService(analyzer)
+        sentence = Sentence.from_text("桜", "s1")
+        sentence.characters[0].set_check_count(1, force=True)
+
+        service.analyze_and_apply_sentence_pipeline(
+            sentence, update_checkpoints=True
+        )
+        assert sentence.characters[0].check_count == 3  # さくら 3 拍
+
+    def test_project_pipeline_preserves_check_count_values(self):
+        """项目级不更新节奏点：注音更新但 check_count 还原。"""
+        from strange_uta_game.backend.domain import Project
+
+        analyzer = _FixedReadingAnalyzer({"桜": "さくら"})
+        service = AutoCheckService(analyzer)
+        project = Project()
+        sentence = Sentence.from_text("桜", "s1")
+        sentence.characters[0].set_check_count(1, force=True)
+        project.sentences.append(sentence)
+
+        service.analyze_and_apply_pipeline(project, update_checkpoints=False)
+
+        ch = project.sentences[0].characters[0]
+        assert ch.ruby is not None
+        assert "".join(p.text for p in ch.ruby.parts) == "さくら"
+        assert ch.check_count == 1

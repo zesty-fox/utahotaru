@@ -2602,6 +2602,14 @@ class AutoCheckService:
         Returns:
             按类型删除的注音数量（无删除步骤时返回 0）。
         """
+        # 不更新节奏点：注音分析本身（apply_to_project/delete/romanize）会改写
+        # check_count，故先快照全项目节奏点数，管线末尾再还原。
+        saved_cc = None
+        if not update_checkpoints:
+            saved_cc = [
+                [c.check_count for c in s.characters] for s in project.sentences
+            ]
+
         # Step 1: 注音分析（延迟 romaji，delete 之后再转）
         self.apply_to_project(
             project,
@@ -2631,6 +2639,12 @@ class AutoCheckService:
         # Step 4: 罗马音转换（在 delete 之后，只转换剩余的假名注音）
         self.romanize_project_rubies(project, progress_callback=progress_callback)
 
+        # Step 5: 还原节奏点（不更新节奏点模式）。在所有改动之后兜底还原，
+        # 权威 setter 会把新注音的 ruby.parts 重新对齐回原节奏点数。
+        if saved_cc is not None:
+            for s, ccs in zip(project.sentences, saved_cc):
+                self._restore_sentence_check_counts(s, ccs)
+
         return deleted_count
 
     def analyze_and_apply_sentence_pipeline(
@@ -2655,6 +2669,12 @@ class AutoCheckService:
             update_checkpoints: True=分析后重算节奏点（默认）；
                 False=只更新注音、保留现有节奏点不动。
         """
+        # 不更新节奏点：apply_to_sentence 内部会按新注音重写 check_count，
+        # 故先快照整句节奏点数，分析后还原（覆盖全句，确保节奏点完全不动）。
+        saved_cc = None
+        if not update_checkpoints:
+            saved_cc = [c.check_count for c in sentence.characters]
+
         self.apply_to_sentence(
             sentence,
             only_noruby=only_noruby,
@@ -2663,6 +2683,20 @@ class AutoCheckService:
         )
         if update_checkpoints:
             self.update_checkpoints_from_rubies(sentence)
+        elif saved_cc is not None:
+            self._restore_sentence_check_counts(sentence, saved_cc)
+
+    @staticmethod
+    def _restore_sentence_check_counts(sentence: Sentence, saved: List[int]) -> None:
+        """把句中字符的 check_count 还原到 saved（供「不更新节奏点」复用）。
+
+        仅对实际发生变化的字符调用权威 setter——setter 会按旧节奏点数重新对齐
+        新注音的 ruby.parts（缩小合并尾段 / 放大补占位），从而做到「注音更新、
+        节奏点不动」。未变化的字符跳过，避免无谓重切 parts。
+        """
+        for i, ch in enumerate(sentence.characters):
+            if i < len(saved) and ch.check_count != saved[i]:
+                ch.set_check_count(saved[i], force=True)
 
     def estimate_check_count(self, text: str) -> int:
         """估算文本的节奏点数量
