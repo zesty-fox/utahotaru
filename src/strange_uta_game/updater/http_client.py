@@ -84,6 +84,39 @@ def get_json(
     return HttpResult(ok=True, status=resp.status_code, body=data)
 
 
+def get_redirect_location(
+    url: str,
+    *,
+    proxies: Optional[Dict[str, str]] = None,
+    timeout: Tuple[float, float] = DEFAULT_TIMEOUT,
+) -> HttpResult:
+    """GET 一个会 302 跳转的 URL 但不跟随跳转，返回 ``Location`` 头。
+
+    用途：``github.com/<owner>/<repo>/releases/latest`` 会 302 到
+    ``/releases/tag/<tag>``。这个网页端点不计入 ``api.github.com`` 的
+    "未认证 60 次/小时（按出口 IP）"限流，因此可在 API 全部返回 403 时作为
+    轻量兜底，仅用来探测最新版本号。
+
+    成功时 ``HttpResult.body`` 为 ``Location`` 字符串。
+    """
+    try:
+        resp = requests.get(
+            url,
+            headers=_headers(),
+            proxies=proxies,
+            timeout=timeout,
+            allow_redirects=False,
+        )
+    except requests.RequestException as e:
+        return HttpResult(ok=False, error=f"网络错误: {e}")
+    if resp.status_code in (301, 302, 303, 307, 308):
+        loc = resp.headers.get("Location") or ""
+        if loc:
+            return HttpResult(ok=True, status=resp.status_code, body=loc)
+        return HttpResult(ok=False, status=resp.status_code, error="重定向缺少 Location 头")
+    return HttpResult(ok=False, status=resp.status_code, error=f"HTTP {resp.status_code}")
+
+
 def get_text(
     url: str,
     *,

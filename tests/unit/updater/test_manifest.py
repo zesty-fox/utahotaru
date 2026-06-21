@@ -86,7 +86,7 @@ class TestOverrideAssetUrls:
         overridden = override_asset_urls(rel, "ghproxy", "StrangeUtaGame-v0.3.3.zip")
         primary = overridden.pick_primary_asset("StrangeUtaGame-v0.3.3.zip")
         assert primary is not None
-        assert "mirror.ghproxy.com" in primary.download_url
+        assert "ghfast.top" in primary.download_url
 
     def test_keep_others(self):
         rel = _parse_release_json(_fake_payload())
@@ -94,14 +94,14 @@ class TestOverrideAssetUrls:
         sha = overridden.pick_sha256_asset("StrangeUtaGame-v0.3.3.zip")
         # sha256 资产名字不匹配 primary_asset_name，URL 应保持原样
         assert sha is not None
-        assert "mirror.ghproxy.com" not in sha.download_url
+        assert "ghfast.top" not in sha.download_url
 
     def test_override_all_when_no_filter(self):
         rel = _parse_release_json(_fake_payload())
-        overridden = override_asset_urls(rel, "fastgit", primary_asset_name=None)
+        overridden = override_asset_urls(rel, "gh-proxy", primary_asset_name=None)
         # 没有 primary_asset_name 过滤 → 所有资产都被重写
         for a in overridden.assets:
-            assert a.download_url.startswith("https://download.fastgit.org/")
+            assert a.download_url.startswith("https://gh-proxy.com/https://github.com/")
 
 
 class TestReleaseAssetExt:

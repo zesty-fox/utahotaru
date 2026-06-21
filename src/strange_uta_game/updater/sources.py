@@ -3,7 +3,7 @@
 提供下载源：
 
 * ``github``           —— 官方 GitHub Release 直链
-* ``ghproxy``          —— ``https://mirror.ghproxy.com/`` 反代（稳定性极高）
+* ``ghproxy``          —— ``https://ghfast.top/`` 反代（原 mirror.ghproxy.com 已停服）
 * ``gh-proxy``         —— ``https://gh-proxy.com/`` 反代（速度快）
 * ``ghproxy-net``      —— ``https://ghproxy.net/`` 反代（速度快）
 
@@ -22,7 +22,7 @@ SOURCE_IDS: Tuple[SourceId, ...] = ("github", "ghproxy", "gh-proxy", "ghproxy-ne
 # 人类可读的标签，供 UI 显示。
 SOURCE_LABELS: Dict[SourceId, str] = {
     "github": "GitHub Release（官方）",
-    "ghproxy": "GitHub Proxy（mirror.ghproxy.com）",
+    "ghproxy": "GitHub Proxy（ghfast.top）",
     "gh-proxy": "GitHub Proxy（gh-proxy.com）",
     "ghproxy-net": "GitHub Proxy（ghproxy.net）",
 }
@@ -59,7 +59,7 @@ def build_download_url(source: SourceId, tag: str, asset_name: str) -> str:
     if source == "github":
         return f"https://github.com/{path}"
     if source == "ghproxy":
-        return f"https://mirror.ghproxy.com/https://github.com/{path}"
+        return f"https://ghfast.top/https://github.com/{path}"
     if source == "gh-proxy":
         return f"https://gh-proxy.com/https://github.com/{path}"
     if source == "ghproxy-net":
@@ -88,7 +88,7 @@ def build_api_urls(order: List[str]) -> List[Tuple[SourceId, str]]:
             out.append((sid, f"https://api.github.com/{api_path}"))
         elif sid == "ghproxy":
             out.append(
-                (sid, f"https://mirror.ghproxy.com/https://api.github.com/{api_path}")
+                (sid, f"https://ghfast.top/https://api.github.com/{api_path}")
             )
         elif sid == "gh-proxy":
             out.append(
@@ -114,7 +114,7 @@ def build_api_list_urls(order: List[str], per_page: int = 30) -> List[Tuple[Sour
             out.append((sid, f"https://api.github.com/{api_path}"))
         elif sid == "ghproxy":
             out.append(
-                (sid, f"https://mirror.ghproxy.com/https://api.github.com/{api_path}")
+                (sid, f"https://ghfast.top/https://api.github.com/{api_path}")
             )
         elif sid == "gh-proxy":
             out.append(

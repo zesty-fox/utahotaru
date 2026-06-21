@@ -14,13 +14,34 @@ from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
 from ..__version__ import __version__
 from . import http_client
-from .manifest import LatestRelease, fetch_latest_release, fetch_releases_since, override_asset_urls
+from .manifest import (
+    LatestRelease,
+    fetch_latest_release,
+    fetch_latest_release_via_redirect,
+    fetch_releases_since,
+    override_asset_urls,
+)
 from .proxy import resolve_proxy
 from .settings import UpdaterSettings
 from .sources import SourceId
 from .version import is_newer_version
 
 log = logging.getLogger(__name__)
+
+
+def _build_check_error(attempts: List[Tuple[SourceId, str, str]]) -> str:
+    """根据各源失败原因给出更有指导性的错误文案。
+
+    最常见的失败是 ``api.github.com`` 的 403 限流（代理出口 IP 共享，
+    未认证额度 60 次/小时被打满），这与"网络不通"完全是两回事，需要单独提示。
+    """
+    joined = " ".join(err for _sid, _url, err in attempts if err)
+    if "403" in joined:
+        return (
+            "GitHub 访问频率超限：代理出口 IP 的未认证 API 配额（60 次/小时）已用尽。"
+            "这通常是机场共享节点导致，请稍后重试或更换代理节点后再试。"
+        )
+    return "无法访问任何更新源（请检查网络/代理）"
 
 
 @dataclass
@@ -84,13 +105,23 @@ class _CheckRunnable(QObject):
         release, attempts = fetch_latest_release(
             self._settings.source_order, proxies=proxies
         )
+        # 2.1) API 全部失败时的兜底：用 github.com 网页端 302 跳转探测版本。
+        # 典型触发场景是代理出口 IP 触发 api.github.com 的 403 限流——此时代理
+        # "联通"但官方与各镜像 API 都拿不到数据。网页端跳转不计入该限流。
+        redirect_fallback = False
         if release is None:
-            log.warning("所有更新源 API 均失败: %s", attempts)
-            return CheckResult(
-                ok=False,
-                error="无法访问任何更新源（请检查网络/代理）",
-                attempts=attempts,
-            )
+            fb_release, fb_attempts = fetch_latest_release_via_redirect(proxies=proxies)
+            attempts = attempts + fb_attempts
+            if fb_release is None:
+                log.warning("所有更新源 API 与跳转兜底均失败: %s", attempts)
+                return CheckResult(
+                    ok=False,
+                    error=_build_check_error(attempts),
+                    attempts=attempts,
+                )
+            release = fb_release
+            redirect_fallback = True
+            log.info("API 源全部失败，已用 github.com 跳转兜底探测到版本: %s", release.tag)
 
         # 拉取成功 → 更新 last_check_at（即使 has_update=False 也写，避免每次启动都打 API）
         try:
@@ -106,11 +137,18 @@ class _CheckRunnable(QObject):
         from .sources import build_release_urls
         from ..__version__ import ASSET_NAME_TEMPLATE
         preferred_asset_name = ASSET_NAME_TEMPLATE.format(version=release.version)
-        found_asset = release.pick_primary_asset(preferred_name=preferred_asset_name)
-        # 只有版本更新 AND 本变体的 zip 已上传到这个 release，才报有更新。
-        # 防止 noWinIME 等变体在主版本 zip 上传、但自己的 zip 尚未上传时误报有更新。
-        has_update = version_newer and (found_asset is not None)
-        asset_name = found_asset.name if found_asset else preferred_asset_name
+        if redirect_fallback:
+            # 跳转兜底拿不到资产清单，无法核对本变体 zip 是否已上传：
+            # 按命名约定信任资产存在，仅以版本号判断是否有更新。
+            found_asset = None
+            has_update = version_newer
+            asset_name = preferred_asset_name
+        else:
+            found_asset = release.pick_primary_asset(preferred_name=preferred_asset_name)
+            # 只有版本更新 AND 本变体的 zip 已上传到这个 release，才报有更新。
+            # 防止 noWinIME 等变体在主版本 zip 上传、但自己的 zip 尚未上传时误报有更新。
+            has_update = version_newer and (found_asset is not None)
+            asset_name = found_asset.name if found_asset else preferred_asset_name
 
         candidates: List[Tuple[SourceId, str]] = build_release_urls(
             self._settings.source_order, release.tag, asset_name
@@ -123,8 +161,9 @@ class _CheckRunnable(QObject):
             release = override_asset_urls(release, primary_source_id, asset_name)  # type: ignore[arg-type]
 
         # 5) 有更新时获取全部中间版本的 changelog（跨版本更新日志聚合）
+        # 跳转兜底模式下 API 必然仍是失败的，跳过聚合以免徒劳的 403 请求。
         all_releases: List[LatestRelease] = []
-        if has_update:
+        if has_update and not redirect_fallback:
             try:
                 all_releases, _ = fetch_releases_since(
                     __version__, self._settings.source_order, proxies=proxies

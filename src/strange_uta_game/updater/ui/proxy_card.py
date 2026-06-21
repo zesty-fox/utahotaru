@@ -338,13 +338,29 @@ def _build_scan_hint() -> str:
 
 
 def _test_connectivity(parent: QWidget, card: _ProxyStatusCard) -> None:
-    """用当前代理设置请求 GitHub API 测试连通性。"""
+    """用当前代理设置探测 GitHub 可达性。
+
+    注意：**不能**用 ``api.github.com`` 来判定连通——它对未认证请求有
+    "60 次/小时、按出口 IP"的限流，机场共享节点很容易被打满而返回 403。
+    那种 403 恰恰证明请求已经到达 GitHub（即代理是通的），却会被误判为
+    "连通失败"。因此这里改用 github.com 网页端（不受该限流约束）作为主判据，
+    并单独探一次 API 配额仅用于附加提示。
+    """
+    from ...__version__ import REPO_NAME, REPO_OWNER
+
     s = UpdaterSettings.load()
     _info, proxies = resolve_proxy(s.proxy_mode, s.proxy_manual_url)
     card.btn_test.setEnabled(False)
     card.btn_test.setText(_tr("测试中..."))
     try:
-        result = http_client.get_json(
+        # 主判据：github.com 网页端 releases/latest 会 302 跳转，可达即视为连通。
+        reach = http_client.get_redirect_location(
+            f"https://github.com/{REPO_OWNER}/{REPO_NAME}/releases/latest",
+            proxies=proxies,
+            timeout=(5.0, 10.0),
+        )
+        # 附加：探一次官方 API 是否被限流（仅用于提示，不决定成败）。
+        api = http_client.get_json(
             "https://api.github.com/zen",
             proxies=proxies,
             timeout=(5.0, 10.0),
@@ -353,20 +369,35 @@ def _test_connectivity(parent: QWidget, card: _ProxyStatusCard) -> None:
         card.btn_test.setEnabled(True)
         card.btn_test.setText(_tr("测试连通性"))
 
-    if result.ok or result.status == 200:
-        InfoBar.success(
-            title=_tr("连通成功"),
-            content=_tr("GitHub API 可达"),
-            orient=Qt.Orientation.Horizontal,
-            isClosable=True,
-            position=InfoBarPosition.TOP,
-            duration=3000,
-            parent=parent.window(),
-        )
+    if reach.ok:
+        # 代理可达 GitHub。再看官方 API 是否被限流给出对应提示。
+        if api.status == 403:
+            InfoBar.warning(
+                title=_tr("连通成功（API 限流中）"),
+                content=_tr(
+                    "代理可正常访问 GitHub，但官方 API 对你的出口 IP 限流（403）。"
+                    "检查更新会自动改用网页端探测，通常不受影响。"
+                ),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=5000,
+                parent=parent.window(),
+            )
+        else:
+            InfoBar.success(
+                title=_tr("连通成功"),
+                content=_tr("GitHub 可达"),
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=parent.window(),
+            )
     else:
         InfoBar.error(
             title=_tr("连通失败"),
-            content=result.error or f"HTTP {result.status}",
+            content=reach.error or f"HTTP {reach.status}",
             orient=Qt.Orientation.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,

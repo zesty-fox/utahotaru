@@ -167,6 +167,54 @@ def fetch_latest_release(
     return None, attempts
 
 
+def fetch_latest_release_via_redirect(
+    proxies: Optional[Dict[str, str]] = None,
+) -> Tuple[Optional[LatestRelease], List[Tuple[SourceId, str, str]]]:
+    """轻量兜底：用 github.com 网页端 ``releases/latest`` 的 302 跳转探测最新 tag。
+
+    当 :func:`fetch_latest_release` 的所有 API 源都失败时调用 —— 最典型的场景是
+    代理出口 IP（机场共享节点）触发 ``api.github.com`` 的"未认证 60 次/小时"
+    限流而返回 403。该网页端点不计入该限流，只要代理能访问 github.com 即可拿到
+    版本号。
+
+    代价：只能拿到 ``tag`` / ``version``，拿不到 changelog 正文与资产清单。调用方
+    需按发布命名约定自行合成下载链接，并据 ``version`` 判断是否有更新。
+
+    Returns:
+        ``(release, attempts)``，``release`` 只填了 tag/version/html_url，其余为空。
+    """
+    from ..__version__ import REPO_OWNER, REPO_NAME
+
+    url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/releases/latest"
+    attempts: List[Tuple[SourceId, str, str]] = []
+    result = http_client.get_redirect_location(url, proxies=proxies)
+    if not result.ok or not isinstance(result.body, str):
+        attempts.append(("github-redirect", url, result.error or "未知错误"))  # type: ignore[arg-type]
+        return None, attempts
+
+    location = result.body
+    # Location 形如 ``https://github.com/<owner>/<repo>/releases/tag/SUGv1.2.6``
+    tag = location.rstrip("/").rsplit("/tag/", 1)[-1] if "/tag/" in location else ""
+    if not tag:
+        attempts.append(
+            ("github-redirect", url, f"无法从跳转地址解析 tag: {location}")  # type: ignore[arg-type]
+        )
+        return None, attempts
+
+    attempts.append(("github-redirect", url, ""))  # type: ignore[arg-type]
+    release = LatestRelease(
+        tag=tag,
+        version=strip_tag_prefix(tag),
+        name=tag,
+        body="",
+        html_url=location,
+        prerelease=False,
+        published_at="",
+        assets=[],
+    )
+    return release, attempts
+
+
 def fetch_releases_since(
     current_version: str,
     source_order: List[str],
