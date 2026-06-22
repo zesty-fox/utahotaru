@@ -163,6 +163,16 @@ jobs:
               echo "::warning::缺少产物 dist/$f"
             fi
           done
+          # mac 专属：可拖拽安装的 DMG（仅 mac 变体产出）
+          if [ "$VARIANT" = "mac" ]; then
+            for f in "$APP-v$VER.dmg" "$APP-v$VER.dmg.sha256"; do
+              if [ -f "dist/$f" ]; then
+                cp "dist/$f" "$OUT/"
+              else
+                echo "::warning::缺少产物 dist/$f"
+              fi
+            done
+          fi
           ls -la "$OUT"
 
       - uses: actions/upload-artifact@v4

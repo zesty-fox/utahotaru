@@ -38,10 +38,12 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import plistlib
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time as _time
 import zipfile
 from dataclasses import dataclass, field
@@ -465,6 +467,98 @@ def _pack_zip(version: str, vcfg: VariantConfig) -> Path:
                 zf.write(p, arcname=p.relative_to(dist_root.parent))
     print(f"  ✓ {zip_path}  ({zip_path.stat().st_size / 1024 / 1024:.1f} MB)")
     return zip_path
+
+
+def _customize_app_bundle(app_dir: Path, display_name: str, version: str) -> None:
+    """改写 DMG 内 .app 的 Info.plist：显示名、版本号、``.sug`` 文件关联。
+
+    - 把 CFBundleName/DisplayName 改成干净产品名（去掉 ``-mac`` 变体后缀）；
+    - 用真实版本号覆盖 PyInstaller 默认的 ``0.0.0``；
+    - 声明 CFBundleDocumentTypes + UTExportedTypeDeclarations，让 mac 双击 ``.sug``
+      能关联打开（app 侧由 main.py 的 QFileOpenEvent 接收）。
+    """
+    plist_path = app_dir / "Contents" / "Info.plist"
+    with open(plist_path, "rb") as f:
+        pl = plistlib.load(f)
+    pl["CFBundleName"] = display_name
+    pl["CFBundleDisplayName"] = display_name
+    pl["CFBundleShortVersionString"] = version
+    pl["CFBundleVersion"] = version
+    bundle_id = pl.get("CFBundleIdentifier", "com.xuancc.strangeutagame")
+    sug_uti = f"{bundle_id}.sug"
+    pl["CFBundleDocumentTypes"] = [
+        {
+            "CFBundleTypeName": "StrangeUtaGame Project",
+            "CFBundleTypeRole": "Editor",
+            "LSHandlerRank": "Owner",
+            "LSItemContentTypes": [sug_uti],
+        }
+    ]
+    pl["UTExportedTypeDeclarations"] = [
+        {
+            "UTTypeIdentifier": sug_uti,
+            "UTTypeDescription": "StrangeUtaGame Project",
+            "UTTypeConformsTo": ["public.json"],
+            "UTTypeTagSpecification": {"public.filename-extension": ["sug"]},
+        }
+    ]
+    with open(plist_path, "wb") as f:
+        plistlib.dump(pl, f)
+
+
+def _pack_dmg(version: str, vcfg: VariantConfig) -> Optional[Path]:
+    """mac 变体：把 ``dist/<app_name>.app`` 打成标准拖拽安装 DMG。
+
+    DMG 内含重命名后的 ``<产品名>.app``（去掉变体后缀）与指向 ``/Applications`` 的
+    软链；并改写 Info.plist 设显示名/版本/``.sug`` 文件关联。仅 macOS 可用
+    （依赖系统自带 ``hdiutil``）；其它平台返回 None 并跳过。
+    """
+    if sys.platform != "darwin":
+        print("  · 跳过 DMG：仅 macOS 平台可生成（需要 hdiutil）")
+        return None
+    app_bundle = ROOT / "dist" / f"{vcfg.app_name}.app"
+    if not app_bundle.is_dir():
+        print(f"  · 跳过 DMG：未找到 {app_bundle}")
+        return None
+
+    # DMG 内的显示名/包名：去掉变体后缀（StrangeUtaGame-mac → StrangeUtaGame）
+    display_name = (
+        vcfg.app_name.removesuffix(f"-{vcfg.variant}") if vcfg.variant else vcfg.app_name
+    )
+
+    dmg_path = ROOT / "dist" / f"{vcfg.app_name}-v{version}.dmg"
+    if dmg_path.exists():
+        dmg_path.unlink()
+
+    staging = Path(tempfile.mkdtemp(prefix="sug-dmg-"))
+    try:
+        staging_app = staging / f"{display_name}.app"
+        shutil.copytree(app_bundle, staging_app, symlinks=True)
+        _customize_app_bundle(staging_app, display_name, version)
+        # /Applications 软链（hdiutil 以 staging 为 DMG 根）
+        apps_link = staging / "Applications"
+        if apps_link.is_symlink() or apps_link.exists():
+            apps_link.unlink()
+        apps_link.symlink_to("/Applications")
+
+        print(f"  打包 {staging_app.name} → {dmg_path.name}")
+        cmd = [
+            "hdiutil", "create",
+            "-volname", display_name,
+            "-srcfolder", str(staging),
+            "-ov",
+            "-fs", "HFS+",
+            "-format", "UDZO",  # 压缩只读 DMG，适合分发
+            str(dmg_path),
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"  ✗ hdiutil 失败:\n{(result.stderr or result.stdout)[-800:]}")
+            return None
+        print(f"  ✓ {dmg_path}  ({dmg_path.stat().st_size / 1024 / 1024:.1f} MB)")
+        return dmg_path
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
 
 
 def _sha256_of(path: Path) -> str:
@@ -1027,6 +1121,13 @@ def cmd_build(
     zip_path = _pack_zip(version, vcfg)
     sha_path = _write_sha256(zip_path)
 
+    # mac 变体：额外产出可拖拽安装的 DMG（dist/<app>.app → .dmg）
+    print()
+    print("[step] 打 mac DMG（拖拽安装，仅 macOS）...")
+    dmg_path = _pack_dmg(version, vcfg)
+    if dmg_path is not None:
+        _write_sha256(dmg_path)
+
     print()
     print(f"[step] 写对外发布 {vcfg.manifest_name(version)} ...")
     manifest_path = _write_release_manifest(
@@ -1066,6 +1167,11 @@ def cmd_build(
                 p = p.with_name(p.name + ext)
             if p.exists():
                 print(f"      • {p.relative_to(ROOT)}")
+    if dmg_path is not None and dmg_path.exists():
+        print(f"      • {dmg_path.relative_to(ROOT)}                ← mac 拖拽安装 DMG")
+        dmg_sha = dmg_path.with_name(dmg_path.name + ".sha256")
+        if dmg_sha.exists():
+            print(f"      • {dmg_sha.relative_to(ROOT)}")
     return 0
 
 
