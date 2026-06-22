@@ -4,13 +4,13 @@
 
 ## 核心实现
 
-### SugProjectParser (v2.0 项目解析器)
-基于 JSON 格式的项目文件解析与序列化，版本 2.0 对应新的分层模型。
+### SugProjectParser / SugMigrator (.sug 项目读写)
+基于 JSON 格式的项目文件解析与序列化。当前格式版本 `SugMigrator.CURRENT_VERSION = "0.3.0"`（独立于应用版本号；实现见 `persistence/sug_io.py`）。
 
 - **职责**：
-    - `save(project, path)`：将 Project 对象（包含 sentences, characters, ruby）序列化为 JSON 字符串并保存。
-    - `load(path)`：从文件读取 JSON 并反序列化为 Project 实体树。序列化/反序列化 `sentence_end_ts` 字段。
-    - **向后兼容迁移**：加载旧版 v2.0 文件（无 `sentence_end_ts` 字段）时，自动将句尾字符（is_sentence_end=True）的最后一个时间戳提取为 `sentence_end_ts`。
+    - `save(project, path)`：将 Project 对象（包含 sentences, characters, ruby）序列化为 JSON 字符串并保存，写入 `version` 字段。
+    - `load(path)`：从文件读取 JSON 并反序列化为 Project 实体树（含 `sentence_end_ts`）；`version` 不等于 `CURRENT_VERSION` 时先经 `SugMigrator.migrate` 升级。
+    - **向后兼容迁移**：旧版文件按 `1.0 → 2.0 → 0.3.0` 链式升级（line→sentence 结构、Ruby 分组 / RubyPart 模型重建）。
     - **格式特点**：按 Sentence → Character → Ruby 结构存储，不保存音频物理路径。
 
 ### inline_format (内联文本处理)
@@ -20,27 +20,27 @@
     - `to_inline_text(sentence)`：将带时间标签的句子转换为带有 `[timestamp]` 标记的文本字符串。
     - `from_inline_text(text)`：解析内联格式文本并重建 Sentence 和时间标签。
 
-### WinRTAnalyzer (WinRT IME 分析器)
-提供高精度的日语分词与注音分析实现，为日语注音主引擎。
+### 注音分析器（WinRT / Sudachi 双引擎）
+提供高精度的日语分词与注音分析实现。两种分词器均继承分词器无关基类 `KanaDistributingAnalyzer`（假名锚点 + pykakasi 参考的两步分配策略），仅"分词 + 读音获取"实现不同。
 
-- **职责**：
-    - **WinRT IME 上下文感知**：基于 `Windows.Globalization.JapanesePhoneticAnalyzer`，按整段输入做上下文消歧分词；分配逻辑由分词器无关基类 `KanaDistributingAnalyzer` 提供（假名锚点 + pykakasi 参考的两步策略）。
+- **WinRTAnalyzer（main 变体主引擎）**：
+    - **WinRT IME 上下文感知**：基于 `Windows.Globalization.JapanesePhoneticAnalyzer`，按整段输入做上下文消歧分词。
     - **运行时依赖**：注音引擎来自系统日语功能 `Language.Basic~~~ja-JP`（日语 IME）。应用内 `winrt_japanese_status()` 探测、`install_winrt_japanese()`（UAC 提权）/`winrt_install_guidance()` 引导安装。
     - **输入约束**：`GetWords` 单次上限 100 字符（按 ≤100 字切块）；surface 取原文切片（display_text 会半角→全角归一，不可信）。
     - **假名统一**：所有注音输出均为平假名（`yomi_text`）。
-    - **回退链**：`create_analyzer()` 优先级 WinRT → pykakasi → DummyAnalyzer（**不回退 Sudachi**）。
-    - **内置词典**：缺失 `dictionary.json` 时自动从内嵌的 RL 词典初始化。
-    - **`_is_kanji`**：判定范围含 CJK Unified Ideographs (U+4E00-U+9FFF)、CJK Extension A (U+3400-U+4DBF)、CJK Compatibility (U+F900-U+FAFF)、以及迭字记号 `々` (U+3005)。
+- **SudachiAnalyzer（noWinIME / mac 变体主引擎）**：基于 `sudachipy` + `sudachidict_small`（控制打包体积），分词粒度 Mode A（最短形态素，与 WinRT 默认粒度相近）。
+- **回退链**：`create_analyzer()` 顺序为 **WinRTAnalyzer → SudachiAnalyzer → PykakasiAnalyzer → DummyAnalyzer**。main 变体优先 WinRT（缺日语 IME 由 UI 引导安装）；noWinIME/mac 变体无 winrt 包，直接落到 Sudachi。
+- **内置词典**：缺失 `dictionary.json` 时自动从内嵌的 RL 词典初始化。
+- **`_is_kanji`**：判定范围含 CJK Unified Ideographs (U+4E00-U+9FFF)、CJK Extension A (U+3400-U+4DBF)、CJK Compatibility (U+F900-U+FAFF)、以及迭字记号 `々` (U+3005)。
 
 ### kanji_readings (单字音读字典)
 基于 KANJIDIC2 项目提取的全量汉字读音数据，用于复合词读音拆分。
 
 - **数据源**：KANJIDIC2 XML（Jim Breen / EDRDG 维护），包含 12000+ 汉字的音读（on）和训读（kun）。
-- **文件**：`infrastructure/parsers/kanji_readings.json`，格式 `{字: {on: [...], kun: [...]}}`。
+- **文件**：`src/strange_uta_game/config/kanji_readings.json`（作为 package data 打包），格式 `{字: {on: [...], kun: [...]}}`；拆分逻辑在 `infrastructure/parsers/kanji_reading_split.py`。
 - **职责**：
     - 为 `_try_split_to_chars` 的 Pass 2（音读字典组合匹配）提供单字候选读音。
     - 不包含连浊、缩读、特殊读法——这些属于用户词典 `dictionary.json` 的范畴。
-- **更新方式**：运行 `gen_kanji_dict.py` 脚本从 KANJIDIC2 XML 重新生成。
 
 ### lyric_parser (歌词解析器)
 支持多种原始歌词格式的导入。
@@ -134,16 +134,22 @@
         - LRC (逐字)：`[mm:ss.xx]字[mm:ss.xx]字...` 方括号逐字标签。
     - **KRA Exporter**：同 LRC 增强型，不同扩展名。
     - **SRT Exporter**：标准 SRT 字幕格式（序号 + 时间戳 + 文本）。
-    - **TXT Exporter**：纯文本打轴数据。使用 `ch.export_timestamps`。
-    - **txt2ass Exporter**：兼容特定 ASS 生成工具的中间格式。使用 `ch.export_timestamps`。
+    - **TXT Exporter**：纯文本打轴数据。使用 `ch.global_timestamps`。
+    - **txt2ass Exporter**：兼容特定 ASS 生成工具的中间格式。使用 `ch.global_timestamps`。
     - **ASS Exporter**：直接生成包含 Ruby 支持和样式信息的 ASS 字幕。
-        - **Nicokara Exporter**：符合ニコカラメーカー规范。使用 `ch.export_timestamps`，支持句尾释放时间戳（非行尾句尾字符后插入额外时间戳）。
+        - **Nicokara Exporter（含带注音变体）**：符合ニコカラメーカー规范。使用 `ch.global_timestamps`，支持句尾释放时间戳（非行尾句尾字符后插入额外时间戳）。
             - **@Ruby 拡張規格**：格式 `@RubyN=亲,注音,开始时间,结束时间`，N 从 1 连续编号。注音含内嵌时间戳（`つ[00:00:20]ば[00:00:60]さ`）。同 (亲, 读音) 组 reading_with_ts 全相同 → 单条全局；有差异 → 按子组输出带时间范围（首省略开始、末省略结束）。所有条目按首字符时间戳全局排序，跨字交错。分隔符半角逗号；含逗号用 `&#44;` 转义。
             - **演唱者标签**：无效演唱者（空/"?"/"未知"）归一化为默认演唱者；标签 `【名】` 跨行连续，仅在演唱者实际变化（对比 `prev_singer_id`）时插入；默认演唱者首次出现也插入。
 
 ### AudioEngine (音频引擎)
-提供跨平台音频播放与实时处理。
+统一接口 `IAudioEngine`（`audio/base.py`），多实现按平台 / 设置切换。引擎在 `MainWindow._make_audio_engine()` 中选定。
 
-- **职责**：
-    - **WSOLA 离线预渲染变速不变调**：基于 pedalboard `time_stretch` 离线预渲染变速 PCM，配合 SPSC RingBuffer 实现零分配音频回调，立体声相位一致，支持实时速度切换（50%-200%）。切换速度时播控栏实时显示后台渲染进度。位置追踪始终基于原始音频时间轴。
-    - **低延迟播放**：sounddevice (PortAudio) 输出，soundfile 解码多格式。
+- **实现与选择策略**：
+    - **BassEngine**（`bass_engine.py`，Windows 默认引擎）：基于 **BASS** 音频库，支持 FLAC/OPUS/MP3/WMA/WV/DSD/ALAC/AAC/AC3/WebM 等格式原生解码与低延迟回放。
+    - **BassTsmEngine**（`bass_tsm_engine.py`）：在 BASS 之上做**离线 TSM 预渲染**变速（变速不变调、无爆音）。「设置 → 启用高质量音频变速」开启（默认）时用它，关闭时退回 `BassEngine`（原版 BASS 实时变速，零缓存但可能爆音）。
+    - **SoundDeviceEngine**（`sounddevice_engine.py`）：sounddevice (PortAudio) 输出 + soundfile 解码。**BASS 不可用的 macOS** 始终用它，并固定走离线 TSM（HQ 开关无效）。
+- **支撑组件**：
+    - **SPSC RingBuffer**（`ring_buffer.py`）：单生产者单消费者环形缓冲，零分配音频回调，立体声相位一致。
+    - **TSMCache**（`tsm_cache.py`）+ **pedalboard**：高质量离线变速预渲染缓存。切换速度时播控栏实时显示后台渲染进度；位置追踪始终基于原始音频时间轴。
+    - **video_converter**：从视频文件抽取音轨。
+    - 变速范围 0.2×–2.0×（20%–200%）。

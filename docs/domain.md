@@ -37,12 +37,16 @@ class Character:
     is_sentence_end: bool = False
     is_rest: bool = False
     singer_id: str = ""
-    # 内部：offset 预计算的渲染/导出时间戳
-    render_timestamps / render_sentence_end_ts
-    export_timestamps / export_sentence_end_ts
+    selected_checkpoint_idx: Optional[int] = None  # 选中 cp（UI 态，不序列化）
+    needs_guide: bool = False                       # 导唱待办视觉提示（不参与不变式）
+    # 内部：全局偏移预计算的派生时间戳（渲染与导出共用同一套）
+    _global_offset_ms: int          # 全局偏移量
+    global_timestamps / global_sentence_end_ts
 ```
 
-核心方法：`push_to_ruby()`（写入 Ruby.timestamps + RubyPart.offset_ms）、`add_timestamp`、`remove_timestamp_at`、`set_sentence_end_ts`、`set_offsets`、`_update_offset_timestamps`（重算 render/export）。所有时间戳写入均由 TimingService 独家调用。
+核心方法：`push_to_ruby()`（写入 Ruby.timestamps + RubyPart.offset_ms）、`add_timestamp`、`remove_timestamp_at`、`set_sentence_end_ts`、`set_check_count`（维护 check_count / timestamps / ruby.parts 不变式）、`set_offset`、`_update_offset_timestamps`（按 `_global_offset_ms` 重算 `global_timestamps`）。所有时间戳写入均由 TimingService 独家调用。
+
+> ⚠️ 偏移模型已统一：早期版本曾区分 `render_timestamps` 与 `export_timestamps` 两套派生时间戳，现已合并为**单套 `global_timestamps`**（渲染与导出共用），由 `set_offset()` 写入。
 
 ### Word (词组实体)
 
@@ -63,7 +67,7 @@ class Sentence:
 
 ### Singer (演唱者实体)
 
-id、name、color、backend_number、display_priority、enabled 等字段。颜色由 SingerService 维护。
+id、name、color、complement_color（自动算补色，选中高亮用）、backend_number、display_priority、enabled、is_default、is_placeholder、group 等字段。支持**分色**：`color_mode`（`"solid"` / `"split"`）+ `split_colors`（split 模式额外颜色，总数 ≤ 5）。颜色与补色由 SingerService / 实体方法（`change_color` 等）维护。
 
 ### Project (项目根实体)
 
@@ -75,9 +79,12 @@ class Project:
     id: str
     sentences: List[Sentence]
     singers: List[Singer]
-    metadata: ProjectMetadata
+    metadata: ProjectMetadata           # title/artist/album/language/created_at/updated_at
     audio_duration_ms: int = 0
+    global_offset_ms: Optional[int] = None   # 每项目全局偏移（None=用全局默认）
 ```
+
+> ⚠️ 选中态不变量（I1 全局单选 / I2 默认选中 / I3 增删对称）由 Project 层维护：`set_selected_checkpoint` / `clear_selected_checkpoint` / `get_selected_checkpoint` / `select_default_checkpoint` / `shift_selected_checkpoint_if_lost`。
 
 核心辅助方法：
 

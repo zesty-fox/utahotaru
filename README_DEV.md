@@ -4,7 +4,14 @@
 
 一款由 RhythmicaLyrics 启发的歌词打轴软件，专注于低延迟、高精度的卡拉OK时间标签制作。
 
-**当前版本**：v0.3.0 | **许可证**：GPL-3.0 | **平台**：Windows 10/11
+**当前版本**：v1.2.6 | **许可证**：GPL-3.0 | **平台**：Windows 10/11（主） · macOS（实验性）
+
+> 📦 **构建变体（VARIANT）**：项目分三个发布变体——
+> - **main**（默认，Windows）：日语注音用系统 **WinRT JapanesePhoneticAnalyzer**
+> - **noWinIME**（Windows）：不含 WinRT，改用 **SudachiPy + sudachidict_small** 注音
+> - **mac**（macOS，实验性）：同 noWinIME 的注音方案
+>
+> 变体标识写在 `src/strange_uta_game/__version__.py` 的 `VARIANT`，由 `build.py --variant` 切换，依赖按 `requirements-winrt.txt`（main）/ `requirements-variants.txt`（noWinIME/mac）追加。
 
 ## 核心特性
 
@@ -12,32 +19,52 @@
 - **双模式打轴**：打轴模式/编辑模式，左下角实时提示
 - **精准时间控制**：Alt+↑/↓ 微调时间戳，Alt+←/→ 字符内切换节奏点
 - **批量编辑**：批量替换文本、注音和节奏点，支持撤销/重做
+- **时间戳工具箱**：批量删除（全部 / 保留首行 / 所选范围）、按行或按所选范围移动、自动补偿、分离符号时间戳、放宽的原始时间戳调整（−99999~99999ms）
+- **打轴预览指引**：上一个 / 正在打 / 下一个字的引导着色（透明度与开关可自定义）+ 导唱符待办标记（`needs_guide`）
+- **打轴按键音**：default / arcade / osu / sci 等风格（默认关闭）
+- **跨行划选**：跨行拖拽选中后可应用演唱者、注音、删除、Ctrl+C 等
 
 ### 🎵 音频处理
-- **WSOLA 变速**：pedalboard `time_stretch` 离线预渲染，50%-200% 速度调节
+- **低延迟播放**：BASS 音频库为主引擎（全格式解码 + 低延迟回放），辅以 sounddevice (PortAudio) 输出路径
+- **变速不变调**：BASS-FX 实时变速 + pedalboard 离线高质量预渲染（0.2×–2.0×）；「高质量音频变速」开关在 `BassTsmEngine`（离线 TSM）与 `BassEngine`（实时）间切换
 - **SPSC RingBuffer**：零分配音频回调，立体声相位一致
-- **低延迟播放**：sounddevice (PortAudio) 输出
+- **视频抽轨**：内置 `video_converter` 从视频文件提取音轨
 
 ### 📝 注音系统
-- **日语注音**：SudachiPy 上下文感知，5 级 Pass 拆分策略
-- **英文注音**：CMU 词典 + morikatron 规则引擎
-- **用户词典**：1757 条内置词典，支持 RL 字典导入
+- **日语注音（双引擎）**：main 变体用系统 **WinRT JapanesePhoneticAnalyzer**；noWinIME/mac 变体用 **SudachiPy**；两者均叠加 `pykakasi` 与本地/联网词典覆盖（回退链 WinRT → Sudachi → pykakasi → Dummy）
+- **LLM 注音**：可选大模型注音（自配 API，不内置；失败自动回退普通注音），见 `parsers/llm_ruby.py`
+- **罗马音**：支持朴素罗马音转换与「一键全部转罗马音」；另有「仅注音」模式（保留节奏点）
+- **候补字典**：批量变更 / 修改字符 / F2 中可「查询候补字典」，从本地 + 网络源取多个候选读音
+- **英文注音**：CMU 词典（cmudict-0.7b）+ e2k 规则引擎 + pyphen 音节切分
+- **本地 + 联网词典**：内置 RhythmicaLyrics 官方词典源，支持 RL 字典导入；`{原文||读音}` 即写即用
+
+### 🎤 演唱者
+- **多演唱者 + 分色**：任意数量演唱者，自带配色 / 互补色 / **分色（单人最多 5 色）** / 分组 / 拖拽排序 / 启用禁用 / 软件预设
+- **逐字归属**：per-char `singer_id`，支持同一行内切换、跨行划选批量应用
+- **分色标签助手**：导出 Nicokara 时辅助生成 / 编辑演唱者 emoji 标签
+
+### 🌍 界面与本地化
+- **多语言 UI（i18n）**：简体中文 / 日本語 / English，默认 Auto 跟随系统；基于 Qt `.ts/.qm`（`frontend/localization/`）
+- **Fluent Design**：PyQt6-Fluent-Widgets，浅色 / 深色 / 跟随系统主题
+- **自适应显示**：按屏幕分辨率/多屏裁剪窗口尺寸（`frontend/window_sizing`）
 
 ### 📁 文件支持
-- **多格式导入**：LRC、ASS、SRT、TXT、KRA、Nicokara
-- **多格式导出**：LRC（3 种）、KRA、SRT、TXT、txt2ass、ASS、Nicokara
-- **项目格式**：.sug JSON 格式，支持版本迁移
+- **多格式导入**：LRC（逐行/逐字/增强型）、ASS、SRT、TXT、KRA、Nicokara
+- **多格式导出（11 种）**：LRC×3、KRA、TXT、SRT、txt2ass、ASS、Nicokara、Nicokara(带注音)、RL 内联
+- **项目格式**：.sug JSON 格式（`CURRENT_VERSION="0.3.0"`），支持版本迁移
+- **自动保存 + 闪退恢复**：默认每 5 分钟落盘 `.sug.temp` 到 `.cache/`，启动检测并询问恢复
 
 ## 技术栈
 
 | 类别 | 技术 |
 |------|------|
-| **编程语言** | Python 3.11+ |
+| **编程语言** | Python 3.13（CI/发布构建）；代码保持 3.9 语法兼容（ruff/black/mypy target = py39） |
 | **UI 框架** | PyQt6 + PyQt6-Fluent-Widgets (Fluent Design) |
-| **音频处理** | sounddevice + soundfile + pedalboard (WSOLA) |
-| **日语处理** | SudachiPy + pykakasi |
-| **英文注音** | CMU 词典 + morikatron 规则引擎 |
-| **打包工具** | PyInstaller |
+| **音频引擎** | BASS + BASS-FX（低延迟 / 变速）· sounddevice + soundfile · pedalboard (HQ time-stretch) |
+| **日语注音** | WinRT JapanesePhoneticAnalyzer（main）/ SudachiPy（noWinIME/mac）+ pykakasi + jaconv；可选 LLM 注音（自配 API） |
+| **本地化 / i18n** | Qt Linguist `.ts/.qm`（zh_CN / ja_JP / en_US，`frontend/localization/`） |
+| **英文注音** | CMUdict + e2k 规则引擎 + pyphen |
+| **打包工具** | PyInstaller（`build.py` / `build_all.py`，三变体） |
 | **代码质量** | ruff, black, mypy |
 | **测试框架** | pytest + pytest-qt + pytest-cov |
 
@@ -47,37 +74,48 @@
 StrangeUtaGame/
 ├── src/                            # 应用源代码
 │   └── strange_uta_game/
-│       ├── backend/                # 后端核心逻辑
-│       │   ├── domain/             # 领域层：纯数据模型，无外部依赖
-│       │   ├── application/        # 应用服务层：业务逻辑协调
+│       ├── __version__.py          # 版本号 + 变体标识（VARIANT / TAG_PREFIX / 资产名模板）
+│       ├── backend/                # 后端核心逻辑（无 Qt 依赖）
+│       │   ├── domain/             # 领域层：纯数据模型，无外部依赖（entities / models / project）
+│       │   ├── application/        # 应用服务层：业务逻辑协调（timing/export/auto_check/calibration/singer/project/command_manager）
 │       │   └── infrastructure/     # 基础设施层：具体实现
-│       │       ├── audio/          # 音频引擎（SoundDeviceEngine, TSMRenderCache, RingBuffer）
+│       │       ├── audio/          # 音频引擎（BassEngine, BassTSMEngine, SoundDeviceEngine, RingBuffer, TSMCache, KeysoundPlayer, video_converter）
 │       │       ├── data/           # 内嵌词典数据（default_dictionary.py）
-│       │       ├── exporters/      # 导出器集合（LRC/KRA/SRT/TXT/ASS/Nicokara）
-│       │       ├── parsers/        # 解析器（lyric_parser, text_splitter, ruby_analyzer, e2k_engine）
-│       │       └── persistence/    # 项目持久化（sug_io）
-│       ├── frontend/               # 前端 UI 层（PyQt）
+│       │       ├── exporters/      # 导出器集合（lrc/nicokara/srt/txt/txt2ass/inline）
+│       │       ├── parsers/        # 解析与注音（lyric/ass/srt parser, ruby_analyzer, english_ruby, e2k_engine, inline_format, romaji, kanji_reading_split, rl_dictionary, text_splitter, llm_ruby）
+│       │       ├── persistence/    # 项目持久化（sug_io）
+│       │       └── network_dictionary.py   # 联网读音词典
+│       ├── frontend/               # 前端 UI 层（PyQt6 + Fluent）
+│       │   ├── main_window.py / theme.py / workers.py / window_sizing.py / splash_screen.py / winrt_japanese_guide.py
 │       │   ├── home/               # 主页（项目创建入口）
-│       │   ├── editor/             # 编辑器界面（timing_interface + timing/ 子包）
+│       │   ├── editor/             # 编辑器界面（timing_interface + timing/ 子包, fulltext_interface, line_interface）
 │       │   ├── export/             # 导出界面
 │       │   ├── singer/             # 演唱者管理界面
-│       │   ├── online/             # 在线查询界面（占位）
-│       │   └── settings/           # 设置界面（拆分为 app_settings / cards / dialogs 等子模块）
-│       ├── resource/               # 应用资源（icon.ico）
-│       └── config/                 # 内嵌默认配置文件（config.json, dictionary.json, singers.json, e2k.txt）
+│       │   ├── online/             # 联网词典查询界面
+│       │   ├── settings/           # 设置界面（app_settings / cards / 各 dialog 子模块）
+│       │   ├── localization/       # 多语言 i18n（zh / en / ja）
+│       │   └── startup/ · log/     # 启动流程 / 日志
+│       ├── updater/                # 应用内自动更新器（http_client/installer/manifest/proxy/sources/version/worker + ui/）
+│       ├── bass/                   # BASS DLLs（x86 根目录 + x64/ 子目录）
+│       ├── resource/               # 应用资源（icon.ico / icon.icns / mascot.png / sounds/）
+│       └── config/                 # 内嵌默认配置（config.json, dictionary.json, singers.json, e2k.txt, cmudict-0.7b, kanji_readings.json）
 ├── tests/                          # 测试文件（与应用代码分离）
 │   └── unit/                       # 单元测试
 │       ├── domain/                 # 领域层测试
 │       ├── application/            # 应用层测试
 │       ├── infrastructure/         # 基础设施层测试
-│       └── frontend/               # 前端层测试
+│       ├── frontend/               # 前端层测试
+│       └── updater/                # 自动更新器测试
 ├── docs/                           # 设计文档
-├── scripts/                        # 辅助脚本（迁移工具等）
+├── scripts/                        # 辅助脚本（release.py / 词典迁移 / 翻译提取等）
 ├── main.py                         # 启动脚本
-├── build.py                        # PyInstaller 打包脚本
-├── requirements.txt                # 生产依赖
+├── build.py · build_all.py         # PyInstaller 打包脚本（单变体 / 全变体）
+├── requirements.txt                # 生产依赖（锁定版本）
+├── requirements-winrt.txt          # main 变体注音依赖（WinRT）
+├── requirements-variants.txt       # noWinIME / mac 变体注音依赖（sudachi）
 ├── requirements-dev.txt            # 开发依赖
-├── pyproject.toml                  # 项目元数据与工具配置
+├── pyproject.toml                  # 工具配置（ruff/black/mypy/pytest；不承载安装依赖）
+├── RELEASING.md                    # 发布流程说明
 └── README.md                       # 用户文档
 ```
 
@@ -117,8 +155,8 @@ StrangeUtaGame/
 
 ### 环境要求
 
-- **操作系统**：Windows 10/11（主要开发平台）
-- **Python**：3.11+
+- **操作系统**：Windows 10/11（主要开发平台）· macOS（实验性）
+- **Python**：3.13（CI/发布构建所用版本；代码本身保持 3.9 语法兼容）
 - **音频设备**：支持音频输出的设备
 
 ### 开发环境设置
@@ -134,6 +172,12 @@ venv\Scripts\activate
 
 # 安装生产依赖
 pip install -r requirements.txt
+
+# 按变体追加注音依赖：
+#   main 变体（Windows，WinRT 注音）：
+pip install -r requirements-winrt.txt
+#   noWinIME / mac 变体（sudachi 注音）：
+#   pip install -r requirements-variants.txt
 
 # 安装开发依赖
 pip install -r requirements-dev.txt
@@ -182,17 +226,18 @@ pytest tests/ --cov=src --cov-report=html
 | `Space` | 打轴（按下记录时间） | 增加节奏点 (+1) |
 | `D` | 播放/暂停 | 播放/暂停 |
 | `S` | 停止 | 停止 |
-| `Z` / `X` | 后退 / 前进 5 秒 | 后退 / 前进 5 秒 |
-| `Q` / `W` | 减速 / 加速 (±10%) | 减速 / 加速 (±10%) |
+| `Z` / `X` | 后退 / 前进（默认 2000ms / 3000ms） | 同左 |
+| `Q` / `W` | 减速 / 加速（0.2×–2.0×） | 同左 |
 | `↑` / `↓` | 上一行 / 下一行 | 上一行 / 下一行 |
 | `←` / `→` | 上一字符 / 下一字符（行首/末自动跨行） | 上一字符 / 下一字符 |
 | `Enter` | — | 插入换行（在当前字符处拆分新行） |
 | `Shift+Enter` | — | 合并上一行（将当前行合并到上一行末尾） |
 | `Delete` | — | 删除选中字符（支持划词多选） |
-| `Backspace` | — | 减少节奏点 (-1，最小0) |
+| `Backspace` | 清除当前时间戳 | 减少节奏点 (-1，最小0) |
+| `[` / `]` | 增加 / 减少节奏点 | 同左 |
 | `F2` | 编辑注音（支持连词合并/拆分） | 编辑注音 |
 | `F3` | 连词/取消连词（可自定义快捷键） | 连词/取消连词 |
-| `F5` / `F6` | 增加 / 减少节奏点 | — |
+| `P` | 打到句尾（剩余字符全部打戳） | — |
 | `.` (长按) | 切换句尾标记（is_sentence_end） | — |
 | `.` (短按) | — | 切换句尾标记 |
 | `Alt+←` / `Alt+→` | 当前字符内节奏点循环切换（上一个 / 下一个） | 同左 |
@@ -285,10 +330,9 @@ pytest tests/ --cov=src --cov-report=html
 
 ### 9. Karaoke 渲染偏移及导出偏移
 
-- 在「设置」→「打轴设定」中设置全局偏移量（毫秒）
-- 渲染和导出偏移预计算在 Character 数据结构中（`render_timestamps` / `export_timestamps`）
-- 预览走字效果使用 `render_timestamps` 实时应用偏移，导出时使用 `export_timestamps`
-- 确保预览与导出效果完全一致，无需手动计算偏移
+- 在打轴界面工具栏 / 「设置」→「打轴设定」中设置全局偏移量（毫秒）；按项目存于 `Project.global_offset_ms`
+- 偏移由 `Character.set_offset()` 预计算到**单套** `global_timestamps` / `global_sentence_end_ts`（渲染与导出共用，早期的 `render_/export_timestamps` 双套已合并）
+- 预览走字与导出统一读取 `global_timestamps`，确保两者完全一致，无需手动计算偏移
 
 ### 10. 快捷键自定义
 
@@ -325,11 +369,11 @@ pytest tests/ --cov=src --cov-report=html
 ## 项目文件格式
 
 - **.sug** - StrangeUtaGame 项目文件（**S**trange **U**ta **G**ame 的缩写）
-  - 基于 JSON 格式（v0.3.0）
+  - 基于 JSON 格式，当前格式版本 `0.3.0`（`SugMigrator.CURRENT_VERSION`，独立于应用版本号）
   - 存储歌词、时间标签、节奏点配置、注音等
   - **不存储音频路径**，用户每次使用时重新选择音频（更灵活）
   - 存储音频时长用于验证（可选）
-  - 旧版 v0.1 文件自动迁移到 v0.3.0（Ruby → RubyPart）
+  - 旧版文件自动迁移：`1.0` → `2.0` → `0.3.0`（line→sentence、Ruby 分组模型 / RubyPart）
 
 ## 支持的导入格式
 
@@ -361,9 +405,12 @@ pytest tests/ --cov=src --cov-report=html
 - [应用层设计](docs/application.md)
 - [基础设施层设计](docs/infrastructure.md)
 - [UI 层设计](docs/ui.md)
+- [自动更新](docs/auto_update.md)
+- [时间标签规范映射](docs/timetag-spec-mapping.md)
+- [词典嵌入说明](docs/EMBEDDING.md)
 - [经验教训](docs/lessons_learned.md)
 - [修复记录](docs/fixes_summary.md)
-- [更新日志 v0.3.0](docs/更新日志-0.3.0.md)
+- [更新日志](CHANGELOG.md) · [发布流程](RELEASING.md)
 
 ## 测试
 
@@ -375,7 +422,8 @@ tests/
     ├── domain/               # 领域层测试
     ├── application/          # 应用层测试
     ├── infrastructure/       # 基础设施层测试
-    └── frontend/             # 前端层测试
+    ├── frontend/             # 前端层测试
+    └── updater/              # 自动更新器测试
 ```
 
 ### 运行测试
@@ -402,7 +450,7 @@ pytest tests/ -v
 
 ### 测试统计
 
-- **当前测试数量**：382 个
+- **当前测试数量**：约 785 个测试函数（57 个测试文件）
 - **测试覆盖率**：运行 `pytest tests/ --cov=src` 查看
 
 ### 编写测试
@@ -429,40 +477,31 @@ def test_character_check_count():
 ### 使用打包脚本（推荐）
 
 ```bash
-# 安装 PyInstaller
+# 安装 PyInstaller（已含在 requirements.txt）
 pip install pyinstaller
 
-# 运行打包脚本
-python build.py
+# 按变体打包（默认 main）
+python build.py                    # main：Windows + WinRT 注音
+python build.py --variant noWinIME # Windows，无 WinRT，sudachi 注音
+python build.py --variant mac      # macOS（实验性）
+
+# 或一次性构建全部变体
+python build_all.py
 ```
 
 `build.py` 包含所有必要的配置：
-- `hidden-imports`（numpy, sudachipy, pedalboard 等）
-- 数据/二进制收集配置
-- PortAudio DLL 路径检测
+- 按变体改写 `__version__.py` 的 `VARIANT`（打包后还原）
+- `hidden-imports` / 数据 / 二进制收集（BASS DLLs、PortAudio、soundfile 等）
+- main 变体收集 WinRT 包；noWinIME/mac 变体收集 `sudachipy` + `sudachidict_small`
+- 防呆：屏蔽旧的 editable install，确保打进新源码
 
-### 手动打包
-
-```bash
-pyinstaller --noconfirm --onedir --windowed \
-  --name "StrangeUtaGame" \
-  --icon="src/strange_uta_game/resource/icon.ico" \
-  --add-data "src/strange_uta_game/config;strange_uta_game/config" \
-  --add-data "src/strange_uta_game/resource;strange_uta_game/resource" \
-  --collect-data "sudachipy" \
-  --collect-data "sudachidict_core" \
-  --collect-binaries "soundfile" \
-  --hidden-import "numpy" \
-  --hidden-import "sudachipy" \
-  --hidden-import "pedalboard" \
-  main.py
-```
+> 发布流程见 [RELEASING.md](RELEASING.md)：推送 `SUGv{version}` tag，由 `scripts/release.py` 与 GitHub Actions 分变体发布；runtime 按内容哈希做增量更新。
 
 ### 打包产物
 
-- **输出目录**：`dist/StrangeUtaGame/`
-- **主程序**：`StrangeUtaGame.exe`
-- **体积参考**：约 410 MB（sudachidict_core 约 207 MB 占大头，属日语形态素分析词典）
+- **输出目录**：`dist/StrangeUtaGame/`（变体名带中缀，如 `dist/StrangeUtaGame-noWinIME/`）
+- **主程序**：`StrangeUtaGame.exe`（macOS 为 `StrangeUtaGame.app`）
+- **发布资产**：`StrangeUtaGame-v{version}.zip` / `StrangeUtaGame-noWinIME-v{version}.zip` / `StrangeUtaGame-mac-v{version}.zip`
 
 ## 项目信息
 
@@ -471,23 +510,23 @@ pyinstaller --noconfirm --onedir --windowed \
 | **GitHub** | https://github.com/karaoke-studio/StrangeUtaGame |
 | **许可证** | GPL-3.0 License |
 | **作者** | Xuan-cc |
-| **版本** | v0.3.0 |
+| **版本** | v1.2.6 |
 
 ## 依赖
 
 ### 生产依赖
 
-主要依赖项：
-- PyQt6 >= 6.6.0
-- PyQt6-Fluent-Widgets >= 1.5.0
-- sounddevice >= 0.4.6
-- soundfile >= 0.12.1
-- pedalboard >= 0.9.0
-- sudachipy >= 0.6.0
-- sudachidict_core
-- pykakasi >= 2.2.1
+依赖按锁定版本管理（`pip freeze` 结果），主要依赖项：
+- PyQt6 == 6.11.0 · PyQt6-Fluent-Widgets == 1.11.2
+- sounddevice == 0.5.5 · soundfile == 0.13.1 · pedalboard == 0.9.22
+- numpy == 2.4.4 · pykakasi == 2.3.0 · jaconv == 0.5.0 · pyphen == 0.17.2
+- requests == 2.32.5（联网词典 / 自动更新）
 
-完整依赖列表见 [requirements.txt](requirements.txt)
+按变体追加日语注音依赖：
+- **main**（[requirements-winrt.txt](requirements-winrt.txt)）：`winrt-Windows.*` == 3.2.1
+- **noWinIME / mac**（[requirements-variants.txt](requirements-variants.txt)）：`sudachipy` == 0.6.11 + `sudachidict_small`
+
+> ⚠️ `requirements*.txt` 是依赖真源，被 `scripts/release.py` 做内容哈希用于 runtime 增量更新，**改动需谨慎**；`pyproject.toml` 不承载安装依赖（仅工具配置）。完整列表见 [requirements.txt](requirements.txt)。
 
 ### 开发依赖
 

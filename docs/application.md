@@ -9,7 +9,7 @@
 节奏点时间戳的**唯一**写入入口（AGENTS.md 不变量）。
 
 - `on_key_changed(timestamp_ms, key_type)`：统一按键入口，pressed/released 全推给当前选中 cp，由 cp 角色过滤——普通 cp 仅响应 `pressed`，句尾末尾 cp（`is_sentence_end_tail_cp`）仅响应 `released`。写入后单次推进。
-- `adjust_current_timestamp(delta_ms)`（批 18 #8）：微调当前 cp 时间戳。普通 cp 分支显式调 `_update_offset_timestamps()` + `push_to_ruby()`，避免 render/export 失同步。
+- `adjust_current_timestamp(delta_ms)`：微调当前 cp 时间戳。普通 cp 分支显式调 `_update_offset_timestamps()` + `push_to_ruby()`，避免 `global_timestamps` 与基础时间戳失同步。
 - 播放位置与选中 cp（`Project.selected_checkpoint_*` / `_current_position`）同步维护。
 - Offset 校准基于按键按下。打轴时覆盖现有时间戳，不提示时间倒退。
 
@@ -36,7 +36,7 @@
 
 ### ExportService（导出服务）
 
-调用 infrastructure 导出器生成 LRC（增强型/逐行/逐字）/ KRA / TXT / SRT / ASS / Nicokara。导出器统一使用 `ch.export_timestamps`，ExportService 将导出器 `_offset_ms` 强制设为 0 避免双重 offset。
+调用 infrastructure 导出器生成 LRC（增强型/逐行/逐字）/ KRA / TXT / SRT / txt2ass / ASS / Nicokara / Nicokara(带注音) / RL 内联，共 11 种。导出器统一读 `ch.global_timestamps` / `ch.global_sentence_end_ts`（全局偏移已由前端 `Character.set_offset()` 预写入），ExportService 的 `offset_ms` 参数已弃用（保留签名兼容），避免双重 offset。
 
 ### SingerService（演唱者管理）
 

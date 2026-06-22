@@ -156,17 +156,17 @@
 <tr>
   <td align="center">🎤</td>
   <td>
-    <b>多演唱者管理 / Multi-singer manager</b><br/>
-    <sub>支持任意数量演唱者，自带配色、互补色生成、拖拽排序、启用/禁用、软件级预设；导出时可按演唱者过滤，或在切换处自动插入 <code>【名】</code> 标签。<br/>
-    Unlimited singers with auto color generation, drag-reorder, enable/disable and presets; export can filter by singer or auto-inject <code>【name】</code> tags at switch points.</sub>
+    <b>多演唱者管理 + 分色 / Multi-singer manager + split colors</b><br/>
+    <sub>支持任意数量演唱者，自带配色、互补色生成、<b>分色（单人最多 5 色）</b>、分组、拖拽排序、启用/禁用、软件级预设；可逐字（per-char）指定演唱者并支持跨行划选批量应用；导出时可按演唱者过滤，或在切换处自动插入 <code>【名】</code> 标签，另配<b>分色标签助手</b>。<br/>
+    Unlimited singers with auto color generation, <b>split colors (up to 5 per singer)</b>, grouping, drag-reorder, enable/disable and presets; per-char singer assignment with cross-line selection; export can filter by singer or auto-inject <code>【name】</code> tags, plus a color-tag helper.</sub>
   </td>
 </tr>
 <tr>
   <td align="center">🇯🇵</td>
   <td>
-    <b>自动注音（双引擎） / Auto-furigana (dual engine)</b><br/>
-    <sub>主引擎使用 <b>WinRT JapanesePhoneticAnalyzer</b>（系统日语 IME），辅以 <code>pykakasi</code> + 联网词典；按平假名/片假名/汉字/字母/数字 分类启停，自动补全句首句尾、促音、长音、括号、英文音节等规则。<br/>
-    Primary engine is Windows' <b>WinRT JapanesePhoneticAnalyzer</b>; <code>pykakasi</code> + an online dictionary fall in behind. Per-category toggles for hiragana / katakana / kanji / digits, plus rules for sokuon, long vowel, parentheses, English syllables …</sub>
+    <b>自动注音（多引擎 + LLM + 罗马音） / Auto-furigana (multi-engine + LLM + romaji)</b><br/>
+    <sub>主引擎 <b>WinRT JapanesePhoneticAnalyzer</b>（main 变体）/ <b>SudachiPy</b>（noWinIME·mac 变体），辅以 <code>pykakasi</code> + 本地/联网词典；可选 <b>LLM 注音</b>（自配 API，失败自动回退）；支持<b>一键转罗马音</b>与「仅注音」模式；按平假名/片假名/汉字/字母/数字 分类启停，自动补全句首句尾、促音、长音、括号、英文音节等规则。<br/>
+    Primary engine is <b>WinRT JapanesePhoneticAnalyzer</b> (main build) or <b>SudachiPy</b> (noWinIME/mac); <code>pykakasi</code> + local/online dictionaries fall in behind. Optional <b>LLM-based furigana</b> (bring-your-own API, auto-fallback) and <b>one-click romaji</b>. Per-category toggles plus rules for sokuon, long vowel, parentheses, English syllables …</sub>
   </td>
 </tr>
 <tr>
@@ -210,6 +210,30 @@
   </td>
 </tr>
 <tr>
+  <td align="center">🧰</td>
+  <td>
+    <b>时间戳工具箱 / Timestamp toolbox</b><br/>
+    <sub>打轴界面「时间戳工具」集合：批量删除（全部 / 保留首行 / 所选范围）、按行或按所选范围整体移动、自动补偿、分离符号时间戳、超宽的原始时间戳调整 —— 扒轴返工不再手忙脚乱。<br/>
+    A "Timestamp tools" suite: bulk delete (all / keep first line / selected range), shift by line or range, auto-compensate, split symbol timestamps, and wide raw-timestamp tweaking.</sub>
+  </td>
+</tr>
+<tr>
+  <td align="center">🎯</td>
+  <td>
+    <b>打轴预览指引 / Customizable timing guide</b><br/>
+    <sub>预览走字可叠加「上一个 / 正在打 / 下一个」字的引导着色，每档透明度与开关均可自定义；另有导唱符待办标记，对无时间戳处提前标注「此处需导唱符」。<br/>
+    The karaoke preview can overlay prev / current / next guide coloring with per-level alpha and toggles; plus a "needs guide symbol" to-do marker for untimed spots.</sub>
+  </td>
+</tr>
+<tr>
+  <td align="center">🔊</td>
+  <td>
+    <b>打轴按键音 / Key sounds</b><br/>
+    <sub>可选 default / arcade / osu / sci 等多种按键音效，把打轴体验拉近音游手感（默认关闭，按需开启）。<br/>
+    Optional key-press/-release sounds (default / arcade / osu / sci …) for a rhythm-game-like feel — off by default.</sub>
+  </td>
+</tr>
+<tr>
   <td align="center">🌏</td>
   <td>
     <b>无需日语转区 / No Japanese locale required</b><br/>
@@ -231,6 +255,14 @@
     <b>内置自动更新器 / Built-in updater</b><br/>
     <sub>启动时检查 GitHub 发行版；可选 <b>ghproxy / gh-proxy / ghproxy-net</b> 镜像加速；支持系统代理 / 手动代理 / 跳过版本。<br/>
     Auto-checks GitHub releases at launch; supports ghproxy / gh-proxy / ghproxy-net mirrors plus system or manual proxy.</sub>
+  </td>
+</tr>
+<tr>
+  <td align="center">🌍</td>
+  <td>
+    <b>多语言界面 / Multilingual UI</b><br/>
+    <sub>内置<b>简体中文 / 日本語 / English</b> 三语，默认 <code>Auto</code> 跟随系统语言，也可在 <b>设置 → 关于/语言</b> 固定；基于 Qt <code>.ts/.qm</code> 翻译资源，欢迎贡献新语言。<br/>
+    Ships <b>Simplified Chinese / Japanese / English</b>; defaults to <code>Auto</code> (follows the OS) or pin it under <b>Settings → About/Language</b>. Built on Qt <code>.ts/.qm</code> — new languages welcome.</sub>
   </td>
 </tr>
 <tr>
@@ -345,12 +377,12 @@ The packaged executable will appear in `dist/StrangeUtaGame/`.
 <tr>
   <td>减速 / 加速 · Speed − / +</td>
   <td align="center"><kbd>Q</kbd> &nbsp; <kbd>W</kbd></td>
-  <td>0.2× ~ 1.0×，变速不变调</td>
+  <td>0.2× ~ 2.0×，变速不变调</td>
 </tr>
 <tr>
   <td>音量 − / + · Volume − / +</td>
-  <td align="center"><kbd>Ctrl</kbd>+<kbd>Q</kbd> &nbsp; <kbd>Ctrl</kbd>+<kbd>W</kbd></td>
-  <td>—</td>
+  <td align="center"><kbd>Ctrl</kbd>+<kbd>W</kbd> &nbsp; <kbd>Ctrl</kbd>+<kbd>Q</kbd></td>
+  <td>默认步进 ±5%</td>
 </tr>
 
 <tr>
@@ -555,9 +587,11 @@ The packaged executable will appear in `dist/StrangeUtaGame/`.
 ```text
 StrangeUtaGame/
 ├── main.py                       # 入口 / Entry point
-├── build.py                      # PyInstaller 打包脚本 / Build script
-├── pyproject.toml                # 工程元数据 / Project metadata
-├── requirements.txt              # 运行依赖 / Runtime deps
+├── build.py · build_all.py       # PyInstaller 打包脚本（单变体 / 全变体）
+├── pyproject.toml                # 工具配置（ruff/black/mypy/pytest）/ Tool config
+├── requirements.txt              # 运行依赖（锁定版本）/ Runtime deps (pinned)
+├── requirements-winrt.txt        # main 变体：WinRT 注音 / WinRT furigana (main)
+├── requirements-variants.txt     # noWinIME / mac 变体：sudachi 注音
 ├── requirements-dev.txt          # 开发依赖 / Dev deps
 ├── setup_env.bat                 # Windows 一键环境 / Win one-click setup
 │
@@ -577,73 +611,56 @@ StrangeUtaGame/
 │   └── 更新日志-0.2.0.md
 │
 ├── src/strange_uta_game/         # 主包 / Main package
+│   ├── __version__.py            # 版本号 + 变体标识 / Version & build variant
 │   │
-│   ├── app/                      # 应用层 / Application layer
-│   │   ├── services/             #   业务服务 / Business services
-│   │   │   ├── auto_check_service.py
-│   │   │   ├── calibration_service.py
-│   │   │   ├── command_manager/   #   命令模式 + 撤销栈
-│   │   │   ├── export_service.py
-│   │   │   ├── project_import_service.py
-│   │   │   ├── project_service.py
-│   │   │   ├── singer_service.py
-│   │   │   └── timing_service.py
-│   │   └── domain/               #   领域实体 / Domain entities
-│   │       ├── entities.py
-│   │       ├── models.py
-│   │       └── project.py
+│   ├── backend/                  # 后端（无 Qt 依赖）/ Backend (Qt-free)
+│   │   ├── domain/               #   领域层 / Domain (纯数据模型)
+│   │   │   └── entities.py · models.py · project.py
+│   │   ├── application/          #   应用服务 / Application services
+│   │   │   ├── timing_service.py · export_service.py
+│   │   │   ├── auto_check_service.py · calibration_service.py
+│   │   │   ├── command_manager.py · singer_service.py
+│   │   │   └── project_service.py · project_import_service.py
+│   │   └── infrastructure/       #   基础设施 / Infrastructure
+│   │       ├── audio/            #     音频引擎 / Audio engine
+│   │       │   ├── bass_engine.py · bass_tsm_engine.py
+│   │       │   ├── sounddevice_engine.py · ring_buffer.py
+│   │       │   └── tsm_cache.py · keysound_player.py · video_converter.py
+│   │       ├── parsers/          #     解析与注音 / Parsers & furigana
+│   │       │   ├── lyric_parser.py · ass_parser.py · srt_parser.py
+│   │       │   ├── ruby_analyzer.py · english_ruby.py · e2k_engine.py
+│   │       │   ├── inline_format.py · annotated_text.py · romaji.py
+│   │       │   └── kanji_reading_split.py · rl_dictionary.py · text_splitter.py · llm_ruby.py
+│   │       ├── exporters/        #     导出器 / Exporters
+│   │       │   ├── lrc_exporter.py · nicokara_exporter.py · srt_exporter.py
+│   │       │   └── txt_exporter.py · txt2ass_exporter.py · inline_exporter.py
+│   │       ├── data/default_dictionary.py   #   内置词典 / Built-in dict
+│   │       ├── persistence/sug_io.py        #   .sug 工程读写 / Project IO
+│   │       └── network_dictionary.py        #   联网词典 / Online dict
 │   │
-│   ├── infrastructure/           # 基础设施 / Infrastructure
-│   │   ├── audio/                #   音频引擎 / Audio engine
-│   │   │   ├── bass_engine.py    #     BASS 主引擎
-│   │   │   ├── bass_tsm_engine.py#     BASS 变速
-│   │   │   ├── sounddevice_engine.py
-│   │   │   ├── ring_buffer.py
-│   │   │   ├── tsm_cache.py
-│   │   │   └── video_converter.py
-│   │   ├── dictionary/           #   词典 / Dictionary
-│   │   │   ├── default_dictionary.py
-│   │   │   └── network_dictionary.py
-│   │   ├── exporters/            #   11 种导出器 / 11 exporters
-│   │   │   ├── lrc_exporter.py
-│   │   │   ├── nicokara_exporter.py
-│   │   │   ├── ass / srt / txt / txt2ass / inline ...
-│   │   ├── text/                 #   文本处理 / Text processing
-│   │   │   ├── ass_parser.py     │   srt_parser.py
-│   │   │   ├── lyric_parser.py   │   rl_dictionary.py
-│   │   │   ├── ruby_analyzer.py  │   e2k_engine.py
-│   │   │   ├── english_ruby.py   │   annotated_text.py
-│   │   │   ├── inline_format.py  └── text_splitter.py
-│   │   └── storage/sug_io.py     #   .sug 工程读写
-│   │
-│   ├── ui/                       # 界面层 / UI layer (PyQt6 + Fluent)
-│   │   ├── main_window.py
-│   │   ├── theme.py · workers.py · winrt_japanese_guide.py
-│   │   ├── common/               #   主三屏 / Three main views
-│   │   │   ├── timing_interface.py
-│   │   │   ├── fulltext_interface.py
-│   │   │   ├── line_interface.py
-│   │   │   └── widgets/          #     波形 / 时间轴 / 工具栏 / …
-│   │   ├── home/                 #   起始页 / Home view
-│   │   ├── export/               #   导出页 / Export view
-│   │   ├── singer/               #   演唱者管理 / Singer manager
-│   │   ├── online/               #   联网词典页 / Online dictionary view
-│   │   ├── settings/             #   设置页 + 10 张 cards
-│   │   │   └── cards/            #     about / playback / timing /
-│   │   │                         #     auto_save / auto_check / export /
-│   │   │                         #     dictionary / network / shortcut / …
-│   │   └── dialogs/              #   弹窗 / Dialogs
+│   ├── frontend/                 # 界面层 / UI layer (PyQt6 + Fluent)
+│   │   ├── main_window.py · theme.py · workers.py
+│   │   ├── window_sizing.py · splash_screen.py · winrt_japanese_guide.py
+│   │   ├── editor/               #   编辑器 / Editors
+│   │   │   ├── timing_interface.py + timing/   #     打轴主界面 + 子组件
+│   │   │   ├── fulltext_interface.py           #     全文本编辑（已废弃）
+│   │   │   └── line_interface.py               #     行编辑
+│   │   ├── home/ · export/ · singer/ · online/ #   起始 / 导出 / 演唱者 / 联网词典
+│   │   ├── settings/             #   设置页 + cards + dialogs
+│   │   ├── localization/         #   多语言 i18n (zh / en / ja)
+│   │   └── startup/ · log/
 │   │
 │   ├── updater/                  # 自动更新器 / Auto-updater
-│   │   ├── http_client.py · installer.py · manifest.py
+│   │   ├── http_client.py · installer.py · manifest.py · worker.py
 │   │   ├── proxy.py · settings.py · sources.py · version.py
 │   │   └── ui/                   #   更新弹窗 / Update dialogs
 │   │
-│   ├── lib/                      # BASS DLLs（x86 + x64）
-│   ├── resources/                # 词典、配置、字符集
-│   │   ├── cmudict-0.7b · e2k.txt · kanji_readings.json
-│   │   └── config.json · dictionary.json · singers.json
-│   └── assets/icon.ico
+│   ├── bass/                     # BASS DLLs（x86 + x64）/ BASS DLLs
+│   ├── config/                   # 默认配置与词典 / Default config & dicts
+│   │   ├── config.json · dictionary.json · singers.json
+│   │   └── cmudict-0.7b · e2k.txt · kanji_readings.json
+│   └── resource/                 # 图标与音效 / Icons & key sounds
+│       └── icon.ico · icon.icns · mascot.png · sounds/
 │
 ├── tests/                        # 测试 / Tests (pytest + pytest-qt)
 │   ├── app/services/    · app/domain/
@@ -704,7 +721,13 @@ git push origin feat/your-idea
 
 **🌍 翻译 / Translate**
 
-新增语言：Todo..
+已支持 中 / 日 / 英；新增语言可基于
+`src/strange_uta_game/frontend/localization/`
+的 Qt `.ts` 资源翻译后提交。
+
+Already in zh / ja / en — add a language by
+translating the Qt `.ts` files under
+`frontend/localization/`.
 
 </td>
 </tr>

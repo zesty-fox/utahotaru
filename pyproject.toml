@@ -3,8 +3,10 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
+# 注意：版本号真源在 src/strange_uta_game/__version__.py（更新器/关于页读取该处）。
+# 此处仅作元数据展示，发布时随之更新。
 name = "strange-uta-game"
-version = "0.1.0"
+version = "1.2.6"
 description = "一款由 RhythmicaLyrics 启发的歌词打轴软件"
 readme = "README.md"
 license = { text = "GPL-3.0" }
@@ -20,6 +22,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Multimedia :: Sound/Audio",
     "Topic :: Text Processing :: Linguistic",
 ]
