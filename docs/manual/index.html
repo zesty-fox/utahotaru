@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>StrangeUtaGame 用户说明书</title>
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+<button class="menu-toggle">☰ 目录</button>
+<div class="layout">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="../../assets/mascot.png" alt="SUG" onerror="this.style.display='none'" />
+      StrangeUtaGame
+    </a>
+    <p class="ver">用户说明书 · v1.2.6</p>
+
+    <nav class="nav-group">
+      <h4>入门</h4>
+      <a href="index.html"><span class="ico">🏠</span>总览</a>
+      <a href="getting-started.html"><span class="ico">🚀</span>新手入门</a>
+      <a href="interface.html"><span class="ico">🗺️</span>界面导览</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>核心功能</h4>
+      <a href="timing.html"><span class="ico">🎯</span>打轴</a>
+      <a href="furigana.html"><span class="ico">🇯🇵</span>注音</a>
+      <a href="fulltext.html"><span class="ico">📝</span>全文本编辑</a>
+      <a href="singers.html"><span class="ico">🎤</span>演唱者管理</a>
+      <a href="export.html"><span class="ico">📤</span>导出</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>进阶 / 参考</h4>
+      <a href="calibration.html"><span class="ico">🎚️</span>偏移与校准</a>
+      <a href="settings.html"><span class="ico">⚙️</span>设置详解</a>
+      <a href="hotkeys.html"><span class="ico">⌨️</span>快捷键大全</a>
+      <a href="faq.html"><span class="ico">❓</span>FAQ / 排错</a>
+    </nav>
+  </aside>
+
+  <!-- ============ CONTENT ============ -->
+  <main class="content">
+    <div class="hero">
+      <img class="mascot" src="../../assets/mascot.png" alt="SUG 吉祥物" onerror="this.style.display='none'" />
+      <h1>StrangeUtaGame 用户说明书</h1>
+      <p class="tagline">低延迟 · 高精度 · 卡拉 OK 打轴工具<br/>「打出你听见的每一个字。」</p>
+      <div class="badge-row">
+        <span class="badge">v1.2.6</span>
+        <span class="badge">Windows 10 / 11</span>
+        <span class="badge">macOS（实验性）</span>
+        <span class="badge">11 种导出格式</span>
+        <span class="badge">三语界面</span>
+      </div>
+    </div>
+
+    <div class="callout note">
+      <span class="ttl">📖 这份说明书写给谁？</span>
+      <p>无论你是第一次接触卡拉 OK 打轴的新手，还是从 RhythmicaLyrics / NicokaraMaker / Aegisub
+      迁移过来的老手，这份文档都能帮上忙。<b>初次使用请从「新手入门」开始</b>；想查具体功能，直接点左侧对应章节。</p>
+    </div>
+
+    <h2>🧭 <span class="em">从这里开始</span></h2>
+    <div class="cards">
+      <a class="card" href="getting-started.html">
+        <div class="ico">🚀</div>
+        <h3>新手入门</h3>
+        <p>安装、首次启动、从零完成你的第一份卡拉 OK 时间轴。</p>
+      </a>
+      <a class="card" href="interface.html">
+        <div class="ico">🗺️</div>
+        <h3>界面导览</h3>
+        <p>主窗口、侧边栏、打轴界面、波形与预览各区域是什么。</p>
+      </a>
+      <a class="card" href="hotkeys.html">
+        <div class="ico">⌨️</div>
+        <h3>快捷键大全</h3>
+        <p>全键盘打轴流的所有默认键位，可在设置里自由重映射。</p>
+      </a>
+    </div>
+
+    <h2>✨ <span class="em">核心功能速览</span></h2>
+    <div class="cards">
+      <a class="card" href="timing.html">
+        <div class="ico">🎯</div>
+        <h3>打轴</h3>
+        <p>逐字标记时间戳、节奏点、句尾、导唱符；变速慢放、时间戳工具箱。</p>
+      </a>
+      <a class="card" href="furigana.html">
+        <div class="ico">🇯🇵</div>
+        <h3>自动注音</h3>
+        <p>多引擎 + LLM + 罗马音，本地 / 联网词典覆盖，按字符类型启停。</p>
+      </a>
+      <a class="card" href="fulltext.html">
+        <div class="ico">📝</div>
+        <h3>全文本编辑</h3>
+        <p>把整篇歌词当带注音 + 时间戳的内联文本批量改，自带完整时间轴、逐行独立解码。</p>
+      </a>
+      <a class="card" href="singers.html">
+        <div class="ico">🎤</div>
+        <h3>演唱者管理</h3>
+        <p>多演唱者上色、分色、分组、逐字指定，导出时按演唱者过滤或插标签。</p>
+      </a>
+      <a class="card" href="export.html">
+        <div class="ico">📤</div>
+        <h3>导出</h3>
+        <p>LRC / KRA / ASS / SRT / Nicokara / txt2ass 等 11 种格式一键产出。</p>
+      </a>
+      <a class="card" href="calibration.html">
+        <div class="ico">🎚️</div>
+        <h3>偏移与校准</h3>
+        <p>按键补偿 / 全局偏移 / 导出偏移到底各是什么、怎么校准、如何检查轴精度。</p>
+      </a>
+      <a class="card" href="settings.html">
+        <div class="ico">⚙️</div>
+        <h3>设置详解</h3>
+        <p>10 个分类页：演奏控制、打轴、自动保存、AutoCheck、词典、界面、导出、快捷键、网络、关于/语言。</p>
+      </a>
+      <a class="card" href="faq.html">
+        <div class="ico">❓</div>
+        <h3>FAQ / 排错</h3>
+        <p>没声音、注音不准、联网词典不通、自动更新走不动？看这里。</p>
+      </a>
+    </div>
+
+    <h2>💡 <span class="em">一句话理解 SUG</span></h2>
+    <p>
+      SUG 是一款<b>卡拉 OK 歌词「打轴」工具</b> —— 它的核心工作是：把一首歌的歌词，逐字逐句地
+      标上「这个字什么时候开始唱、什么时候唱完」的时间戳，最终导出成各种卡拉 OK / 字幕格式。
+    </p>
+    <div class="callout note">
+      <span class="ttl">它不是什么</span>
+      <p>❌ 不是音游 &nbsp;·&nbsp; ❌ 不是字幕翻译工具 &nbsp;·&nbsp; ❌ 不是音频编辑器（DAW）。
+      做特效与样式请把导出的 ASS 交给 Aegisub —— 两者互补。</p>
+    </div>
+
+    <div class="footer">
+      Made with 💜 by karaoke-studio · 本说明书随软件版本 v1.2.6 编写<br/>
+      软件以 GPL v3 协议开源
+    </div>
+  </main>
+</div>
+<script src="assets/nav.js"></script>
+</body>
+</html>

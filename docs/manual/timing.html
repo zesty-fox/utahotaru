@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>打轴功能详解 · StrangeUtaGame 说明书</title>
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+<button class="menu-toggle">☰ 目录</button>
+<div class="layout">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="../../assets/mascot.png" alt="SUG" onerror="this.style.display='none'" />
+      StrangeUtaGame
+    </a>
+    <p class="ver">用户说明书 · v1.2.6</p>
+    <nav class="nav-group">
+      <h4>入门</h4>
+      <a href="index.html"><span class="ico">🏠</span>总览</a>
+      <a href="getting-started.html"><span class="ico">🚀</span>新手入门</a>
+      <a href="interface.html"><span class="ico">🗺️</span>界面导览</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>核心功能</h4>
+      <a href="timing.html"><span class="ico">🎯</span>打轴</a>
+      <a href="furigana.html"><span class="ico">🇯🇵</span>注音</a>
+      <a href="fulltext.html"><span class="ico">📝</span>全文本编辑</a>
+      <a href="singers.html"><span class="ico">🎤</span>演唱者管理</a>
+      <a href="export.html"><span class="ico">📤</span>导出</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>进阶 / 参考</h4>
+      <a href="calibration.html"><span class="ico">🎚️</span>偏移与校准</a>
+      <a href="settings.html"><span class="ico">⚙️</span>设置详解</a>
+      <a href="hotkeys.html"><span class="ico">⌨️</span>快捷键大全</a>
+      <a href="faq.html"><span class="ico">❓</span>FAQ / 排错</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <h1>🎯 打轴功能详解</h1>
+    <p class="subtitle">SUG 的核心。本章把打轴涉及的每一类操作拆开讲清楚。</p>
+
+    <h2>🎹 <span class="em">基础打轴操作</span></h2>
+    <table class="tbl">
+      <tr><th>操作</th><th>键</th><th>说明</th></tr>
+      <tr><td>打轴（记录当前时刻）</td><td class="center"><kbd>Space</kbd></td><td>给当前字打上时间戳，并自动前进到下一字</td></tr>
+      <tr><td>清除当前节奏点</td><td class="center"><kbd>Backspace</kbd></td><td>只清时间戳，不删字。删除后会智能回跳一小段便于复听</td></tr>
+      <tr><td>打到句尾</td><td class="center"><kbd>P</kbd></td><td>把当前行剩余字符<b>一次性全部</b>打上时间戳</td></tr>
+      <tr><td>句尾标记切换</td><td class="center"><kbd>.</kbd></td><td>切换行末「●」句尾标记（决定一句何时结束变色）</td></tr>
+    </table>
+
+    <div class="callout tip">
+      <span class="ttl">💡 删除即回放</span>
+      <p>清除节奏点时，光标会自动回跳 <code>jump_before_ms</code> 毫秒，方便你立刻重听、重打 ——
+      返工不用手动找位置。</p>
+    </div>
+
+    <h2>⏯️ <span class="em">播放、跳转与变速</span></h2>
+    <table class="tbl">
+      <tr><th>操作</th><th>键</th><th>默认值</th></tr>
+      <tr><td>播放 / 暂停</td><td class="center"><kbd>D</kbd></td><td>音频与光标同步</td></tr>
+      <tr><td>停止（回行首）</td><td class="center"><kbd>S</kbd></td><td>—</td></tr>
+      <tr><td>后退 / 前进</td><td class="center"><kbd>Z</kbd> / <kbd>X</kbd></td><td>后退 2000 ms / 前进 3000 ms</td></tr>
+      <tr><td>减速 / 加速</td><td class="center"><kbd>Q</kbd> / <kbd>W</kbd></td><td>±5%，范围 0.2×–2.0×</td></tr>
+      <tr><td>音量 − / +</td><td class="center"><kbd>Ctrl</kbd>+<kbd>W</kbd> / <kbd>Ctrl</kbd>+<kbd>Q</kbd></td><td>±5%</td></tr>
+    </table>
+
+    <h3>变速不变调，慢放扒轴</h3>
+    <p>SUG 采用 <b>BASS-FX + pedalboard 双管线</b>时间拉伸，最低能拉到 <b>0.2×</b>仍保持音高不失真 ——
+    慢放时咬字、气口、连唱依旧清晰。扒快歌、密集歌词强烈建议先慢放打粗轴，再原速校准。</p>
+
+    <div class="shot">
+      <div class="cam">📷</div>
+      <div class="lbl">截图位 · 传输条与工具栏（变速 / 音量 / 全局偏移输入框）</div>
+      <div class="hint">（此处留空，待补：顶部传输条特写）</div>
+    </div>
+
+    <h2>🧭 <span class="em">光标导航与行编辑</span></h2>
+    <table class="tbl">
+      <tr><th>操作</th><th>键</th></tr>
+      <tr><td>上一行 / 下一行</td><td class="center"><kbd>↑</kbd> / <kbd>↓</kbd></td></tr>
+      <tr><td>上一字 / 下一字</td><td class="center"><kbd>←</kbd> / <kbd>→</kbd></td></tr>
+      <tr><td>在光标处断行</td><td class="center"><kbd>Enter</kbd></td></tr>
+      <tr><td>与上一行合并</td><td class="center"><kbd>Shift</kbd>+<kbd>Enter</kbd></td></tr>
+      <tr><td>插入空格</td><td class="center"><kbd>M</kbd></td></tr>
+      <tr><td>删除字</td><td class="center"><kbd>Delete</kbd></td></tr>
+    </table>
+
+    <h2>🔧 <span class="em">节奏点（checkpoint）精修</span></h2>
+    <p>切到<b>编辑模式</b>后，可调整每个字内部的节奏点数量 —— 用于长音、拖腔、一字多段变色。</p>
+    <table class="tbl">
+      <tr><th>操作</th><th>键</th><th>说明</th></tr>
+      <tr><td>增加 / 减少节奏点</td><td class="center"><kbd>[</kbd> / <kbd>]</kbd></td><td>给当前字添加或移除一个字内节奏点</td></tr>
+      <tr><td>切换字内节奏点</td><td class="center"><kbd>Alt</kbd>+<kbd>←</kbd> / <kbd>Alt</kbd>+<kbd>→</kbd></td><td>在一个字的多个节奏点间移动选中</td></tr>
+      <tr><td>时间戳微调 ±</td><td class="center"><kbd>Alt</kbd>+<kbd>↑</kbd> / <kbd>Alt</kbd>+<kbd>↓</kbd></td><td>当前节奏点 ±10 ms（步长可在设置改）</td></tr>
+    </table>
+    <div class="callout note">
+      <span class="ttl"><code>^</code> 是什么？—— 演唱停顿符</span>
+      <p>当一个字的<b>节奏点数量多于它的读音拍数</b>时，多出来的节奏点没有对应假名，会用 <code>^</code> 占位，
+      表示<b>延音 / 拖腔 / 停顿</b>（这一拍换色但不是新音节）。它是有意义的占位符，不是错误。
+      详见 <a href="fulltext.html">全文本编辑 → 演唱停顿符</a>。</p>
+    </div>
+
+    <h2>🎵 <span class="em">导唱符（前奏 / 间奏指示）</span></h2>
+    <p>导唱符（如 <code>●</code>）用于在歌词开始前、间奏处显示「即将开唱」的节拍提示点。</p>
+    <ul>
+      <li><b>插入导唱符</b>：<kbd>Ctrl</kbd><span class="kbd-plus">+</span><kbd>1</kbd>（默认符号「●」）。</li>
+      <li><b>插入导唱符对话框</b>：在工具栏，可在选中字符前<b>批量插入</b>导唱字符，自动计算时间戳并设置连接关系。</li>
+      <li><b>待办标记</b>：对还没打导唱符的位置，可标注「此处需导唱符」提醒自己。</li>
+    </ul>
+
+    <h2>🧰 <span class="em">工具栏全览</span></h2>
+    <p>打轴界面顶部的工具栏是各种批量操作的指挥中心，分成几个下拉菜单 / 按钮：</p>
+    <table class="tbl">
+      <tr><th>工具栏项</th><th>内容</th></tr>
+      <tr><td><b>文件管理</b></td><td>新建项目 / 加载项目 / 保存项目 / 项目另存为 / 加载音频 / 加载歌词</td></tr>
+      <tr><td><b>编辑管理</b></td><td>修改所选字符 / 批量变更 / 修改选中行</td></tr>
+      <tr><td><b>插入导唱符</b></td><td>在选中字符前批量插入导唱符（见上一节）</td></tr>
+      <tr><td><b>自动注音管理</b></td><td>含节奏点 / 仅注音（各分 全部·按行·所选）、全部转为罗马字、按类型删除注音（见<a href="furigana.html">注音详解</a>）</td></tr>
+      <tr><td><b>演唱者相关</b></td><td>演唱者管理 / 应用演唱者 / 按行设置演唱者（见<a href="singers.html">演唱者管理</a>）</td></tr>
+      <tr><td><b>全文本编辑</b></td><td>打开<a href="fulltext.html">全文本编辑</a></td></tr>
+      <tr><td><b>时间戳工具</b></td><td>补全 / 分离符号 / 调整原始时间戳 / 批量删除（详见下表）</td></tr>
+      <tr><td><b>全局偏移</b> 输入框</td><td>整首歌时间戳整体平移（见<a href="calibration.html">偏移与校准</a>）</td></tr>
+    </table>
+
+    <h3>编辑管理里的「修改选中行」</h3>
+    <p>打开<b>行详情</b>对话框，逐字编辑该行的文本、注音、节奏点数量、句尾标记和演唱者 —— 适合集中整理一整行。</p>
+
+    <h3>时间戳工具（特殊工具详解）</h3>
+    <p>这是扒轴返工最常用的一组，里面几个「特殊工具」单独说明：</p>
+    <table class="tbl">
+      <tr><th>工具</th><th>作用</th></tr>
+      <tr><td><b>补全时间戳</b></td><td>打轴<b>全部完成后</b>，自动找出还没有普通时间戳的字符（可按字符类型 + 排除规则筛选），用<b>前后时间戳的平均值均分</b>补上；可设「行首扣除 / 行尾增加」的边界偏移。</td></tr>
+      <tr><td><b>分离符号时间戳</b></td><td>针对标点 / 符号批量处理：<b>后补偿</b> = 把句尾符号的句尾时间戳提升为普通时间戳、并把句尾时间后移；<b>前补偿</b> = 把符号的时间戳传给它后面的第一个文字、符号自身时间前移。用来让符号与文字的时间「分家」。</td></tr>
+      <tr><td><b>调整原始时间戳</b><br/>（全部 / 按行 / 所选）</td><td><b>非模态</b>窗口，点「应用」就把（全部 / 该行 / 所选）的<b>原始时间戳</b>整体平移一次，正=后移、负=前移；可<b>反复叠加</b>、可切回主界面试听后继续调。</td></tr>
+      <tr><td>批量删除时间戳</td><td>删除所有 / 删除所有但保留行首 / 删除所选范围</td></tr>
+    </table>
+    <div class="callout warn">
+      <span class="ttl">⚠️「调整原始时间戳」与「全局偏移」不一样</span>
+      <p>调整原始时间戳是<b>真的改写</b>每个字记录的原始时间值（不可一键还原，靠撤销栈）；
+      全局偏移则是<b>整体平移显示/导出</b>而不动原始值。整条轴系统性偏，优先用全局偏移；
+      只想永久改某段的原始值，才用调整原始时间戳。</p>
+    </div>
+
+    <div class="shot">
+      <div class="cam">📷</div>
+      <div class="lbl">截图位 · 工具栏与时间戳工具菜单</div>
+      <div class="hint">（此处留空，待补：展开的「时间戳工具」下拉菜单 / 补全时间戳对话框）</div>
+    </div>
+
+    <h2>✏️ <span class="em">改字、批量替换与候补字典</span></h2>
+    <ul>
+      <li><b>修改字 / 行</b>：<kbd>J</kbd>（修改所选字符）/ <kbd>Ctrl</kbd><span class="kbd-plus">+</span><kbd>2</kbd>（修改行）。
+        修改所选字符对话框可改文本、注音、节奏点数量，并能注册到用户词典，自动保持句尾标记与演唱者继承。</li>
+      <li><b>批量替换</b>：<kbd>Ctrl</kbd><span class="kbd-plus">+</span><kbd>H</kbd>，整篇批量替换文本（支持撤销）。</li>
+      <li><b>查询候补字典</b>：在「批量变更 / 修改所选字符 / 编辑注音(F2)」对话框中，点「查询候补字典」可列出
+        词典里与原文完全匹配的读音条目，双击应用后自动按该读音分段填充。</li>
+    </ul>
+
+    <h2>🔊 <span class="em">打轴按键音</span></h2>
+    <p>可选 默认 / osu / 街机风 / 金属感 等按键音效，把打轴体验拉近音游手感。<b>默认关闭</b>，
+    在「设置 → 打轴 → 打轴按键音」中按需开启，并可调音量与风格。</p>
+
+    <h2>↩️ <span class="em">撤销 / 重做与自动保存</span></h2>
+    <ul>
+      <li><b>撤销 / 重做</b>：<kbd>Ctrl</kbd><span class="kbd-plus">+</span><kbd>Z</kbd> /
+        <kbd>Ctrl</kbd><span class="kbd-plus">+</span><kbd>Y</kbd>，命令式深度撤销栈，支持几十步回退。</li>
+      <li><b>自动保存</b>：默认每 5 分钟把工程落盘到程序目录 <code>.cache</code> 下的临时 <code>.sug.temp</code>。
+        间隔可在「设置 → 自动保存」调（1–60 分钟）。</li>
+      <li><b>闪退恢复</b>：异常退出后再次启动，会提示从临时文件恢复现场。</li>
+    </ul>
+
+    <div class="callout warn">
+      <span class="ttl">⚠️ 注意：打轴会覆盖现有时间戳</span>
+      <p>在已打过的字上再按 <kbd>Space</kbd> 会直接覆盖原时间戳，且<b>不提示时间倒退</b>。
+      重打前若想保留旧值，请先确认或利用撤销栈回退。</p>
+    </div>
+
+    <div class="page-nav">
+      <a class="prev" href="interface.html"><span class="dir">← 上一篇</span><span class="ttl">界面导览</span></a>
+      <a class="next" href="furigana.html"><span class="dir">下一篇 →</span><span class="ttl">注音功能详解</span></a>
+    </div>
+    <div class="footer">StrangeUtaGame 用户说明书 · v1.2.6</div>
+  </main>
+</div>
+<script src="assets/nav.js"></script>
+</body>
+</html>

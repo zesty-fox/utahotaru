@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FAQ / 排错 · StrangeUtaGame 说明书</title>
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+<button class="menu-toggle">☰ 目录</button>
+<div class="layout">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="../../assets/mascot.png" alt="SUG" onerror="this.style.display='none'" />
+      StrangeUtaGame
+    </a>
+    <p class="ver">用户说明书 · v1.2.6</p>
+    <nav class="nav-group">
+      <h4>入门</h4>
+      <a href="index.html"><span class="ico">🏠</span>总览</a>
+      <a href="getting-started.html"><span class="ico">🚀</span>新手入门</a>
+      <a href="interface.html"><span class="ico">🗺️</span>界面导览</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>核心功能</h4>
+      <a href="timing.html"><span class="ico">🎯</span>打轴</a>
+      <a href="furigana.html"><span class="ico">🇯🇵</span>注音</a>
+      <a href="fulltext.html"><span class="ico">📝</span>全文本编辑</a>
+      <a href="singers.html"><span class="ico">🎤</span>演唱者管理</a>
+      <a href="export.html"><span class="ico">📤</span>导出</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>进阶 / 参考</h4>
+      <a href="calibration.html"><span class="ico">🎚️</span>偏移与校准</a>
+      <a href="settings.html"><span class="ico">⚙️</span>设置详解</a>
+      <a href="hotkeys.html"><span class="ico">⌨️</span>快捷键大全</a>
+      <a href="faq.html"><span class="ico">❓</span>FAQ / 排错</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <h1>❓ FAQ / 排错</h1>
+    <p class="subtitle">常见疑问与故障排查。找不到答案？欢迎到 GitHub Issues 反馈。</p>
+
+    <h2>💬 <span class="em">常见问题</span></h2>
+
+    <h3>Q1. 为什么叫 “StrangeUtaGame”？这是音游吗？</h3>
+    <p>不是。<b>Uta</b> 是日语「歌」。它是<b>卡拉 OK 打轴工具</b>，名字只是有点意思而已，不是音游。</p>
+
+    <h3>Q2. 和 RhythmicaLyrics、Aegisub 有什么区别？</h3>
+    <ul>
+      <li>相比 <b>RhythmicaLyrics</b>：现代 UI、毫秒级低延迟回放、无需日语转区、原生 UTF-8。</li>
+      <li>相比 <b>Aegisub kara-templater</b>：SUG 专注「<b>打轴</b>」这一步，导出 ASS 后再交给 Aegisub
+        做样式与特效，两者互补。</li>
+    </ul>
+
+    <h3>Q3. 支持 macOS / Linux 吗？</h3>
+    <p>官方主要支持 <b>Windows 10/11</b>；macOS 为<b>实验性</b>构建。代码是 Python + Qt，理论可移植，
+    欢迎社区贡献。</p>
+
+    <h3>Q4. 我之前的 RhythmicaLyrics工程能导入吗？</h3>
+    <p>能。支持导入 RL 导出的 <b>ASS / LRC / TXT</b> 与 <b>RL 编辑模式</b>文本；联网词典兼容 RL 官方接口，
+    旧词典资产可直接复用。</p>
+
+    <h2>🛠️ <span class="em">故障排查</span></h2>
+
+    <h3>🔇 打开后没有声音 / 某个音频加载报错</h3>
+    <ul>
+      <li>发行版自带全套 <b>BASS 解码 DLL</b>（FLAC / OPUS / AAC / AC3 / WMA / DSD / ALAC / WebM）。
+        从源码运行时，确保 <code>src/strange_uta_game/lib/</code> 下插件完整。</li>
+      <li>视频文件靠内置转换器抽音轨；若失败，检查「设置 → 关于/语言 → FFmpeg 路径」，
+        可填路径或「一键安装」。</li>
+      <li>检查系统输出设备与软件音量（<kbd>Ctrl</kbd>+<kbd>Q</kbd> 加音量）。</li>
+    </ul>
+
+    <h3>🈁 自动注音不准 / 某些词读音错</h3>
+    <ul>
+      <li>主版本注音引擎是 Windows 的 <b>WinRT JapanesePhoneticAnalyzer</b>，需安装<b>日语基本包</b>
+        （<code>Language.Basic~~~ja-JP</code>）。未启用时软件会探测并引导安装。</li>
+      <li>生僻词 / 专有名词 / 特殊读法：把正确读音加进<b>用户词典</b>，它会覆盖引擎结果（一劳永逸）。</li>
+      <li>仍不满意可尝试<b>联网词典</b>或可选的 <b>LLM 注音</b>。详见
+        <a href="furigana.html">注音功能详解</a>。</li>
+    </ul>
+
+    <h3>🌐 联网词典查不到 / 被墙</h3>
+    <p>到「设置 → 网络」切换词典源（内置 <b>RhythmicaLyrics 官方</b>）、添加自定义 URL、调整源优先级。</p>
+
+    <h3>🚀 自动更新下载很慢 / 失败</h3>
+    <p>到「设置 → 网络」的更新区，启用 <b>ghproxy / gh-proxy / ghproxy-net</b> 镜像，或配置系统/手动代理；
+    也可「跳过此版本」。macOS 版无应用内更新，会用浏览器打开 Releases 页面。</p>
+
+    <h3>💥 软件闪退后工程丢了？</h3>
+    <p>别慌。SUG 默认每 5 分钟自动保存到 <code>.cache</code> 临时文件，<b>下次启动会提示恢复</b>。
+    平时也建议常按 <kbd>Ctrl</kbd>+<kbd>S</kbd>。</p>
+
+    <h3>🈚 文件名 / 路径乱码？</h3>
+    <p>SUG 原生 UTF-8，<b>无需 AppLocale、无需日语转区</b>。若你仍开着转区工具反而可能出问题，建议关闭。</p>
+
+    <h2>🐛 <span class="em">反馈与求助</span></h2>
+    <ul>
+      <li>报 Bug：附上复现步骤、系统版本，以及能说明问题的截图，提交到
+        <a href="https://github.com/karaoke-studio/StrangeUtaGame/issues" target="_blank">GitHub Issues</a>。</li>
+      <li>提功能 / 翻译新语言：欢迎先开 Discussion 或直接 PR。</li>
+    </ul>
+
+    <div class="callout note">
+      <span class="ttl">📚 想系统了解？</span>
+      <p>回到 <a href="index.html">总览</a> 或从 <a href="getting-started.html">新手入门</a> 重新过一遍流程。</p>
+    </div>
+
+    <div class="page-nav">
+      <a class="prev" href="hotkeys.html"><span class="dir">← 上一篇</span><span class="ttl">快捷键大全</span></a>
+      <a class="next disabled" href="#"></a>
+    </div>
+    <div class="footer">
+      StrangeUtaGame 用户说明书 · v1.2.6 · Made with 💜 by karaoke-studio<br/>
+      软件以 GPL v3 协议开源
+    </div>
+  </main>
+</div>
+<script src="assets/nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>偏移与校准 · StrangeUtaGame 说明书</title>
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+<button class="menu-toggle">☰ 目录</button>
+<div class="layout">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="../../assets/mascot.png" alt="SUG" onerror="this.style.display='none'" />
+      StrangeUtaGame
+    </a>
+    <p class="ver">用户说明书 · v1.2.6</p>
+    <nav class="nav-group">
+      <h4>入门</h4>
+      <a href="index.html"><span class="ico">🏠</span>总览</a>
+      <a href="getting-started.html"><span class="ico">🚀</span>新手入门</a>
+      <a href="interface.html"><span class="ico">🗺️</span>界面导览</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>核心功能</h4>
+      <a href="timing.html"><span class="ico">🎯</span>打轴</a>
+      <a href="furigana.html"><span class="ico">🇯🇵</span>注音</a>
+      <a href="fulltext.html"><span class="ico">📝</span>全文本编辑</a>
+      <a href="singers.html"><span class="ico">🎤</span>演唱者管理</a>
+      <a href="export.html"><span class="ico">📤</span>导出</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>进阶 / 参考</h4>
+      <a href="calibration.html"><span class="ico">🎚️</span>偏移与校准</a>
+      <a href="settings.html"><span class="ico">⚙️</span>设置详解</a>
+      <a href="hotkeys.html"><span class="ico">⌨️</span>快捷键大全</a>
+      <a href="faq.html"><span class="ico">❓</span>FAQ / 排错</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <h1>🎚️ 偏移与校准</h1>
+    <p class="subtitle">软件里有好几个「偏移」，含义各不相同。这一章讲清每个偏移、如何校准、如何检查轴准不准。</p>
+
+    <div class="callout note">
+      <span class="ttl">先理解：为什么会有偏移？</span>
+      <p>你「听到声音 → 大脑反应 → 手指按键」本身就有约 <b>0.2 秒</b>的固有延迟；耳机/声卡/系统输出也各有延迟。
+      如果直接把按键时刻当成字的开始时间，整条轴会<b>系统性偏晚</b>。偏移设置就是用来抵消这些延迟、让轴对得准。</p>
+    </div>
+
+    <h2>🧩 <span class="em">三种偏移，一次看懂</span></h2>
+    <table class="tbl">
+      <tr><th>偏移</th><th>默认</th><th>作用时机</th><th>解决什么</th></tr>
+      <tr>
+        <td><b>按键补偿</b><br/><span class="pill">tag_offset_ms</span></td>
+        <td>0 ms</td>
+        <td>打轴<b>那一刻</b>，每次按键即时生效</td>
+        <td>抵消「你的反应 + 设备」延迟，让记录的时间戳比你实际按键<b>提前</b>一点</td>
+      </tr>
+      <tr>
+        <td><b>全局偏移</b><br/><span class="pill">软件内 / 编辑器</span></td>
+        <td>0 ms</td>
+        <td>打完轴后，在<b>软件内</b>实时统一平移全部时间戳（预览即时刷新）</td>
+        <td>轴整体早/晚了一截，不重打、一键整体挪；按<b>项目</b>保存</td>
+      </tr>
+      <tr>
+        <td><b>导出偏移</b><br/><span class="pill">export.offset_ms</span></td>
+        <td>0 ms</td>
+        <td>作用于<b>导出文件</b>的整体偏移</td>
+        <td>适配某个播放器/平台时，给导出结果再整体挪一挪</td>
+      </tr>
+    </table>
+
+    <div class="callout warn">
+      <span class="ttl">⚠️ 速度补正不是偏移</span>
+      <p>「<b>速度补正</b>」（<code>speed_correction</code>，默认 100%，范围 50–200%）是<b>修正系数</b>，不在这三种偏移之列。
+      它在<b>变速打轴</b>（如 0.6× 慢放）时，对记录的时间戳做速度相关修正，让慢放打的轴换回原速也准。一般保持默认即可。</p>
+    </div>
+
+    <div class="callout tip">
+      <span class="ttl">💡 三者怎么分工</span>
+      <p><b>按键补偿</b>是<b>打轴时</b>边打边补，影响「新打的字」；<b>全局偏移</b>是<b>打完后</b>把
+      「所有已存在的字」在软件内统一搬家；<b>导出偏移</b>则作用在<b>最终导出的文件</b>上。
+      三者都遵循<b>负值 = 提前、正值 = 延后</b>。</p>
+    </div>
+
+    <h3>① 按键补偿（tag_offset_ms）</h3>
+    <p>位置：<b>设置 → 打轴 → 按键补偿</b>。默认 <b>0 ms</b>，范围 −5000～5000，步进 10 ms。</p>
+    <ul>
+      <li>负值表示「把时间戳记得比按键时刻更<b>早</b>」—— 人通常慢半拍按下，所以校准后这个值往往是负的。</li>
+      <li>不建议凭感觉乱填，<b>强烈建议用下面的节拍器校准</b>测出你自己的值再填进去。</li>
+    </ul>
+
+    <h3>② 全局偏移</h3>
+    <p>位置：打轴界面<b>工具栏的「全局偏移」输入框</b>（范围 −5000～5000 ms）。</p>
+    <ul>
+      <li>把整首歌<b>所有</b>时间戳在软件内统一平移，预览<b>即时</b>刷新，所见即所得。</li>
+      <li>按<b>项目</b>保存进 <code>.sug</code> 工程，下次打开自动恢复。</li>
+      <li>它与<b>导出偏移联动同步</b>：改了全局偏移，导出偏移会跟着更新，所以<b>预览看到的就是导出得到的</b>。</li>
+    </ul>
+
+    <h3>③ 导出偏移（export.offset_ms）</h3>
+    <p>作用于<b>导出文件</b>的整体偏移，默认 <b>0 ms</b>。它与上面的全局偏移是同一套整体偏移的两个作用面、
+    保持同步 —— 一般你只需调全局偏移即可，导出会自动带上同样的偏移；只有当你想让导出结果与软件内预览
+    刻意错开（比如专门适配某播放器）时才单独关注它。</p>
+
+    <div class="callout note">
+      <span class="ttl">别和「微调时间戳步长」搞混</span>
+      <p><b>设置 → 打轴 → 微调时间戳步长</b>（默认 10 ms）决定打轴界面里 <kbd>Alt</kbd>+<kbd>↑</kbd> /
+      <kbd>Alt</kbd>+<kbd>↓</kbd> 每次微调<b>单个</b>节奏点的幅度 —— 这是针对一个字的精修，不是整体偏移。</p>
+    </div>
+
+    <h2>🎼 <span class="em">用节拍器校准测出你的「按键补偿」</span></h2>
+    <p>位置：<b>设置 → 打轴 → Offset 校准 → 开始校准</b>。它能客观量出「你听到拍子后平均晚多少按下」。</p>
+    <ol class="steps">
+      <li><span class="st-title">打开校准弹窗</span>深色画布上有滑块匀速滑过中央的判定线，同时播放节拍器「咔哒」声。</li>
+      <li><span class="st-title">戴好耳机，跟着节拍按空格</span>每当滑块/咔哒到达判定线，就按一下 <kbd>Space</kbd>。</li>
+      <li><span class="st-title">看实时统计</span>左上角显示你最近一次与<b>平均</b>偏移；可调 BPM（60–240）多敲几轮取稳。</li>
+      <li><span class="st-title">把平均值填进「按键补偿」</span>用校准得到的偏移设置 <code>tag_offset_ms</code>，
+        之后打轴就自动抵消你的固有延迟。</li>
+    </ol>
+    <div class="callout warn">
+      <span class="ttl">⚠️ 换设备要重校</span>
+      <p>偏移和你的耳机/声卡/蓝牙都有关。<b>换了音频设备（尤其蓝牙耳机延迟很大）建议重新校准</b>。
+      用蓝牙打轴往往延迟大且不稳，追求精度时优先有线设备。</p>
+    </div>
+
+    <div class="shot">
+      <div class="cam">📷</div>
+      <div class="lbl">截图位 · Offset 校准弹窗（滑块 / 判定线 / 实时偏移统计）</div>
+      <div class="hint">（此处留空，待补：校准画布全貌）</div>
+    </div>
+
+    <h2>🔍 <span class="em">如何检查轴精度</span></h2>
+    <p>打完轴别急着导出，用这几种方式自查准不准：</p>
+
+    <h3>1. 双击字 / 节奏点，跳到该处听声</h3>
+    <p>这是最直接的「点对点」核对法：<b>双击某个字</b>，音频会立刻跳到这个字时间戳的位置开始播放；
+    <b>双击某个节奏点</b>，则跳到该节奏点的时间。于是你能<b>逐字/逐点听原声</b>，确认轴有没有对在咬字起点上。</p>
+    <ul>
+      <li>是<b>双击</b>才会跳音频听声。<b>单击不会</b> —— 单击只是把光标/选中移到该字或节奏点
+        （决定下次从哪打、哪里开始播），并不会跳到该处发声。</li>
+      <li>双击跳转<b>不受</b>「设置 → 打轴 → 禁用单击跳转」影响，随时可用。</li>
+    </ul>
+
+    <h3>2. 看卡拉 OK 预览逐字变色</h3>
+    <p>播放时盯着<a href="interface.html">预览区</a>，文字应<b>恰好在演唱者唱到该字时</b>变色。
+    早了说明轴偏前，晚了说明偏后 —— 据此调整。</p>
+
+    <h3>3. 打开「打轴预览指引」</h3>
+    <p><b>设置 → 打轴 → 打轴预览指引</b>：播放时用过渡色提示「上一个 / 正在打 / 下一个」字，
+    以光标为锚，让你更直观看出当前打到哪、对没对上。各档透明度与开关可在「预览指引方式」里调。</p>
+
+    <h3>4. 用波形 / 时间线核对</h3>
+    <p>波形图上的能量起伏对应发音起止。把节奏点位置和波形的音头对一对，能看出明显的错位。</p>
+
+    <h3>5. 慢放复听</h3>
+    <p>按 <kbd>Q</kbd> 减速到 0.2×–0.6×，逐字听咬字起点，配合 <kbd>Z</kbd> 回放反复确认。</p>
+
+    <h3>6. 逐点微调</h3>
+    <p>发现某个字偏了，选中它用 <kbd>Alt</kbd>+<kbd>↑</kbd> /
+    <kbd>Alt</kbd>+<kbd>↓</kbd> 按步长（默认 10 ms）微调；整体偏就改<b>全局偏移</b>。</p>
+
+    <div class="callout tip">
+      <span class="ttl">💡 排查顺序建议</span>
+      <p>① 想确认某个具体字 → <b>双击它跳转听声</b>；② 整条轴都偏一致 → 调<b>全局偏移</b>或重测<b>按键补偿</b>；
+      ③ 只有个别字偏 → <b>逐点微调</b>；④ 慢放打的轴换原速整体偏 → 检查<b>速度补正</b>。</p>
+    </div>
+
+    <div class="page-nav">
+      <a class="prev" href="export.html"><span class="dir">← 上一篇</span><span class="ttl">导出</span></a>
+      <a class="next" href="settings.html"><span class="dir">下一篇 →</span><span class="ttl">设置详解</span></a>
+    </div>
+    <div class="footer">StrangeUtaGame 用户说明书 · v1.2.6</div>
+  </main>
+</div>
+<script src="assets/nav.js"></script>
+</body>
+</html>

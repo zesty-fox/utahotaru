@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>设置详解 · StrangeUtaGame 说明书</title>
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+<button class="menu-toggle">☰ 目录</button>
+<div class="layout">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="../../assets/mascot.png" alt="SUG" onerror="this.style.display='none'" />
+      StrangeUtaGame
+    </a>
+    <p class="ver">用户说明书 · v1.2.6</p>
+    <nav class="nav-group">
+      <h4>入门</h4>
+      <a href="index.html"><span class="ico">🏠</span>总览</a>
+      <a href="getting-started.html"><span class="ico">🚀</span>新手入门</a>
+      <a href="interface.html"><span class="ico">🗺️</span>界面导览</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>核心功能</h4>
+      <a href="timing.html"><span class="ico">🎯</span>打轴</a>
+      <a href="furigana.html"><span class="ico">🇯🇵</span>注音</a>
+      <a href="fulltext.html"><span class="ico">📝</span>全文本编辑</a>
+      <a href="singers.html"><span class="ico">🎤</span>演唱者管理</a>
+      <a href="export.html"><span class="ico">📤</span>导出</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>进阶 / 参考</h4>
+      <a href="calibration.html"><span class="ico">🎚️</span>偏移与校准</a>
+      <a href="settings.html"><span class="ico">⚙️</span>设置详解</a>
+      <a href="hotkeys.html"><span class="ico">⌨️</span>快捷键大全</a>
+      <a href="faq.html"><span class="ico">❓</span>FAQ / 排错</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <h1>⚙️ 设置详解</h1>
+    <p class="subtitle">设置界面顶部用选项卡（Pivot）分成 10 个分类页。本章逐页讲解。</p>
+
+    <div class="callout note">
+      <span class="ttl">通用操作</span>
+      <p>设置改动会<b>防抖自动保存</b>（约 500 ms 后写盘）。底部还有「保存设置」「从 KS 配置导入」
+      「重置为默认设置」按钮。<b>重置不影响用户词典与演唱者预设</b>（它们独立存储）。</p>
+    </div>
+
+    <h2>1️⃣ <span class="em">演奏控制</span></h2>
+    <p>音频回放相关默认值：</p>
+    <table class="tbl">
+      <tr><th>项</th><th>说明</th></tr>
+      <tr><td>默认音量</td><td>音频加载后的初始音量</td></tr>
+      <tr><td>默认速度</td><td>音频加载后的初始播放速度</td></tr>
+      <tr><td>速度滑块最小值 / 最大值</td><td>播放栏速度滑块的上下限（默认 0.2×–2.0×）</td></tr>
+      <tr><td>快进量 / 后退量</td><td>按快进/后退键跳过的毫秒数（默认 3000 / 2000 ms）</td></tr>
+      <tr><td>加载后自动播放</td><td>导入音频后是否立即开始播放</td></tr>
+      <tr><td>高质量变速</td><td>开启更高质量的时间拉伸算法</td></tr>
+      <tr><td>删除回跳量</td><td>清除节奏点后自动回跳的毫秒数（便于复听）</td></tr>
+      <tr><td>滚动模式</td><td>歌词滚动：自动 / 始终 / 从不</td></tr>
+    </table>
+
+    <h2>2️⃣ <span class="em">打轴</span></h2>
+    <p>打轴行为与时间补偿，含可视化 Offset 校准工具：</p>
+    <table class="tbl">
+      <tr><th>项</th><th>说明</th></tr>
+      <tr><td>按键补偿（tag_offset_ms）</td><td><b>偏移①</b>：每次打轴的延迟补偿，<b>默认 0 ms</b>（负=提前，正=延后）；建议用下方校准测出你的值再填</td></tr>
+      <tr><td>速度补正</td><td>变速打轴时的时间戳<b>修正系数（不是偏移）</b>，<b>默认 100%</b>（50–200%）</td></tr>
+      <tr><td>全局偏移 / 导出偏移（export.offset_ms）</td><td><b>偏移②③</b>：整首歌时间戳的整体平移，默认 0、±5000 ms；与打轴界面工具栏的「全局偏移」联动同步，导出时一并带上</td></tr>
+      <tr><td>微调时间戳步长</td><td><kbd>Alt</kbd>+<kbd>↑/↓</kbd> 每次微调的毫秒（默认 10 ms）</td></tr>
+      <tr><td>禁用单击跳转</td><td>关掉「单击字符/节奏点延迟后跳转到目标行」（双击跳转不受影响）</td></tr>
+      <tr><td>隐藏焦点高亮</td><td>隐藏 current / focus 域的高亮底色（启用后仅拖拽多选时显示）</td></tr>
+      <tr><td>打轴预览指引</td><td>预览叠加「上一个/正在打/下一个」引导着色，各档透明度与开关可调</td></tr>
+      <tr><td>打轴按键音 / 音量 / 风格</td><td>按下/抬起音效开关（<b>默认关</b>）、音量（0–200%）、风格（默认 / osu / 街机风 / 金属感）</td></tr>
+    </table>
+    <p>三种偏移的详细含义、如何校准、如何检查轴精度，见 <a href="calibration.html">偏移与校准</a>。</p>
+    <div class="callout tip">
+      <span class="ttl">🎚️ Offset 校准弹窗</span>
+      <p>深色画布上两个白滑块按设定 BPM 匀速滑过中央判定线，同时播放节拍器点击音 ——
+      <b>跟着节拍按空格</b>，软件实时算出你的平均按键偏移，把它填进「按键补偿」就能抵消
+      系统/耳机延迟。BPM 60–240 可调。</p>
+    </div>
+
+    <div class="shot">
+      <div class="cam">📷</div>
+      <div class="lbl">截图位 · Offset 校准弹窗</div>
+      <div class="hint">（此处留空，待补：校准画布与滑块/判定线）</div>
+    </div>
+
+    <h2>3️⃣ <span class="em">自动保存</span></h2>
+    <table class="tbl">
+      <tr><th>项</th><th>说明</th></tr>
+      <tr><td>启用定时自动保存</td><td>开/关周期性自动落盘</td></tr>
+      <tr><td>自动保存间隔</td><td>1–60 分钟（默认 5）</td></tr>
+    </table>
+    <p>自动保存写入程序目录 <code>.cache</code> 下的临时文件；异常退出后启动会提示恢复。</p>
+
+    <h2>4️⃣ <span class="em">AutoCheck（节奏点自动规则）</span></h2>
+    <p>控制「自动补节奏点」按字符类型的启停 —— 决定哪些字会被自动打上节奏点。可逐类开关：</p>
+    <p>
+      <span class="pill">ひらがな 平假名</span><span class="pill">カタカナ 片假名</span>
+      <span class="pill">漢字</span><span class="pill">アルファベット 英文字母</span>
+      <span class="pill">数字</span><span class="pill">記号 符号</span><span class="pill">空格</span>
+    </p>
+    <p>另有 20+ 项细则：小写假名、句首/句尾判定、把空格当行尾、标点是否打点、括号、英文音节、
+    促音、长音「ん」等。AutoCheck 的「<b>节奏点</b>」流程与「<b>注音</b>」流程相互独立。</p>
+
+    <h2>5️⃣ <span class="em">读音词典</span></h2>
+    <p>管理本地用户词典与网络词典源：</p>
+    <ul>
+      <li><b>自定义读音</b>：增删条目，<b>上移 / 下移</b>调整优先级（新增置顶）。</li>
+      <li><b>导入 RL 字典</b>：<code>原文⇥读音1,读音2…</code>，<code>＋</code> 表连词。</li>
+      <li><b>启用网络词典</b>与<b>字典源优先级</b>：本地源 + 各网络源自顶向下排序，首个命中即停。</li>
+    </ul>
+    <p>详见 <a href="furigana.html">注音详解 → 本地用户词典 / 联网读音词典</a>。</p>
+
+    <h2>6️⃣ <span class="em">界面</span></h2>
+    <table class="tbl">
+      <tr><th>项</th><th>说明</th></tr>
+      <tr><td>主题</td><td>自动（跟随系统）/ 浅色 / 深色</td></tr>
+      <tr><td>主文字字体 / 注音字体</td><td>分别指定歌词正文与注音的字体</td></tr>
+      <tr><td>基础字体大小</td><td>非当前行歌词的像素大小</td></tr>
+      <tr><td>当前行字体大小</td><td>当前行歌词的像素大小（通常更大）</td></tr>
+      <tr><td>注音字体大小</td><td>Ruby 注音的像素大小</td></tr>
+      <tr><td>注音与主文字间距</td><td>注音与正文之间的像素间距</td></tr>
+    </table>
+
+    <h2>7️⃣ <span class="em">导出</span></h2>
+    <p>设置默认导出格式及各格式的默认选项 —— 11 种格式：LRC（增强型/逐行/逐字）、KRA、TXT、
+    SRT、txt2ass、ASS、Nicokara、Nicokara（带注音）、RL 编辑模式。详见
+    <a href="export.html">导出格式详解</a>。</p>
+
+    <h2>8️⃣ <span class="em">快捷键</span></h2>
+    <p>重新映射所有打轴/编辑快捷键。支持：</p>
+    <ul>
+      <li><b>双绑定</b>：一个功能绑两个键。</li>
+      <li><b>长按绑定</b>：同一个键短按与长按（持续 300 ms 以上）触发不同功能。</li>
+    </ul>
+    <p>完整默认键位见 <a href="hotkeys.html">快捷键大全</a>。</p>
+
+    <h2>9️⃣ <span class="em">网络</span></h2>
+    <p>分两块：</p>
+    <ul>
+      <li><b>词典源</b>：内置 RhythmicaLyrics 官方源，可自定义源 URL、调整源顺序、定时自动更新。</li>
+      <li><b>更新与代理</b>：自动更新可走 <b>ghproxy / gh-proxy / ghproxy-net</b> 三个 GitHub 镜像，
+        支持系统代理 / 手动代理 / 跳过某版本。</li>
+    </ul>
+
+    <h2>🔟 <span class="em">关于 / 语言</span></h2>
+    <table class="tbl">
+      <tr><th>项</th><th>说明</th></tr>
+      <tr><td>界面语言</td><td>自动（跟随系统）/ 简体中文 / 日本語 / English，<b>切换后需重启</b>生效</td></tr>
+      <tr><td>版本信息</td><td>当前版本号（v1.2.6）等</td></tr>
+      <tr><td>配置文件位置</td><td>「打开目录」查看，「更改位置」可重定向到自定义目录</td></tr>
+      <tr><td>FFmpeg 路径</td><td>加载视频抽音轨用；留空则用系统环境变量，可「一键安装」</td></tr>
+      <tr><td>从 KS 配置导入</td><td>从既有 KS 配置导入主设置 / 用户词典 / 演唱者预设</td></tr>
+      <tr><td>重置为默认设置</td><td>恢复默认（不影响词典与演唱者预设）</td></tr>
+    </table>
+
+    <div class="shot">
+      <div class="cam">📷</div>
+      <div class="lbl">截图位 · 设置界面（顶部 10 个选项卡）</div>
+      <div class="hint">（此处留空，待补：设置界面全貌，Pivot 选项卡清晰）</div>
+    </div>
+
+    <div class="page-nav">
+      <a class="prev" href="calibration.html"><span class="dir">← 上一篇</span><span class="ttl">偏移与校准</span></a>
+      <a class="next" href="hotkeys.html"><span class="dir">下一篇 →</span><span class="ttl">快捷键大全</span></a>
+    </div>
+    <div class="footer">StrangeUtaGame 用户说明书 · v1.2.6</div>
+  </main>
+</div>
+<script src="assets/nav.js"></script>
+</body>
+</html>

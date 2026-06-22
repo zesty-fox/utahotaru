@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>自动注音详解 · StrangeUtaGame 说明书</title>
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+<button class="menu-toggle">☰ 目录</button>
+<div class="layout">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="../../assets/mascot.png" alt="SUG" onerror="this.style.display='none'" />
+      StrangeUtaGame
+    </a>
+    <p class="ver">用户说明书 · v1.2.6</p>
+    <nav class="nav-group">
+      <h4>入门</h4>
+      <a href="index.html"><span class="ico">🏠</span>总览</a>
+      <a href="getting-started.html"><span class="ico">🚀</span>新手入门</a>
+      <a href="interface.html"><span class="ico">🗺️</span>界面导览</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>核心功能</h4>
+      <a href="timing.html"><span class="ico">🎯</span>打轴</a>
+      <a href="furigana.html"><span class="ico">🇯🇵</span>注音</a>
+      <a href="fulltext.html"><span class="ico">📝</span>全文本编辑</a>
+      <a href="singers.html"><span class="ico">🎤</span>演唱者管理</a>
+      <a href="export.html"><span class="ico">📤</span>导出</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>进阶 / 参考</h4>
+      <a href="calibration.html"><span class="ico">🎚️</span>偏移与校准</a>
+      <a href="settings.html"><span class="ico">⚙️</span>设置详解</a>
+      <a href="hotkeys.html"><span class="ico">⌨️</span>快捷键大全</a>
+      <a href="faq.html"><span class="ico">❓</span>FAQ / 排错</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <h1>🇯🇵 自动注音详解</h1>
+    <p class="subtitle">给日文歌词的汉字标假名（furigana / 读音），SUG 提供多引擎 + 词典 + LLM + 罗马音的完整方案。</p>
+
+    <div class="callout note">
+      <span class="ttl">什么是注音？为什么打轴需要它？</span>
+      <p>日文汉字一个字可能对应多个假名（拍 / mora）。注音告诉软件「<b>大冒険</b>」读作「だい・ぼう・けん」，
+      这样它才能正确地把字拆成节奏点、在卡拉 OK 里逐拍变色。注音准不准，直接影响节奏点切分。</p>
+    </div>
+
+    <h2>🤖 <span class="em">注音引擎与回退链</span></h2>
+    <p>SUG 按不同发行变体使用不同主引擎，再叠加词典与回退规则：</p>
+    <table class="tbl">
+      <tr><th>变体</th><th>主注音引擎</th></tr>
+      <tr><td>main（Windows 主版本）</td><td><b>WinRT JapanesePhoneticAnalyzer</b>（系统自带日语 IME 分析器）</td></tr>
+      <tr><td>noWinIME / mac</td><td><b>SudachiPy</b>（内置，无需系统语言包）</td></tr>
+    </table>
+    <p>主引擎之外，注音结果会经过一条<b>回退链</b>逐级兜底：用户词典 → e2k 英文引擎 →
+    用户词典整词回退 → e2k 静态词表 → 英文 fallback；日语侧另有
+    <code>pykakasi</code> + 本地/联网词典作参考与覆盖。</p>
+
+    <div class="callout tip">
+      <span class="ttl">💡 词典优先级最高</span>
+      <p>本地 / 联网词典的读音会<b>覆盖</b>引擎结果。遇到生僻词、专有名词、歌曲特殊读法读不准时，
+      把正确读音加进用户词典即可一劳永逸。</p>
+    </div>
+
+    <h2>⌨️ <span class="em">注音操作快捷键</span></h2>
+    <table class="tbl">
+      <tr><th>操作</th><th>键</th></tr>
+      <tr><td>编辑当前字注音</td><td class="center"><kbd>F2</kbd></td></tr>
+      <tr><td>分析整篇注音</td><td class="center"><kbd>Ctrl</kbd>+<kbd>3</kbd></td></tr>
+      <tr><td>分析选区注音</td><td class="center"><kbd>Ctrl</kbd>+<kbd>A</kbd></td></tr>
+      <tr><td>分析当前行注音</td><td class="center"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td></tr>
+      <tr><td>按类型删除注音</td><td class="center"><kbd>Ctrl</kbd>+<kbd>4</kbd></td></tr>
+      <tr><td>切换连字（连词）</td><td class="center"><kbd>F3</kbd></td></tr>
+    </table>
+
+    <div class="shot">
+      <div class="cam">📷</div>
+      <div class="lbl">截图位 · 编辑注音对话框（F2）</div>
+      <div class="hint">（此处留空，待补：单字注音编辑窗，含「查询候补字典」按钮）</div>
+    </div>
+
+    <h2>🔤 <span class="em">按字符类型启停注音</span></h2>
+    <p>注音可对不同字符类型分别开关 —— 比如只给汉字注音、保留假名原样。支持的类型包括：</p>
+    <p>
+      <span class="pill">平假名</span><span class="pill">片假名</span><span class="pill">汉字</span>
+      <span class="pill">字母（英文）</span><span class="pill">数字</span><span class="pill">符号</span>
+      <span class="pill">空格</span><span class="pill">小假名 ぁぃぅぇぉゃゅょゎっ</span>
+    </p>
+    <p>软件还内置了一批规则，自动处理：句首句尾、促音（っ）、长音（ー / ～）、括号、英文音节切分等。
+    「<b>按类型删除注音</b>」（<kbd>Ctrl</kbd><span class="kbd-plus">+</span><kbd>4</kbd>）可按类型批量清除，
+    例如一键去掉所有符号 / 长音的注音。</p>
+
+    <h2>🧩 <span class="em">连词（多字共享读音）</span></h2>
+    <p>有些词需要多个汉字共享一段读音、作为一个整体变色（如「大冒険」连成一组）。这就是<b>连词</b>。</p>
+    <ul>
+      <li>用 <kbd>F3</kbd> 切换当前字与下一字是否连字。</li>
+      <li>连词组在预览里会合并渲染读音与连词框。</li>
+      <li>内联格式写作 <code>{大冒険|だい,ぼう,けん}</code>，各字独立读音用逗号分隔；
+        <code>{One|ワン,,}</code> 表示首字承载读音、其余为空。</li>
+    </ul>
+
+    <h2>🔡 <span class="em">罗马音与「仅注音」模式</span></h2>
+    <ul>
+      <li><b>一键转罗马音</b>：把假名注音整体转成罗马字（romaji），适合做罗马音歌词。</li>
+      <li><b>仅注音模式</b>：只生成 / 显示注音而不影响其它，便于专注校对读音。</li>
+    </ul>
+
+    <h2>🧠 <span class="em">LLM 注音（可选 · 自配 API）</span></h2>
+    <p>对引擎和词典都难搞定的复杂歌词，可启用 <b>LLM 注音</b>：用大语言模型推断读音。</p>
+    <ul>
+      <li><b>自带 API</b>（bring-your-own）：在设置里填入你自己的 API 配置。</li>
+      <li><b>自动回退</b>：LLM 调用失败时自动退回常规引擎，不中断流程。</li>
+    </ul>
+    <div class="callout warn">
+      <span class="ttl">⚠️ LLM 注音是可选项</span>
+      <p>它需要你自备可用的 API 且会产生网络请求 / 费用，适合追求高准确率的进阶用户。
+      日常注音用内置引擎 + 词典通常已足够。</p>
+    </div>
+
+    <h2>📚 <span class="em">本地用户词典</span></h2>
+    <p>用户词典是你<b>专属的读音覆盖表</b>，独立存于 <code>dictionary.json</code>，<b>重置配置不会清空它</b>。</p>
+    <ul>
+      <li>首次启动自动从内置 1757 条 RL 词典种入。</li>
+      <li>在「设置 → 读音词典」管理：条目按优先级排列（新增置顶），可上移/下移调整。</li>
+      <li>支持<b>导入 RL 字典</b>，格式 <code>原文⇥读音1,读音2…</code>，其中 <code>＋</code> 代表连词。</li>
+      <li>允许同一个词有多个读音并存；最新导入的条目优先级最高。</li>
+    </ul>
+
+    <h2>🌐 <span class="em">联网读音词典</span></h2>
+    <p>内置 <b>RhythmicaLyrics 官方源</b>，可在线查询读音并与本地词典合并使用。详细的源配置、
+    自定义 URL、优先级排序与定时更新见 <a href="settings.html">设置详解 → 网络</a>。</p>
+
+    <div class="callout note">
+      <span class="ttl">📷 截图说明</span>
+      <p>下方为词典管理界面的截图占位，待补。</p>
+    </div>
+    <div class="shot">
+      <div class="cam">📷</div>
+      <div class="lbl">截图位 · 用户词典管理界面</div>
+      <div class="hint">（此处留空，待补：设置 → 读音词典 的条目列表与上移/下移/导入按钮）</div>
+    </div>
+
+    <div class="page-nav">
+      <a class="prev" href="timing.html"><span class="dir">← 上一篇</span><span class="ttl">打轴功能详解</span></a>
+      <a class="next" href="fulltext.html"><span class="dir">下一篇 →</span><span class="ttl">全文本编辑</span></a>
+    </div>
+    <div class="footer">StrangeUtaGame 用户说明书 · v1.2.6</div>
+  </main>
+</div>
+<script src="assets/nav.js"></script>
+</body>
+</html>

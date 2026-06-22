@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>全文本编辑详解 · StrangeUtaGame 说明书</title>
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+<button class="menu-toggle">☰ 目录</button>
+<div class="layout">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="../../assets/mascot.png" alt="SUG" onerror="this.style.display='none'" />
+      StrangeUtaGame
+    </a>
+    <p class="ver">用户说明书 · v1.2.6</p>
+    <nav class="nav-group">
+      <h4>入门</h4>
+      <a href="index.html"><span class="ico">🏠</span>总览</a>
+      <a href="getting-started.html"><span class="ico">🚀</span>新手入门</a>
+      <a href="interface.html"><span class="ico">🗺️</span>界面导览</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>核心功能</h4>
+      <a href="timing.html"><span class="ico">🎯</span>打轴</a>
+      <a href="furigana.html"><span class="ico">🇯🇵</span>注音</a>
+      <a href="fulltext.html"><span class="ico">📝</span>全文本编辑</a>
+      <a href="singers.html"><span class="ico">🎤</span>演唱者管理</a>
+      <a href="export.html"><span class="ico">📤</span>导出</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>进阶 / 参考</h4>
+      <a href="calibration.html"><span class="ico">🎚️</span>偏移与校准</a>
+      <a href="settings.html"><span class="ico">⚙️</span>设置详解</a>
+      <a href="hotkeys.html"><span class="ico">⌨️</span>快捷键大全</a>
+      <a href="faq.html"><span class="ico">❓</span>FAQ / 排错</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <h1>📝 全文本编辑详解</h1>
+    <p class="subtitle">把整篇歌词当成一段「带注音 + 时间戳」的纯文本来改 —— 键盘流批量编辑神器。</p>
+
+    <div class="callout note">
+      <span class="ttl">它适合做什么？</span>
+      <p>逐字界面适合「听音打轴」，而全文本编辑适合<b>大批量的文字 / 注音 / 时间整理</b>：
+      统一改错字、整段调注音、复制粘贴整首歌、对照参考文本核对 …… 用文本编辑器的肌肉记忆就能干完。
+      它<b>自带完整时间轴</b>，<b>逐行独立解码</b> —— 增删、重排行不会丢失或错配时间戳。</p>
+    </div>
+
+    <h2>🚪 <span class="em">如何打开</span></h2>
+    <p>在打轴界面按 <kbd>Ctrl</kbd><span class="kbd-plus">+</span><kbd>T</kbd>，或从导航切到「全文本编辑」标签页。
+    加载项目后，整篇歌词会以下面这套<b>内联格式</b>显示在编辑框里，带 VSCode 风格的<b>语法高亮</b>
+    （时间戳、句尾标记、演唱者标签、注音块各有颜色）。</p>
+
+    <div class="shot">
+      <div class="cam">📷</div>
+      <div class="lbl">截图位 · 全文本编辑界面（语法高亮的内联文本）</div>
+      <div class="hint">（此处留空，待补：编辑框里带颜色的歌词文本 + 顶部工具按钮）</div>
+    </div>
+
+    <h2>🔤 <span class="em">内联格式速查</span></h2>
+    <p>软件界面顶部也有一句话说明，这里展开讲。一行歌词大致长这样：</p>
+    <pre><code>【ハル】[00:12.34]{大冒険||だ|い,ぼ|う,け|ん}[00:13.90]の[>00:14.55]</code></pre>
+    <table class="tbl">
+      <tr><th>符号</th><th>含义</th></tr>
+      <tr><td><code>{原文||读音}</code></td><td><b>注音块</b>：<code>||</code> 左边是原文，右边是读音区</td></tr>
+      <tr><td><code>,</code>（注音块内）</td><td>分隔块内<b>各个字</b>的读音（如 <code>だ|い , ぼ|う , け|ん</code> 对应 大/冒/険）</td></tr>
+      <tr><td><code>|</code>（注音块内）</td><td>分隔同一个字内的<b>多个拍（mora / RubyPart）</b></td></tr>
+      <tr><td><code>[分:秒.厘秒]</code></td><td><b>时间戳</b>，写在字的<b>前面</b>，如 <code>[00:12.34]</code></td></tr>
+      <tr><td><code>[T]</code></td><td>时间戳<b>占位</b>（还没打时间的位置，空时间戳）</td></tr>
+      <tr><td><code>[&gt;…]</code></td><td><b>句尾时间戳</b>，贴在行末字的<b>后面</b>，标记这句唱完的时刻</td></tr>
+      <tr><td><code>【名】</code></td><td><b>演唱者切换</b>：从此处起改由「名」演唱</td></tr>
+    </table>
+
+    <div class="callout tip">
+      <span class="ttl">💡 兼容写法</span>
+      <p>注音块支持几种简写：<code>{漢|か|ん|じ}</code>（单字多拍，省略 <code>||</code>）、
+      <code>{赤|あか}</code>（单字单读音）、<code>{text}</code>（只圈定文字、无读音）。
+      连词组（多字共享一段读音）会自动合并成一个 <code>{…||…}</code> 块。</p>
+    </div>
+
+    <h2>⏸️ <span class="em">关于 <code>^</code> —— 演唱停顿符（占位符）</span></h2>
+    <p>你可能会在注音里看到 <code>^</code>（脱字符）。它是 SUG 的<b>演唱停顿符 / 注音占位符</b>，含义是：</p>
+    <div class="callout note">
+      <span class="ttl">「这一拍有节奏点，但没有新的文字」</span>
+      <p>当一个字的<b>节奏点数量多于它的读音拍数</b>时，多出来的那些节奏点没有对应的假名，
+      就用 <code>^</code> 占位 —— 通常表示<b>延音 / 拖腔 / 停顿</b>（同一个字唱很长、中途换一次色，但不是新音节）。</p>
+    </div>
+    <ul>
+      <li>它<b>不是错误</b>，而是有意义的占位 —— 软件禁止用空串或空格占位（会被误删、导致节奏点与读音错配）。</li>
+      <li>在编辑器里它显示为 <code>^</code>；导出 Nicokara 时它就是该格式的<b>演唱停顿符</b>。</li>
+      <li>停顿符字符可在「设置 → 导出」里改（<code>export.nicokara_pause_char</code>，默认 <code>^</code>）；
+        旧存档里的占位符会自动映射到你当前配置的字符，不会错乱。</li>
+    </ul>
+
+    <h2>🛠️ <span class="em">工具按钮</span></h2>
+    <p>编辑框上方有一排操作，对应批量处理：</p>
+    <table class="tbl">
+      <tr><th>按钮</th><th>作用</th></tr>
+      <tr><td><b>全部注音 · 仅注音</b></td><td>给全文重新生成注音，<b>保留现有节奏点不动</b>（只动读音，不改时间结构）</td></tr>
+      <tr><td><b>全部注音 · 含节奏点</b></td><td>重新生成注音，<b>并按新注音重算节奏点</b></td></tr>
+      <tr><td><b>更新节奏点</b></td><td>仅按当前注音 + AutoCheck 规则重算节奏点（不重新分析读音）</td></tr>
+      <tr><td><b>按类型删除注音</b></td><td>按字符类型批量清除注音：平假名 / 片假名 / 汉字 / 英文 / 数字 / 符号 / 空格 / 促音 / 长音 等</td></tr>
+      <tr><td><b>应用更改</b></td><td>把文本框内容解析回项目数据（也会在切走标签页时<b>自动应用</b>）</td></tr>
+      <tr><td><b>还原</b></td><td>放弃文本框里的改动，重新从项目载入</td></tr>
+      <tr><td><b>字号</b></td><td>调整编辑框字体大小（仅影响显示）</td></tr>
+      <tr><td><b>字宽统计 开关</b></td><td>用等宽度量对齐每行字宽，方便核对排版</td></tr>
+    </table>
+
+    <div class="callout warn">
+      <span class="ttl">⚠️ 「仅注音」 vs 「含节奏点」要分清</span>
+      <p>已经打好轴后想顺手补注音，用<b>「仅注音」</b>，免得「含节奏点」把你辛苦打的节奏点结构重算掉。
+      只有在你确实想让节奏点跟随新读音重新切分时，才用「含节奏点」。</p>
+    </div>
+
+    <h2>🧷 <span class="em">为什么改行不会乱套？</span></h2>
+    <p>全文本编辑<b>逐行独立解码</b>：每一行单独解析自己的时间戳与注音。因此你在文本里增行、删行、
+    调换顺序，甚至两行文字相同，时间戳也不会张冠李戴 —— 这正是它相比「把全篇当一坨文本」的旧做法更可靠的地方。</p>
+
+    <div class="callout tip">
+      <span class="ttl">💡 与逐字打轴配合</span>
+      <p>常见流程：先在<a href="timing.html">打轴界面</a>听音打时间 → 切到全文本编辑批量修文字 / 调注音 →
+      切回打轴微调。两边数据是同一个项目，随时互通。</p>
+    </div>
+
+    <div class="page-nav">
+      <a class="prev" href="furigana.html"><span class="dir">← 上一篇</span><span class="ttl">注音功能详解</span></a>
+      <a class="next" href="singers.html"><span class="dir">下一篇 →</span><span class="ttl">演唱者管理</span></a>
+    </div>
+    <div class="footer">StrangeUtaGame 用户说明书 · v1.2.6</div>
+  </main>
+</div>
+<script src="assets/nav.js"></script>
+</body>
+</html>

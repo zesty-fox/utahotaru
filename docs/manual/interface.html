@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>界面导览 · StrangeUtaGame 说明书</title>
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+<button class="menu-toggle">☰ 目录</button>
+<div class="layout">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="../../assets/mascot.png" alt="SUG" onerror="this.style.display='none'" />
+      StrangeUtaGame
+    </a>
+    <p class="ver">用户说明书 · v1.2.6</p>
+    <nav class="nav-group">
+      <h4>入门</h4>
+      <a href="index.html"><span class="ico">🏠</span>总览</a>
+      <a href="getting-started.html"><span class="ico">🚀</span>新手入门</a>
+      <a href="interface.html"><span class="ico">🗺️</span>界面导览</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>核心功能</h4>
+      <a href="timing.html"><span class="ico">🎯</span>打轴</a>
+      <a href="furigana.html"><span class="ico">🇯🇵</span>注音</a>
+      <a href="fulltext.html"><span class="ico">📝</span>全文本编辑</a>
+      <a href="singers.html"><span class="ico">🎤</span>演唱者管理</a>
+      <a href="export.html"><span class="ico">📤</span>导出</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>进阶 / 参考</h4>
+      <a href="calibration.html"><span class="ico">🎚️</span>偏移与校准</a>
+      <a href="settings.html"><span class="ico">⚙️</span>设置详解</a>
+      <a href="hotkeys.html"><span class="ico">⌨️</span>快捷键大全</a>
+      <a href="faq.html"><span class="ico">❓</span>FAQ / 排错</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <h1>🗺️ 界面导览</h1>
+    <p class="subtitle">认识主窗口的各个区域，知道每个按钮和面板大致在哪、是干什么的。</p>
+
+    <h2>🪟 <span class="em">主窗口与侧边栏</span></h2>
+    <p>SUG 采用 Windows 11 风格的 Fluent 界面，<b>左侧是导航侧边栏</b>，点击切换不同的工作界面：</p>
+    <table class="tbl">
+      <tr><th>导航项</th><th>用途</th></tr>
+      <tr><td>🏠 主页</td><td>创建项目入口：拖入 / 选择音频与歌词，点「创建项目」。</td></tr>
+      <tr><td>🎯 打轴</td><td><b>核心工作区</b>：波形、卡拉 OK 预览、歌词字符行、打轴操作全在这里。</td></tr>
+      <tr><td>🎤 演唱者</td><td>管理演唱者列表：颜色、分色、分组、启用/禁用、预设。</td></tr>
+      <tr><td>🌐 在线词典</td><td>联网读音词典查询界面。</td></tr>
+      <tr><td>📤 导出</td><td>选择格式与选项，导出歌词 / 字幕文件。</td></tr>
+      <tr><td>⚙️ 设置</td><td>10 个分类的全局配置页。</td></tr>
+    </table>
+
+    <div class="callout note">
+      <span class="ttl">全局快捷操作</span>
+      <p><kbd>Ctrl</kbd><span class="kbd-plus">+</span><kbd>S</kbd> 随时保存工程（无路径时弹出另存为）。
+      启动时若检测到上次异常退出，会询问是否<b>恢复闪退现场</b>。关闭时若有未保存改动，会弹出
+      「保存 / 放弃 / 取消」确认。</p>
+    </div>
+
+    <div class="shot">
+      <div class="cam">📷</div>
+      <div class="lbl">截图位 · 主窗口全貌（标注侧边栏各项）</div>
+      <div class="hint">（此处留空，待补：完整主窗口，左侧导航清晰可见）</div>
+    </div>
+
+    <h2>🎯 <span class="em">打轴界面剖析</span></h2>
+    <p>这是你花最多时间的地方。它由上到下大致分为几块：</p>
+
+    <h3>① 顶部传输条（Transport Bar）</h3>
+    <p>播放控制中枢，包含：</p>
+    <ul>
+      <li><b>播放 / 暂停 / 停止</b>按钮（对应 <kbd>D</kbd> / <kbd>S</kbd>）。</li>
+      <li><b>变速</b>：可直接在输入框填 20–200%，或用 <kbd>Q</kbd>/<kbd>W</kbd> 每次 ±5%（范围 0.2×–2.0×，<b>变速不变调</b>）。</li>
+      <li><b>音量</b>：<kbd>Ctrl</kbd><span class="kbd-plus">+</span><kbd>Q</kbd> /
+        <kbd>Ctrl</kbd><span class="kbd-plus">+</span><kbd>W</kbd> 每次 ±5%。</li>
+    </ul>
+    <p>另外，编辑器<b>工具栏</b>上有一个「<b>全局偏移</b>」输入框（范围 −5000～5000 ms），
+    对整首歌所有时间戳统一平移、预览即时刷新，按项目保存，并与<b>导出偏移联动</b>。
+    按键补偿 / 全局偏移 / 导出偏移三者的区别见 <a href="calibration.html">偏移与校准</a>。</p>
+
+    <h3>② 卡拉 OK 预览（KaraokePreview）</h3>
+    <p>实时模拟卡拉 OK 走字效果：播放时<b>逐字高亮、注音同步走字</b>，让你边打边看效果对不对。</p>
+    <ul>
+      <li>无时间戳的字会按邻近组时间均分「连读」显示。</li>
+      <li>连词组（多个字共享一段读音）会合并渲染。</li>
+      <li>可叠加「上一个 / 正在打 / 下一个」字的<b>引导着色</b>，每档透明度与开关可在设置里调。</li>
+      <li>没打时间戳的位置可标「此处需导唱符」待办标记，提醒后续补打。</li>
+    </ul>
+
+    <h3>③ 波形 / 时间线（TimelineWidget）</h3>
+    <p>显示当前音频波形与节奏点位置，帮你用眼睛辅助判断字的起止 —— 配合慢放扒轴尤其有用。</p>
+
+    <h3>④ 歌词字符行</h3>
+    <p>逐行逐字显示歌词，每个字上方是它的<b>注音</b>，下方/内部承载它的<b>节奏点（checkpoint）</b>与时间戳。
+    这里是打轴的「画布」：</p>
+    <ul>
+      <li><b>单击某字</b>：跳到它的第一个节奏点；无节奏点的字会保持视觉焦点便于添加。</li>
+      <li><b>划选多字</b>：跨行框选，用于批量操作（设演唱者、删时间戳等）。</li>
+      <li><b>右键某字</b>：弹出上下文菜单 —— 删除字 / 删时间戳 / 插入空格 / 合并行 / 删除行 /
+        插入空行 / 增减节奏点 / 切换句尾 / 设置演唱者。</li>
+    </ul>
+
+    <h3>⑤ 工具栏（ToolBar）</h3>
+    <p>各种批量操作的指挥中心，分成「文件管理 / 编辑管理 / 插入导唱符 / 自动注音管理 / 演唱者相关 /
+    全文本编辑 / 时间戳工具」几组下拉菜单与按钮，外加一个「全局偏移」输入框。
+    每项的详细用法见 <a href="timing.html">打轴详解 → 工具栏全览</a>。</p>
+
+    <div class="shot">
+      <div class="cam">📷</div>
+      <div class="lbl">截图位 · 打轴界面分区标注图</div>
+      <div class="hint">（此处留空，待补：打轴界面，用①②③④⑤标出传输条 / 预览 / 波形 / 字符行 / 工具栏）</div>
+    </div>
+
+    <h2>🔀 <span class="em">两种工作模式：打轴模式 vs 编辑模式</span></h2>
+    <p>打轴界面有两种模式，<b>仅 <kbd>Space</kbd> 与 <kbd>Backspace</kbd> 的行为不同</b>：</p>
+    <table class="tbl">
+      <tr><th>模式</th><th><kbd>Space</kbd></th><th><kbd>Backspace</kbd></th><th>适用</th></tr>
+      <tr>
+        <td><b>打轴模式</b></td>
+        <td>在当前字打<b>时间戳</b></td>
+        <td>清除当前字时间戳</td>
+        <td>实际听音、记录时间</td>
+      </tr>
+      <tr>
+        <td><b>编辑模式</b></td>
+        <td><b>增加</b>节奏点</td>
+        <td><b>减少</b>节奏点</td>
+        <td>调整每个字的节奏点数量 / 拆分细节</td>
+      </tr>
+    </table>
+    <div class="callout note">
+      <span class="ttl">什么是「节奏点 / checkpoint」？</span>
+      <p>一个字可以有多个节奏点（比如长音、拖腔需要中途换色）。节奏点决定这个字在卡拉 OK 里
+      <b>分几段变色</b>。大多数字只有 1 个；编辑模式就是用来给特殊字增减节奏点的。</p>
+    </div>
+
+    <h2>📝 <span class="em">其它编辑视图</span></h2>
+    <h3>行编辑 / 行详情</h3>
+    <p>以表格形式总览所有歌词行（行号、演唱者、连词标记等），支持加/删/复制/插入行；双击行打开
+    <b>行详情对话框</b>，可逐字编辑注音、节奏点、句尾标记和演唱者。</p>
+
+    <h3>全文本编辑</h3>
+    <p>把整段歌词作为一段<b>带注音与时间戳的内联文本</b>来编辑 —— 注音
+    <code>{原文||读音}</code>、时间戳 <code>[mm:ss.cc]</code>、句尾、演唱者 <code>【名】</code> 全写在文本里，
+    键盘流批量改字、改注音、调时间一气呵成。<kbd>Ctrl</kbd><span class="kbd-plus">+</span><kbd>T</kbd> 打开。
+    它自带完整时间轴、逐行独立解码，行的增删/重排不会错配时间戳。详见
+    <a href="fulltext.html">全文本编辑详解</a>。</p>
+
+    <div class="page-nav">
+      <a class="prev" href="getting-started.html"><span class="dir">← 上一篇</span><span class="ttl">新手入门</span></a>
+      <a class="next" href="timing.html"><span class="dir">下一篇 →</span><span class="ttl">打轴功能详解</span></a>
+    </div>
+    <div class="footer">StrangeUtaGame 用户说明书 · v1.2.6</div>
+  </main>
+</div>
+<script src="assets/nav.js"></script>
+</body>
+</html>

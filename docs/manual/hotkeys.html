@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>快捷键大全 · StrangeUtaGame 说明书</title>
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+<button class="menu-toggle">☰ 目录</button>
+<div class="layout">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="../../assets/mascot.png" alt="SUG" onerror="this.style.display='none'" />
+      StrangeUtaGame
+    </a>
+    <p class="ver">用户说明书 · v1.2.6</p>
+    <nav class="nav-group">
+      <h4>入门</h4>
+      <a href="index.html"><span class="ico">🏠</span>总览</a>
+      <a href="getting-started.html"><span class="ico">🚀</span>新手入门</a>
+      <a href="interface.html"><span class="ico">🗺️</span>界面导览</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>核心功能</h4>
+      <a href="timing.html"><span class="ico">🎯</span>打轴</a>
+      <a href="furigana.html"><span class="ico">🇯🇵</span>注音</a>
+      <a href="fulltext.html"><span class="ico">📝</span>全文本编辑</a>
+      <a href="singers.html"><span class="ico">🎤</span>演唱者管理</a>
+      <a href="export.html"><span class="ico">📤</span>导出</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>进阶 / 参考</h4>
+      <a href="calibration.html"><span class="ico">🎚️</span>偏移与校准</a>
+      <a href="settings.html"><span class="ico">⚙️</span>设置详解</a>
+      <a href="hotkeys.html"><span class="ico">⌨️</span>快捷键大全</a>
+      <a href="faq.html"><span class="ico">❓</span>FAQ / 排错</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <h1>⌨️ 快捷键大全</h1>
+    <p class="subtitle">以下为默认键位（打轴模式）。全部可在 <b>设置 → 快捷键</b> 重新映射，支持双绑定与长按绑定。</p>
+
+    <h2>🎯 <span class="em">播放与跳转</span></h2>
+    <table class="tbl">
+      <tr><th>功能</th><th class="center">键</th><th>说明</th></tr>
+      <tr><td>播放 / 暂停</td><td class="center"><kbd>D</kbd></td><td>音频与光标同步</td></tr>
+      <tr><td>停止</td><td class="center"><kbd>S</kbd></td><td>停止并回到行首</td></tr>
+      <tr><td>后退 / 前进</td><td class="center"><kbd>Z</kbd> &nbsp; <kbd>X</kbd></td><td>默认后退 2000 / 前进 3000 ms</td></tr>
+      <tr><td>减速 / 加速</td><td class="center"><kbd>Q</kbd> &nbsp; <kbd>W</kbd></td><td>0.2×–2.0×，变速不变调</td></tr>
+      <tr><td>音量 − / +</td><td class="center"><kbd>Ctrl</kbd>+<kbd>W</kbd> &nbsp; <kbd>Ctrl</kbd>+<kbd>Q</kbd></td><td>默认步进 ±5%</td></tr>
+    </table>
+
+    <h2>🎯 <span class="em">打轴主操作</span></h2>
+    <table class="tbl">
+      <tr><th>功能</th><th class="center">键</th><th>说明</th></tr>
+      <tr><td><b>打轴（记录当前）</b></td><td class="center"><kbd>Space</kbd></td><td>在当前字打节奏点时间戳</td></tr>
+      <tr><td>清除当前节奏点</td><td class="center"><kbd>Backspace</kbd></td><td>仅清时间戳，不删字</td></tr>
+      <tr><td>句尾标记切换</td><td class="center"><kbd>.</kbd></td><td>句尾「●」标记</td></tr>
+      <tr><td>打到句尾</td><td class="center"><kbd>P</kbd></td><td>把剩余字符全部打上时间戳</td></tr>
+      <tr><td>切换字内节奏点</td><td class="center"><kbd>Alt</kbd>+<kbd>←</kbd> &nbsp; <kbd>Alt</kbd>+<kbd>→</kbd></td><td>多重 check 间切换</td></tr>
+      <tr><td>增加 / 减少节奏点</td><td class="center"><kbd>[</kbd> &nbsp; <kbd>]</kbd></td><td>字内多重 check</td></tr>
+      <tr><td>插入导唱符</td><td class="center"><kbd>Ctrl</kbd>+<kbd>1</kbd></td><td>默认符号「●」</td></tr>
+      <tr><td>时间戳微调 ±</td><td class="center"><kbd>Alt</kbd>+<kbd>↑</kbd> &nbsp; <kbd>Alt</kbd>+<kbd>↓</kbd></td><td>默认步进 10 ms</td></tr>
+    </table>
+
+    <h2>🎯 <span class="em">光标导航</span></h2>
+    <table class="tbl">
+      <tr><th>功能</th><th class="center">键</th></tr>
+      <tr><td>上一行 / 下一行</td><td class="center"><kbd>↑</kbd> &nbsp; <kbd>↓</kbd></td></tr>
+      <tr><td>上一字 / 下一字</td><td class="center"><kbd>←</kbd> &nbsp; <kbd>→</kbd></td></tr>
+      <tr><td>断行</td><td class="center"><kbd>Enter</kbd></td></tr>
+      <tr><td>与上一行合并</td><td class="center"><kbd>Shift</kbd>+<kbd>Enter</kbd></td></tr>
+    </table>
+
+    <h2>🎯 <span class="em">编辑</span></h2>
+    <table class="tbl">
+      <tr><th>功能</th><th class="center">键</th></tr>
+      <tr><td>编辑注音（furigana）</td><td class="center"><kbd>F2</kbd></td></tr>
+      <tr><td>切换连字</td><td class="center"><kbd>F3</kbd></td></tr>
+      <tr><td>批量修改 / 替换</td><td class="center"><kbd>Ctrl</kbd>+<kbd>H</kbd></td></tr>
+      <tr><td>修改字 / 行</td><td class="center"><kbd>J</kbd> &nbsp; <kbd>Ctrl</kbd>+<kbd>2</kbd></td></tr>
+      <tr><td>插入空格</td><td class="center"><kbd>M</kbd></td></tr>
+      <tr><td>删除字</td><td class="center"><kbd>Delete</kbd></td></tr>
+      <tr><td>撤销 / 重做</td><td class="center"><kbd>Ctrl</kbd>+<kbd>Z</kbd> &nbsp; <kbd>Ctrl</kbd>+<kbd>Y</kbd></td></tr>
+      <tr><td>复制字 / 粘贴歌词</td><td class="center"><kbd>Ctrl</kbd>+<kbd>C</kbd> &nbsp; <kbd>Ctrl</kbd>+<kbd>V</kbd></td></tr>
+    </table>
+
+    <h2>🎯 <span class="em">注音 / 演唱者</span></h2>
+    <table class="tbl">
+      <tr><th>功能</th><th class="center">键</th></tr>
+      <tr><td>分析整篇注音</td><td class="center"><kbd>Ctrl</kbd>+<kbd>3</kbd></td></tr>
+      <tr><td>分析选区注音</td><td class="center"><kbd>Ctrl</kbd>+<kbd>A</kbd></td></tr>
+      <tr><td>分析当前行注音</td><td class="center"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></td></tr>
+      <tr><td>按类型删除注音</td><td class="center"><kbd>Ctrl</kbd>+<kbd>4</kbd></td></tr>
+      <tr><td>按行设置演唱者</td><td class="center"><kbd>Ctrl</kbd>+<kbd>5</kbd></td></tr>
+      <tr><td>应用演唱者</td><td class="center"><kbd>K</kbd></td></tr>
+    </table>
+
+    <h2>🎯 <span class="em">工程与导出</span></h2>
+    <table class="tbl">
+      <tr><th>功能</th><th class="center">键</th></tr>
+      <tr><td>打开全文本编辑</td><td class="center"><kbd>Ctrl</kbd>+<kbd>T</kbd></td></tr>
+      <tr><td>保存工程</td><td class="center"><kbd>Ctrl</kbd>+<kbd>S</kbd></td></tr>
+      <tr><td>快速导出（按上次格式与目录）</td><td class="center"><kbd>Ctrl</kbd>+<kbd>E</kbd></td></tr>
+    </table>
+
+    <div class="callout note">
+      <span class="ttl">🔀 打轴模式 vs 编辑模式</span>
+      <p>两种模式<b>仅 <kbd>Space</kbd> / <kbd>Backspace</kbd> 行为不同</b>：编辑模式下它们用于
+      <b>增减节奏点</b>，而非打时间戳。其余键位一致。详见
+      <a href="interface.html">界面导览 → 两种工作模式</a>。</p>
+    </div>
+
+    <div class="page-nav">
+      <a class="prev" href="settings.html"><span class="dir">← 上一篇</span><span class="ttl">设置详解</span></a>
+      <a class="next" href="faq.html"><span class="dir">下一篇 →</span><span class="ttl">FAQ / 排错</span></a>
+    </div>
+    <div class="footer">StrangeUtaGame 用户说明书 · v1.2.6</div>
+  </main>
+</div>
+<script src="assets/nav.js"></script>
+</body>
+</html>

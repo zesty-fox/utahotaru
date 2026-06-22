@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>新手入门 · StrangeUtaGame 说明书</title>
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+<button class="menu-toggle">☰ 目录</button>
+<div class="layout">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="../../assets/mascot.png" alt="SUG" onerror="this.style.display='none'" />
+      StrangeUtaGame
+    </a>
+    <p class="ver">用户说明书 · v1.2.6</p>
+    <nav class="nav-group">
+      <h4>入门</h4>
+      <a href="index.html"><span class="ico">🏠</span>总览</a>
+      <a href="getting-started.html"><span class="ico">🚀</span>新手入门</a>
+      <a href="interface.html"><span class="ico">🗺️</span>界面导览</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>核心功能</h4>
+      <a href="timing.html"><span class="ico">🎯</span>打轴</a>
+      <a href="furigana.html"><span class="ico">🇯🇵</span>注音</a>
+      <a href="fulltext.html"><span class="ico">📝</span>全文本编辑</a>
+      <a href="singers.html"><span class="ico">🎤</span>演唱者管理</a>
+      <a href="export.html"><span class="ico">📤</span>导出</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>进阶 / 参考</h4>
+      <a href="calibration.html"><span class="ico">🎚️</span>偏移与校准</a>
+      <a href="settings.html"><span class="ico">⚙️</span>设置详解</a>
+      <a href="hotkeys.html"><span class="ico">⌨️</span>快捷键大全</a>
+      <a href="faq.html"><span class="ico">❓</span>FAQ / 排错</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <h1>🚀 新手入门</h1>
+    <p class="subtitle">从下载到导出第一份卡拉 OK 时间轴，跟着走一遍就懂了。</p>
+
+    <div class="callout tip">
+      <span class="ttl">🎯 先理解「打轴」这件事</span>
+      <p>「打轴」= 给歌词的每一个字标上时间。SUG 的做法很像音游：你戴上耳机、放歌，
+      <b>每听到一个字开始唱，就在那一刻按一下键</b>。软件把你按键的时刻记成这个字的开始时间，
+      逐字记录下来，就形成了一条「时间轴」。导出后，卡拉 OK 播放器就能让歌词跟着音乐逐字变色。</p>
+    </div>
+
+    <h2>① <span class="em">安装与启动</span></h2>
+
+    <h3>方式一 · 直接运行（推荐新手）</h3>
+    <ol class="steps">
+      <li><span class="st-title">下载发行版</span>
+        前往 <a href="https://github.com/karaoke-studio/StrangeUtaGame/releases" target="_blank">Releases 页面</a>，
+        下载最新的 <code>StrangeUtaGame-v1.2.6.zip</code>（约 250 MB）。</li>
+      <li><span class="st-title">解压到任意目录</span>
+        建议放在一个英文或中文路径都可以的固定文件夹（SUG 原生支持 UTF-8 路径，<b>无需日语转区</b>）。</li>
+      <li><span class="st-title">双击运行</span>
+        打开文件夹里的 <code>StrangeUtaGame.exe</code> 即可。首次启动会显示启动画面（Splash）。</li>
+    </ol>
+
+    <div class="callout note">
+      <span class="ttl">🍎 macOS 用户</span>
+      <p>macOS 版为<b>实验性</b>构建，未签名。首次打开请在 <code>StrangeUtaGame.app</code> 上
+      <b>右键 → 打开</b>，弹窗里再点一次「打开」；或在终端执行
+      <code>xattr -dr com.apple.quarantine /路径/StrangeUtaGame.app</code>。
+      macOS 版<b>不支持应用内自动更新</b>，新版本会用浏览器打开 Releases 页面供手动下载。</p>
+    </div>
+
+    <h3>方式二 · 从源码运行（开发者 / 进阶）</h3>
+    <pre><code>git clone https://github.com/karaoke-studio/StrangeUtaGame.git
+cd StrangeUtaGame
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+# Windows 主版本（WinRT 注音）额外装：
+pip install -r requirements-winrt.txt
+python main.py</code></pre>
+    <p>noWinIME / mac 变体改装 <code>requirements-variants.txt</code>（使用 Sudachi 注音）。详见仓库 README 的「安装与运行」。</p>
+
+    <div class="shot">
+      <div class="cam">📷</div>
+      <div class="lbl">截图位 · 启动画面 / 主窗口首屏</div>
+      <div class="hint">（此处留空，待补：程序启动后的第一个画面）</div>
+    </div>
+
+    <h2>② <span class="em">准备日语注音引擎（建议）</span></h2>
+    <p>如果你打的是<b>日文歌</b>，希望自动给汉字标假名（注音 / furigana），主版本依赖 Windows 自带的
+    <b>WinRT 日语语音分析器</b>。它需要系统安装<b>日语基本包</b>：</p>
+    <ol class="steps">
+      <li><span class="st-title">打开系统设置</span>Windows 设置 → 时间和语言 → 语言和区域。</li>
+      <li><span class="st-title">添加日语</span>添加语言 → 选「日本語」，安装其中的「基本输入」语言包
+        （<code>Language.Basic~~~ja-JP</code>）。</li>
+      <li><span class="st-title">回到 SUG</span>未启用时，软件会自动探测并弹出引导提示，按提示安装即可。</li>
+    </ol>
+    <div class="callout note">
+      <span class="ttl">不打日文歌？</span>
+      <p>那可以跳过这一步。noWinIME / mac 变体内置 Sudachi 注音引擎，无需系统语言包。</p>
+    </div>
+
+    <h2>③ <span class="em">创建你的第一个项目</span></h2>
+    <p>SUG 的项目 = 一首歌的「音频 + 歌词 + 时间轴」打包。创建非常简单 —— <b>直接拖进去就行</b>。</p>
+    <ol class="steps">
+      <li><span class="st-title">准备素材</span>
+        一段<b>音频</b>（mp3 / wav / flac / ogg 等，视频文件也行，会自动抽音轨）和一份<b>歌词文本</b>
+        （纯文本 .txt，或已有的 .lrc / .ass / .srt / .kra / Nicokara）。</li>
+      <li><span class="st-title">拖入主页</span>
+        把音频和歌词文件<b>拖到软件窗口里</b>即可。也可在「主页」用按钮选择文件。</li>
+      <li><span class="st-title">点击「创建项目」</span>
+        SUG 会自动识别歌词格式（ASS / SRT / LRC / Nicokara / 内联 / 纯文本），完成解析。</li>
+      <li><span class="st-title">（可选）自动注音</span>
+        日文歌创建时会自动为未注音的字生成假名，不会覆盖你导入文件里已有的注音。</li>
+    </ol>
+
+    <div class="shot">
+      <div class="cam">📷</div>
+      <div class="lbl">截图位 · 主页 / 拖入文件创建项目</div>
+      <div class="hint">（此处留空，待补：主页拖拽区与「创建项目」按钮）</div>
+    </div>
+
+    <div class="callout tip">
+      <span class="ttl">💡 没有现成歌词文件？</span>
+      <p>直接把歌词文字粘进主页的文本框，一行一句，也能创建项目。打轴前可以随时在界面里改字、断行。</p>
+    </div>
+
+    <h2>④ <span class="em">开始打轴（核心流程）</span></h2>
+    <p>项目创建后会进入<b>打轴界面</b>。最基础的打轴只用到三个键：</p>
+    <table class="tbl">
+      <tr><th>键</th><th>作用</th></tr>
+      <tr><td class="center"><kbd>D</kbd></td><td>播放 / 暂停</td></tr>
+      <tr><td class="center"><kbd>Space</kbd></td><td><b>打轴</b> —— 在「当前字」上记录此刻的时间戳，并自动跳到下一个字</td></tr>
+      <tr><td class="center"><kbd>Backspace</kbd></td><td>清除当前字的时间戳（只清时间，不删字）</td></tr>
+    </table>
+
+    <ol class="steps">
+      <li><span class="st-title">把光标放到第一行第一个字</span>用方向键 <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> 移动。</li>
+      <li><span class="st-title">按 <kbd>D</kbd> 播放</span>音乐开始，仔细听。</li>
+      <li><span class="st-title">每听到一个字开唱，就按一下 <kbd>Space</kbd></span>
+        光标会自动前进到下一个字，跟着唱跟着按即可。</li>
+      <li><span class="st-title">按错了？</span>按 <kbd>Z</kbd> 后退 2 秒重听，把光标移回去，
+        <kbd>Backspace</kbd> 清掉再重打。</li>
+      <li><span class="st-title">太快跟不上？</span>按 <kbd>Q</kbd> 减速（最低 0.2× 变速不变调），慢慢扒。</li>
+    </ol>
+
+    <div class="callout tip">
+      <span class="ttl">💜 新手节奏建议</span>
+      <p>第一次别追求一遍到位。<b>先用 0.6×～0.8× 慢放</b>，一句一句来；打完一句用 <kbd>Z</kbd> 回放，
+      看预览区文字是否跟着音乐准确变色，不对就局部重打。打轴是「听 → 按 → 校」的循环。</p>
+    </div>
+
+    <div class="shot">
+      <div class="cam">📷</div>
+      <div class="lbl">截图位 · 打轴界面（波形 + 预览 + 歌词字符行）</div>
+      <div class="hint">（此处留空，待补：正在打轴的主界面，最好有正在变色的预览）</div>
+    </div>
+
+    <h2>⑤ <span class="em">保存与导出</span></h2>
+    <ol class="steps">
+      <li><span class="st-title">随手保存工程</span>
+        <kbd>Ctrl</kbd><span class="kbd-plus">+</span><kbd>S</kbd> 保存为 <code>.sug</code> 工程文件，下次可继续编辑。
+        （软件默认每 5 分钟也会自动保存一次。）</li>
+      <li><span class="st-title">打开导出界面</span>
+        在侧边栏切到「导出」，选择目标格式（卡拉 OK 常用 <b>Nicokara</b> 或 <b>ASS</b>；歌词常用 <b>LRC</b>）。</li>
+      <li><span class="st-title">导出</span>
+        确认选项后导出文件。以后同样的格式与目录可用 <kbd>Ctrl</kbd><span class="kbd-plus">+</span><kbd>E</kbd> 一键快速导出。</li>
+    </ol>
+
+    <div class="callout note">
+      <span class="ttl">🎉 你已经完成了一份时间轴！</span>
+      <p>接下来想做得更精细 —— 给汉字加注音、多人对唱上色、用句尾标记和导唱符、批量调整时间戳 ——
+      请继续阅读核心功能各章节。</p>
+    </div>
+
+    <div class="page-nav">
+      <a class="prev" href="index.html"><span class="dir">← 上一篇</span><span class="ttl">总览</span></a>
+      <a class="next" href="interface.html"><span class="dir">下一篇 →</span><span class="ttl">界面导览</span></a>
+    </div>
+    <div class="footer">StrangeUtaGame 用户说明书 · v1.2.6</div>
+  </main>
+</div>
+<script src="assets/nav.js"></script>
+</body>
+</html>

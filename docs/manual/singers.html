@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>演唱者管理 · StrangeUtaGame 说明书</title>
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+<button class="menu-toggle">☰ 目录</button>
+<div class="layout">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="../../assets/mascot.png" alt="SUG" onerror="this.style.display='none'" />
+      StrangeUtaGame
+    </a>
+    <p class="ver">用户说明书 · v1.2.6</p>
+    <nav class="nav-group">
+      <h4>入门</h4>
+      <a href="index.html"><span class="ico">🏠</span>总览</a>
+      <a href="getting-started.html"><span class="ico">🚀</span>新手入门</a>
+      <a href="interface.html"><span class="ico">🗺️</span>界面导览</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>核心功能</h4>
+      <a href="timing.html"><span class="ico">🎯</span>打轴</a>
+      <a href="furigana.html"><span class="ico">🇯🇵</span>注音</a>
+      <a href="fulltext.html"><span class="ico">📝</span>全文本编辑</a>
+      <a href="singers.html"><span class="ico">🎤</span>演唱者管理</a>
+      <a href="export.html"><span class="ico">📤</span>导出</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>进阶 / 参考</h4>
+      <a href="calibration.html"><span class="ico">🎚️</span>偏移与校准</a>
+      <a href="settings.html"><span class="ico">⚙️</span>设置详解</a>
+      <a href="hotkeys.html"><span class="ico">⌨️</span>快捷键大全</a>
+      <a href="faq.html"><span class="ico">❓</span>FAQ / 排错</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <h1>🎤 演唱者管理</h1>
+    <p class="subtitle">对唱、合唱、分声部 —— 给不同演唱者上不同颜色，导出时区分显示。</p>
+
+    <div class="callout note">
+      <span class="ttl">什么场景需要它？</span>
+      <p>双人对唱、团体合唱、主唱/和声分离 —— 这些场景里不同人唱的歌词通常用<b>不同颜色</b>区分。
+      SUG 让你把每一句、甚至每一个字指定给某位演唱者，并自动按其配色渲染、导出。</p>
+    </div>
+
+    <h2>👥 <span class="em">管理演唱者列表</span></h2>
+    <p>在侧边栏「演唱者」界面管理。每位演唱者可设置：</p>
+    <ul>
+      <li><b>名称</b>与<b>颜色</b>（支持自动配色、互补色生成）。</li>
+      <li><b>分色</b>：单个演唱者最多 5 种颜色（用于渐变 / 多色描边等效果）。</li>
+      <li><b>分组</b>：把多位演唱者归到一组管理。</li>
+      <li><b>拖拽排序</b>：调整演唱者在列表中的顺序。</li>
+      <li><b>启用 / 禁用</b>：临时屏蔽某演唱者。</li>
+      <li><b>软件级预设</b>：常用演唱者配置存为预设，跨项目复用（独立存于 <code>singers.json</code>，
+        重置配置不影响）。</li>
+    </ul>
+
+    <div class="shot">
+      <div class="cam">📷</div>
+      <div class="lbl">截图位 · 演唱者管理界面</div>
+      <div class="hint">（此处留空，待补：演唱者列表，含颜色块、分色、拖拽排序、启用开关）</div>
+    </div>
+
+    <h2>🖍️ <span class="em">把演唱者指定给歌词</span></h2>
+    <p>SUG 支持<b>逐字（per-char）</b>级别的演唱者指定，也支持整行批量：</p>
+    <table class="tbl">
+      <tr><th>操作</th><th>键 / 方式</th><th>说明</th></tr>
+      <tr><td>应用演唱者</td><td class="center"><kbd>K</kbd></td><td>把当前选中（单字或划选范围）指定给某演唱者</td></tr>
+      <tr><td>按行设置演唱者</td><td class="center"><kbd>Ctrl</kbd>+<kbd>5</kbd></td><td>整行指定演唱者</td></tr>
+      <tr><td>跨行划选批量应用</td><td class="center">鼠标框选 + <kbd>K</kbd></td><td>跨多行选中一段，批量指定同一演唱者</td></tr>
+      <tr><td>右键菜单设置</td><td class="center">右键字符</td><td>上下文菜单里直接「设置演唱者」</td></tr>
+    </table>
+
+    <div class="callout tip">
+      <span class="ttl">💡 创建项目时已自动铺底</span>
+      <p>创建项目时，默认演唱者会传播到句 / 字 / 注音三层，避免留空。Nicokara 导入则通过
+      singer_key 映射达到同样效果。所以你只需在「换人唱」的地方改演唱者即可，其余自动继承。</p>
+    </div>
+
+    <h2>📤 <span class="em">导出时的演唱者处理</span></h2>
+    <p>导出界面提供两个独立的演唱者相关选项：</p>
+    <ul>
+      <li><b>按演唱者过滤</b>：只导出某位/某些演唱者的歌词（导出界面会<b>自动只列出当前实际用到的演唱者</b>，
+        列表可滚动）。适合单独导出某声部。</li>
+      <li><b>插入【演唱者名】标签</b>（仅 Nicokara）：在演唱者切换处自动插入 <code>【名】</code> 标签。这是独立设置项，与过滤互不影响。</li>
+    </ul>
+    <p>导出 Nicokara 时还有 <b>Nicokara 标签设置</b> 与 <b>分色标签设置助手</b> —— 后者用 <code>@Emoji</code>
+    标签把每位演唱者变成颜色 / 图标，与「插入【演唱者名】标签」配套实现多人分色。三者如何联动见
+    <a href="export.html">导出 → Nicokara：标签设置 + 演唱者名 + 分色助手</a>。</p>
+
+    <div class="shot">
+      <div class="cam">📷</div>
+      <div class="lbl">截图位 · 导出界面的演唱者过滤 / 插入标签选项</div>
+      <div class="hint">（此处留空，待补：导出界面中演唱者相关的勾选区）</div>
+    </div>
+
+    <div class="page-nav">
+      <a class="prev" href="fulltext.html"><span class="dir">← 上一篇</span><span class="ttl">全文本编辑</span></a>
+      <a class="next" href="export.html"><span class="dir">下一篇 →</span><span class="ttl">导出</span></a>
+    </div>
+    <div class="footer">StrangeUtaGame 用户说明书 · v1.2.6</div>
+  </main>
+</div>
+<script src="assets/nav.js"></script>
+</body>
+</html>

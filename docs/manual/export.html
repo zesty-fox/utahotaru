@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>导出格式详解 · StrangeUtaGame 说明书</title>
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+<button class="menu-toggle">☰ 目录</button>
+<div class="layout">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="../../assets/mascot.png" alt="SUG" onerror="this.style.display='none'" />
+      StrangeUtaGame
+    </a>
+    <p class="ver">用户说明书 · v1.2.6</p>
+    <nav class="nav-group">
+      <h4>入门</h4>
+      <a href="index.html"><span class="ico">🏠</span>总览</a>
+      <a href="getting-started.html"><span class="ico">🚀</span>新手入门</a>
+      <a href="interface.html"><span class="ico">🗺️</span>界面导览</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>核心功能</h4>
+      <a href="timing.html"><span class="ico">🎯</span>打轴</a>
+      <a href="furigana.html"><span class="ico">🇯🇵</span>注音</a>
+      <a href="fulltext.html"><span class="ico">📝</span>全文本编辑</a>
+      <a href="singers.html"><span class="ico">🎤</span>演唱者管理</a>
+      <a href="export.html"><span class="ico">📤</span>导出</a>
+    </nav>
+    <nav class="nav-group">
+      <h4>进阶 / 参考</h4>
+      <a href="calibration.html"><span class="ico">🎚️</span>偏移与校准</a>
+      <a href="settings.html"><span class="ico">⚙️</span>设置详解</a>
+      <a href="hotkeys.html"><span class="ico">⌨️</span>快捷键大全</a>
+      <a href="faq.html"><span class="ico">❓</span>FAQ / 排错</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <h1>📤 导出格式详解</h1>
+    <p class="subtitle">打完轴，导出成你需要的格式。SUG 支持 11 种主流卡拉 OK / 字幕格式。</p>
+
+    <h2>🚪 <span class="em">如何导出</span></h2>
+    <ol class="steps">
+      <li><span class="st-title">切到「导出」界面</span>侧边栏点击「导出」。</li>
+      <li><span class="st-title">选择格式</span>从下方 11 种格式里挑一个。</li>
+      <li><span class="st-title">配置选项</span>如演唱者过滤、是否插入【演唱者名】标签等（视格式而定）。</li>
+      <li><span class="st-title">导出文件</span>选择保存位置完成导出。</li>
+      <li><span class="st-title">下次一键快导</span>之后按 <kbd>Ctrl</kbd><span class="kbd-plus">+</span><kbd>E</kbd>
+        即可用<b>上次的格式与目录</b>快速导出。</li>
+    </ol>
+
+    <div class="shot">
+      <div class="cam">📷</div>
+      <div class="lbl">截图位 · 导出界面（格式列表 + 选项区）</div>
+      <div class="hint">（此处留空，待补：导出界面全貌）</div>
+    </div>
+
+    <h2>📋 <span class="em">11 种格式一览</span></h2>
+    <table class="tbl">
+      <tr><th>格式</th><th>类型</th><th>典型用途</th></tr>
+      <tr><td><b>LRC · 增强型</b></td><td>逐字歌词</td><td>支持逐字时间的增强 LRC，现代播放器卡拉 OK</td></tr>
+      <tr><td><b>LRC · 逐行</b></td><td>逐行歌词</td><td>最通用的 LRC，每行一个时间戳</td></tr>
+      <tr><td><b>LRC · 逐字</b></td><td>逐字歌词</td><td>每个字独立时间戳的 LRC</td></tr>
+      <tr><td><b>KRA</b></td><td>卡拉 OK</td><td>Karaoke 字幕格式</td></tr>
+      <tr><td><b>TXT</b></td><td>纯文本</td><td>无时间，仅歌词文本</td></tr>
+      <tr><td><b>SRT</b></td><td>字幕</td><td>通用视频字幕，播放器 / 剪辑软件通吃</td></tr>
+      <tr><td><b>txt2ass</b></td><td>ASS 模板</td><td>面向 txt2ass 工作流的 ASS</td></tr>
+      <tr><td><b>ASS</b></td><td>高级字幕</td><td>交给 <b>Aegisub</b> 做样式与卡拉 OK 特效</td></tr>
+      <tr><td><b>Nicokara</b></td><td>卡拉 OK</td><td>NicokaraMaker 工作流</td></tr>
+      <tr><td><b>Nicokara（带注音）</b></td><td>卡拉 OK</td><td>含 furigana 的 Nicokara</td></tr>
+      <tr><td><b>RL 编辑模式 / 内联</b></td><td>RL 文本</td><td>RhythmicaLyrics 编辑模式内联文本，回传 RL</td></tr>
+    </table>
+
+    <h2>🎯 <span class="em">该选哪个格式？</span></h2>
+    <table class="tbl">
+      <tr><th>我想要…</th><th>推荐格式</th></tr>
+      <tr><td>做卡拉 OK（B 站 / 弹幕站风格）</td><td><b>Nicokara</b> 或 <b>Nicokara（带注音）</b></td></tr>
+      <tr><td>做精美字幕特效（自己写样式）</td><td><b>ASS</b>（再用 Aegisub 加工）</td></tr>
+      <tr><td>普通音乐播放器歌词</td><td><b>LRC · 逐行</b>；想逐字变色用 <b>LRC · 增强型</b></td></tr>
+      <tr><td>给视频配字幕</td><td><b>SRT</b></td></tr>
+      <tr><td>回到 RhythmicaLyrics继续编辑</td><td><b>RL 编辑模式</b></td></tr>
+    </table>
+
+    <div class="callout tip">
+      <span class="ttl">💡 全局偏移已内置</span>
+      <p>所有导出器都读取已应用全局偏移后的时间戳，<b>预览看到的就是导出得到的</b>，不存在「导出后整体偏一截」的问题。</p>
+    </div>
+
+    <h2>🎤 <span class="em">演唱者相关导出选项</span></h2>
+    <p>导出时可<b>按演唱者过滤</b>（只列当前实际使用的演唱者）。详见
+    <a href="singers.html">演唱者管理 → 导出时的演唱者处理</a>。</p>
+
+    <h2>🏷️ <span class="em">Nicokara：标签设置 + 演唱者名 + 分色助手</span></h2>
+    <p>当导出格式选为 <b>Nicokara</b> / <b>Nicokara（带注音）</b> 时，会多出三个相关入口。它们是配套使用的，
+    搞懂彼此关系就能做出<b>多人分色</b>的卡拉 OK。</p>
+
+    <h3>① Nicokara 标签设置…</h3>
+    <p>设置文件头部的元数据标签：<code>@Title</code>（歌曲名）、<code>@Artist</code>（演唱者）、
+    <code>@Album</code>（专辑）、<code>@TaggingBy</code>（打轴者）、<code>@SilencemSec</code>（前奏静音毫秒）、
+    以及任意 <code>@Custom</code> 自定义标签。保存后写入软件配置，导出时写进文件头。</p>
+
+    <h3>② 插入【演唱者名】标签</h3>
+    <p>勾选后，导出时<b>每当演唱者发生变化</b>，就在该处字符前自动插入一个
+    <code>【演唱者名】</code> 标签。子选项「<b>→每行行首都插入演唱者</b>」可让<b>每行开头</b>都带上演唱者名
+    （需先勾选上一项）。<b>这个 <code>【名】</code> 标签就是分色的「触发字符」。</b></p>
+
+    <h3>③ 分色标签设置助手…</h3>
+    <p>这是把「演唱者」变成「颜色 / 图标」的关键。它按演唱者逐行配置 NicokaraMaker3 的
+    <code>@Emoji</code> 标签，确认后<b>自动写入 Nicokara 标签的自定义字段</b>（即 <code>@Custom</code>）。格式：</p>
+    <pre><code>@Emoji=&lt;触发字符&gt;,&lt;擦除前图片&gt;,&lt;擦除后图片(可省)&gt;,&lt;选项…&gt;</code></pre>
+    <ul>
+      <li><b>触发字符</b>：通常就填 <code>【演唱者名】</code> —— 与第②步插入的标签对应。</li>
+      <li><b>前/后画像</b>：演唱者的图标图片名（仅取文件名）；纯分色无图标时常用一张透明 1×1 占位图。</li>
+      <li><b>选项</b>：<code>Zoom=n%</code> 缩放、<code>Fix</code> 原图尺寸、<code>NoDecor</code> 不加文字装饰、
+        <code>ForceWipeDecor</code> 强制擦除装饰、<code>MarginLeft/Right/Bottom</code>（余白，可负）。</li>
+      <li>演唱者列表<b>跟随导出过滤器</b>的勾选（没勾就用全部演唱者）；可「将首行参数复制到其他行」批量套用。</li>
+    </ul>
+    <pre><code>典型「无图标纯分色」写法：
+@Emoji=【ハル】,透明画像1x1.png,,Zoom=1,NoDecor,MarginRight=-170</code></pre>
+
+    <div class="callout note">
+      <span class="ttl">🔗 三者怎么联动起来</span>
+      <p>① <b>分色助手</b>定义「每个 <code>【演唱者名】</code> 触发什么图标/装饰」并写进 <code>@Custom</code>；
+      ② <b>插入【演唱者名】标签</b>把这些 <code>【名】</code> 触发字符真正插进歌词的换人处；
+      ③ 导出的 Nicokara 进 NicokaraMaker 后，文字里的 <code>【名】</code> 命中对应 <code>@Emoji</code> 规则，
+      就实现了<b>按演唱者分色 / 加图标</b>。三步缺一不可：只插标签没配助手 = 看到一堆 <code>【名】</code> 文字；
+      只配助手没插标签 = 没有触发点、不生效。</p>
+    </div>
+
+    <div class="shot">
+      <div class="cam">📷</div>
+      <div class="lbl">截图位 · 分色标签设置助手对话框</div>
+      <div class="hint">（此处留空，待补：分色助手逐行配置界面 + 导出界面的三个入口）</div>
+    </div>
+
+    <h2>📥 <span class="em">导入兼容性（反向）</span></h2>
+    <p>SUG 也能导入既有成果继续编辑：</p>
+    <ul>
+      <li>支持导入 <b>ASS / LRC / TXT / SRT / KRA / Nicokara</b> 以及 <b>RL 编辑模式</b>内联文本。</li>
+      <li>创建项目时自动识别格式（含 LRC 的逐行/逐字/增强型三种子类）。</li>
+      <li>RhythmicaLyrics导出的文件可直接导入；联网词典也兼容 RL 官方接口，旧词典资产可复用。</li>
+    </ul>
+
+    <div class="page-nav">
+      <a class="prev" href="singers.html"><span class="dir">← 上一篇</span><span class="ttl">演唱者管理</span></a>
+      <a class="next" href="calibration.html"><span class="dir">下一篇 →</span><span class="ttl">偏移与校准</span></a>
+    </div>
+    <div class="footer">StrangeUtaGame 用户说明书 · v1.2.6</div>
+  </main>
+</div>
+<script src="assets/nav.js"></script>
+</body>
+</html>
