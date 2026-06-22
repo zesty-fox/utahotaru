@@ -38,6 +38,7 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import plistlib
 import re
 import shutil
 import subprocess
@@ -468,11 +469,49 @@ def _pack_zip(version: str, vcfg: VariantConfig) -> Path:
     return zip_path
 
 
+def _customize_app_bundle(app_dir: Path, display_name: str, version: str) -> None:
+    """改写 DMG 内 .app 的 Info.plist：显示名、版本号、``.sug`` 文件关联。
+
+    - 把 CFBundleName/DisplayName 改成干净产品名（去掉 ``-mac`` 变体后缀）；
+    - 用真实版本号覆盖 PyInstaller 默认的 ``0.0.0``；
+    - 声明 CFBundleDocumentTypes + UTExportedTypeDeclarations，让 mac 双击 ``.sug``
+      能关联打开（app 侧由 main.py 的 QFileOpenEvent 接收）。
+    """
+    plist_path = app_dir / "Contents" / "Info.plist"
+    with open(plist_path, "rb") as f:
+        pl = plistlib.load(f)
+    pl["CFBundleName"] = display_name
+    pl["CFBundleDisplayName"] = display_name
+    pl["CFBundleShortVersionString"] = version
+    pl["CFBundleVersion"] = version
+    bundle_id = pl.get("CFBundleIdentifier", "com.xuancc.strangeutagame")
+    sug_uti = f"{bundle_id}.sug"
+    pl["CFBundleDocumentTypes"] = [
+        {
+            "CFBundleTypeName": "StrangeUtaGame Project",
+            "CFBundleTypeRole": "Editor",
+            "LSHandlerRank": "Owner",
+            "LSItemContentTypes": [sug_uti],
+        }
+    ]
+    pl["UTExportedTypeDeclarations"] = [
+        {
+            "UTTypeIdentifier": sug_uti,
+            "UTTypeDescription": "StrangeUtaGame Project",
+            "UTTypeConformsTo": ["public.json"],
+            "UTTypeTagSpecification": {"public.filename-extension": ["sug"]},
+        }
+    ]
+    with open(plist_path, "wb") as f:
+        plistlib.dump(pl, f)
+
+
 def _pack_dmg(version: str, vcfg: VariantConfig) -> Optional[Path]:
     """mac 变体：把 ``dist/<app_name>.app`` 打成标准拖拽安装 DMG。
 
-    DMG 内含 ``<app_name>.app`` 与指向 ``/Applications`` 的软链（用户拖拽即装）。
-    仅 macOS 可用（依赖系统自带 ``hdiutil``）；其它平台返回 None 并跳过。
+    DMG 内含重命名后的 ``<产品名>.app``（去掉变体后缀）与指向 ``/Applications`` 的
+    软链；并改写 Info.plist 设显示名/版本/``.sug`` 文件关联。仅 macOS 可用
+    （依赖系统自带 ``hdiutil``）；其它平台返回 None 并跳过。
     """
     if sys.platform != "darwin":
         print("  · 跳过 DMG：仅 macOS 平台可生成（需要 hdiutil）")
@@ -482,23 +521,30 @@ def _pack_dmg(version: str, vcfg: VariantConfig) -> Optional[Path]:
         print(f"  · 跳过 DMG：未找到 {app_bundle}")
         return None
 
+    # DMG 内的显示名/包名：去掉变体后缀（StrangeUtaGame-mac → StrangeUtaGame）
+    display_name = (
+        vcfg.app_name.removesuffix(f"-{vcfg.variant}") if vcfg.variant else vcfg.app_name
+    )
+
     dmg_path = ROOT / "dist" / f"{vcfg.app_name}-v{version}.dmg"
     if dmg_path.exists():
         dmg_path.unlink()
 
     staging = Path(tempfile.mkdtemp(prefix="sug-dmg-"))
     try:
-        # 暂存目录：<app_name>.app + /Applications 软链（hdiutil 以此为 DMG 根）
-        shutil.copytree(app_bundle, staging / app_bundle.name, symlinks=True)
+        staging_app = staging / f"{display_name}.app"
+        shutil.copytree(app_bundle, staging_app, symlinks=True)
+        _customize_app_bundle(staging_app, display_name, version)
+        # /Applications 软链（hdiutil 以 staging 为 DMG 根）
         apps_link = staging / "Applications"
         if apps_link.is_symlink() or apps_link.exists():
             apps_link.unlink()
         apps_link.symlink_to("/Applications")
 
-        print(f"  打包 {app_bundle.name} → {dmg_path.name}")
+        print(f"  打包 {staging_app.name} → {dmg_path.name}")
         cmd = [
             "hdiutil", "create",
-            "-volname", vcfg.app_name,
+            "-volname", display_name,
             "-srcfolder", str(staging),
             "-ov",
             "-fs", "HFS+",

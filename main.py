@@ -23,7 +23,7 @@ if sys.platform == "win32":
 
 # 必须先创建 QApplication，再导入任何 QWidget
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QEvent
 from PyQt6.QtGui import QIcon
 
 # 启用 DPI 缩放
@@ -31,8 +31,32 @@ QApplication.setHighDpiScaleFactorRoundingPolicy(
     Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
 )
 
+
+class SUGApplication(QApplication):
+    """处理 macOS 双击关联文件（QFileOpenEvent）。
+
+    mac 上双击 ``.sug`` 走 Apple Event（QFileOpenEvent），不进 ``sys.argv``；
+    启动期窗口尚未就绪时先缓存路径，``main()`` 设置 file_open_handler 后冲放。
+    """
+
+    def __init__(self, argv):
+        super().__init__(argv)
+        self.file_open_handler = None  # main() 创建窗口后赋值
+        self._pending_file = None
+
+    def event(self, e):
+        if e.type() == QEvent.Type.FileOpen:
+            path = e.file()
+            if self.file_open_handler:
+                self.file_open_handler(path)
+            else:
+                self._pending_file = path
+            return True
+        return super().event(e)
+
+
 # 创建应用实例
-app = QApplication(sys.argv)
+app = SUGApplication(sys.argv)
 
 # 确定图标路径（后续多次使用）
 _icon_path = (
@@ -167,6 +191,18 @@ def main():
     # 如果有命令行传入的项目文件，延迟加载（等事件循环启动后执行）
     if initial_project:
         QTimer.singleShot(200, lambda: window.open_initial_project(initial_project))
+
+    # macOS：把 QFileOpenEvent（双击 .sug 关联打开）接到 open_initial_project。
+    # mac 上双击文件不走 sys.argv，而是 QFileOpenEvent。
+    def _open_project_file(path: str) -> None:
+        if path and path.lower().endswith(".sug"):
+            window.open_initial_project(path)
+
+    app.file_open_handler = _open_project_file
+    if app._pending_file:  # 启动期 handler 未就绪时缓存的文件
+        _pending = app._pending_file
+        app._pending_file = None
+        QTimer.singleShot(200, lambda: _open_project_file(_pending))
 
     # 运行应用
     sys.exit(app.exec())
