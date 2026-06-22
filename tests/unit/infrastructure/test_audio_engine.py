@@ -6,9 +6,19 @@ import soundfile as sf
 from pathlib import Path
 
 from strange_uta_game.backend.infrastructure.audio import (
-    BassEngine,
+    bass_available,
     AudioLoadError,
     PlaybackState,
+)
+
+# BASS 不可用（mac 等）时，整个 BASS 引擎测试类跳过。
+if bass_available:
+    from strange_uta_game.backend.infrastructure.audio import BassEngine
+else:
+    BassEngine = None  # type: ignore[assignment,misc]
+
+pytestmark = pytest.mark.skipif(
+    not bass_available, reason="BASS 引擎仅 Windows 可用"
 )
 
 

@@ -23,7 +23,6 @@ from typing import Optional
 
 from strange_uta_game.backend.application import CommandManager, TimingService
 from strange_uta_game.backend.domain import Project
-from strange_uta_game.backend.infrastructure.audio import BassEngine, BassTsmEngine
 from strange_uta_game.frontend.project_store import ProjectStore
 from strange_uta_game.frontend.theme import theme
 from strange_uta_game.frontend.fluent_widgets import message_choice, message_question
@@ -669,8 +668,14 @@ class MainWindow(MSFluentWindow):
             return True
 
     def _make_audio_engine(self):
-        """按设置创建音频引擎。"""
-        return BassTsmEngine() if self._hq_speed_enabled() else BassEngine()
+        """按设置与平台能力创建音频引擎。
+
+        mac（BASS 不可用）始终返回 SoundDeviceEngine；Windows 按 HQ 开关在
+        BassTsmEngine / BassEngine 间选择。
+        """
+        from strange_uta_game.backend.infrastructure.audio import select_audio_engine
+
+        return select_audio_engine(self._hq_speed_enabled())
 
     def _apply_audio_engine_setting(self):
         """设置变更时按"高质量音频变速"开关切换引擎。
@@ -678,6 +683,15 @@ class MainWindow(MSFluentWindow):
         仅在引擎类型实际改变时重建：释放旧引擎、接入新引擎，并重载当前曲目
         （位置重置为 0）。切换是用户在设置里的低频操作，可接受短暂中断。
         """
+        from strange_uta_game.backend.infrastructure.audio import bass_available
+
+        # mac（BASS 不可用）：SoundDeviceEngine 始终走离线 TSM，HQ 开关无效，直接返回，
+        # 否则下方 isinstance(x, None) 会抛 TypeError。
+        if not bass_available:
+            return
+
+        from strange_uta_game.backend.infrastructure.audio import BassEngine, BassTsmEngine
+
         desired = BassTsmEngine if self._hq_speed_enabled() else BassEngine
         if isinstance(self._audio_engine, desired):
             return
@@ -862,15 +876,40 @@ class MainWindow(MSFluentWindow):
 
             # 用户确认更新 → 启动 Updater.exe 并退出
             if not upd_installer.is_updater_available():
-                InfoBar.warning(
-                    title=self.tr("更新器未就绪"),
-                    content=self.tr("未找到 Updater.exe。请到 GitHub 手动下载完整安装包。"),
-                    orient=Qt.Orientation.Horizontal,
-                    isClosable=True,
-                    position=InfoBarPosition.TOP,
-                    duration=6000,
-                    parent=self,
-                )
+                import sys
+
+                if sys.platform == "darwin":
+                    # mac 无自动安装 handoff：直接打开 release 页面供手动下载。
+                    from PyQt6.QtCore import QUrl
+                    from PyQt6.QtGui import QDesktopServices
+                    from strange_uta_game.__version__ import REPO_OWNER, REPO_NAME
+
+                    QDesktopServices.openUrl(
+                        QUrl(
+                            f"https://github.com/{REPO_OWNER}/{REPO_NAME}/releases/latest"
+                        )
+                    )
+                    InfoBar.success(
+                        title=self.tr("已打开下载页面"),
+                        content=self.tr(
+                            "macOS 暂不支持自动更新，已在浏览器打开最新版本下载页。"
+                        ),
+                        orient=Qt.Orientation.Horizontal,
+                        isClosable=True,
+                        position=InfoBarPosition.TOP,
+                        duration=6000,
+                        parent=self,
+                    )
+                else:
+                    InfoBar.warning(
+                        title=self.tr("更新器未就绪"),
+                        content=self.tr("未找到 Updater.exe。请到 GitHub 手动下载完整安装包。"),
+                        orient=Qt.Orientation.Horizontal,
+                        isClosable=True,
+                        position=InfoBarPosition.TOP,
+                        duration=6000,
+                        parent=self,
+                    )
                 return
 
             from strange_uta_game.updater.proxy import resolve_proxy

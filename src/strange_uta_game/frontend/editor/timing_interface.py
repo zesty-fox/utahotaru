@@ -272,8 +272,8 @@ class EditorInterface(QWidget):
     def _init_keysound(self) -> None:
         """创建播放器并预加载默认风格样本（失败时静默跳过，不影响主功能）。"""
         try:
-            from ...backend.infrastructure.audio.keysound_player import KeySoundPlayer
-            self._keysound_player = KeySoundPlayer()
+            from ...backend.infrastructure.audio.keysound_player import create_keysound_player
+            self._keysound_player = create_keysound_player()
             self._reload_keysound("default")  # 预热：先加载默认风格
         except Exception as e:
             print(f"[KeySound] 初始化失败: {e}")

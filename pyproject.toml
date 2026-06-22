@@ -7,11 +7,9 @@ name = "strange-uta-game"
 version = "0.1.0"
 description = "一款由 RhythmicaLyrics 启发的歌词打轴软件"
 readme = "README.md"
-license = {text = "GPL-3.0"}
+license = { text = "GPL-3.0" }
 requires-python = ">=3.9"
-authors = [
-    {name = "StrangeUtaGame Team"}
-]
+authors = [{ name = "StrangeUtaGame Team" }]
 keywords = ["karaoke", "lyrics", "timing", "rhythmica", "subtitle"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -28,7 +26,7 @@ classifiers = [
 
 dependencies = [
     "PyQt6>=6.6.0",
-    "PyQt-Fluent-Widgets>=1.5.0",
+    "PyQt6-Fluent-Widgets>=1.5.0",
     "sounddevice>=0.4.6",
     "soundfile>=0.12.1",
     "pedalboard>=0.9.0",
@@ -89,7 +87,7 @@ select = [
     "SIM", # flake8-simplify
 ]
 ignore = [
-    "E501",  # Line too long (handled by black)
+    "E501", # Line too long (handled by black)
 ]
 
 [tool.ruff.pydocstyle]
@@ -107,7 +105,14 @@ warn_unused_ignores = true
 show_error_codes = true
 
 [[tool.mypy.overrides]]
-module = ["sounddevice", "soundfile", "pedalboard", "pedalboard.io", "numpy", "pykakasi"]
+module = [
+    "sounddevice",
+    "soundfile",
+    "pedalboard",
+    "pedalboard.io",
+    "numpy",
+    "pykakasi",
+]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
@@ -117,11 +122,7 @@ python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 qt_api = "pyqt6"
-addopts = [
-    "--strict-markers",
-    "--strict-config",
-    "--verbose",
-]
+addopts = ["--strict-markers", "--strict-config", "--verbose"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
@@ -132,10 +133,7 @@ markers = [
 [tool.coverage.run]
 source = ["src/strange_uta_game"]
 branch = true
-omit = [
-    "*/tests/*",
-    "*/test_*",
-]
+omit = ["*/tests/*", "*/test_*"]
 
 [tool.coverage.report]
 exclude_lines = [
