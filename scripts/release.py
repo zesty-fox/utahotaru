@@ -42,6 +42,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time as _time
 import zipfile
 from dataclasses import dataclass, field
@@ -465,6 +466,53 @@ def _pack_zip(version: str, vcfg: VariantConfig) -> Path:
                 zf.write(p, arcname=p.relative_to(dist_root.parent))
     print(f"  ✓ {zip_path}  ({zip_path.stat().st_size / 1024 / 1024:.1f} MB)")
     return zip_path
+
+
+def _pack_dmg(version: str, vcfg: VariantConfig) -> Optional[Path]:
+    """mac 变体：把 ``dist/<app_name>.app`` 打成标准拖拽安装 DMG。
+
+    DMG 内含 ``<app_name>.app`` 与指向 ``/Applications`` 的软链（用户拖拽即装）。
+    仅 macOS 可用（依赖系统自带 ``hdiutil``）；其它平台返回 None 并跳过。
+    """
+    if sys.platform != "darwin":
+        print("  · 跳过 DMG：仅 macOS 平台可生成（需要 hdiutil）")
+        return None
+    app_bundle = ROOT / "dist" / f"{vcfg.app_name}.app"
+    if not app_bundle.is_dir():
+        print(f"  · 跳过 DMG：未找到 {app_bundle}")
+        return None
+
+    dmg_path = ROOT / "dist" / f"{vcfg.app_name}-v{version}.dmg"
+    if dmg_path.exists():
+        dmg_path.unlink()
+
+    staging = Path(tempfile.mkdtemp(prefix="sug-dmg-"))
+    try:
+        # 暂存目录：<app_name>.app + /Applications 软链（hdiutil 以此为 DMG 根）
+        shutil.copytree(app_bundle, staging / app_bundle.name, symlinks=True)
+        apps_link = staging / "Applications"
+        if apps_link.is_symlink() or apps_link.exists():
+            apps_link.unlink()
+        apps_link.symlink_to("/Applications")
+
+        print(f"  打包 {app_bundle.name} → {dmg_path.name}")
+        cmd = [
+            "hdiutil", "create",
+            "-volname", vcfg.app_name,
+            "-srcfolder", str(staging),
+            "-ov",
+            "-fs", "HFS+",
+            "-format", "UDZO",  # 压缩只读 DMG，适合分发
+            str(dmg_path),
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"  ✗ hdiutil 失败:\n{(result.stderr or result.stdout)[-800:]}")
+            return None
+        print(f"  ✓ {dmg_path}  ({dmg_path.stat().st_size / 1024 / 1024:.1f} MB)")
+        return dmg_path
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
 
 
 def _sha256_of(path: Path) -> str:
@@ -1027,6 +1075,13 @@ def cmd_build(
     zip_path = _pack_zip(version, vcfg)
     sha_path = _write_sha256(zip_path)
 
+    # mac 变体：额外产出可拖拽安装的 DMG（dist/<app>.app → .dmg）
+    print()
+    print("[step] 打 mac DMG（拖拽安装，仅 macOS）...")
+    dmg_path = _pack_dmg(version, vcfg)
+    if dmg_path is not None:
+        _write_sha256(dmg_path)
+
     print()
     print(f"[step] 写对外发布 {vcfg.manifest_name(version)} ...")
     manifest_path = _write_release_manifest(
@@ -1066,6 +1121,11 @@ def cmd_build(
                 p = p.with_name(p.name + ext)
             if p.exists():
                 print(f"      • {p.relative_to(ROOT)}")
+    if dmg_path is not None and dmg_path.exists():
+        print(f"      • {dmg_path.relative_to(ROOT)}                ← mac 拖拽安装 DMG")
+        dmg_sha = dmg_path.with_name(dmg_path.name + ".sha256")
+        if dmg_sha.exists():
+            print(f"      • {dmg_sha.relative_to(ROOT)}")
     return 0
 
 
