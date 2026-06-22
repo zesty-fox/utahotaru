@@ -24,26 +24,14 @@ classifiers = [
     "Topic :: Text Processing :: Linguistic",
 ]
 
-dependencies = [
-    "PyQt6>=6.6.0",
-    "PyQt6-Fluent-Widgets>=1.5.0",
-    "sounddevice>=0.4.6",
-    "soundfile>=0.12.1",
-    "pedalboard>=0.9.0",
-    "numpy>=1.24.0",
-    "pykakasi>=2.2.1",
-]
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.4.0",
-    "pytest-cov>=4.1.0",
-    "pytest-qt>=4.2.0",
-    "black>=23.12.0",
-    "ruff>=0.1.9",
-    "mypy>=1.7.1",
-    "psutil>=5.9.0",
-]
+# 依赖真源不在此处。运行/开发依赖以锁定版本的 requirements*.txt 为准
+# （requirements.txt + 按变体追加 requirements-winrt.txt / requirements-variants.txt，
+# 开发工具见 requirements-dev.txt）。这些文件被 scripts/release.py 做内容哈希用于
+# runtime 增量更新，改动需谨慎。
+# pyproject.toml 在本项目仅承载工具配置（ruff/black/mypy/pytest），不参与打包安装
+# （打包走 PyInstaller / build.py）。故此处不再维护一份会与 requirements 漂移的
+# dependencies 列表。安装：pip install -r requirements.txt（或 uv pip install -r ...）。
+dependencies = []
 
 [project.scripts]
 strange-uta-game = "strange_uta_game.main:main"
