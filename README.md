@@ -247,7 +247,7 @@
 
 ## 📦 安装与运行 / Installation
 
-> 🪟 **支持系统 / Supported OS：** Windows 10 / 11
+> 🪟 **支持系统 / Supported OS：** Windows 10 / 11 ·  🍎 macOS（实验性 / experimental）
 
 ### 🚀 方式一 · 直接运行（推荐） / Pre-built release (recommended)
 
@@ -255,6 +255,15 @@
 Download the latest archive from the [Releases](https://github.com/karaoke-studio/StrangeUtaGame/releases) page, unzip, then run `StrangeUtaGame.exe`.
 
 <sub>📦 体积参考 / Approx. size: <b>~250 MB</b></sub>
+
+#### 🍎 macOS 注意事项 / macOS notes
+
+macOS 版为实验性构建，使用前请留意：
+
+- **首次打开被拦截（未签名）/ Unsigned app blocked on first launch.** 应用未做 Apple 签名与公证，双击会提示「无法打开，因为无法验证开发者」。绕过方式：在 `StrangeUtaGame.app` 上**右键 → 打开**，在弹窗里再次点「打开」；或在终端执行 `xattr -dr com.apple.quarantine /path/to/StrangeUtaGame.app` 后再启动。
+- **无自动更新 / No auto-update.** macOS 不支持应用内自动更新；检测到新版本时只会在浏览器打开 [Releases](https://github.com/karaoke-studio/StrangeUtaGame/releases) 页面，需手动下载并替换旧的 `.app`。
+
+> macOS builds are experimental: the app is **not signed/notarized** — on first launch use **right-click → Open** (or `xattr -dr com.apple.quarantine <app>`) to bypass Gatekeeper. There is **no in-app auto-update**; new versions open the Releases page in your browser for a manual download.
 
 ---
 
@@ -275,6 +284,20 @@ pip install -r requirements.txt
 # 启动 / Launch
 python main.py
 ```
+
+或使用 [uv](https://docs.astral.sh/uv/)（更快） / Or with [uv](https://docs.astral.sh/uv/) (faster):
+
+```bash
+uv venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+uv pip install -r requirements.txt -r requirements-dev.txt
+python main.py
+```
+
+> **依赖文件说明 / Dependency files.** 依赖真源是锁定版本的 `requirements*.txt`（被发布流程做内容哈希用于增量更新，**改动需谨慎**）；`pyproject.toml` 仅承载工具配置（ruff/black/mypy/pytest）。安装时按平台/变体追加其一：
+> - **main 变体（Windows，WinRT 注音）**：额外 `pip install -r requirements-winrt.txt`
+> - **noWinIME / mac 变体（sudachi 注音）**：额外 `pip install -r requirements-variants.txt`
+>
+> Source of truth for deps is the pinned `requirements*.txt` (content-hashed by the release pipeline for incremental updates — **change with care**); `pyproject.toml` only holds tool config. Add one extra file per platform/variant as above.
 
 ---
 
