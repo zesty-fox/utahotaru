@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QEvent
 from PyQt6.QtGui import QFont, QColor, QKeyEvent, QKeySequence
+from strange_uta_game.frontend.font_utils import ui_font
 from qfluentwidgets import (
     PushButton,
     PrimaryPushButton,
@@ -317,7 +318,7 @@ class LineDetailDialog(QDialog):
         )
         self.setWindowTitle(self.tr("行详情 - {title}").format(title=title_text))
         fit_to_screen(self, 900, 500)
-        self.setFont(QFont("Microsoft YaHei", 10))
+        self.setFont(ui_font(10))
 
         self.vbox = QVBoxLayout(self)
 
@@ -734,7 +735,7 @@ class EditInterface(QWidget):
 
         # Top Area
         self.title_label = QLabel(self.tr("行编辑视图"), self)
-        self.title_label.setFont(QFont("Microsoft YaHei", 24, QFont.Weight.Bold))
+        self.title_label.setFont(ui_font(24, QFont.Weight.Bold))
         self.vbox.addWidget(self.title_label)
 
         self.desc_label = CaptionLabel(self.tr("查看和编辑所有歌词行的打轴数据"), self)
@@ -742,7 +743,7 @@ class EditInterface(QWidget):
 
         # Stats
         self.stats_label = QLabel(self.tr("共 0 行 | 已完成 0 行 | 进度 0%"), self)
-        self.stats_label.setFont(QFont("Microsoft YaHei", 10))
+        self.stats_label.setFont(ui_font(10))
         self.vbox.addWidget(self.stats_label)
 
         # Toolbar

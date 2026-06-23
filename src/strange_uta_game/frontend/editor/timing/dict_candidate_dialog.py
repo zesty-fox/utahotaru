@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
+from strange_uta_game.frontend.font_utils import ui_font
 from PyQt6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -140,14 +141,14 @@ class DictCandidateDialog(QDialog):
         layout.setSpacing(12)
 
         title = QLabel(self.tr("候补字典 — 「{word}」").format(word=self._word))
-        title.setFont(QFont("Microsoft YaHei", 14))
+        title.setFont(ui_font(14))
         layout.addWidget(title)
 
         desc = QLabel(self.tr(
             "列出词典中与所选原文**完全匹配**的条目（本地 + 启用网络源，按优先级）。\n"
             "双击条目或选中后点「应用」，将按该条目的格式（RubyPart / 节奏点 / 连词）填充并执行。"
         ))
-        desc.setFont(QFont("Microsoft YaHei", 10))
+        desc.setFont(ui_font(10))
         desc.setWordWrap(True)
         layout.addWidget(desc)
 
@@ -172,7 +173,7 @@ class DictCandidateDialog(QDialog):
             self._table.selectRow(0)
         else:
             empty = QLabel(self.tr("（词典中没有完全匹配的条目）"))
-            empty.setFont(QFont("Microsoft YaHei", 10))
+            empty.setFont(ui_font(10))
             layout.addWidget(empty)
 
         btn_row = QHBoxLayout()

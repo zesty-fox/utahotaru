@@ -6,6 +6,8 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from qfluentwidgets import FluentIcon as FIF, PushButton, SettingCard, SettingCardGroup
 
+from strange_uta_game.frontend.font_utils import DEFAULT_FONT_FAMILY, resolve_font_family
+
 from ..cards import ComboSettingCard, DoubleSpinSettingCard, FontSettingCard, SpinSettingCard, TextSettingCard
 from ..checkpoint_marker_dialog import CheckpointMarkerDialog
 from .base import SubSettingInterface
@@ -161,8 +163,10 @@ class UISubInterface(SubSettingInterface):
         self.card_theme.setVisible(not embedded)
         theme_idx = {"auto": 0, "light": 1, "dark": 2}.get(s.get("ui.theme", "auto"), 0)
         self.card_theme.setCurrentIndex(theme_idx)
-        self.card_main_font.setValue(s.get("ui.main_font", "Microsoft YaHei"))
-        self.card_ruby_font.setValue(s.get("ui.ruby_font", "Microsoft YaHei"))
+        # 显示实际生效的字体族：存储值在本平台不可用时（如 Windows 项目带到 mac，
+        # 存的是"Microsoft YaHei"）回退到平台默认，避免选择器显示一个本机没有的字体名。
+        self.card_main_font.setValue(resolve_font_family(s.get("ui.main_font", DEFAULT_FONT_FAMILY)))
+        self.card_ruby_font.setValue(resolve_font_family(s.get("ui.ruby_font", DEFAULT_FONT_FAMILY)))
         self.card_font_size.setValue(s.get("ui.font_size", 18))
         self.card_current_line_font_size.setValue(s.get("ui.current_line_font_size", 22))
         self.card_ruby_size.setValue(s.get("ui.ruby_size", 10))

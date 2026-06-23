@@ -23,6 +23,8 @@ from PyQt6.QtGui import (
     QPaintEvent,
     QPen,
 )
+
+from strange_uta_game.frontend.font_utils import DEFAULT_FONT_FAMILY, ui_font
 from PyQt6.QtWidgets import QScrollBar, QWidget
 from qfluentwidgets import Action, RoundMenu
 
@@ -300,11 +302,11 @@ class KaraokePreview(QWidget):
         self._drag_scroll_mouse_y: int = 0
 
         # 缓存字体和 QFontMetrics，避免每帧重建
-        self._font_current = QFont("Microsoft YaHei", 22, QFont.Weight.Bold)
-        self._font_context = QFont("Microsoft YaHei", 18)
-        self._font_ruby = QFont("Microsoft YaHei", 10)
+        self._font_current = ui_font(22, QFont.Weight.Bold)
+        self._font_context = ui_font(18)
+        self._font_ruby = ui_font(10)
         self._font_checkpoint = self._build_checkpoint_font(8)
-        self._font_line_number = QFont("Microsoft YaHei", 10)
+        self._font_line_number = ui_font(10)
         self._fm_current = QFontMetrics(self._font_current)
         self._fm_context = QFontMetrics(self._font_context)
         self._fm_ruby = QFontMetrics(self._font_ruby)
@@ -337,7 +339,7 @@ class KaraokePreview(QWidget):
         # 导唱待办标记（半透明红色叠加在字符左上角，符号与字号可配置）
         self._needs_guide_symbol: str = "✚"
         self._needs_guide_size: int = 12
-        self._font_needs_guide = QFont("Microsoft YaHei", self._needs_guide_size, QFont.Weight.Bold)
+        self._font_needs_guide = ui_font(self._needs_guide_size, QFont.Weight.Bold)
         self._fm_needs_guide = QFontMetrics(self._font_needs_guide)
 
         # 逐句渲染数据缓存（避免每帧重复计算）
@@ -385,7 +387,7 @@ class KaraokePreview(QWidget):
         13px 好）。本类对 marker 一律改用 ``QPainterPath`` 矢量轮廓填充绘制
         （见 _marker_path / paintEvent），从构造上绕开点阵，无需在字号上做手脚。
         """
-        return QFont("Microsoft YaHei", cp_size)
+        return ui_font(cp_size)
 
     def _marker_path(self, ch: str, x: float, baseline_y: float) -> QPainterPath:
         """返回 marker 字符在 (x, baseline_y) 处的矢量轮廓路径。
@@ -796,7 +798,7 @@ class KaraokePreview(QWidget):
             self._alignment_margin = margin
             self.update()
 
-    def set_font_sizes(self, base_size: int, current_line_size: int = 0, ruby_size: int = 10, cp_size: int = 8, line_height_factor: float = 1.20, ruby_spacing: int = 4, main_font: str = "Microsoft YaHei", ruby_font: str = "Microsoft YaHei", cp_spacing: int = 4):
+    def set_font_sizes(self, base_size: int, current_line_size: int = 0, ruby_size: int = 10, cp_size: int = 8, line_height_factor: float = 1.20, ruby_spacing: int = 4, main_font: str = DEFAULT_FONT_FAMILY, ruby_font: str = DEFAULT_FONT_FAMILY, cp_spacing: int = 4):
         """设置字体大小/字体族并自动适配预览行数。
 
         Args:
@@ -871,7 +873,7 @@ class KaraokePreview(QWidget):
             return
         self._needs_guide_symbol = symbol
         self._needs_guide_size = size
-        self._font_needs_guide = QFont("Microsoft YaHei", size, QFont.Weight.Bold)
+        self._font_needs_guide = ui_font(size, QFont.Weight.Bold)
         self._fm_needs_guide = QFontMetrics(self._font_needs_guide)
         self.update()
 

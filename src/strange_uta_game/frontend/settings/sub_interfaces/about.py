@@ -7,6 +7,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QEvent, Qt, QProcess, QUrl
 from PyQt6.QtGui import QDesktopServices, QFont
+from strange_uta_game.frontend.font_utils import ui_font
 from PyQt6.QtWidgets import QApplication, QFileDialog, QHBoxLayout, QWidget
 from qfluentwidgets import (
     FluentIcon as FIF,
@@ -61,10 +62,10 @@ class AboutSubInterface(SubSettingInterface):
         self._path_card = SettingCard(FIF.FOLDER, self.tr("配置文件位置"),
             self.tr("（未加载）"), self.about_group)
         self._btn_open_dir = PushButton(self.tr("打开目录"), self._path_card)
-        self._btn_open_dir.setFont(QFont("Microsoft YaHei", 10))
+        self._btn_open_dir.setFont(ui_font(10))
         self._btn_open_dir.clicked.connect(self._open_config_dir)
         self._btn_change_dir = PushButton(self.tr("更改位置"), self._path_card)
-        self._btn_change_dir.setFont(QFont("Microsoft YaHei", 10))
+        self._btn_change_dir.setFont(ui_font(10))
         self._btn_change_dir.clicked.connect(self._change_config_dir)
         self._path_card.hBoxLayout.addWidget(self._btn_open_dir, 0, Qt.AlignmentFlag.AlignRight)
         self._path_card.hBoxLayout.addWidget(self._btn_change_dir, 0, Qt.AlignmentFlag.AlignRight)
@@ -79,21 +80,21 @@ class AboutSubInterface(SubSettingInterface):
             self.tools_group,
         )
         self._ffmpeg_path_label = PushButton(self.tr("（使用环境变量）"), self._ffmpeg_card)
-        self._ffmpeg_path_label.setFont(QFont("Microsoft YaHei", 9))
+        self._ffmpeg_path_label.setFont(ui_font(9))
         self._ffmpeg_path_label.setEnabled(False)
         self._ffmpeg_path_label.setMaximumWidth(260)
         self._btn_browse_ffmpeg = PushButton(self.tr("浏览"), self._ffmpeg_card)
-        self._btn_browse_ffmpeg.setFont(QFont("Microsoft YaHei", 10))
+        self._btn_browse_ffmpeg.setFont(ui_font(10))
         self._btn_browse_ffmpeg.clicked.connect(self._browse_ffmpeg)
         self._btn_clear_ffmpeg = PushButton(self.tr("清除"), self._ffmpeg_card)
-        self._btn_clear_ffmpeg.setFont(QFont("Microsoft YaHei", 10))
+        self._btn_clear_ffmpeg.setFont(ui_font(10))
         self._btn_clear_ffmpeg.clicked.connect(self._clear_ffmpeg_path)
         self._ffmpeg_card.hBoxLayout.addWidget(self._ffmpeg_path_label, 0, Qt.AlignmentFlag.AlignRight)
         self._ffmpeg_card.hBoxLayout.addWidget(self._btn_browse_ffmpeg, 0, Qt.AlignmentFlag.AlignRight)
         self._ffmpeg_card.hBoxLayout.addWidget(self._btn_clear_ffmpeg, 0, Qt.AlignmentFlag.AlignRight)
         if sys.platform == "win32":
             self._btn_install_ffmpeg = PrimaryPushButton(self.tr("一键安装"), self._ffmpeg_card)
-            self._btn_install_ffmpeg.setFont(QFont("Microsoft YaHei", 10))
+            self._btn_install_ffmpeg.setFont(ui_font(10))
             self._btn_install_ffmpeg.clicked.connect(self._install_ffmpeg)
             self._ffmpeg_card.hBoxLayout.addWidget(self._btn_install_ffmpeg, 0, Qt.AlignmentFlag.AlignRight)
         self._ffmpeg_card.hBoxLayout.addSpacing(16)

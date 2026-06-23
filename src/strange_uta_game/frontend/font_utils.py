@@ -7,9 +7,38 @@
 
 from __future__ import annotations
 
+import sys
+
 from PyQt6.QtGui import QFont, QFontDatabase, QFontMetrics
 
-DEFAULT_FONT_FAMILY = "Microsoft YaHei"
+
+def _platform_default_font_family() -> str:
+    """各平台的默认中文 UI 字体族。
+
+    - Windows：``Microsoft YaHei``（微软雅黑）。
+    - macOS：``PingFang SC``（苹方-简，10.11+ 系统内置的默认中文 UI 字体，
+      地位对应微软雅黑）。
+    - 其余（Linux 等）：``Noto Sans CJK SC``，缺失时由下游 ``resolve_font_family``
+      / Qt 自身再行回退。
+    """
+    if sys.platform == "darwin":
+        return "PingFang SC"
+    if sys.platform.startswith("win"):
+        return "Microsoft YaHei"
+    return "Noto Sans CJK SC"
+
+
+#: 当前平台的默认中文 UI 字体族（字体回退与硬编码控件字体的单一真源）。
+DEFAULT_FONT_FAMILY = _platform_default_font_family()
+
+
+def ui_font(point_size: int, weight: QFont.Weight = QFont.Weight.Normal) -> QFont:
+    """以平台默认 UI 字体族构造 ``QFont``（替代散落的硬编码字体名）。
+
+    Windows 得到微软雅黑、macOS 得到苹方，避免在 macOS 上落到不存在的字体名而
+    被 Qt 静默替换成观感不佳的兜底字体。
+    """
+    return QFont(DEFAULT_FONT_FAMILY, point_size, weight)
 
 
 def resolve_font_family(family: str | None) -> str:

@@ -14,6 +14,7 @@ import numpy as np
 import sounddevice as sd
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QBrush, QColor, QFont, QKeyEvent, QPainter, QPaintEvent, QPen
+from strange_uta_game.frontend.font_utils import ui_font
 from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 from qfluentwidgets import (
     InfoBar,
@@ -113,9 +114,9 @@ class CalibrationDialog(QDialog):
         left_layout = QVBoxLayout()
         left_layout.setSpacing(4)
         self.lbl_latest = QLabel(self.tr("最近偏移: -- ms"), self)
-        self.lbl_latest.setFont(QFont("Microsoft YaHei", 10))
+        self.lbl_latest.setFont(ui_font(10))
         self.lbl_average = QLabel(self.tr("平均偏移: -- ms"), self)
-        self.lbl_average.setFont(QFont("Microsoft YaHei", 10))
+        self.lbl_average.setFont(ui_font(10))
         left_layout.addWidget(self.lbl_latest)
         left_layout.addWidget(self.lbl_average)
         top_row.addLayout(left_layout)
@@ -124,17 +125,17 @@ class CalibrationDialog(QDialog):
         right_layout = QHBoxLayout()
         right_layout.setSpacing(8)
         self.lbl_bpm = QLabel(self.tr("节拍 BPM"), self)
-        self.lbl_bpm.setFont(QFont("Microsoft YaHei", 10))
+        self.lbl_bpm.setFont(ui_font(10))
         self.spin_bpm = SpinBox(self)
         self.spin_bpm.setRange(60, 240)
         self.spin_bpm.setValue(self._bpm)
         self.spin_bpm.setSuffix(" BPM")
         self.spin_bpm.setMinimumWidth(130)
-        self.spin_bpm.setFont(QFont("Microsoft YaHei", 10))
+        self.spin_bpm.setFont(ui_font(10))
         self.btn_reset = PushButton(self.tr("重置"), self)
-        self.btn_reset.setFont(QFont("Microsoft YaHei", 10))
+        self.btn_reset.setFont(ui_font(10))
         self.btn_apply = PushButton(self.tr("应用"), self)
-        self.btn_apply.setFont(QFont("Microsoft YaHei", 10))
+        self.btn_apply.setFont(ui_font(10))
 
         right_layout.addWidget(self.lbl_bpm)
         right_layout.addWidget(self.spin_bpm)
@@ -150,7 +151,7 @@ class CalibrationDialog(QDialog):
         self.lbl_hint = QLabel(
             self.tr("按空格键跟拍，可持续任意次数，关闭窗口前都会保持运行"), self
         )
-        self.lbl_hint.setFont(QFont("Microsoft YaHei", 9))
+        self.lbl_hint.setFont(ui_font(9))
         root.addWidget(self.lbl_hint)
 
         self.animation_timer = QTimer(self)

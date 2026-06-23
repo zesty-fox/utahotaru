@@ -32,6 +32,7 @@ except Exception:  # pragma: no cover
 
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
+from strange_uta_game.frontend.font_utils import ui_font
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
@@ -376,7 +377,7 @@ class EmojiTagDialog(QDialog):
             ctrls["zoom_mode"].setCurrentText("Zoom")
 
         ctrls["zoom_value"] = LineEdit()
-        ctrls["zoom_value"].setFont(QFont("Microsoft YaHei", 10))
+        ctrls["zoom_value"].setFont(ui_font(10))
         ctrls["zoom_value"].setText(str(default_opts["zoom_value"]))
         ctrls["zoom_value"].setMinimumWidth(54)
         ctrls["zoom_value"].setPlaceholderText("100")
@@ -399,7 +400,7 @@ class EmojiTagDialog(QDialog):
         ctrls["margin_left_lbl"] = BodyLabel("L")
 
         ctrls["margin_left"] = LineEdit()
-        ctrls["margin_left"].setFont(QFont("Microsoft YaHei", 10))
+        ctrls["margin_left"].setFont(ui_font(10))
         ctrls["margin_left"].setText(str(default_opts["margin_left"]))
         ctrls["margin_left"].setMinimumWidth(68)
         ctrls["margin_left"].setPlaceholderText("0")
@@ -408,7 +409,7 @@ class EmojiTagDialog(QDialog):
         ctrls["margin_right_lbl"] = BodyLabel("R")
 
         ctrls["margin_right"] = LineEdit()
-        ctrls["margin_right"].setFont(QFont("Microsoft YaHei", 10))
+        ctrls["margin_right"].setFont(ui_font(10))
         ctrls["margin_right"].setText(str(default_opts["margin_right"]))
         ctrls["margin_right"].setMinimumWidth(68)
         ctrls["margin_right"].setPlaceholderText("0")
@@ -417,7 +418,7 @@ class EmojiTagDialog(QDialog):
         ctrls["margin_bottom_lbl"] = BodyLabel("B")
 
         ctrls["margin_bottom"] = LineEdit()
-        ctrls["margin_bottom"].setFont(QFont("Microsoft YaHei", 10))
+        ctrls["margin_bottom"].setFont(ui_font(10))
         ctrls["margin_bottom"].setText(str(default_opts["margin_bottom"]))
         ctrls["margin_bottom"].setMinimumWidth(68)
         ctrls["margin_bottom"].setPlaceholderText("0")
@@ -518,7 +519,7 @@ class EmojiTagDialog(QDialog):
         row1.setSpacing(6)
 
         name_edit = LineEdit()
-        name_edit.setFont(QFont("Microsoft YaHei", 10))
+        name_edit.setFont(ui_font(10))
         name_edit.setText(singer_name)
         name_edit.setPlaceholderText(self.tr("演唱者名"))
         name_edit.setFixedWidth(96)
@@ -528,7 +529,7 @@ class EmojiTagDialog(QDialog):
         row1.addWidget(trigger_lbl)
 
         trigger_edit = LineEdit()
-        trigger_edit.setFont(QFont("Microsoft YaHei", 10))
+        trigger_edit.setFont(ui_font(10))
         if trigger_text is not None:
             trigger_edit.setText(trigger_text)
         else:
@@ -542,7 +543,7 @@ class EmojiTagDialog(QDialog):
         row1.addWidget(front_lbl)
 
         front_edit = LineEdit()
-        front_edit.setFont(QFont("Microsoft YaHei", 10))
+        front_edit.setFont(ui_font(10))
         front_edit.setText(default_front)
         front_edit.setPlaceholderText(self.tr("可留空"))
         row1.addWidget(front_edit, stretch=2)
@@ -553,7 +554,7 @@ class EmojiTagDialog(QDialog):
         row1.addWidget(back_lbl)
 
         back_edit = LineEdit()
-        back_edit.setFont(QFont("Microsoft YaHei", 10))
+        back_edit.setFont(ui_font(10))
         back_edit.setText(default_back)
         back_edit.setPlaceholderText(self.tr("留空=同前画像"))
         row1.addWidget(back_edit, stretch=2)

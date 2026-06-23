@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
+from strange_uta_game.frontend.font_utils import ui_font
 from strange_uta_game.frontend.window_sizing import fit_min_size
 from PyQt6.QtWidgets import (
     QDialog,
@@ -49,7 +50,7 @@ class DictionaryEditDialog(QDialog):
         layout.setSpacing(12)
 
         title = QLabel(self.tr("读音词典"))
-        title.setFont(QFont("Microsoft YaHei", 14))
+        title.setFont(ui_font(14))
         layout.addWidget(title)
 
         desc = QLabel(self.tr(
@@ -58,7 +59,7 @@ class DictionaryEditDialog(QDialog):
             "注音格式：{原文||段1,段2,...}（块内 | 分 mora、, 分字符；空段=无 ruby）。\n"
             "示例：{微笑||ほほ,え}ん  /  {大冒険||だ|い,ぼ|う,け|ん}"
         ))
-        desc.setFont(QFont("Microsoft YaHei", 10))
+        desc.setFont(ui_font(10))
         desc.setWordWrap(True)
         layout.addWidget(desc)
 

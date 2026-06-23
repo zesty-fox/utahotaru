@@ -9,6 +9,7 @@ from typing import Optional
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QKeyEvent, QWheelEvent
+from strange_uta_game.frontend.font_utils import ui_font
 from PyQt6.QtWidgets import QDialog, QFileDialog, QLabel, QVBoxLayout, QWidget
 from strange_uta_game.frontend.theme import theme
 from strange_uta_game.frontend.fluent_widgets import dialog_button_row
@@ -361,7 +362,7 @@ class _KeyCaptureButton(PushButton):
         self._hold_timer.setInterval(self.HOLD_THRESHOLD_MS)
         self._hold_timer.timeout.connect(self._on_hold_timeout)
         self.setMinimumWidth(140)  # 长按键名（如 "ALT+RIGHT:short"）翻译后可能更宽
-        self.setFont(QFont("Microsoft YaHei", 9))
+        self.setFont(ui_font(9))
         self.clicked.connect(self._start_listening)
 
     def _start_listening(self):
@@ -614,7 +615,7 @@ class ShortcutSettingCard(SettingCard):
         self.btn_key2.set_key(key2)
 
         self._lbl_or = QLabel(self.tr("或"), self)
-        self._lbl_or.setFont(QFont("Microsoft YaHei", 9))
+        self._lbl_or.setFont(ui_font(9))
 
         self.btn_key1.key_captured.connect(lambda k: self._on_key_changed(self.btn_key1, k))
         self.btn_key2.key_captured.connect(lambda k: self._on_key_changed(self.btn_key2, k))

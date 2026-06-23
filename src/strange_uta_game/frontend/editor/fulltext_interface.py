@@ -24,6 +24,8 @@ from PyQt6.QtGui import (
     QTextCursor,
     QTextFormat,
 )
+
+from strange_uta_game.frontend.font_utils import ui_font
 from qfluentwidgets import (
     CheckBox,
     PushButton,
@@ -389,7 +391,7 @@ class DeleteRubyByTypeDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(self.tr("按类型删除注音"))
         fit_to_screen(self, 320, 400)
-        self.setFont(QFont("Microsoft YaHei", 10))
+        self.setFont(ui_font(10))
 
         layout = QVBoxLayout(self)
         layout.setSpacing(8)
@@ -555,7 +557,7 @@ class RubyInterface(QWidget):
 
         # 全文本编辑器（带行号栏 + 语法着色，Alt+滚轮缩放字体）
         self.text_edit = LineNumberPlainTextEdit()
-        self.text_edit.setFont(QFont("Microsoft YaHei", 12))
+        self.text_edit.setFont(ui_font(12))
         self.text_edit.setPlaceholderText(self.tr(
             "加载项目后，歌词将以带时间戳的注音格式显示在此处...\n"
             "示例: {大冒険||[00:01.00]だ|[00:01.20]い,...}"
