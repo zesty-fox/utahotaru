@@ -127,6 +127,10 @@ class ExportInterface(QWidget):
         super().__init__(parent)
         self._project: Optional[Project] = None
         self._export_service = ExportService()
+        # 输出目录是否由用户通过「浏览」主动选定。一经选定即保留，自动预填不再
+        # 覆盖它（切换音频、改设置均不影响），直到用户再次「浏览」更换、或切换项目。
+        # 放在 __init__ 而非 _init_ui，避免切语言重建时被清零。
+        self._output_user_set = False
         self._init_ui()
 
     def changeEvent(self, event):
@@ -431,12 +435,13 @@ class ExportInterface(QWidget):
         if change_type == "project":
             self._project = self._store.project
             self._sync_default_filename()
-            self._sync_default_output_dir(force=True)
+            # 切换项目才清除用户上次的浏览选择
+            self._sync_default_output_dir(reset_user_choice=True)
             self._refresh_singer_checkboxes()
         elif change_type == "audio":
             # 音频变更即刻反映到默认文件名（无需等待"创建项目"）
             self._sync_default_filename()
-            self._sync_default_output_dir(force=True)
+            self._sync_default_output_dir()
         elif change_type == "singers":
             if self._store and self._store.project:
                 self._project = self._store.project
@@ -463,20 +468,27 @@ class ExportInterface(QWidget):
                 self._on_format_selected(item, None)
                 return
 
-    def _sync_default_output_dir(self, force: bool = False):
-        """根据当前 store 的工作目录自动预填导出路径（用户可手动改）。
+    def _sync_default_output_dir(self, reset_user_choice: bool = False):
+        """根据 store 的导出目录自动预填导出路径（仅影响预填值）。
+
+        预填取值优先级见 ``ProjectStore.export_dir``（已保存项目 > 默认导出
+        目录 > 上次加载目录）。用户通过「浏览」主动选过路径后，该选择会被
+        保留，自动预填不再覆盖它，直到用户再次「浏览」更换、或切换项目。
 
         Args:
-            force: 为 True 时无论字段是否已有内容都强制刷新（用于项目加载/音频加载场景）。
+            reset_user_choice: 为 True 时清除用户上次的浏览选择（仅切换项目时
+                传入；切换音频、改设置都不重置）。
         """
         if not self._store:
             return
-        # 非强制模式下，用户已经手填过路径则不覆盖
-        if not force and self.line_output.text().strip():
+        if reset_user_choice:
+            self._output_user_set = False
+        # 用户通过「浏览」指定的导出路径应当保留，不被自动预填覆盖
+        if self._output_user_set:
             return
-        working_dir = self._store.working_dir
-        if working_dir:
-            self.line_output.setText(working_dir)
+        export_dir = self._store.export_dir
+        if export_dir:
+            self.line_output.setText(export_dir)
 
     def _sync_default_filename(self):
         """根据当前 store 的音频 / 项目元数据刷新默认导出文件名。"""
@@ -566,16 +578,16 @@ class ExportInterface(QWidget):
         return {s.id: s.name for s in self._project.singers}
 
     def _on_browse(self):
-        settings = AppSettings()
-        # 优先用 store 的工作目录，回退到 settings 中的 last_export_dir
+        # 优先用导出专用目录（默认导出目录 > 项目/音频/歌词），回退到 last_export_dir
         default_dir = ""
         if self._store:
-            default_dir = self._store.working_dir
+            default_dir = self._store.export_dir
         if not default_dir:
-            default_dir = settings.get("export.last_export_dir", "")
+            default_dir = AppSettings().get("export.last_export_dir", "")
         path = QFileDialog.getExistingDirectory(self, self.tr("选择导出目录"), default_dir)
         if path:
             self.line_output.setText(path)
+            self._output_user_set = True
 
     def _on_nicokara_tags(self):
         """打开 Nicokara 标签设置对话框"""
@@ -684,12 +696,11 @@ class ExportInterface(QWidget):
         output_dir = self.line_output.text()
         if not output_dir:
             # 弹出文件选择
-            settings = AppSettings()
             default_dir = ""
             if self._store:
-                default_dir = self._store.working_dir
+                default_dir = self._store.export_dir
             if not default_dir:
-                default_dir = settings.get("export.last_export_dir", "")
+                default_dir = AppSettings().get("export.last_export_dir", "")
             output_dir = QFileDialog.getExistingDirectory(self, self.tr("选择导出目录"), default_dir)
             if not output_dir:
                 return

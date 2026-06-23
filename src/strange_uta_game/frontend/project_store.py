@@ -248,6 +248,34 @@ class ProjectStore(QObject):
             return last
         return ""
 
+    @property
+    def export_dir(self) -> str:
+        """派生：导出目标目录（仅供导出界面使用，区别于 working_dir）。
+
+        与 ``working_dir`` 的关键差异：用户在设置中显式指定的
+        ``export.default_export_dir`` 优先于音频/歌词/last_export_dir，
+        仅次于已正式保存的项目目录。保存场景仍走 ``working_dir``，不受
+        默认导出目录影响。
+
+        优先级：
+          1. 已正式保存的项目目录（排除 .cache 临时项目；全新未保存的
+             未命名项目 _save_path 为 None，天然跳过）
+          2. settings["export.default_export_dir"]（用户显式指定）
+          3. working_dir 的其余回退（音频 / 歌词 / last_export_dir）
+        """
+        if self._save_path and not self.is_temp_save_path(self._save_path):
+            parent = str(Path(self._save_path).parent)
+            if parent and Path(parent).is_dir():
+                return parent
+        try:
+            from strange_uta_game.frontend.settings.app_settings import AppSettings
+            default_dir = AppSettings().get("export.default_export_dir", "") or ""
+            if default_dir and Path(default_dir).is_dir():
+                return default_dir
+        except Exception:
+            pass
+        return self.working_dir
+
     def suggested_save_path(self, ext: str = ".sug") -> str:
         """根据 working_dir + 项目标题/音频名生成建议的保存全路径。
 
