@@ -1,0 +1,120 @@
+"""跨平台用户数据目录解析（单一真源）。
+
+各处需要落盘的模块都应经由本模块取目录，确保口径一致，并避免在只读位置写入。
+
+设计：
+- **Windows / Linux**：保持原「便携」行为 —— 配置与缓存都写在程序所在目录，
+  并支持程序目录下的 ``.config_redirect`` 把配置重定向到自定义位置。
+- **macOS**：程序被装进只读的 ``.app`` bundle（或经 Gatekeeper App Translocation
+  从只读临时挂载点运行），程序目录不可写。改用系统约定的可写位置：
+    * 配置 / 项目 → ``~/Library/Application Support/StrangeUtaGame``
+    * 缓存        → ``~/Library/Caches/StrangeUtaGame``
+    * 日志        → ``~/Library/Logs/StrangeUtaGame``
+- **任意平台兜底**：若上述目录最终不可写（例如 Windows 装在 ``Program Files`` 且
+  无写权限），回退到 ``~/.strange_uta_game``（及其 ``cache`` / ``logs`` 子目录），
+  保证程序绝不因目录不可写而崩溃。
+
+注意：可写性以「能否真正建文件」为准（试写探针），而不是 ``mkdir(exist_ok=True)``
+是否成功 —— 只读 bundle 内目标目录已存在，``mkdir`` 不会报错，但写入会失败。
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+import tempfile
+from pathlib import Path
+from typing import Optional
+
+APP_NAME = "StrangeUtaGame"
+_FALLBACK_ROOT = Path.home() / ".strange_uta_game"
+_REDIRECT_FILENAME = ".config_redirect"
+
+
+def program_dir() -> Path:
+    """可执行文件（开发期为入口脚本）所在目录。"""
+    return Path(sys.argv[0]).resolve().parent
+
+
+def _is_dir_writable(d: Path) -> bool:
+    """目录是否「真正可写」：能创建则建之，再用试写探针验证写权限。"""
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return False
+    try:
+        # 仅探测写权限：临时文件用完即删，不留痕迹。
+        with tempfile.TemporaryFile(dir=str(d)):
+            pass
+        return True
+    except OSError:
+        return False
+
+
+def _first_writable(*candidates: Path) -> Path:
+    """返回首个可写目录；全不可写时返回最后一个候选（已尽力 mkdir，交由调用方兜底）。"""
+    for c in candidates:
+        if _is_dir_writable(c):
+            return c
+    last = candidates[-1]
+    try:
+        last.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+    return last
+
+
+def redirect_marker_path() -> Path:
+    """``.config_redirect`` 标记文件位置（始终在程序目录，保持便携语义）。"""
+    return program_dir() / _REDIRECT_FILENAME
+
+
+def _read_redirect() -> Optional[Path]:
+    marker = redirect_marker_path()
+    try:
+        if marker.exists():
+            custom = Path(marker.read_text(encoding="utf-8").strip())
+            if custom.is_dir():
+                return custom
+    except OSError:
+        pass
+    return None
+
+
+def config_dir() -> Path:
+    """配置 / 项目目录（已确保存在且可写）。
+
+    优先级：``.config_redirect`` > 平台默认 > ``~/.strange_uta_game`` 兜底。
+    """
+    redirected = _read_redirect()
+    if redirected is not None:
+        return _first_writable(redirected, _FALLBACK_ROOT)
+    if sys.platform == "darwin":
+        return _first_writable(
+            Path.home() / "Library" / "Application Support" / APP_NAME,
+            _FALLBACK_ROOT,
+        )
+    return _first_writable(program_dir(), _FALLBACK_ROOT)
+
+
+def cache_dir() -> Path:
+    """缓存目录（已确保存在且可写）。``SUG_CACHE_DIR`` 环境变量最高优先。"""
+    env_dir = os.environ.get("SUG_CACHE_DIR")
+    if env_dir:
+        return _first_writable(Path(env_dir), _FALLBACK_ROOT / "cache")
+    if sys.platform == "darwin":
+        return _first_writable(
+            Path.home() / "Library" / "Caches" / APP_NAME,
+            _FALLBACK_ROOT / "cache",
+        )
+    return _first_writable(program_dir() / ".cache", _FALLBACK_ROOT / "cache")
+
+
+def logs_dir() -> Path:
+    """日志目录（已确保存在且可写）。"""
+    if sys.platform == "darwin":
+        return _first_writable(
+            Path.home() / "Library" / "Logs" / APP_NAME,
+            _FALLBACK_ROOT / "logs",
+        )
+    return _first_writable(program_dir() / "logs", _FALLBACK_ROOT / "logs")

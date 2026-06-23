@@ -38,6 +38,8 @@ import soundfile as sf
 from pedalboard import time_stretch
 from pedalboard.io import AudioFile
 
+from strange_uta_game import app_dirs
+
 
 ProgressCallback = Callable[[float, float], None]  # (speed, 0.0~1.0)
 DoneCallback = Callable[[float], None]              # (speed,)
@@ -94,16 +96,12 @@ def _quantize(speed: float) -> float:
 
 
 def _get_cache_dir() -> Path:
-    """获取缓存目录（程序所在目录下的 .cache 文件夹）"""
-    env_dir = os.environ.get("SUG_CACHE_DIR")
-    if env_dir:
-        cache_dir = Path(env_dir)
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        return cache_dir
-    program_dir = Path(sys.argv[0]).resolve().parent
-    cache_dir = program_dir / _CACHE_DIR_NAME
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    return cache_dir
+    """获取缓存目录（与 project_store / video_converter 同源）。
+
+    解析逻辑见 :mod:`strange_uta_game.app_dirs`：``SUG_CACHE_DIR`` 最高优先，
+    macOS 用 ``~/Library/Caches``，其余平台用程序目录下的 ``.cache``。
+    """
+    return app_dirs.cache_dir()
 
 
 def _get_cache_path(song_name: str, speed: float) -> Path:

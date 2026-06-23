@@ -120,10 +120,17 @@ class TestCacheRedirectContract:
         assert ps._untitled_temp_path().parent == tmp_path
 
     def test_no_env_is_standalone(self, monkeypatch):
+        import sys
+
         monkeypatch.delenv("SUG_CACHE_DIR", raising=False)
         from strange_uta_game.frontend import project_store as ps
 
-        assert ps._get_cache_dir().name == ".cache"
+        cache = ps._get_cache_dir()
+        if sys.platform == "darwin":
+            # macOS：bundle 只读，缓存落在 ~/Library/Caches/<App>
+            assert "Caches" in cache.parts
+        else:
+            assert cache.name == ".cache"
 
 
 class TestEmbeddedUIContract:

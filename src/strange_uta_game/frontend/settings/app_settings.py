@@ -19,6 +19,8 @@ from typing import Any, ClassVar, Dict, Optional, Protocol, runtime_checkable
 import json
 import sys
 
+from strange_uta_game import app_dirs
+
 
 @runtime_checkable
 class SettingsProvider(Protocol):
@@ -319,20 +321,13 @@ class AppSettings:
 
     @staticmethod
     def get_config_dir() -> Path:
-        """获取配置文件目录（默认为程序所在目录）。
+        """获取配置文件目录（已确保存在且可写）。
 
-        支持通过程序目录下的 .config_redirect 文件重定向到自定义位置。
+        解析逻辑见 :mod:`strange_uta_game.app_dirs`：Windows/Linux 默认程序目录并
+        支持 ``.config_redirect`` 重定向；macOS 用 ``~/Library/Application Support``；
+        目录不可写时回退到 ``~/.strange_uta_game``。
         """
-        program_dir = Path(sys.argv[0]).resolve().parent
-        redirect_file = program_dir / ".config_redirect"
-        if redirect_file.exists():
-            try:
-                custom_dir = Path(redirect_file.read_text(encoding="utf-8").strip())
-                if custom_dir.is_dir():
-                    return custom_dir
-            except Exception:
-                pass
-        return program_dir
+        return app_dirs.config_dir()
 
     @staticmethod
     def _get_packaged_config_path(filename: str) -> Optional[Path]:
@@ -378,13 +373,8 @@ class AppSettings:
         if effective_provider is None:
             # ── standalone 模式：保持原有文件型行为 ──
             if config_path is None:
+                # get_config_dir() 已确保目录存在且可写（含 macOS / 只读位置兜底）。
                 config_dir = self.get_config_dir()
-                try:
-                    config_dir.mkdir(exist_ok=True)
-                except OSError:
-                    # 程序目录不可写时回退到用户目录
-                    config_dir = Path.home() / ".strange_uta_game"
-                    config_dir.mkdir(exist_ok=True)
                 self._config_path = config_dir / "config.json"
                 # 如果用户配置不存在，从内嵌配置复制
                 if not self._config_path.exists():

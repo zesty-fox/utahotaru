@@ -17,7 +17,6 @@ LLM 的产出（分词 + 平假名读音）与 WinRT/Sudachi 的 ``(surface, rea
 from __future__ import annotations
 
 import json
-import sys
 import threading
 import time
 from dataclasses import dataclass
@@ -25,6 +24,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+from strange_uta_game import app_dirs
 from strange_uta_game.backend.infrastructure.parsers.ruby_analyzer import (
     KanaDistributingAnalyzer,
     RubyAnalyzer,
@@ -68,9 +68,8 @@ def _next_call_seq() -> int:
 
 
 def _llm_log_dir() -> Path:
-    """LLM 请求日志目录（程序目录下 .cache/llm_ruby，与 tsm_cache 同源）。"""
-    program_dir = Path(sys.argv[0]).resolve().parent
-    return program_dir / ".cache" / _LOG_DIR_NAME
+    """LLM 请求日志目录（缓存根目录下 llm_ruby 子目录，与 tsm_cache 同源）。"""
+    return app_dirs.cache_dir() / _LOG_DIR_NAME
 
 
 def llm_log_event(event: str, **fields) -> None:

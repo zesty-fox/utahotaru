@@ -10,17 +10,28 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
+from strange_uta_game import app_dirs
+
 
 _ENABLED = os.getenv("SUG_TIMING_PERF_LOG", "").lower() not in ("", "0", "false", "no", "off")
 _DEFAULT_THRESHOLD_MS = float(os.getenv("SUG_TIMING_PERF_THRESHOLD_MS", "16"))
 
 
 def _default_log_path() -> Path:
+    """诊断日志默认路径。
+
+    macOS 程序目录在只读 bundle 内，改用 ``~/Library/Logs``；其余平台沿用程序目录
+    下的 ``logs``。目录在首次写入时（已被 ``_ENABLED`` 门控且 try/except 包裹）惰性
+    创建，故此处只解析路径、不触碰文件系统。
+    """
     try:
-        base_dir = Path(sys.argv[0]).resolve().parent
+        if sys.platform == "darwin":
+            base_dir = Path.home() / "Library" / "Logs" / app_dirs.APP_NAME
+        else:
+            base_dir = app_dirs.program_dir() / "logs"
     except Exception:
-        base_dir = Path.cwd()
-    return base_dir / "logs" / "sug-timing-perf.log"
+        base_dir = Path.cwd() / "logs"
+    return base_dir / "sug-timing-perf.log"
 
 
 _LOG_PATH = Path(
