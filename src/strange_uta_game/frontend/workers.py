@@ -172,6 +172,7 @@ class RubyAnalyzeWorker(QObject):
 
     progress = pyqtSignal(str, int, int)  # (phase, current_line, total_lines)
     llm_waiting = pyqtSignal()         # LLM 整首批量请求发出、等待返回中
+    llm_progress = pyqtSignal(str)     # LLM 内部阶段文本（请求/解析/重试/轮次）
     finished = pyqtSignal(object, int) # (analyzed_project_copy, deleted_count)
     error = pyqtSignal(str)
 
@@ -210,6 +211,8 @@ class RubyAnalyzeWorker(QObject):
             # LLM 注音：显式预热整首批量请求，期间发「等待 LLM」信号给 UI。
             _analyzer = getattr(self._auto_check, "_analyzer", None)
             if _analyzer is not None and hasattr(_analyzer, "prewarm"):
+                if hasattr(_analyzer, "set_progress_callback"):
+                    _analyzer.set_progress_callback(self.llm_progress.emit)
                 self.llm_waiting.emit()
                 _analyzer.prewarm()
 
@@ -240,6 +243,7 @@ class RubySubsetAnalyzeWorker(QObject):
     """
 
     llm_waiting = pyqtSignal()     # LLM 整首批量请求发出、等待返回中
+    llm_progress = pyqtSignal(str) # LLM 内部阶段文本（请求/解析/重试/轮次）
     finished = pyqtSignal(object)  # analyzed project copy
     error = pyqtSignal(str)
 
@@ -270,6 +274,8 @@ class RubySubsetAnalyzeWorker(QObject):
             # LLM 注音：显式预热整首批量请求，期间发「等待 LLM」信号给 UI。
             _analyzer = getattr(self._auto_check, "_analyzer", None)
             if _analyzer is not None and hasattr(_analyzer, "prewarm"):
+                if hasattr(_analyzer, "set_progress_callback"):
+                    _analyzer.set_progress_callback(self.llm_progress.emit)
                 self.llm_waiting.emit()
                 _analyzer.prewarm()
 

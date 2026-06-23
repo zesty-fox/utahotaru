@@ -318,6 +318,22 @@ class LLMRubyClient:
         # 记录本次 _request 链路中最近一次（成功）HTTP 调用的全局 seq，
         # 供 _request 把 extracted 文本对齐到同一调用编号下落盘。
         self._last_call_seq: Optional[int] = None
+        # 进度回调：把「请求 / 已返回 / 解析 / 重试 / 第几轮」等内部阶段文本
+        # 上报给 UI（由 worker 接到信号刷 StateToolTip）。失败静默，绝不影响主流程。
+        self._progress_cb: Optional[Callable[[str], None]] = None
+
+    def set_progress_callback(self, cb: Optional[Callable[[str], None]]) -> None:
+        """注册进度回调（线程安全无关：仅赋值；回调内部自行做线程转发）。"""
+        self._progress_cb = cb
+
+    def _report(self, msg: str) -> None:
+        cb = self._progress_cb
+        if cb is None:
+            return
+        try:
+            cb(msg)
+        except Exception:
+            pass
 
     # ── 公共 API ──
 
@@ -351,40 +367,93 @@ class LLMRubyClient:
         )
         return (True, f"连接成功（{elapsed:.1f}s，模型 {self._cfg.model}）：{sample} → {readings}")
 
+    # 整首一次性发送是既定策略；未通过校验（字符不符 / 漏注音漢字）的行，
+    # 收集后再整批发给 LLM 重试一轮，多轮仍缺才由调用方回退本地引擎。
+    # 总轮数 = 1 次首发 + (N-1) 次重试。
+    _MAX_ANNOTATE_ROUNDS = 2
+
     def annotate_lines(
         self, lines: List[str]
     ) -> Tuple[Dict[int, Pairs], Optional[str]]:
-        """整首一次请求，返回 ``({line_idx: pairs}, error)``。
+        """整首一次请求 + 缺失行重试，返回 ``({line_idx: pairs}, error)``。
 
-        error 为 None 表示请求成功（个别行可能因校验失败而缺席，由调用方按行回退）；
-        非 None 表示整体失败（网络/鉴权/JSON），调用方应全部回退本地引擎。
+        - error 为 None：请求成功（个别行多轮重试后仍缺席的，由调用方按行回退）。
+        - error 非 None：**首轮**整体失败（网络/鉴权/JSON），调用方应全部回退本地引擎。
+
+        校验在 :func:`_parse_payload` 内完成（字符完整 + 漢字读音覆盖）。未达标的
+        行不进 mapping → 成为下一轮的 pending 行，整批重发给 LLM 再试。
         """
         if not self._cfg.is_complete():
             return ({}, "连接信息不完整")
-        llm_log_event("annotate_start", lines=len(lines))
-        try:
-            raw = self._request(lines)
-        except LLMRubyError as e:
-            llm_log_event("annotate_error", error=str(e))
-            return ({}, str(e))
-        except Exception as e:  # noqa: BLE001
-            llm_log_event("annotate_error", error=f"{type(e).__name__}: {e}")
-            return ({}, f"{type(e).__name__}: {e}")
-        try:
-            mapping = _parse_payload(raw, lines)
-        except Exception as e:  # noqa: BLE001
-            snippet = (raw or "")[:300].replace("\n", " ")
-            # 完整 raw 单独成文件，便于复盘解析失败的原始返回；index 只放短摘要。
-            err_seq = _next_call_seq()
-            _dump_call(err_seq, "parse_error", raw or "", redactor=self._redact)
-            llm_log_event("parse_error", seq=err_seq, error=str(e))
-            return ({}, f"返回内容解析失败：{e}；原始返回：{snippet}")
-        # 记录命中/缺失行数，便于核对按行回退
+
+        n = len(lines)
+        mapping: Dict[int, Pairs] = {}
+        pending = list(range(n))
+
+        for round_idx in range(self._MAX_ANNOTATE_ROUNDS):
+            sub_lines = [lines[i] for i in pending]
+            is_retry = round_idx > 0
+            if is_retry:
+                self._report(f"第 {round_idx + 1} 轮：为 {len(sub_lines)} 行缺失注音重试…")
+            else:
+                self._report(f"正在请求 LLM 注音（{len(sub_lines)} 行）…")
+            llm_log_event(
+                "annotate_start", round=round_idx + 1, lines=len(sub_lines),
+                retry=is_retry,
+            )
+
+            try:
+                raw = self._request(sub_lines)
+            except LLMRubyError as e:
+                if not is_retry:
+                    llm_log_event("annotate_error", error=str(e))
+                    return ({}, str(e))
+                # 重试轮失败：保留已得结果，停止重试（缺失行交调用方回退）。
+                llm_log_event("annotate_retry_error", round=round_idx + 1, error=str(e))
+                break
+            except Exception as e:  # noqa: BLE001
+                if not is_retry:
+                    llm_log_event("annotate_error", error=f"{type(e).__name__}: {e}")
+                    return ({}, f"{type(e).__name__}: {e}")
+                llm_log_event(
+                    "annotate_retry_error", round=round_idx + 1,
+                    error=f"{type(e).__name__}: {e}",
+                )
+                break
+
+            self._report("已返回，正在解析…")
+            try:
+                sub_mapping = _parse_payload(raw, sub_lines)
+            except Exception as e:  # noqa: BLE001
+                snippet = (raw or "")[:300].replace("\n", " ")
+                err_seq = _next_call_seq()
+                _dump_call(err_seq, "parse_error", raw or "", redactor=self._redact)
+                llm_log_event("parse_error", seq=err_seq, round=round_idx + 1, error=str(e))
+                if not is_retry:
+                    return ({}, f"返回内容解析失败：{e}；原始返回：{snippet}")
+                break
+
+            # 子索引（sub_lines 内 0-based）→ 原始行索引
+            newly = 0
+            for sub_idx, pairs in sub_mapping.items():
+                orig = pending[sub_idx]
+                if orig not in mapping:
+                    mapping[orig] = pairs
+                    newly += 1
+            pending = [i for i in range(n) if i not in mapping]
+            llm_log_event(
+                "annotate_round_done", round=round_idx + 1,
+                newly=newly, remaining=len(pending),
+            )
+            if not pending:
+                break
+            # 重试轮零新增 → 再发也是徒劳（同样的行同样的模型），停止以免空烧 token。
+            # 首轮零新增仍要给一次重试（用户要求「被回退的再给 LLM 试一下」）。
+            if is_retry and newly == 0:
+                break
+
         llm_log_event(
-            "annotate_done",
-            total=len(lines),
-            annotated=len(mapping),
-            missing=sorted(set(range(len(lines))) - set(mapping.keys())),
+            "annotate_done", total=n, annotated=len(mapping), missing=pending,
         )
         return (mapping, None)
 
@@ -562,6 +631,9 @@ class LLMRubyClient:
                 )
                 last_err = LLMRubyError(f"网络请求失败：{e}")
                 if attempt < self._MAX_RETRIES:
+                    self._report(
+                        f"网络异常，重试中（{attempt + 2}/{self._MAX_RETRIES + 1}）…"
+                    )
                     time.sleep(0.8 * (attempt + 1))
                     continue
                 raise last_err from e
@@ -586,6 +658,10 @@ class LLMRubyClient:
             # 429 / 5xx 视为瞬时，退避重试
             if resp.status_code in self._TRANSIENT_STATUS and attempt < self._MAX_RETRIES:
                 last_err = LLMRubyError(f"HTTP {resp.status_code}：{text[:200]}")
+                self._report(
+                    f"服务端 {resp.status_code}，重试中"
+                    f"（{attempt + 2}/{self._MAX_RETRIES + 1}）…"
+                )
                 time.sleep(0.8 * (attempt + 1))
                 continue
 
@@ -736,6 +812,38 @@ def _annotated_to_pairs(text: str) -> Tuple[Pairs, str]:
     return pairs, "".join(raw_chars)
 
 
+def _is_kanji_char(ch: str) -> bool:
+    """是否为漢字（与 ruby_analyzer.RubyAnalyzer._is_kanji 同一码区，含々）。"""
+    code = ord(ch)
+    return (
+        0x4E00 <= code <= 0x9FFF
+        or 0x3400 <= code <= 0x4DBF
+        or 0xF900 <= code <= 0xFAFF
+        or code == 0x3005  # 々
+    )
+
+
+def _has_unread_kanji(pairs: Pairs) -> bool:
+    """是否存在「含漢字却没拿到真实读音」的 pair（漏包 / 空读音块 / 自注音）。
+
+    LLM 偶尔会漏把某个漢字包进 ``{...}``，或给空读音块 ``{漢字}``。这类字经
+    :func:`_annotated_to_pairs` 会落成 ``(漢字, 漢字)`` 或 ``(漢字, "")`` —— 剥标后
+    字符不增减，``raw_text == line`` 仍成立，于是旧逻辑静默接受、该字最终无注音。
+
+    本函数把「漢字 surface 的拼接读音等于 surface 本身或为空」判定为未注音，
+    供 :func:`_parse_payload` 在按行校验时连同字符完整性一起把关：未达标的行不
+    进 mapping，交由 :meth:`LLMRubyClient.annotate_lines` 的重试轮再给 LLM 一次，
+    多轮仍缺才回退本地引擎。
+    """
+    for surface, reading in pairs:
+        if not any(_is_kanji_char(c) for c in surface):
+            continue
+        joined = "".join(reading) if isinstance(reading, list) else reading
+        if not joined or joined == surface:
+            return True
+    return False
+
+
 def _legacy_tokens_to_pairs(tokens: list, line: str) -> Optional[Pairs]:
     """旧 ``tokens: [{s, r}]`` 格式 → Pairs。返回 None 表示 surface 拼接 ≠ 原行。"""
     pairs: Pairs = []
@@ -793,15 +901,16 @@ def _parse_payload(text: str, lines: List[str]) -> Dict[int, Pairs]:
         text_field = entry.get("text")
         if isinstance(text_field, str) and text_field:
             pairs, raw_text = _annotated_to_pairs(text_field)
-            if raw_text == line:
+            # 校验两件事：① 剥标后字符与原行一致；② 没有漏注音的漢字。
+            # 任一不满足 → 不进 mapping，该行成为重试轮的 pending 行。
+            if raw_text == line and not _has_unread_kanji(pairs):
                 mapping[idx] = pairs
-            # 不一致 → 丢弃该行，调用方按行回退
             continue
         # 回退旧 tokens 形式
         tokens = entry.get("tokens")
         if isinstance(tokens, list):
             pairs_opt = _legacy_tokens_to_pairs(tokens, line)
-            if pairs_opt is not None:
+            if pairs_opt is not None and not _has_unread_kanji(pairs_opt):
                 mapping[idx] = pairs_opt
     return mapping
 
@@ -848,6 +957,10 @@ class LLMRubyAnalyzer(KanaDistributingAnalyzer):
             self._pykakasi_conv = kks.getConverter()
         except Exception:
             pass
+
+    def set_progress_callback(self, cb: Optional[Callable[[str], None]]) -> None:
+        """注册进度回调，转发到 HTTP 客户端（请求/解析/重试/轮次等阶段文本）。"""
+        self._client.set_progress_callback(cb)
 
     def prewarm(self) -> None:
         """显式触发整首批量请求（供调用方在进度提示「等待 LLM」时主动调用）。"""

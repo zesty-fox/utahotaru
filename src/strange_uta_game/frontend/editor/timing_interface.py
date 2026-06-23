@@ -6523,8 +6523,12 @@ class EditorInterface(QWidget):
         def _on_llm_waiting() -> None:
             state_tooltip.setContent(self.tr("正在等待 LLM 返回…（整首歌词一次性发送，请稍候）"))
 
+        def _on_llm_progress(msg: str) -> None:
+            state_tooltip.setContent(msg)
+
         thread.started.connect(worker.run)
         worker.llm_waiting.connect(_on_llm_waiting)
+        worker.llm_progress.connect(_on_llm_progress)
         worker.progress.connect(_on_progress)
         worker.finished.connect(_on_finished)
         worker.error.connect(_on_error)
@@ -6774,8 +6778,13 @@ class EditorInterface(QWidget):
             if subset_tooltip is not None:
                 subset_tooltip.setContent(self.tr("正在等待 LLM 返回…（整首歌词一次性发送，请稍候）"))
 
+        def _on_llm_progress(msg: str) -> None:
+            if subset_tooltip is not None:
+                subset_tooltip.setContent(msg)
+
         thread.started.connect(worker.run)
         worker.llm_waiting.connect(_on_llm_waiting)
+        worker.llm_progress.connect(_on_llm_progress)
         worker.finished.connect(_on_finished)
         worker.error.connect(_on_error)
         worker.finished.connect(thread.quit)

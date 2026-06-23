@@ -155,6 +155,33 @@ def test_parse_payload_annotated_mismatch_dropped():
     assert _parse_payload(payload, ["今日は"]) == {}
 
 
+def test_parse_payload_unwrapped_kanji_dropped():
+    """漏包的漢字（块外裸 漢字 → 自注音）虽字符对齐，但应判未达标而丢弃。"""
+    # 「今日」正确注音，但「天気」漏包 → 块外裸字 → 天/気 自注音（无注音）
+    payload = '{"lines":[{"i":0,"text":"{今日||きょう,}は天気"}]}'
+    assert _parse_payload(payload, ["今日は天気"]) == {}
+
+
+def test_parse_payload_empty_reading_kanji_block_dropped():
+    """空读音块 `{漢字}` / `{漢字||}` 静默失音 → 应判未达标而丢弃。"""
+    assert _parse_payload('{"lines":[{"i":0,"text":"{空}"}]}', ["空"]) == {}
+    assert _parse_payload('{"lines":[{"i":0,"text":"{空||}"}]}', ["空"]) == {}
+
+
+def test_parse_payload_unread_kanji_in_tokens_dropped():
+    """tokens 路径同样把「漢字读音==自身」判为未达标。"""
+    payload = '{"lines":[{"i":0,"tokens":[{"s":"空","r":"空"}]}]}'
+    assert _parse_payload(payload, ["空"]) == {}
+
+
+def test_parse_payload_kana_self_reading_still_accepted():
+    """纯假名/记号读音==自身是正常的（は→は），不应被覆盖校验误伤。"""
+    payload = '{"lines":[{"i":0,"text":"{今日||きょう,}は！"}]}'
+    assert _parse_payload(payload, ["今日は！"]) == {
+        0: [("今日", "きょう"), ("は", "は"), ("！", "！")]
+    }
+
+
 def test_parse_payload_prefers_text_over_tokens():
     """同时给 text 和 tokens → 优先 text（推荐路径）。"""
     payload = (
@@ -427,6 +454,91 @@ def test_annotate_lines_responses_format_end_to_end(monkeypatch):
     assert mapping == {0: [("空", "そら")]}
     assert captured["url"] == "https://opencode.ai/zen/v1/responses"
     assert "input" in captured["body"] and "instructions" in captured["body"]
+
+
+def test_annotate_lines_retries_failed_lines(monkeypatch):
+    """首轮漏注音的行（漢字未注音）应在第二轮被单独重发并补齐。"""
+    from strange_uta_game.backend.infrastructure.parsers.llm_ruby import LLMRubyClient
+
+    cfg = LLMRubyConfig(base_url="http://x/v1", api_key="k", model="m")
+    client = LLMRubyClient(cfg)
+    rounds = {"n": 0}
+
+    def _fake_request(lines):
+        rounds["n"] += 1
+        if rounds["n"] == 1:
+            # 整首：行0 OK，行1「空」漏注音（块外裸字 → 自注音）
+            return (
+                '{"lines":['
+                '{"i":0,"text":"{今日||きょう,}"},'
+                '{"i":1,"text":"空"}]}'
+            )
+        # 第二轮只收到 pending=["空"]，这次正确注音
+        assert lines == ["空"]
+        return '{"lines":[{"i":0,"text":"{空||そら}"}]}'
+
+    monkeypatch.setattr(client, "_request", _fake_request)
+    mapping, err = client.annotate_lines(["今日", "空"])
+    assert err is None
+    assert rounds["n"] == 2  # 触发了第二轮重试
+    assert mapping[0] == [("今日", "きょう")]
+    assert mapping[1] == [("空", "そら")]
+
+
+def test_annotate_lines_stops_when_retry_no_progress(monkeypatch):
+    """重试轮零新增 → 停止重试，缺失行留给调用方回退（不死循环）。"""
+    from strange_uta_game.backend.infrastructure.parsers.llm_ruby import LLMRubyClient
+
+    cfg = LLMRubyConfig(base_url="http://x/v1", api_key="k", model="m")
+    client = LLMRubyClient(cfg)
+    rounds = {"n": 0}
+
+    def _fake_request(lines):
+        rounds["n"] += 1
+        # 每轮都把「空」漏注音 → 永远不达标
+        return '{"lines":[{"i":0,"text":"空"}]}'
+
+    monkeypatch.setattr(client, "_request", _fake_request)
+    mapping, err = client.annotate_lines(["空"])
+    assert err is None
+    assert mapping == {}  # 始终缺失 → 调用方回退
+    assert rounds["n"] == 2  # 首轮 + 1 次重试后因零新增停止（_MAX_ANNOTATE_ROUNDS=2）
+
+
+def test_annotate_lines_first_round_error_returns_error(monkeypatch):
+    """首轮整体失败（网络等）→ 直接返回 error，不进重试。"""
+    from strange_uta_game.backend.infrastructure.parsers.llm_ruby import (
+        LLMRubyClient,
+        LLMRubyError,
+    )
+
+    cfg = LLMRubyConfig(base_url="http://x/v1", api_key="k", model="m")
+    client = LLMRubyClient(cfg)
+
+    def _fake_request(lines):
+        raise LLMRubyError("网络请求失败：timeout")
+
+    monkeypatch.setattr(client, "_request", _fake_request)
+    mapping, err = client.annotate_lines(["空"])
+    assert mapping == {}
+    assert err == "网络请求失败：timeout"
+
+
+def test_annotate_lines_reports_progress(monkeypatch):
+    """进度回调应收到「请求 / 已返回，正在解析」等阶段文本。"""
+    from strange_uta_game.backend.infrastructure.parsers.llm_ruby import LLMRubyClient
+
+    cfg = LLMRubyConfig(base_url="http://x/v1", api_key="k", model="m")
+    client = LLMRubyClient(cfg)
+    msgs = []
+    client.set_progress_callback(msgs.append)
+    monkeypatch.setattr(
+        client, "_request",
+        lambda lines: '{"lines":[{"i":0,"text":"{空||そら}"}]}',
+    )
+    client.annotate_lines(["空"])
+    assert any("请求" in m for m in msgs)
+    assert any("解析" in m for m in msgs)
 
 
 def test_post_json_retries_transient_then_succeeds(monkeypatch):
