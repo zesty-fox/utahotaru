@@ -4361,22 +4361,71 @@ class EditorInterface(QWidget):
             self._show_runtime_error(str(e))
 
     def _clear_all_checkpoints(self):
-        """清除当前字符的全部节奏点：cc=0，is_sentence_end=False，清空时间戳。"""
+        """清除选中字符的全部节奏点：cc=0，is_sentence_end=False，清空时间戳。
+
+        支持拖选范围：多行选区 / 单行划选范围内的所有字符都会被清除，并拼成
+        一个 undo/redo；无选区时回退到当前单字符。仅产生一次结构变更（无逐字通知）。
+        """
         if not self._project:
             return
-        line_idx, char_idx = self._resolve_target_char()
-        if line_idx < 0 or line_idx >= len(self._project.sentences):
-            return
-        sentence = self._project.sentences[line_idx]
-        if char_idx < 0 or char_idx >= len(sentence.characters):
-            return
 
-        def _mutate():
-            char = sentence.characters[char_idx]
+        def _clear_one(line_idx: int, ch_idx: int) -> None:
+            sentence = self._project.sentences[line_idx]
+            if ch_idx < 0 or ch_idx >= len(sentence.characters):
+                return
+            char = sentence.characters[ch_idx]
             char.clear_timestamps()
             char.set_check_count(0, force=True)
             char.is_sentence_end = False
-            return line_idx, char_idx, 0, "checkpoints"
+
+        # 多行选区：清除选区内每一行的字符
+        if self.preview.is_multi_line_selection():
+            sel = self.preview.get_normalized_selection()
+            if sel is None:
+                return
+            start_line, start_char, end_line, end_char = sel
+
+            def _mutate_multi():
+                for line_idx in range(start_line, end_line + 1):
+                    if line_idx < 0 or line_idx >= len(self._project.sentences):
+                        continue
+                    sentence = self._project.sentences[line_idx]
+                    if not sentence.characters:
+                        continue
+                    s = start_char if line_idx == start_line else 0
+                    e = end_char if line_idx == end_line else len(sentence.characters) - 1
+                    for ch_idx in range(s, e + 1):
+                        _clear_one(line_idx, ch_idx)
+                fl = max(0, min(start_line, len(self._project.sentences) - 1))
+                chars = self._project.sentences[fl].characters
+                fc = min(start_char, len(chars) - 1) if chars else 0
+                return fl, fc, 0, "checkpoints"
+
+            self._execute_structural_edit("清除所有节奏点", _mutate_multi)
+            return
+
+        # 单行划选 / 单字符回退（与「连词」等窗口一致：focus 域优先）
+        sel_line = self.preview._focus_line_idx
+        sel_start = self.preview._focus_char_idx
+        sel_end = self.preview._focus_char_range_end
+        if sel_line >= 0 and sel_start >= 0:
+            use_line = sel_line
+            start_idx = min(sel_start, sel_end)
+            end_idx = max(sel_start, sel_end)
+        else:
+            use_line, char_idx = self._resolve_target_char()
+            start_idx = end_idx = char_idx
+
+        if use_line < 0 or use_line >= len(self._project.sentences):
+            return
+        sentence = self._project.sentences[use_line]
+        if start_idx < 0 or end_idx >= len(sentence.characters):
+            return
+
+        def _mutate():
+            for ch_idx in range(start_idx, end_idx + 1):
+                _clear_one(use_line, ch_idx)
+            return use_line, start_idx, 0, "checkpoints"
 
         self._execute_structural_edit("清除所有节奏点", _mutate)
 
