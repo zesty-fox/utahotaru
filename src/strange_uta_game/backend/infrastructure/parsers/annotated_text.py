@@ -537,7 +537,10 @@ def parse_timed_line(
 
         if c == "【":
             close = line_text.find("】", i)
-            if close != -1:
+            # inner 含另一个 '【' 时，当前 '【' 是多余的字面字符，真正的标签从
+            # 内层 '【' 开始。放行当前 '【' 为普通字符，循环在下一个 '【' 重试
+            # （如 "【【名】" → '【' + 【名】 标签）。
+            if close != -1 and "【" not in line_text[i + 1 : close]:
                 name = line_text[i + 1 : close]
                 if name == DEFAULT_SINGER_LABEL:
                     current = default_singer_id
@@ -563,7 +566,10 @@ def parse_timed_line(
 
         if c == "[":
             close = line_text.find("]", i)
-            if close != -1:
+            # inner 含另一个 '[' 时，当前 '[' 不是合法 token 起点（token 内部
+            # 绝不含 '['）——真正的 token 从内层 '[' 开始。此处放行当前 '[' 为
+            # 普通字符，由循环在下一个 '[' 重新尝试解析（如 "[[T]" → '[' + [T]）。
+            if close != -1 and "[" not in line_text[i + 1 : close]:
                 inner = line_text[i + 1 : close]
                 is_end_tok = inner.startswith(">")
                 val_str = inner[1:] if is_end_tok else inner
@@ -599,7 +605,10 @@ def parse_timed_line(
             close = line_text.find("}", i)
             if close != -1:
                 content = line_text[i + 1 : close]
-                if is_valid_block_content(content):
+                # content 含另一个 '{' 时，当前 '{' 是多余的字面字符，真正的块从
+                # 内层 '{' 开始。放行当前 '{' 为普通字符，循环在下一个 '{' 重试
+                # （如 "{{原文||…}" → '{' + {原文||…} 块）。
+                if "{" not in content and is_valid_block_content(content):
                     chars.extend(_parse_block(content, current, offset_ms))
                     pending_starts = []
                     i = close + 1

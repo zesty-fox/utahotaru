@@ -216,6 +216,27 @@ def test_decode_malformed_bracket_becomes_literal():
     assert chars5[0].check_count == 1 and chars5[0].timestamps == []
     assert chars5[0].is_sentence_end and chars5[0].sentence_end_ts is None
 
+    # 普通字符 '[' 紧跟合法 token：'[' 是字面字符，'[T]' 仍是有效占位 token，
+    # 不应把整个 "[[T]" 误判为非法标识符当普通字符（与高亮器 regex 行为一致）。
+    chars6, _ = parse_timed_line("[[T]あ")
+    assert [c.char for c in chars6] == ["[", "あ"]
+    assert chars6[0].char == "[" and chars6[0].check_count == 0
+    assert chars6[1].char == "あ"
+    assert chars6[1].check_count == 1 and chars6[1].timestamps == []
+
+    # '[' 紧跟合法时间戳 token 同理：'[' 字面 + [00:01.00] 绑定到 'か'
+    chars7, _ = parse_timed_line("[[00:01.00]か")
+    assert [c.char for c in chars7] == ["[", "か"]
+    assert chars7[0].check_count == 0
+    assert chars7[1].timestamps == [1000]
+
+    # 普通字符 '{' 紧跟合法注音块：'{' 字面 + {漢||…} 仍按结构化块解析。
+    chars8, _ = parse_timed_line("{{漢||[00:02.00]か}")
+    assert chars8[0].char == "{" and chars8[0].check_count == 0
+    assert chars8[1].char == "漢"
+    assert chars8[1].timestamps == [2000]
+    assert [p.text for p in chars8[1].ruby.parts] == ["か"]
+
 
 def test_centisecond_rounding():
     """毫秒非 10 整除时编码到厘秒会截断（厘秒级精度）。"""
@@ -269,6 +290,15 @@ def test_decode_unknown_singer_tag_becomes_literal():
     )
     assert [c.char for c in chars3] == ["さ"]
     assert chars3[0].singer_id == "id-a"
+
+    # 普通字符 '【' 紧跟合法标签：'【' 字面 + 【太郎】 仍切换演唱者，
+    # 不应把整个 "【【太郎】" 误判为非法标签当普通字符。
+    chars4, _ = parse_timed_line(
+        "【【太郎】さ", name_to_singer_id=name_map, default_singer_id="id-x"
+    )
+    assert [c.char for c in chars4] == ["【", "さ"]
+    assert chars4[0].char == "【" and chars4[0].singer_id == "id-x"
+    assert chars4[1].char == "さ" and chars4[1].singer_id == "id-a"
 
 
 def test_timed_line_columns_point_to_glyphs():
