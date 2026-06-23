@@ -21,14 +21,6 @@ from strange_uta_game.frontend.perf_log import log_elapsed, log_perf_event, perf
 from strange_uta_game.frontend.workers import ProjectSaveWorker
 
 
-def _get_config_dir() -> Path:
-    """获取配置文件目录（与 AppSettings.get_config_dir 同源）。
-
-    解析逻辑见 :mod:`strange_uta_game.app_dirs`。
-    """
-    return app_dirs.config_dir()
-
-
 def _get_cache_dir() -> Path:
     """获取缓存目录（与 video_converter / tsm_cache 同源）。
 
@@ -36,10 +28,6 @@ def _get_cache_dir() -> Path:
     macOS 用 ``~/Library/Caches``，其余平台用程序目录下的 ``.cache``。
     """
     return app_dirs.cache_dir()
-
-
-# 配置目录（与 AppSettings 一致）
-_CONFIG_DIR = _get_config_dir()
 
 
 def _cache_dir() -> Path:
