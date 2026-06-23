@@ -31,6 +31,17 @@ class TestGetCharType:
     def test_long_vowel(self):
         assert get_char_type("ー") == CharType.LONG_VOWEL
 
+    def test_katakana_block_separators_are_symbols(self):
+        # 「・」U+30FB、「゠」U+30A0 落在片假名 Unicode 块内但不表音，
+        # 必须归为符号，否则补全时间戳会把 "シンフォニック・ラブ" 的中点也补轴。
+        assert get_char_type("・") == CharType.SYMBOL
+        assert get_char_type("゠") == CharType.SYMBOL
+
+    def test_katakana_iteration_marks_stay_katakana(self):
+        # 片假名迭字「ヽヾ」表音，仍按片假名处理（不被上面的符号特判误吞）。
+        assert get_char_type("ヽ") == CharType.KATAKANA
+        assert get_char_type("ヾ") == CharType.KATAKANA
+
     def test_sokuon(self):
         assert get_char_type("っ") == CharType.SOKUON
         assert get_char_type("ッ") == CharType.SOKUON
