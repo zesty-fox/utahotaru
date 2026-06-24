@@ -535,6 +535,24 @@ def _pack_dmg(version: str, vcfg: VariantConfig) -> Optional[Path]:
         staging_app = staging / f"{display_name}.app"
         shutil.copytree(app_bundle, staging_app, symlinks=True)
         _customize_app_bundle(staging_app, display_name, version)
+
+        # ── ad-hoc 重签 ──────────────────────────────────────────────────
+        # 改写 Info.plist 会使 PyInstaller build 时打的 ad-hoc 签名失效（签名
+        # 覆盖 plist 哈希）。在 arm64 macOS 上，签名无效的 .app 会被内核直接判为
+        # “已损坏，无法打开”，连“右键打开 / 去 quarantine”都救不回来。这里对
+        # staging 副本（原 dist 不动）重新 ad-hoc 签名修复结构，让 DMG 内的 app
+        # 至少能通过 README 给的绕过方式正常启动。
+        # 必须在改 plist 之后、打 DMG 之前；正规 Developer ID 签名 + 公证另行处理。
+        sign = subprocess.run(
+            ["codesign", "--force", "--deep", "--sign", "-", str(staging_app)],
+            capture_output=True, text=True,
+        )
+        if sign.returncode != 0:
+            # 宁可不产 DMG，也不分发坏签名的 app（否则用户必现“已损坏”）。
+            print(f"  ✗ ad-hoc 重签失败，跳过 DMG:\n{(sign.stderr or sign.stdout)[-800:]}")
+            return None
+        print("  ✓ 已对 .app 做 ad-hoc 重签（修复改 Info.plist 导致的签名失效）")
+
         # /Applications 软链（hdiutil 以 staging 为 DMG 根）
         apps_link = staging / "Applications"
         if apps_link.is_symlink() or apps_link.exists():
