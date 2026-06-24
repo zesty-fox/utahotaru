@@ -1192,44 +1192,86 @@
 <context>
     <name>DictCandidateDialog</name>
     <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="143" />
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="260" />
+        <source>从本地词典及所有网络源缓存中删除条目「{word}」→「{reading}」？
+（网络源条目下次更新时会被重新拉回。）</source>
+        <translation>从本地词典及所有网络源缓存中删除条目「{word}」→「{reading}」？
+（网络源条目下次更新时会被重新拉回。）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="164" />
         <source>候补字典 — 「{word}」</source>
         <translation>候补字典 — 「{word}」</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="147" />
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="168" />
         <source>列出词典中与所选原文**完全匹配**的条目（本地 + 启用网络源，按优先级）。
 双击条目或选中后点「应用」，将按该条目的格式（RubyPart / 节奏点 / 连词）填充并执行。</source>
         <translation>列出词典中与所选原文**完全匹配**的条目（本地 + 启用网络源，按优先级）。
 双击条目或选中后点「应用」，将按该条目的格式（RubyPart / 节奏点 / 连词）填充并执行。</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="186" />
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="195" />
+        <source>删除条目</source>
+        <translation>删除条目</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="203" />
         <source>取消</source>
         <translation>取消</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="181" />
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="275" />
+        <source>已删除</source>
+        <translation>已删除</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="276" />
+        <source>已删除 {n} 条匹配条目</source>
+        <translation>已删除 {n} 条匹配条目</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="199" />
         <source>应用</source>
         <translation>应用</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="133" />
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="281" />
+        <source>未删除</source>
+        <translation>未删除</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="154" />
         <source>查询候补字典</source>
         <translation>查询候补字典</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="156" />
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="282" />
+        <source>没有可删除的本地 / 网络缓存条目</source>
+        <translation>没有可删除的本地 / 网络缓存条目</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="177" />
         <source>注音(annotated)</source>
         <translation>注音(annotated)</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="156" />
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="259" />
+        <source>确认删除</source>
+        <translation>确认删除</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="177" />
         <source>词</source>
         <translation>词</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="175" />
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="263" />
+        <source>（空）</source>
+        <translation>（空）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="189" />
         <source>（词典中没有完全匹配的条目）</source>
         <translation>（词典中没有完全匹配的条目）</translation>
     </message>

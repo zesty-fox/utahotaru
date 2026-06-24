@@ -1192,44 +1192,86 @@
 <context>
     <name>DictCandidateDialog</name>
     <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="143" />
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="260" />
+        <source>从本地词典及所有网络源缓存中删除条目「{word}」→「{reading}」？
+（网络源条目下次更新时会被重新拉回。）</source>
+        <translation>ローカル辞書とすべてのネット辞書ソースのキャッシュから項目「{word}」→「{reading}」を削除しますか？
+（ネット辞書ソースの項目は次回の更新時に再取得されます。）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="164" />
         <source>候补字典 — 「{word}」</source>
         <translation>候補辞書 — 「{word}」</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="147" />
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="168" />
         <source>列出词典中与所选原文**完全匹配**的条目（本地 + 启用网络源，按优先级）。
 双击条目或选中后点「应用」，将按该条目的格式（RubyPart / 节奏点 / 连词）填充并执行。</source>
         <translation>辞書内で選択原文と**完全一致**する項目を一覧表示（ローカル + 有効ネットワークソース、優先順）。
 項目をダブルクリックまたは選択後「適用」で、当該項目の形式（RubyPart / リズム点 / 連結）で実行します。</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="186" />
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="195" />
+        <source>删除条目</source>
+        <translation>項目を削除</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="203" />
         <source>取消</source>
         <translation>キャンセル</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="181" />
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="275" />
+        <source>已删除</source>
+        <translation>削除しました</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="276" />
+        <source>已删除 {n} 条匹配条目</source>
+        <translation>一致する項目を {n} 件削除しました</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="199" />
         <source>应用</source>
         <translation>適用</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="133" />
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="281" />
+        <source>未删除</source>
+        <translation>削除なし</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="154" />
         <source>查询候补字典</source>
         <translation>候補辞書を検索</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="156" />
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="282" />
+        <source>没有可删除的本地 / 网络缓存条目</source>
+        <translation>削除できるローカル / ネットキャッシュ項目はありません</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="177" />
         <source>注音(annotated)</source>
         <translation>ルビ(annotated)</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="156" />
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="259" />
+        <source>确认删除</source>
+        <translation>削除確認</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="177" />
         <source>词</source>
         <translation>語</translation>
     </message>
     <message>
-        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="175" />
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="263" />
+        <source>（空）</source>
+        <translation>（空）</translation>
+    </message>
+    <message>
+        <location filename="src/strange_uta_game/frontend/editor/timing/dict_candidate_dialog.py" line="189" />
         <source>（词典中没有完全匹配的条目）</source>
         <translation>（辞書に完全一致する項目はありません）</translation>
     </message>

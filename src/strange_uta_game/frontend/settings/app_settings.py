@@ -755,6 +755,55 @@ class AppSettings:
         entries.insert(0, new_entry)
         self.save_dictionary(entries)
 
+    def delete_dictionary_entry(self, word: str, reading: str) -> int:
+        """从本地词典 + 所有网络源缓存中删除完全匹配 ``(word, reading)`` 的条目。
+
+        用于「查询候补字典」窗口的删除功能：让某条读音从所有词典源彻底消失，
+        不再被注音 lookup 命中。本地删除持久；网络源条目下次拉取（自动 / 手动
+        更新）会被重新写回——删除不持久，这是网络源的固有语义。
+
+        Args:
+            word: 原文词（完全相等匹配）。
+            reading: annotated 注音（完全相等匹配，去首尾空白后比较）。
+
+        Returns:
+            删除的条目总数（本地 + 各网络源累计）。未匹配 / word 为空 → 0。
+        """
+        word = (word or "").strip()
+        reading = (reading or "").strip()
+        if not word:
+            return 0
+
+        def _match(e: dict) -> bool:
+            return (
+                (e.get("word") or "").strip() == word
+                and (e.get("reading") or "").strip() == reading
+            )
+
+        removed = 0
+
+        # 本地词典
+        local = self.load_dictionary()
+        kept = [e for e in local if not _match(e)]
+        if len(kept) != len(local):
+            removed += len(local) - len(kept)
+            self.save_dictionary(kept)
+
+        # 网络源缓存（遍历每个源的 entries；仅在确有删除时回写，避免无谓落盘）
+        doc = self.load_network_dictionary()
+        changed = False
+        for src in doc.get("sources") or []:
+            entries = src.get("entries") or []
+            new_entries = [e for e in entries if not _match(e)]
+            if len(new_entries) != len(entries):
+                removed += len(entries) - len(new_entries)
+                src["entries"] = new_entries
+                changed = True
+        if changed:
+            self.save_network_dictionary(doc)
+
+        return removed
+
     def import_rl_dictionary(self, text: str) -> tuple:
         """导入 RL 字典文本：新条目整体插入到顶部，保持原文件顺序。
 

@@ -9,9 +9,10 @@
 公共 API
 --------
 * :func:`query_dict_candidates` — word → 完全匹配的条目列表（保序、去重 reading）。
+* :func:`delete_dict_candidate` — 从本地词典 + 所有网络源缓存删除某 ``(word, reading)``。
 * :func:`apply_entry_to_dialog_rows` — 把 ``(word, reading)`` 解析并填充到一个具备
   ``edit_new_chars`` + ``_char_rows`` 结构的对话框；返回是否成功。
-* :class:`DictCandidateDialog` — 候补列表对话框。
+* :class:`DictCandidateDialog` — 候补列表对话框（支持选中应用 / 删除条目）。
 """
 
 from __future__ import annotations
@@ -30,8 +31,9 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
+from strange_uta_game.frontend.fluent_widgets import message_question
 from strange_uta_game.frontend.window_sizing import fit_min_size
-from qfluentwidgets import PrimaryPushButton, PushButton
+from qfluentwidgets import InfoBar, InfoBarPosition, PrimaryPushButton, PushButton
 
 
 def query_dict_candidates(word: str) -> List[Dict[str, Any]]:
@@ -64,6 +66,25 @@ def query_dict_candidates(word: str) -> List[Dict[str, Any]]:
         seen_readings.add(reading)
         out.append({"word": word, "reading": reading})
     return out
+
+
+def delete_dict_candidate(word: str, reading: str) -> int:
+    """从本地词典 + 所有网络源缓存删除完全匹配 ``(word, reading)`` 的条目。
+
+    Args:
+        word: 待删除原文（完全相等匹配）。
+        reading: 待删除注音（完全相等匹配）。
+
+    Returns:
+        删除的条目总数（本地 + 各网络源累计）。失败 / 无匹配 → 0。
+        网络源条目下次拉取会被重新写回（删除不持久），由网络源语义决定。
+    """
+    try:
+        from strange_uta_game.frontend.settings.app_settings import AppSettings
+
+        return AppSettings().delete_dictionary_entry(word, reading)
+    except Exception:
+        return 0
 
 
 def apply_entry_to_dialog_rows(dialog: Any, word: str, reading: str) -> bool:
@@ -164,29 +185,42 @@ class DictCandidateDialog(QDialog):
         self._table.cellDoubleClicked.connect(self._on_double_clicked)
         layout.addWidget(self._table, 1)
 
-        for entry in self._candidates:
-            row = self._table.rowCount()
-            self._table.insertRow(row)
-            self._table.setItem(row, 0, QTableWidgetItem(entry["word"]))
-            self._table.setItem(row, 1, QTableWidgetItem(entry["reading"]))
-        if self._candidates:
-            self._table.selectRow(0)
-        else:
-            empty = QLabel(self.tr("（词典中没有完全匹配的条目）"))
-            empty.setFont(ui_font(10))
-            layout.addWidget(empty)
+        # 空态提示（无匹配时显示）；常驻控件，由 _reload_candidates 切换可见性
+        self._empty_label = QLabel(self.tr("（词典中没有完全匹配的条目）"), self)
+        self._empty_label.setFont(ui_font(10))
+        layout.addWidget(self._empty_label)
 
         btn_row = QHBoxLayout()
+        # 删除按钮靠左：从本地词典 + 所有网络源缓存移除所选条目
+        self.btn_delete = PushButton(self.tr("删除条目"), self)
+        self.btn_delete.clicked.connect(self._on_delete)
+        btn_row.addWidget(self.btn_delete)
         btn_row.addStretch()
         self.btn_apply = PrimaryPushButton(self.tr("应用"), self)
         self.btn_apply.setDefault(True)
         self.btn_apply.clicked.connect(self._on_apply)
-        self.btn_apply.setEnabled(bool(self._candidates))
         btn_row.addWidget(self.btn_apply)
         btn_cancel = PushButton(self.tr("取消"), self)
         btn_cancel.clicked.connect(self.reject)
         btn_row.addWidget(btn_cancel)
         layout.addLayout(btn_row)
+
+        self._reload_candidates()
+
+    def _reload_candidates(self) -> None:
+        """用最新查询结果重建表格，并同步按钮 / 空态可见性。"""
+        self._table.setRowCount(0)
+        for entry in self._candidates:
+            row = self._table.rowCount()
+            self._table.insertRow(row)
+            self._table.setItem(row, 0, QTableWidgetItem(entry["word"]))
+            self._table.setItem(row, 1, QTableWidgetItem(entry["reading"]))
+        has = bool(self._candidates)
+        if has:
+            self._table.selectRow(0)
+        self._empty_label.setVisible(not has)
+        self.btn_apply.setEnabled(has)
+        self.btn_delete.setEnabled(has)
 
     def _row_to_entry(self, row: int) -> Optional[Dict[str, Any]]:
         if 0 <= row < len(self._candidates):
@@ -207,6 +241,47 @@ class DictCandidateDialog(QDialog):
         if entry is not None:
             self._selected_entry = entry
             self.accept()
+
+    def _on_delete(self) -> None:
+        """删除所选候补：从本地词典 + 所有网络源缓存移除该 ``(word, reading)``。
+
+        删除后原位刷新列表（本对话框不关闭，便于继续删除 / 应用其他条目）。
+        """
+        rows = sorted(set(idx.row() for idx in self._table.selectedIndexes()))
+        if not rows:
+            return
+        entry = self._row_to_entry(rows[0])
+        if entry is None:
+            return
+        reading = entry["reading"]
+        if not message_question(
+            self,
+            self.tr("确认删除"),
+            self.tr(
+                "从本地词典及所有网络源缓存中删除条目「{word}」→「{reading}」？\n"
+                "（网络源条目下次更新时会被重新拉回。）"
+            ).format(word=entry["word"], reading=reading or self.tr("（空）")),
+            default_cancel=True,
+        ):
+            return
+
+        removed = delete_dict_candidate(entry["word"], reading)
+        # 重新查询并刷新（已删除的 reading 不会再出现）
+        self._candidates = query_dict_candidates(self._word)
+        self._reload_candidates()
+
+        if removed > 0:
+            InfoBar.success(
+                title=self.tr("已删除"),
+                content=self.tr("已删除 {n} 条匹配条目").format(n=removed),
+                orient=Qt.Orientation.Horizontal, isClosable=True,
+                position=InfoBarPosition.TOP, duration=3000, parent=self)
+        else:
+            InfoBar.warning(
+                title=self.tr("未删除"),
+                content=self.tr("没有可删除的本地 / 网络缓存条目"),
+                orient=Qt.Orientation.Horizontal, isClosable=True,
+                position=InfoBarPosition.TOP, duration=3000, parent=self)
 
     def get_selected_entry(self) -> Optional[Dict[str, Any]]:
         return self._selected_entry
